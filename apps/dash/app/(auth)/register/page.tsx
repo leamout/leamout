@@ -1,3 +1,5 @@
-export default function page() {
-  return <div>page</div>;
+import { RegisterForm } from "@/components/auth/RegisterForm";
+
+export default function Page() {
+  return <RegisterForm />;
 }

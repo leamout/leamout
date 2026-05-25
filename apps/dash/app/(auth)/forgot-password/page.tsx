@@ -1,3 +1,5 @@
-export default function page() {
-  return <div>page</div>;
+import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm";
+
+export default function Page() {
+  return <ForgotPasswordForm />;
 }

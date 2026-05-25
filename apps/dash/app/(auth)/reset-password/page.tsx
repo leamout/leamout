@@ -1,3 +1,5 @@
-export default function page() {
-  return <div>page</div>;
+import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
+
+export default function Page() {
+  return <ResetPasswordForm />;
 }
