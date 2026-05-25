@@ -1,12 +1,11 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
 import {
   Field,
@@ -16,44 +15,35 @@ import {
 } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
 
-export const formSchema = z.object({
+const formSchema = z.object({
   email: z.email("Please enter a valid email address."),
-  password: z.string().min(1, "Password is required."),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function LoginForm() {
+export function ForgotPasswordForm() {
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
-
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "" },
   });
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
-
     try {
-      const response = await fetch("/api/v1/auth/login", {
+      const response = await fetch("/api/v1/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
-        credentials: "include",
       });
 
       if (response.ok) {
-        toast.success("Successfully logged in!");
-        router.push("/dashboard");
+        toast.success("If that email exists, a reset link has been sent.");
         return;
       }
 
       const errorData = await response.json();
-      toast.error(errorData.message || "Failed to login. Please try again.");
+      toast.error(errorData.message || "Failed to submit request.");
     } catch {
       toast.error("An unexpected error occurred.");
     } finally {
@@ -63,18 +53,17 @@ export function LoginForm() {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-      <FieldGroup className="space-y-2">
+      <FieldGroup>
         <Controller
           name="email"
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="email">Work Email</FieldLabel>
+              <FieldLabel htmlFor="email">Email</FieldLabel>
               <Input
                 {...field}
                 id="email"
                 type="email"
-                placeholder="you@company.com"
                 autoComplete="email"
                 disabled={loading}
               />
@@ -82,47 +71,17 @@ export function LoginForm() {
             </Field>
           )}
         />
-
-        <Controller
-          name="password"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="password">Password</FieldLabel>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <Input
-                {...field}
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                disabled={loading}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
       </FieldGroup>
-
       <div className="space-y-4">
         <Button type="submit" disabled={loading} className="w-full">
-          {loading ? "Logging in..." : "Login"}
+          {loading ? "Sending..." : "Send reset link"}
         </Button>
-
         <p className="text-center text-sm text-muted-foreground">
-          New to Leamout?{" "}
           <Link
-            href="/register"
+            href="/login"
             className="text-foreground font-medium underline underline-offset-4"
           >
-            Create an account
+            Back to login
           </Link>
         </p>
       </div>

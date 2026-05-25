@@ -1,3 +1,10 @@
-export default function page() {
-  return <div>page</div>;
+import { Suspense } from "react";
+import { ResetPasswordForm } from "@/components/auth/ResetPasswordForm";
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordForm />
+    </Suspense>
+  );
 }
