@@ -1,0 +1,47 @@
+name: Docker
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - ".github/workflows/docker.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "deploy/**"
+      - ".github/workflows/docker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  freeswitch:
+    name: Build FreeSWITCH
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build FreeSWITCH image
+        run: |
+          docker build \
+            --file deploy/freeswitch/Dockerfile \
+            --tag leamout/freeswitch:test \
+            deploy/freeswitch
+
+  rtpengine:
+    name: Build RTPengine
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build RTPengine image
+        run: |
+          docker build \
+            --file deploy/rtpengine/Dockerfile \
+            --tag leamout/rtpengine:test \
+            deploy/rtpengine
