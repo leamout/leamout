@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 
-# FreeSWITCH's official CI image is used only for its maintained build
-# toolchain. Its inherited SignalWire APT repository is intentionally removed:
-# it requires SignalWire credentials and is not appropriate for this build.
+# FreeSWITCH's maintained CI foundation supplies the build toolchain. We do
+# not consume its authenticated SignalWire package repository; all native
+# FreeSWITCH dependencies are built by the pinned source tree below.
 FROM signalwire/freeswitch-public-ci-base:bookworm-amd64 AS build
 
 ARG FREESWITCH_REF=3f13ad1b1d323e435757fc43a2bb829d4ea5b9a8
@@ -11,14 +11,16 @@ ARG DEP_BUILD_NUMBER=42
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
-# The CI foundation may contain an authenticated SignalWire repository. The
-# dependency builder must operate against public Debian plus its own source-
-# built dependency repository instead.
-RUN find /etc/apt/sources.list.d -maxdepth 1 -type f \
-      \( -iname '*freeswitch*.list' -o -iname '*signalwire*.list' \) \
-      -delete \
-    && sed -i '/freeswitch\.signalwire\.com/d;/packages\.signalwire\.com/d' \
-      /etc/apt/sources.list 2>/dev/null || true
+# The CI foundation can contain SignalWire APT sources using either .list or
+# deb822 .sources files. Remove every source file that references SignalWire's
+# authenticated repositories. Do not rely on a filename convention.
+RUN while IFS= read -r -d '' file; do \
+      if grep -Eq '(^|[[:space:]]|=)(https?://)?(packages|freeswitch)\.signalwire\.com/' "$file"; then \
+        echo "Removing authenticated SignalWire APT source: $file"; \
+        rm -f "$file"; \
+      fi; \
+    done < <(find /etc/apt -type f -print0) \
+    && rm -f /etc/apt/auth.conf /etc/apt/auth.conf.d/* 2>/dev/null || true
 
 WORKDIR /usr/src
 
@@ -30,11 +32,11 @@ RUN git clone --depth 1 https://github.com/signalwire/freeswitch.git freeswitch 
 
 WORKDIR /usr/src/freeswitch
 
-# Build the native dependency set from source using FreeSWITCH's maintained
-# dependency definitions. This produces a local Debian repository containing
-# Sofia-SIP, SpanDSP, libks, signalwire-c, and the other required libraries.
-# --setup is intentionally omitted: it is the part of the upstream helper that
-# configures external package infrastructure we do not need in this image.
+# Use FreeSWITCH's maintained dependency definitions. The builder clones and
+# builds Sofia-SIP, SpanDSP, libks, signalwire-c, and the other native
+# dependencies into /var/local/deb. --setup is intentionally omitted because
+# this image already has its build toolchain and must not install SignalWire's
+# authenticated package infrastructure.
 RUN ./scripts/packaging/build/dependencies/build-dependencies.sh \
       --build-number "${DEP_BUILD_NUMBER}" \
       --all \
@@ -42,8 +44,8 @@ RUN ./scripts/packaging/build/dependencies/build-dependencies.sh \
       --clone \
       --git-https
 
-# Install the dependency packages produced by the official builder. The local
-# repository is used for native FreeSWITCH build dependencies.
+# The dependency builder creates a local file:// repository in /var/local/deb.
+# Install the generated packages and their dependencies.
 RUN apt-get update \
     && find /var/local/deb -maxdepth 1 -type f -name '*.deb' -print0 \
       | xargs -0 -r apt-get install -y --no-install-recommends \
