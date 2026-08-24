@@ -2,11 +2,13 @@
 
 ARG FREESWITCH_REF=a88d069d6ffb74df797bcaf001f7e63181c07a09
 ARG SOFIA_SIP_REF=v1.13.18
+ARG SPANDSP_REF=v3.0.0
 
 FROM debian:bookworm-slim AS build
 
 ARG FREESWITCH_REF
 ARG SOFIA_SIP_REF
+ARG SPANDSP_REF
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
@@ -23,15 +25,19 @@ RUN apt-get update \
       git \
       libcurl4-openssl-dev \
       libedit-dev \
+      libjpeg62-turbo-dev \
       libpcre3-dev \
       libpq-dev \
       libspeexdsp-dev \
       libsqlite3-dev \
       libssl-dev \
+      libtiff-dev \
       libtool \
       libtool-bin \
       libopus-dev \
       libsndfile1-dev \
+      libxml2-dev \
+      libxslt1-dev \
       pkg-config \
       wget \
     && rm -rf /var/lib/apt/lists/*
@@ -50,6 +56,22 @@ RUN git clone --depth 1 \
       --disable-static \
       --without-doxygen \
       --disable-stun \
+    && make -j"$(nproc)" \
+    && make install \
+    && ldconfig
+
+# FreeSWITCH 1.10.x requires the SpanDSP 3.0 API. Build the verified
+# v3.0.0 release locally so pkg-config exposes spandsp >= 3.0.
+RUN git clone --depth 1 \
+      --branch "${SPANDSP_REF}" \
+      https://github.com/freeswitch/spandsp.git \
+      spandsp \
+    && cd spandsp \
+    && ./bootstrap.sh \
+    && ./configure \
+      --prefix=/usr/local \
+      --disable-static \
+      --disable-doc \
     && make -j"$(nproc)" \
     && make install \
     && ldconfig
@@ -81,18 +103,23 @@ RUN apt-get update \
       ca-certificates \
       libcurl4 \
       libedit2 \
+      libjpeg62-turbo \
       libpcre3 \
       libpq5 \
       libspeexdsp1 \
       libsqlite3-0 \
       libssl3 \
+      libtiff6 \
       libopus0 \
       libsndfile1 \
+      libxml2 \
+      libxslt1.1 \
       tini \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /usr/local/freeswitch /usr/local/freeswitch
 COPY --from=build /usr/local/lib/libsofia* /usr/local/lib/
+COPY --from=build /usr/local/lib/libspandsp* /usr/local/lib/
 
 RUN ldconfig
 
