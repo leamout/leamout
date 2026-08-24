@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1
 
 ARG FREESWITCH_REF=a88d069d6ffb74df797bcaf001f7e63181c07a09
-ARG FREESWITCH_BUILDER_IMAGE=signalwire/freeswitch-public-ci-base:bookworm-amd64@sha256:d39910334bba8e0e5c0a2a1e3f4e4e6c5e0d8f6f1f5d3c7c1c8a0f2b9a6e1f3d
-ARG FREESWITCH_RUNTIME_IMAGE=signalwire/freeswitch-public-base:bookworm@sha256:790ee70a1ae2f7b9f2a5d9d7f1b8e0f1a2c4d6e8f0b2c4d6e8f0a2b4c6d8e0f2
+ARG FREESWITCH_BUILDER_IMAGE=signalwire/freeswitch-public-ci-base:bookworm-amd64
+ARG FREESWITCH_RUNTIME_IMAGE=signalwire/freeswitch-public-base:bookworm
 
 FROM ${FREESWITCH_BUILDER_IMAGE} AS build
 
