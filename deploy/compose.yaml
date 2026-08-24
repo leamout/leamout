@@ -1,0 +1,119 @@
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leamout
+      POSTGRES_USER: leamout
+      POSTGRES_PASSWORD: leamout
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leamout -d leamout"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - leamout-core
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - leamout-core
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    volumes:
+      - ./nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - leamout-core
+
+  opensips:
+    image: opensips/opensips:3.4
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5060:5060/udp"
+      - "127.0.0.1:5060:5060/tcp"
+    volumes:
+      - ./opensips/opensips.cfg:/etc/opensips/opensips.cfg:ro
+      - ./opensips/tls.cfg:/etc/opensips/tls.cfg:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rtpengine:
+        condition: service_started
+      freeswitch:
+        condition: service_started
+    networks:
+      - leamout-core
+
+  coturn:
+    image: coturn/coturn:4.17.0-r0
+    restart: unless-stopped
+    command:
+      - --config
+      - /etc/coturn/turnserver.conf
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    networks:
+      - leamout-core
+
+  freeswitch:
+    image: leamout/freeswitch:1.0.0
+    build:
+      context: ./freeswitch
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD}
+    volumes:
+      - freeswitch_recordings:/var/lib/freeswitch/recordings
+    ports:
+      - "5080:5080/udp"
+      - "5080:5080/tcp"
+      - "8021:8021/tcp"
+      - "10101-10200:10101-10200/udp"
+    networks:
+      - leamout-core
+
+  rtpengine:
+    image: leamout/rtpengine:dev
+    build:
+      context: ./rtpengine
+      dockerfile: Dockerfile
+      args:
+        RTPENGINE_REF: mr26.2.0.0
+    restart: unless-stopped
+    networks:
+      - leamout-core
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  freeswitch_recordings:
+networks:
+  leamout-core:
+    name: leamout-core

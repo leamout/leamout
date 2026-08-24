@@ -1,0 +1,58 @@
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Go build artifacts
+/bin/
+/dist/
+/build/
+*.o
+*.a
+*.so
+*.exe
+*.dll
+*.dylib
+*.test
+
+# Go profiling / coverage
+/coverage/
+*.out
+*.prof
+
+# Go workspace backups
+go.work
+go.work.sum
+go.mod.bak
+go.sum.bak
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Temporary files
+/tmp/
+/tmp-*/
+*.tmp
+*.temp
+*.cache
+*.log
+
+# IDEs / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3

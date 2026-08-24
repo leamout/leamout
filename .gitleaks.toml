@@ -1,0 +1,14 @@
+title = "Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for known non-secret files and test fixtures"
+
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)examples/''',
+  '''(^|/)testdata/''',
+  '''(^|/)fixtures/''',
+]
