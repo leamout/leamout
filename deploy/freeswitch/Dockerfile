@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 ARG FREESWITCH_REF=a88d069d6ffb74df797bcaf001f7e63181c07a09
-ARG SOFIA_SIP_REF=ad36ac8
+ARG SOFIA_SIP_REF=v1.13.18
 ARG FREESWITCH_BUILDER_IMAGE=signalwire/freeswitch-public-ci-base:bookworm-amd64
 ARG FREESWITCH_RUNTIME_IMAGE=signalwire/freeswitch-public-base:bookworm
 
@@ -16,15 +16,20 @@ ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgco
 
 WORKDIR /usr/src
 
-# FreeSWITCH 1.10.12 requires Sofia-SIP >= 1.13.17. Build the pinned
-# 1.13.18 release locally so the image does not depend on an external
-# FreeSWITCH binary package repository.
-RUN git clone --depth 1 https://github.com/freeswitch/sofia-sip.git sofia-sip \
+# FreeSWITCH 1.10.12 requires Sofia-SIP >= 1.13.17. Pin the verified
+# v1.13.18 release tag and build it locally.
+RUN git clone --depth 1 \
+      --branch "${SOFIA_SIP_REF}" \
+      https://github.com/freeswitch/sofia-sip.git \
+      sofia-sip \
     && cd sofia-sip \
-    && git fetch --depth 1 origin "${SOFIA_SIP_REF}" \
-    && git checkout --detach "${SOFIA_SIP_REF}" \
     && ./bootstrap.sh \
-    && ./configure --prefix=/usr/local --disable-rpath --disable-static --without-doxygen --disable-stun \
+    && ./configure \
+      --prefix=/usr/local \
+      --disable-rpath \
+      --disable-static \
+      --without-doxygen \
+      --disable-stun \
     && make -j"$(nproc)" \
     && make install \
     && ldconfig
