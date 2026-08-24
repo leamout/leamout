@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG RTPENGINE_REF=mr26.2.0.0
+ARG RTPENGINE_REF=mr26.2.1
 
 FROM debian:trixie-slim AS build
 
