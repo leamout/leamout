@@ -58,8 +58,9 @@ COPY dialplan/ /leamout-config/dialplan/
 
 COPY entrypoint.d/10-leamout-config.sh \
     /docker-entrypoint.d/10-leamout-config.sh
+COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /docker-entrypoint.d/10-leamout-config.sh
+RUN chmod +x /docker-entrypoint.d/10-leamout-config.sh /entrypoint.sh
 
 # ------------------------------------------------------------
 # FreeSWITCH runtime
@@ -73,6 +74,4 @@ EXPOSE 5060/tcp
 # RTP range used by the internal SIP profile.
 EXPOSE 16384-32768/udp
 
-ENTRYPOINT ["/usr/bin/tini", "--"]
-
-CMD ["/usr/bin/freeswitch", "-nonat", "-nf"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
