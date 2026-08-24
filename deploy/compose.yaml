@@ -90,11 +90,6 @@ services:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD}
     volumes:
       - freeswitch_recordings:/var/lib/freeswitch/recordings
-    ports:
-      - "5080:5080/udp"
-      - "5080:5080/tcp"
-      - "8021:8021/tcp"
-      - "10101-10200:10101-10200/udp"
     networks:
       - leamout-core
 
