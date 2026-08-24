@@ -14,6 +14,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
 
+# FreeSWITCH 1.10.x still checks for the legacy PCRE 1 pkg-config module
+# named "libpcre". Install its development package explicitly.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+      libpcre3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src
 
 # FreeSWITCH 1.10.12 requires Sofia-SIP >= 1.13.17. Pin the verified
