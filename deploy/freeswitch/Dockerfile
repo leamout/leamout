@@ -1,11 +1,8 @@
 # syntax=docker/dockerfile:1
 
-# Official FreeSWITCH CI/build foundation. This is a build environment, not a
-# runtime image: the FreeSWITCH dependency builder below installs the native
-# packages that configure requires (including Sofia-SIP and SpanDSP).
-#
-# Docker Hub currently exposes only a shortened digest in its tag UI, so keep
-# the verified tag here rather than inventing a 64-character digest.
+# FreeSWITCH's official CI image is used only for its maintained build
+# toolchain. Its inherited SignalWire APT repository is intentionally removed:
+# it requires SignalWire credentials and is not appropriate for this build.
 FROM signalwire/freeswitch-public-ci-base:bookworm-amd64 AS build
 
 ARG FREESWITCH_REF=3f13ad1b1d323e435757fc43a2bb829d4ea5b9a8
@@ -14,35 +11,43 @@ ARG DEP_BUILD_NUMBER=42
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 
+# The CI foundation may contain an authenticated SignalWire repository. The
+# dependency builder must operate against public Debian plus its own source-
+# built dependency repository instead.
+RUN find /etc/apt/sources.list.d -maxdepth 1 -type f \
+      \( -iname '*freeswitch*.list' -o -iname '*signalwire*.list' \) \
+      -delete \
+    && sed -i '/freeswitch\.signalwire\.com/d;/packages\.signalwire\.com/d' \
+      /etc/apt/sources.list 2>/dev/null || true
+
 WORKDIR /usr/src
 
-# Pin the FreeSWITCH source to the v1.11.2 release commit.
+# Pin FreeSWITCH to the v1.11.2 release commit.
 RUN git clone --depth 1 https://github.com/signalwire/freeswitch.git freeswitch \
     && cd freeswitch \
     && git fetch --depth 1 origin "${FREESWITCH_REF}" \
     && git checkout --detach "${FREESWITCH_REF}"
 
-# FreeSWITCH's own dependency builder is the source of truth for the native
-# dependency graph. It builds Debian packages for Sofia-SIP, SpanDSP, libks,
-# signalwire-c, and the other libraries required by FreeSWITCH.
-RUN cd /usr/src/freeswitch \
-    && ./scripts/packaging/build/dependencies/build-dependencies.sh \
+WORKDIR /usr/src/freeswitch
+
+# Build the native dependency set from source using FreeSWITCH's maintained
+# dependency definitions. This produces a local Debian repository containing
+# Sofia-SIP, SpanDSP, libks, signalwire-c, and the other required libraries.
+# --setup is intentionally omitted: it is the part of the upstream helper that
+# configures external package infrastructure we do not need in this image.
+RUN ./scripts/packaging/build/dependencies/build-dependencies.sh \
       --build-number "${DEP_BUILD_NUMBER}" \
-      --setup \
       --all \
       --repo \
       --clone \
       --git-https
 
 # Install the dependency packages produced by the official builder. The local
-# repository created by --repo is also registered with APT for dependency
-# resolution.
+# repository is used for native FreeSWITCH build dependencies.
 RUN apt-get update \
     && find /var/local/deb -maxdepth 1 -type f -name '*.deb' -print0 \
       | xargs -0 -r apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /usr/src/freeswitch
 
 RUN ./bootstrap.sh -j \
     && ./configure \
