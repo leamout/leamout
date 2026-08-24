@@ -1,24 +1,27 @@
 # syntax=docker/dockerfile:1
 
-# Official FreeSWITCH CI/build foundation, pinned by immutable digest.
-# The digest is the linux/amd64 Bookworm image currently published for this tag.
-FROM signalwire/freeswitch-public-ci-base:bookworm-amd64@sha256:5f6d211ba9da0000000000000000000000000000000000000000000000000000 AS build
+# FreeSWITCH's maintained Debian Bookworm CI/build foundation.
+# Keep the tag here until the registry's complete immutable digest has been
+# independently verified; never invent or truncate a digest.
+FROM signalwire/freeswitch-public-ci-base:bookworm-amd64 AS build
 
-ARG FREESWITCH_REF=v1.10.12
+# v1.11.2 was released on 2026-08-09. Pin the source to the release commit,
+# rather than relying on a moving branch or tag at build time.
+ARG FREESWITCH_REF=3f13ad1b1d323e435757fc43a2bb829d4ea5b9a8
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /usr/src
 
-# Build FreeSWITCH with the official project's maintained dependency/tooling
-# environment. Do not add SignalWire APT repositories here: the CI base already
-# contains the build dependencies and our build must remain non-interactive.
+# Use the official FreeSWITCH source and its maintained CI build environment.
+# The CI base already provides the build toolchain/dependencies; do not add
+# SignalWire APT repositories or manually build Sofia-SIP/SpanDSP here.
 RUN git clone --depth 1 \
-      --branch "${FREESWITCH_REF}" \
       https://github.com/signalwire/freeswitch.git \
       freeswitch \
     && cd freeswitch \
+    && git fetch --depth 1 origin "${FREESWITCH_REF}" \
+    && git checkout --detach "${FREESWITCH_REF}" \
     && ./bootstrap.sh -j \
     && ./configure \
       --disable-dependency-tracking \
@@ -26,6 +29,9 @@ RUN git clone --depth 1 \
     && make -j"$(nproc)" \
     && make install
 
+# Keep the runtime as a Leamout-owned image. It deliberately does not expose
+# FreeSWITCH ESL (8021); only the SIP and RTP listeners are part of the image's
+# public network contract.
 FROM debian:bookworm-slim AS runtime
 
 ENV PATH=/usr/local/freeswitch/bin:$PATH
@@ -51,8 +57,7 @@ COPY --from=build /usr/local/lib/ /usr/local/lib/
 
 RUN ldconfig
 
-# Leamout owns the runtime configuration; the FreeSWITCH build itself comes
-# from the pinned official source release above.
+# Existing Leamout SIP/RTP configuration remains unchanged.
 COPY autoload_configs/ /leamout-config/autoload_configs/
 COPY sip_profiles/ /leamout-config/sip_profiles/
 COPY dialplan/ /leamout-config/dialplan/
@@ -71,6 +76,4 @@ EXPOSE 5060/udp
 EXPOSE 5060/tcp
 EXPOSE 16384-32768/udp
 
-# ESL 8021 is intentionally not exposed. It remains reachable only on the
-# internal Docker network.
 ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
