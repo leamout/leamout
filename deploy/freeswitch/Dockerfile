@@ -2,7 +2,7 @@
 
 FROM debian:bookworm-slim
 
-ARG FREESWITCH_VERSION=1.10.12
+ARG FREESWITCH_PACKAGE_VERSION=1.10.12-1~bookworm+1
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -32,20 +32,23 @@ RUN mkdir -p /etc/apt/keyrings \
 # ------------------------------------------------------------
 # FreeSWITCH
 # ------------------------------------------------------------
+# Pin every FreeSWITCH package to the same Debian package release.
+# This prevents a rebuild from silently pulling a newer FreeSWITCH.
+# ------------------------------------------------------------
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    freeswitch \
-    freeswitch-mod-commands \
-    freeswitch-mod-dptools \
-    freeswitch-mod-event-socket \
-    freeswitch-mod-sofia \
-    freeswitch-mod-console \
-    freeswitch-mod-logfile \
-    freeswitch-mod-dialplan-xml \
-    freeswitch-mod-codec-pcm \
-    freeswitch-mod-codec-g722 \
-    freeswitch-mod-codec-opus \
+    "freeswitch=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-commands=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-dptools=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-event-socket=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-sofia=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-console=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-logfile=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-dialplan-xml=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-codec-pcm=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-codec-g722=${FREESWITCH_PACKAGE_VERSION}" \
+    "freeswitch-mod-codec-opus=${FREESWITCH_PACKAGE_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------
