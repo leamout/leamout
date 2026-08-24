@@ -101,14 +101,23 @@ services:
       args:
         RTPENGINE_REF: mr26.2.0.0
     restart: unless-stopped
+    environment:
+      RTPENGINE_PUBLIC_IP: ${RTPENGINE_PUBLIC_IP}
+    ports:
+      - "23000-32768:23000-32768/udp"
     networks:
-      - leamout-core
+      leamout-core:
+        ipv4_address: 172.30.0.10
 
 volumes:
   postgres_data:
   redis_data:
   nats_data:
   freeswitch_recordings:
+
 networks:
   leamout-core:
     name: leamout-core
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
