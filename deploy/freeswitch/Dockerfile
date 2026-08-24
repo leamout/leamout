@@ -12,8 +12,6 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig
 
-# Use only Debian's public repositories. Do not depend on SignalWire's
-# package repositories for either FreeSWITCH or build dependencies.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
       autoconf \
@@ -31,6 +29,7 @@ RUN apt-get update \
       libsqlite3-dev \
       libssl-dev \
       libtool \
+      libtool-bin \
       libopus-dev \
       libsndfile1-dev \
       pkg-config \
@@ -39,7 +38,6 @@ RUN apt-get update \
 
 WORKDIR /usr/src
 
-# FreeSWITCH requires Sofia-SIP >= 1.13.17. Build the pinned v1.13.18 tag.
 RUN git clone --depth 1 \
       --branch "${SOFIA_SIP_REF}" \
       https://github.com/freeswitch/sofia-sip.git \
