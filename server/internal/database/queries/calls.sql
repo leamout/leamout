@@ -38,8 +38,8 @@ FROM calls
 WHERE tenant_id = sqlc.arg(tenant_id)
   AND (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
 ORDER BY created_at DESC
-LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset);
+LIMIT sqlc.arg(page_limit)
+OFFSET sqlc.arg(page_offset);
 
 -- name: UpdateCallState :one
 UPDATE calls
