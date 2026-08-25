@@ -20,9 +20,9 @@ type StreamLimits struct {
 
 func DefaultStreamLimits() StreamLimits {
 	return StreamLimits{
-		JobsMaxBytes:   5 * 1024 * 1024 * 1024,
-		EventsMaxBytes: 10 * 1024 * 1024 * 1024,
-		DLQMaxBytes:    5 * 1024 * 1024 * 1024,
+		JobsMaxBytes:   5 << 30,
+		EventsMaxBytes: 10 << 30,
+		DLQMaxBytes:    5 << 30,
 		JobsMaxAge:     7 * 24 * time.Hour,
 		EventsMaxAge:   30 * 24 * time.Hour,
 		DLQMaxAge:      90 * 24 * time.Hour,
@@ -40,7 +40,7 @@ func (c *Client) Provision(ctx context.Context, limits StreamLimits) error {
 
 	for _, config := range StreamConfigs(limits) {
 		if _, err := c.jetStream.CreateOrUpdateStream(ctx, config); err != nil {
-			return fmt.Errorf("provision NATS stream %s: %w", config.Name, err)
+			return fmt.Errorf("provision NATS stream %q: %w", config.Name, err)
 		}
 	}
 
@@ -51,50 +51,67 @@ func StreamConfigs(limits StreamLimits) []natsjs.StreamConfig {
 	limits = normalizeStreamLimits(limits)
 
 	return []natsjs.StreamConfig{
-		{
-			Name:        JobsStreamName,
-			Description: "Leamout background jobs",
-			Subjects:    []string{JobsSubject},
-			Retention:   natsjs.WorkQueuePolicy,
-			Discard:     natsjs.DiscardNew,
-			Storage:     natsjs.FileStorage,
-			Replicas:    limits.Replicas,
-			MaxBytes:    limits.JobsMaxBytes,
-			MaxAge:      limits.JobsMaxAge,
-			MaxMsgSize:  MaxMessageSize,
-			Duplicates:  10 * time.Minute,
-		},
-		{
-			Name:        EventsStreamName,
-			Description: "Leamout domain and provider events",
-			Subjects:    []string{EventsSubject},
-			Retention:   natsjs.LimitsPolicy,
-			Discard:     natsjs.DiscardOld,
-			Storage:     natsjs.FileStorage,
-			Replicas:    limits.Replicas,
-			MaxBytes:    limits.EventsMaxBytes,
-			MaxAge:      limits.EventsMaxAge,
-			MaxMsgSize:  MaxMessageSize,
-			Duplicates:  10 * time.Minute,
-		},
-		{
-			Name:        DLQStreamName,
-			Description: "Leamout dead-letter messages",
-			Subjects:    []string{DLQSubject},
-			Retention:   natsjs.LimitsPolicy,
-			Discard:     natsjs.DiscardOld,
-			Storage:     natsjs.FileStorage,
-			Replicas:    limits.Replicas,
-			MaxBytes:    limits.DLQMaxBytes,
-			MaxAge:      limits.DLQMaxAge,
-			MaxMsgSize:  MaxMessageSize,
-			Duplicates:  10 * time.Minute,
-		},
+		newStreamConfig(
+			JobsStreamName,
+			"Leamout background jobs",
+			JobsSubject,
+			natsjs.WorkQueuePolicy,
+			natsjs.DiscardNew,
+			limits.JobsMaxBytes,
+			limits.JobsMaxAge,
+			limits.Replicas,
+		),
+		newStreamConfig(
+			EventsStreamName,
+			"Leamout domain and provider events",
+			EventsSubject,
+			natsjs.LimitsPolicy,
+			natsjs.DiscardOld,
+			limits.EventsMaxBytes,
+			limits.EventsMaxAge,
+			limits.Replicas,
+		),
+		newStreamConfig(
+			DLQStreamName,
+			"Leamout dead-letter messages",
+			DLQSubject,
+			natsjs.LimitsPolicy,
+			natsjs.DiscardOld,
+			limits.DLQMaxBytes,
+			limits.DLQMaxAge,
+			limits.Replicas,
+		),
+	}
+}
+
+func newStreamConfig(
+	name string,
+	description string,
+	subject string,
+	retention natsjs.RetentionPolicy,
+	discard natsjs.DiscardPolicy,
+	maxBytes int64,
+	maxAge time.Duration,
+	replicas int,
+) natsjs.StreamConfig {
+	return natsjs.StreamConfig{
+		Name:        name,
+		Description: description,
+		Subjects:    []string{subject},
+		Retention:   retention,
+		Discard:     discard,
+		Storage:     natsjs.FileStorage,
+		Replicas:    replicas,
+		MaxBytes:    maxBytes,
+		MaxAge:      maxAge,
+		MaxMsgSize:  MaxMessageSize,
+		Duplicates:  10 * time.Minute,
 	}
 }
 
 func normalizeStreamLimits(limits StreamLimits) StreamLimits {
 	defaults := DefaultStreamLimits()
+
 	if limits.JobsMaxBytes <= 0 {
 		limits.JobsMaxBytes = defaults.JobsMaxBytes
 	}
