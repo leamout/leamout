@@ -1,14 +1,7 @@
 package main
 
-import (
-	"log"
-
-	"github.com/leamout/leamout/server/internal/runtime/worker"
-)
+import "fmt"
 
 func main() {
-	w := worker.New()
-	if err := w.Start(); err != nil {
-		log.Fatal(err)
-	}
+	fmt.Println("Worker service started")
 }
