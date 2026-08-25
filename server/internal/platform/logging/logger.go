@@ -28,6 +28,11 @@ func NewWithHandler(handler slog.Handler) *Logger {
 	return &Logger{logger: slog.New(handler)}
 }
 
+// Slog returns the underlying slog logger for infrastructure integrations.
+func (l *Logger) Slog() *slog.Logger {
+	return l.logger
+}
+
 // With returns a logger with the supplied attributes attached to every entry.
 func (l *Logger) With(args ...any) *Logger {
 	return &Logger{logger: l.logger.With(args...)}
