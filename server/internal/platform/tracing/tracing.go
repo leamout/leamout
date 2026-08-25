@@ -7,13 +7,20 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+const InstrumentationName = "github.com/leamout/leamout/server"
+
 // Tracer provides Leamout's application-facing tracing API.
 type Tracer struct {
 	tracer trace.Tracer
 }
 
-// New creates a tracer for the supplied instrumentation name.
+// New creates a tracer using the supplied instrumentation name. If name is
+// empty, Leamout's standard instrumentation name is used.
 func New(name string) *Tracer {
+	if name == "" {
+		name = InstrumentationName
+	}
+
 	return &Tracer{
 		tracer: otel.Tracer(name),
 	}
@@ -24,7 +31,8 @@ func (t *Tracer) Start(ctx context.Context, name string, opts ...trace.SpanStart
 	return t.tracer.Start(ctx, name, opts...)
 }
 
-// Tracer returns the underlying OpenTelemetry tracer.
+// Tracer returns the underlying OpenTelemetry tracer for integrations that
+// need direct access to OpenTelemetry APIs.
 func (t *Tracer) Tracer() trace.Tracer {
 	return t.tracer
 }
