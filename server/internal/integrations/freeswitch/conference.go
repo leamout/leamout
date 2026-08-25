@@ -9,8 +9,9 @@ func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (Confere
 	if err := req.Validate(); err != nil {
 		return ConferenceResult{}, err
 	}
+
 	args := append([]string{req.Name, req.Command}, req.Arguments...)
-	reply, err := c.Command(ctx, "conference "+strings.Join(args, " "))
+	reply, err := c.Command(ctx, "conference "+commandWords(args...))
 	if err != nil {
 		return ConferenceResult{}, err
 	}
@@ -22,11 +23,15 @@ func (c *Client) ListConferenceMembers(ctx context.Context, conference string) (
 	if err != nil {
 		return ConferenceMembers{}, err
 	}
+
 	reply, err := c.Conference(ctx, ConferenceRequest{Name: conference, Command: "list"})
 	if err != nil {
 		return ConferenceMembers{}, err
 	}
-	return ConferenceMembers{Conference: conference, Members: parseConferenceMembers(reply.Body)}, nil
+	return ConferenceMembers{
+		Conference: conference,
+		Members:    parseConferenceMembers(reply.Body),
+	}, nil
 }
 
 func (c *Client) MuteMember(ctx context.Context, conference, memberID string) error {
@@ -74,7 +79,11 @@ func (c *Client) conferenceCommand(ctx context.Context, conference, command stri
 	if err != nil {
 		return err
 	}
-	_, err = c.Conference(ctx, ConferenceRequest{Name: conference, Command: command, Arguments: args})
+	_, err = c.Conference(ctx, ConferenceRequest{
+		Name:      conference,
+		Command:   command,
+		Arguments: args,
+	})
 	return err
 }
 
@@ -89,7 +98,10 @@ func parseConferenceMembers(body string) []ConferenceMember {
 		if len(parts) < 2 {
 			continue
 		}
-		members = append(members, ConferenceMember{ID: parts[0], CallerID: parts[1]})
+		members = append(members, ConferenceMember{
+			ID:       parts[0],
+			CallerID: parts[1],
+		})
 	}
 	return members
 }
