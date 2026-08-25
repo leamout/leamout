@@ -1,6 +1,7 @@
 package opensips
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,24 +12,30 @@ import (
 
 const DefaultEventPath = "/events"
 
-// Events consumes newline-delimited JSON events from an OpenSIPS event endpoint.
-// The integration deliberately exposes the decoded event and leaves domain
-// interpretation to the caller.
-func (c *Client) Events(ctx context.Context, path string, handler func(context.Context, Event) error) error {
+type EventHandler func(context.Context, Event) error
+
+// Events consumes newline-delimited JSON events from a configured OpenSIPS
+// event endpoint. The integration decodes and validates transport events but
+// does not interpret domain semantics.
+func (c *Client) Events(ctx context.Context, path string, handler EventHandler) error {
 	if err := c.validate(ctx); err != nil {
 		return err
 	}
 	if handler == nil {
 		return fmt.Errorf("OpenSIPS event handler is required")
 	}
-	if strings.TrimSpace(path) == "" {
+
+	path = strings.TrimSpace(path)
+	if path == "" {
 		path = DefaultEventPath
 	}
+	path = "/" + strings.TrimLeft(path, "/")
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/"+strings.TrimLeft(path, "/"), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
 	if err != nil {
 		return fmt.Errorf("create OpenSIPS event request: %w", err)
 	}
+	req.Header.Set("Accept", "application/x-ndjson")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -40,17 +47,30 @@ func (c *Client) Events(ctx context.Context, path string, handler func(context.C
 		return fmt.Errorf("OpenSIPS events returned HTTP %d", resp.StatusCode)
 	}
 
-	decoder := json.NewDecoder(resp.Body)
-	for {
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
 		var event Event
-		if err := decoder.Decode(&event); err != nil {
-			if err == io.EOF {
-				return nil
-			}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
 			return fmt.Errorf("decode OpenSIPS event: %w", err)
+		}
+		if err := event.Validate(); err != nil {
+			return err
 		}
 		if err := handler(ctx, event); err != nil {
 			return fmt.Errorf("handle OpenSIPS event %q: %w", event.Name, err)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return fmt.Errorf("read OpenSIPS events: %w", err)
+	}
+
+	return nil
 }
