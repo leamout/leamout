@@ -21,5 +21,5 @@ func (c *Client) GetRegistrations(ctx context.Context) (Response, error) {
 }
 
 func (c *Client) metric(ctx context.Context, name string) (Response, error) {
-	return c.Command(ctx, Command{Name: CommandGetStatistics, Params: map[string]string{"metric": name}})
+	return c.Command(ctx, Command{Name: CommandGetStatistics, Params: map[string]any{"metric": name}})
 }
