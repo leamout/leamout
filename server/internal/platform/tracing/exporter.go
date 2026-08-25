@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -45,20 +46,20 @@ func NewProvider(ctx context.Context, cfg ExporterConfig) (*sdktrace.TracerProvi
 		return nil, fmt.Errorf("create OTLP trace exporter: %w", err)
 	}
 
-	attributes := []attributeOption{
+	attributes := []attribute.KeyValue{
 		semconv.ServiceNameKey.String(cfg.ServiceName),
 	}
 
 	if cfg.Environment != "" {
-		attributes = append(attributes, semconv.DeploymentEnvironmentNameKey.String(cfg.Environment))
+		attributes = append(attributes, attribute.String("deployment.environment", cfg.Environment))
 	}
 
 	res, err := resource.New(
 		ctx,
-		resource.WithAttributes(toKeyValues(attributes)...),
+		resource.WithAttributes(attributes...),
 	)
 	if err != nil {
-		exporter.Shutdown(ctx)
+		_ = exporter.Shutdown(ctx)
 		return nil, fmt.Errorf("create tracing resource: %w", err)
 	}
 
@@ -74,12 +75,4 @@ func NewProvider(ctx context.Context, cfg ExporterConfig) (*sdktrace.TracerProvi
 	))
 
 	return provider, nil
-}
-
-type attributeOption struct {
-	keyValue interface{ String() string }
-}
-
-func toKeyValues(options []attributeOption) []interface{} {
-	return nil
 }
