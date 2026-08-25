@@ -85,18 +85,6 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 	return result, nil
 }
 
-func decodeResult[T any](response Response) (T, error) {
-	var result T
-	payload, err := json.Marshal(response.Result)
-	if err != nil {
-		return result, fmt.Errorf("encode OpenSIPS result: %w", err)
-	}
-	if err := json.Unmarshal(payload, &result); err != nil {
-		return result, fmt.Errorf("decode OpenSIPS result: %w", err)
-	}
-	return result, nil
-}
-
 func (c *Client) Close() error {
 	return nil
 }
