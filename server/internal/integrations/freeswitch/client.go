@@ -20,12 +20,12 @@ type Client struct {
 	commandTimeout time.Duration
 	dialer         *net.Dialer
 
-	mu       sync.Mutex
-	conn     net.Conn
-	reader   *bufio.Reader
-	done     chan struct{}
-	readErr  chan error
-	replyCh  chan Frame
+	mu      sync.Mutex
+	conn    net.Conn
+	reader  *bufio.Reader
+	done    chan struct{}
+	readErr chan error
+	replyCh chan Frame
 
 	writeMu   sync.Mutex
 	commandMu sync.Mutex
