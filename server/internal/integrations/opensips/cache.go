@@ -8,7 +8,7 @@ const (
 )
 
 func (c *Client) ReloadSubscriberCache(ctx context.Context, req SubscriberCacheRequest) (Response, error) {
-	params := make(map[string]string, 2)
+	params := make(map[string]any, 2)
 	if req.Username != "" {
 		params["username"] = req.Username
 	}
