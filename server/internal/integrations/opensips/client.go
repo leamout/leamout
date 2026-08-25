@@ -36,8 +36,11 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 	transport.DialContext = (&net.Dialer{Timeout: cfg.ConnectTimeout}).DialContext
 
 	return &Client{
-		httpClient: &http.Client{Transport: transport, Timeout: cfg.RequestTimeout},
-		baseURL:    baseURL,
+		httpClient: &http.Client{
+			Transport: transport,
+			Timeout:   cfg.RequestTimeout,
+		},
+		baseURL: baseURL,
 	}, nil
 }
 
@@ -54,7 +57,7 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 		return Response{}, fmt.Errorf("encode OpenSIPS command: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/command", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, bytes.NewReader(payload))
 	if err != nil {
 		return Response{}, fmt.Errorf("create OpenSIPS request: %w", err)
 	}
@@ -65,9 +68,7 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 	if err != nil {
 		return Response{}, fmt.Errorf("execute OpenSIPS command: %w", err)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return Response{}, fmt.Errorf("OpenSIPS command returned HTTP %d", resp.StatusCode)
@@ -75,16 +76,18 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 
 	var result Response
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return Response{}, fmt.Errorf("decode OpenSIPS response: %w", err)
+		return Response{}, fmt.Errorf("decode OpenSIPS JSON-RPC response: %w", err)
 	}
-
 	if err := result.Validate(); err != nil {
 		return Response{}, err
 	}
+
 	return result, nil
 }
 
-func (c *Client) Close() error { return nil }
+func (c *Client) Close() error {
+	return nil
+}
 
 func (c *Client) validate(ctx context.Context) error {
 	if c == nil || c.httpClient == nil || c.baseURL == "" {

@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// These are transport-level command names. Domain operations belong in
-// internal/telecom and should be translated to the OpenSIPS protocol there.
 const (
 	CommandPing      = "ping"
 	CommandReload    = "reload"
@@ -36,11 +34,5 @@ func (c *Client) flagCommand(ctx context.Context, command, name string) (Respons
 	if name == "" {
 		return Response{}, fmt.Errorf("OpenSIPS flag name is required")
 	}
-
-	return c.Command(ctx, Command{
-		Name: command,
-		Params: map[string]string{
-			"name": name,
-		},
-	})
+	return c.Command(ctx, Command{Name: command, Params: map[string]any{"name": name}})
 }

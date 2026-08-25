@@ -13,9 +13,13 @@ const DefaultEventPath = "/events"
 
 type EventHandler func(context.Context, Event) error
 
-// Events consumes newline-delimited JSON events from a configured OpenSIPS
-// event endpoint. The integration decodes and validates transport events but
-// does not interpret domain semantics.
+func (e Event) Validate() error {
+	if strings.TrimSpace(e.Name) == "" {
+		return fmt.Errorf("OpenSIPS event name is required")
+	}
+	return nil
+}
+
 func (c *Client) Events(ctx context.Context, path string, handler EventHandler) error {
 	if err := c.validate(ctx); err != nil {
 		return err
@@ -40,9 +44,7 @@ func (c *Client) Events(ctx context.Context, path string, handler EventHandler) 
 	if err != nil {
 		return fmt.Errorf("connect to OpenSIPS events: %w", err)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("OpenSIPS events returned HTTP %d", resp.StatusCode)
