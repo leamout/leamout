@@ -10,30 +10,28 @@ import (
 )
 
 type Config struct {
-	URL               string
-	MaxRetries        int
-	MinIdleConns      int
-	MaxIdleConns      int
-	ConnMaxIdleTime   time.Duration
-	ConnMaxLifetime   time.Duration
-	DialTimeout       time.Duration
-	ReadTimeout       time.Duration
-	WriteTimeout      time.Duration
-	HealthCheckPeriod time.Duration
+	URL             string
+	MaxRetries      int
+	MinIdleConns    int
+	MaxIdleConns    int
+	ConnMaxIdleTime time.Duration
+	ConnMaxLifetime time.Duration
+	DialTimeout     time.Duration
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
 }
 
 func DefaultConfig(redisURL string) Config {
 	return Config{
-		URL:               strings.TrimSpace(redisURL),
-		MaxRetries:        3,
-		MinIdleConns:      2,
-		MaxIdleConns:      20,
-		ConnMaxIdleTime:   30 * time.Minute,
-		ConnMaxLifetime:   time.Hour,
-		DialTimeout:       5 * time.Second,
-		ReadTimeout:       3 * time.Second,
-		WriteTimeout:      3 * time.Second,
-		HealthCheckPeriod: time.Minute,
+		URL:             strings.TrimSpace(redisURL),
+		MaxRetries:      3,
+		MinIdleConns:    2,
+		MaxIdleConns:    20,
+		ConnMaxIdleTime: 30 * time.Minute,
+		ConnMaxLifetime: time.Hour,
+		DialTimeout:     5 * time.Second,
+		ReadTimeout:     3 * time.Second,
+		WriteTimeout:    3 * time.Second,
 	}
 }
 
@@ -44,6 +42,9 @@ type Client struct {
 func New(ctx context.Context, cfg Config) (*Client, error) {
 	if strings.TrimSpace(cfg.URL) == "" {
 		return nil, fmt.Errorf("redis URL is required")
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf("redis context is nil")
 	}
 
 	options, err := redisv9.ParseURL(cfg.URL)
@@ -61,11 +62,6 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 	options.WriteTimeout = cfg.WriteTimeout
 
 	client := redisv9.NewClient(options)
-
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	if err := client.Ping(ctx).Err(); err != nil {
 		_ = client.Close()
 		return nil, fmt.Errorf("ping redis: %w", err)
@@ -75,8 +71,11 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 }
 
 func (c *Client) Ping(ctx context.Context) error {
-	if c == nil || c.client == nil {
-		return fmt.Errorf("redis client is nil")
+	if err := c.validate(); err != nil {
+		return err
+	}
+	if ctx == nil {
+		return fmt.Errorf("redis context is nil")
 	}
 
 	return c.client.Ping(ctx).Err()
@@ -88,4 +87,12 @@ func (c *Client) Close() error {
 	}
 
 	return c.client.Close()
+}
+
+func (c *Client) validate() error {
+	if c == nil || c.client == nil {
+		return fmt.Errorf("redis client is nil")
+	}
+
+	return nil
 }
