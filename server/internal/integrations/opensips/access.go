@@ -19,7 +19,7 @@ func (c *Client) BlockIP(ctx context.Context, entry AccessEntry) (Response, erro
 	if err != nil {
 		return Response{}, err
 	}
-	params := map[string]string{"address": address}
+	params := map[string]any{"address": address}
 	if reason := strings.TrimSpace(entry.Reason); reason != "" {
 		params["reason"] = reason
 	}
@@ -34,7 +34,7 @@ func (c *Client) UnblockIP(ctx context.Context, address string) (Response, error
 	if err != nil {
 		return Response{}, err
 	}
-	return c.Command(ctx, Command{Name: CommandUnblockIP, Params: map[string]string{"address": address}})
+	return c.Command(ctx, Command{Name: CommandUnblockIP, Params: map[string]any{"address": address}})
 }
 
 func (c *Client) IsBlocked(ctx context.Context, address string) (Response, error) {
@@ -42,7 +42,7 @@ func (c *Client) IsBlocked(ctx context.Context, address string) (Response, error
 	if err != nil {
 		return Response{}, err
 	}
-	return c.Command(ctx, Command{Name: CommandIsBlocked, Params: map[string]string{"address": address}})
+	return c.Command(ctx, Command{Name: CommandIsBlocked, Params: map[string]any{"address": address}})
 }
 
 func (c *Client) ListBlockedIPs(ctx context.Context) (Response, error) {
