@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -10,13 +11,24 @@ import (
 
 // Config configures the PostgreSQL connection pool.
 type Config struct {
-	URL string
-
-	MaxConns          int32
-	MinConns          int32
-	MaxConnLifetime   time.Duration
-	MaxConnIdleTime   time.Duration
+	URL               string
+	MaxConnections    int32
+	MinConnections    int32
+	MaxLifetime       time.Duration
+	MaxIdleTime       time.Duration
 	HealthCheckPeriod time.Duration
+}
+
+// DefaultConfig returns the default PostgreSQL connection pool configuration.
+func DefaultConfig(databaseURL string) Config {
+	return Config{
+		URL:               strings.TrimSpace(databaseURL),
+		MaxConnections:    20,
+		MinConnections:    2,
+		MaxLifetime:       time.Hour,
+		MaxIdleTime:       30 * time.Minute,
+		HealthCheckPeriod: time.Minute,
+	}
 }
 
 // Client owns the PostgreSQL connection pool used by the application.
@@ -35,17 +47,17 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("parse postgres config: %w", err)
 	}
 
-	if cfg.MaxConns > 0 {
-		poolConfig.MaxConns = cfg.MaxConns
+	if cfg.MaxConnections > 0 {
+		poolConfig.MaxConns = cfg.MaxConnections
 	}
-	if cfg.MinConns > 0 {
-		poolConfig.MinConns = cfg.MinConns
+	if cfg.MinConnections > 0 {
+		poolConfig.MinConns = cfg.MinConnections
 	}
-	if cfg.MaxConnLifetime > 0 {
-		poolConfig.MaxConnLifetime = cfg.MaxConnLifetime
+	if cfg.MaxLifetime > 0 {
+		poolConfig.MaxConnLifetime = cfg.MaxLifetime
 	}
-	if cfg.MaxConnIdleTime > 0 {
-		poolConfig.MaxConnIdleTime = cfg.MaxConnIdleTime
+	if cfg.MaxIdleTime > 0 {
+		poolConfig.MaxConnIdleTime = cfg.MaxIdleTime
 	}
 	if cfg.HealthCheckPeriod > 0 {
 		poolConfig.HealthCheckPeriod = cfg.HealthCheckPeriod
@@ -64,8 +76,7 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 	return &Client{pool: pool}, nil
 }
 
-// Pool returns the underlying connection pool for sqlc and integration-level
-// database operations.
+// Pool returns the underlying PostgreSQL connection pool.
 func (c *Client) Pool() *pgxpool.Pool {
 	return c.pool
 }
