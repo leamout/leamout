@@ -96,6 +96,16 @@ type OriginateRequest struct {
 	Variables   map[string]string
 }
 
+func (r OriginateRequest) Validate() error {
+	if strings.TrimSpace(r.Endpoint) == "" {
+		return fmt.Errorf("FreeSWITCH originate endpoint is required")
+	}
+	if strings.TrimSpace(r.Destination) == "" {
+		return fmt.Errorf("FreeSWITCH originate destination is required")
+	}
+	return nil
+}
+
 type TransferRequest struct {
 	CallID      string
 	Destination string
@@ -103,10 +113,33 @@ type TransferRequest struct {
 	Context     string
 }
 
+func (r TransferRequest) Validate() error {
+	if strings.TrimSpace(r.CallID) == "" {
+		return fmt.Errorf("FreeSWITCH transfer call ID is required")
+	}
+	if strings.TrimSpace(r.Destination) == "" {
+		return fmt.Errorf("FreeSWITCH transfer destination is required")
+	}
+	return nil
+}
+
 type RecordRequest struct {
 	CallID string
 	Path   string
 	Action string
+}
+
+func (r RecordRequest) Validate() error {
+	if strings.TrimSpace(r.CallID) == "" {
+		return fmt.Errorf("FreeSWITCH record call ID is required")
+	}
+	if strings.TrimSpace(r.Path) == "" {
+		return fmt.Errorf("FreeSWITCH record path is required")
+	}
+	if r.Action != "" && r.Action != "start" && r.Action != "stop" {
+		return fmt.Errorf("FreeSWITCH record action must be start or stop, got %q", r.Action)
+	}
+	return nil
 }
 
 type Channel struct {
@@ -138,6 +171,16 @@ type ConferenceRequest struct {
 	Name      string
 	Command   string
 	Arguments []string
+}
+
+func (r ConferenceRequest) Validate() error {
+	if strings.TrimSpace(r.Name) == "" {
+		return fmt.Errorf("FreeSWITCH conference name is required")
+	}
+	if strings.TrimSpace(r.Command) == "" {
+		return fmt.Errorf("FreeSWITCH conference command is required")
+	}
+	return nil
 }
 
 type ConferenceResult struct {
