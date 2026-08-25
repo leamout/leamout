@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -132,5 +135,49 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 }
 
 func writeCommand(conn net.Conn, command string) (int, error) {
-	return fmt.Fprintf(conn, "%s\n\n", command)
+	return fmt.Fprintf(conn, "%s\n\n", strings.TrimSpace(command))
+}
+
+func readFrame(reader *bufio.Reader) (Frame, error) {
+	headers := make(map[string]string)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return Frame{}, err
+		}
+		line = strings.TrimRight(line, "\r\n")
+		if line == "" {
+			break
+		}
+
+		key, value, ok := strings.Cut(line, ": ")
+		if !ok {
+			return Frame{}, fmt.Errorf("invalid FreeSWITCH header %q", line)
+		}
+		headers[key] = value
+	}
+
+	contentType := headers["Content-Type"]
+	length := 0
+	if raw := headers["Content-Length"]; raw != "" {
+		var err error
+		length, err = strconv.Atoi(raw)
+		if err != nil || length < 0 {
+			return Frame{}, fmt.Errorf("invalid FreeSWITCH content length %q", raw)
+		}
+	}
+
+	body := make([]byte, length)
+	if length > 0 {
+		if _, err := io.ReadFull(reader, body); err != nil {
+			return Frame{}, fmt.Errorf("read FreeSWITCH frame body: %w", err)
+		}
+	}
+
+	return Frame{
+		ContentType: contentType,
+		Headers:     headers,
+		Body:        string(body),
+	}, nil
 }
