@@ -1,0 +1,37 @@
+CREATE TABLE IF NOT EXISTS recordings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    call_id UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'recording',
+    storage_key TEXT,
+    format TEXT,
+    duration_seconds INTEGER,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT chk_recordings_status CHECK (
+        status IN ('recording', 'completed', 'failed', 'deleted')
+    ),
+    CONSTRAINT chk_recordings_duration CHECK (
+        duration_seconds IS NULL OR duration_seconds >= 0
+    ),
+    CONSTRAINT chk_recordings_completed_at CHECK (
+        completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_recordings_tenant_created
+    ON recordings (tenant_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_recordings_call_created
+    ON recordings (call_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_recordings_status
+    ON recordings (tenant_id, status, created_at DESC);
+
+CREATE TRIGGER set_recordings_updated_at
+BEFORE UPDATE ON recordings
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();

@@ -40,6 +40,15 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 	}, nil
 }
 
+// Answer answers an incoming call.
+func (c *Client) Answer(ctx context.Context, callID string) error {
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	return c.commandOK(ctx, "uuid_answer "+commandWord(callID))
+}
+
 func (c *Client) Hangup(ctx context.Context, callID string) error {
 	callID, err := requiredArgument("call ID", callID)
 	if err != nil {
@@ -62,6 +71,37 @@ func (c *Client) Unhold(ctx context.Context, callID string) error {
 		return err
 	}
 	return c.commandOK(ctx, "uuid_unhold "+commandWord(callID))
+}
+
+// PlayAudio plays an audio file to a call without blocking the ESL client.
+func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	filePath, err = requiredArgument("audio file path", filePath)
+	if err != nil {
+		return err
+	}
+	return c.commandOK(ctx, "uuid_broadcast "+commandWords(callID, filePath, "aleg"))
+}
+
+// StopAudio stops media playback on both legs of a call.
+func (c *Client) StopAudio(ctx context.Context, callID string) error {
+	return c.Break(ctx, callID)
+}
+
+// SendDTMF sends DTMF digits to a call.
+func (c *Client) SendDTMF(ctx context.Context, callID, digits string) error {
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	digits, err = requiredArgument("DTMF digits", digits)
+	if err != nil {
+		return err
+	}
+	return c.commandOK(ctx, "uuid_send_dtmf "+commandWords(callID, digits))
 }
 
 func (c *Client) Break(ctx context.Context, callID string) error {
