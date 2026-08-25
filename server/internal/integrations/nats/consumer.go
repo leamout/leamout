@@ -8,6 +8,18 @@ import (
 	natsjs "github.com/nats-io/nats.go/jetstream"
 )
 
+type AckAction uint8
+
+const (
+	AckNone AckAction = iota
+	Ack
+	Nak
+	Term
+	InProgress
+)
+
+type ConsumerHandler func(context.Context, natsjs.Msg) (AckAction, error)
+
 func (c *Client) CreateOrUpdateConsumer(ctx context.Context, stream string, config natsjs.ConsumerConfig) (natsjs.Consumer, error) {
 	if err := c.validateConsumer(ctx, stream, config); err != nil {
 		return nil, err
@@ -21,9 +33,10 @@ func (c *Client) CreateOrUpdateConsumer(ctx context.Context, stream string, conf
 	return consumer, nil
 }
 
-// Consume starts a pull consumer handler and blocks until ctx is cancelled.
-// The handler owns acknowledgement and should Ack, Nak, Term, or InProgress each message.
-func (c *Client) Consume(ctx context.Context, consumer natsjs.Consumer, handler func(context.Context, natsjs.Msg) error) error {
+// Consume starts a pull consumer and blocks until ctx is cancelled.
+// The handler chooses exactly one acknowledgement action for every message.
+// Returning AckNone is invalid and does not acknowledge the message.
+func (c *Client) Consume(ctx context.Context, consumer natsjs.Consumer, handler ConsumerHandler) error {
 	if err := c.validate(); err != nil {
 		return err
 	}
@@ -38,9 +51,11 @@ func (c *Client) Consume(ctx context.Context, consumer natsjs.Consumer, handler 
 	}
 
 	cons, err := consumer.Consume(func(msg natsjs.Msg) {
-		if err := handler(ctx, msg); err != nil {
-			_ = msg.Nak()
+		action, handlerErr := handler(ctx, msg)
+		if err := applyAckAction(msg, action); err != nil {
+			return
 		}
+		_ = handlerErr
 	})
 	if err != nil {
 		return fmt.Errorf("start NATS consumer: %w", err)
@@ -49,6 +64,30 @@ func (c *Client) Consume(ctx context.Context, consumer natsjs.Consumer, handler 
 
 	<-ctx.Done()
 	return ctx.Err()
+}
+
+func applyAckAction(msg natsjs.Msg, action AckAction) error {
+	var err error
+
+	switch action {
+	case Ack:
+		err = msg.Ack()
+	case Nak:
+		err = msg.Nak()
+	case Term:
+		err = msg.Term()
+	case InProgress:
+		err = msg.InProgress()
+	case AckNone:
+		return fmt.Errorf("NATS acknowledgement action is required")
+	default:
+		return fmt.Errorf("invalid NATS acknowledgement action: %d", action)
+	}
+
+	if err != nil {
+		return fmt.Errorf("apply NATS acknowledgement action %d: %w", action, err)
+	}
+	return nil
 }
 
 func (c *Client) validateConsumer(ctx context.Context, stream string, config natsjs.ConsumerConfig) error {
