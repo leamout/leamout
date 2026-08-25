@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -20,6 +21,40 @@ func TestRegistry(t *testing.T) {
 
 	if got := registry.Errors(); got != 1 {
 		t.Fatalf("Errors() = %d, want 1", got)
+	}
+}
+
+func TestRegistryConcurrent(t *testing.T) {
+	registry := New()
+
+	const (
+		workers = 16
+		updates = 1_000
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(workers)
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+
+			for j := 0; j < updates; j++ {
+				registry.IncRequests()
+				registry.IncErrors()
+			}
+		}()
+	}
+
+	wg.Wait()
+
+	want := uint64(workers * updates)
+	if got := registry.Requests(); got != want {
+		t.Fatalf("Requests() = %d, want %d", got, want)
+	}
+
+	if got := registry.Errors(); got != want {
+		t.Fatalf("Errors() = %d, want %d", got, want)
 	}
 }
 
@@ -43,9 +78,17 @@ func TestHandler(t *testing.T) {
 
 	body := recorder.Body.String()
 	for _, want := range []string{
+		"# HELP leamout_http_requests_total Total number of HTTP requests recorded.",
+		"# TYPE leamout_http_requests_total counter",
 		"leamout_http_requests_total 1",
+		"# HELP leamout_http_errors_total Total number of HTTP errors recorded.",
+		"# TYPE leamout_http_errors_total counter",
 		"leamout_http_errors_total 1",
+		"# HELP leamout_process_uptime_seconds Process uptime in seconds.",
+		"# TYPE leamout_process_uptime_seconds gauge",
 		"leamout_process_uptime_seconds",
+		"# HELP leamout_process_goroutines Current number of goroutines.",
+		"# TYPE leamout_process_goroutines gauge",
 		"leamout_process_goroutines",
 	} {
 		if !strings.Contains(body, want) {
