@@ -5,20 +5,23 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// WithTx executes fn in a PostgreSQL transaction. The transaction is rolled
-// back when fn returns an error and committed when fn succeeds.
-func WithTx(ctx context.Context, pool *pgxpool.Pool, fn func(pgx.Tx) error) error {
-	if pool == nil {
-		return fmt.Errorf("postgres pool is nil")
+// WithTx executes fn in a PostgreSQL transaction.
+//
+// If fn returns an error, the transaction is rolled back. If fn succeeds,
+// the transaction is committed. The transaction is always rolled back on
+// return as a safety net for every path that does not commit successfully.
+func (c *Client) WithTx(ctx context.Context, fn func(pgx.Tx) error) error {
+	if c == nil || c.pool == nil {
+		return fmt.Errorf("postgres client is nil")
 	}
+
 	if fn == nil {
 		return fmt.Errorf("transaction function is nil")
 	}
 
-	tx, err := pool.Begin(ctx)
+	tx, err := c.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin postgres transaction: %w", err)
 	}
