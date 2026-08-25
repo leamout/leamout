@@ -10,6 +10,7 @@ type Config struct {
 	Address        string
 	ConnectTimeout time.Duration
 	CommandTimeout time.Duration
+	MaxRetries     int
 }
 
 func DefaultConfig(address string) Config {
@@ -17,11 +18,12 @@ func DefaultConfig(address string) Config {
 		Address:        strings.TrimSpace(address),
 		ConnectTimeout: 5 * time.Second,
 		CommandTimeout: 5 * time.Second,
+		MaxRetries:     2,
 	}
 }
 
 func (c Config) Validate() error {
-	if c.Address == "" {
+	if strings.TrimSpace(c.Address) == "" {
 		return fmt.Errorf("RTPEngine address is required")
 	}
 	if c.ConnectTimeout <= 0 {
@@ -30,12 +32,16 @@ func (c Config) Validate() error {
 	if c.CommandTimeout <= 0 {
 		return fmt.Errorf("RTPEngine command timeout must be positive")
 	}
+	if c.MaxRetries < 0 {
+		return fmt.Errorf("RTPEngine max retries cannot be negative")
+	}
 	return nil
 }
 
 type Command string
 
 const (
+	CommandPing   Command = "ping"
 	CommandOffer  Command = "offer"
 	CommandAnswer Command = "answer"
 	CommandDelete Command = "delete"
@@ -69,15 +75,39 @@ type OfferRequest struct {
 	Flags   []string
 }
 
+func (r OfferRequest) Validate() error {
+	if err := r.Session.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(r.SDP) == "" {
+		return fmt.Errorf("RTPEngine offer SDP is required")
+	}
+	return nil
+}
+
 type AnswerRequest struct {
 	Session Session
 	SDP     string
 	Flags   []string
 }
 
+func (r AnswerRequest) Validate() error {
+	if err := r.Session.Validate(); err != nil {
+		return err
+	}
+	if strings.TrimSpace(r.SDP) == "" {
+		return fmt.Errorf("RTPEngine answer SDP is required")
+	}
+	return nil
+}
+
 type DeleteRequest struct {
 	Session Session
 	Flags   []string
+}
+
+func (r DeleteRequest) Validate() error {
+	return r.Session.Validate()
 }
 
 type OfferResponse struct {
@@ -107,4 +137,12 @@ func (r Response) OK() bool {
 func (r Response) String(key string) string {
 	value, _ := r.Data[key].(string)
 	return value
+}
+
+func (r Response) RequiredString(key string) (string, error) {
+	value := strings.TrimSpace(r.String(key))
+	if value == "" {
+		return "", fmt.Errorf("RTPEngine response field %q is required", key)
+	}
+	return value, nil
 }

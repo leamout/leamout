@@ -1,24 +1,23 @@
 package rtpengine
 
-import (
-	"context"
-	"fmt"
-)
+import "context"
 
 func (c *Client) Offer(ctx context.Context, request OfferRequest) (OfferResponse, error) {
 	if err := request.Validate(); err != nil {
 		return OfferResponse{}, err
 	}
 
-	response, err := c.do(ctx, CommandOffer, request.Session.params(request.SDP, request.Flags))
+	response, err := c.exchangeSDP(ctx, CommandOffer, request.Session, request.SDP, request.Flags)
 	if err != nil {
 		return OfferResponse{}, err
 	}
 
-	return OfferResponse{
-		SDP:  response.String("sdp"),
-		Data: response.Data,
-	}, nil
+	sdp, err := response.RequiredString("sdp")
+	if err != nil {
+		return OfferResponse{}, err
+	}
+
+	return OfferResponse{SDP: sdp, Data: response.Data}, nil
 }
 
 func (c *Client) Answer(ctx context.Context, request AnswerRequest) (AnswerResponse, error) {
@@ -26,15 +25,17 @@ func (c *Client) Answer(ctx context.Context, request AnswerRequest) (AnswerRespo
 		return AnswerResponse{}, err
 	}
 
-	response, err := c.do(ctx, CommandAnswer, request.Session.params(request.SDP, request.Flags))
+	response, err := c.exchangeSDP(ctx, CommandAnswer, request.Session, request.SDP, request.Flags)
 	if err != nil {
 		return AnswerResponse{}, err
 	}
 
-	return AnswerResponse{
-		SDP:  response.String("sdp"),
-		Data: response.Data,
-	}, nil
+	sdp, err := response.RequiredString("sdp")
+	if err != nil {
+		return AnswerResponse{}, err
+	}
+
+	return AnswerResponse{SDP: sdp, Data: response.Data}, nil
 }
 
 func (c *Client) Delete(ctx context.Context, request DeleteRequest) error {
@@ -42,7 +43,7 @@ func (c *Client) Delete(ctx context.Context, request DeleteRequest) error {
 		return err
 	}
 
-	_, err := c.do(ctx, CommandDelete, request.Session.params("", request.Flags))
+	_, err := c.do(ctx, CommandDelete, sessionParams(request.Session, "", request.Flags))
 	return err
 }
 
@@ -51,7 +52,7 @@ func (c *Client) Query(ctx context.Context, session Session) (QueryResponse, err
 		return QueryResponse{}, err
 	}
 
-	response, err := c.do(ctx, CommandQuery, session.params("", nil))
+	response, err := c.do(ctx, CommandQuery, sessionParams(session, "", nil))
 	if err != nil {
 		return QueryResponse{}, err
 	}
@@ -59,26 +60,12 @@ func (c *Client) Query(ctx context.Context, session Session) (QueryResponse, err
 	return QueryResponse{Data: response.Data}, nil
 }
 
-func (r OfferRequest) Validate() error {
-	if err := r.Session.Validate(); err != nil {
-		return err
-	}
-	if r.SDP == "" {
-		return fmt.Errorf("RTPEngine offer SDP is required")
-	}
-	return nil
-}
-
-func (r AnswerRequest) Validate() error {
-	if err := r.Session.Validate(); err != nil {
-		return err
-	}
-	if r.SDP == "" {
-		return fmt.Errorf("RTPEngine answer SDP is required")
-	}
-	return nil
-}
-
-func (r DeleteRequest) Validate() error {
-	return r.Session.Validate()
+func (c *Client) exchangeSDP(
+	ctx context.Context,
+	command Command,
+	session Session,
+	sdp string,
+	flags []string,
+) (Response, error) {
+	return c.do(ctx, command, sessionParams(session, sdp, flags))
 }
