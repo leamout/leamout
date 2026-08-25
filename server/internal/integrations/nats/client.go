@@ -85,11 +85,7 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("verify JetStream: %w", err)
 	}
 
-	return &Client{
-		connection:   conn,
-		jetStream:    js,
-		drainTimeout: cfg.DrainTimeout,
-	}, nil
+	return &Client{connection: conn, jetStream: js, drainTimeout: cfg.DrainTimeout}, nil
 }
 
 func (c *Client) Ping(ctx context.Context) error {
@@ -111,9 +107,21 @@ func (c *Client) Close() error {
 		return nil
 	}
 
-	if err := c.connection.Drain(); err != nil {
+	done := make(chan error, 1)
+	go func() { done <- c.connection.Drain() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.drainTimeout)
+	defer cancel()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			c.connection.Close()
+			return fmt.Errorf("drain NATS connection: %w", err)
+		}
+	case <-ctx.Done():
 		c.connection.Close()
-		return fmt.Errorf("drain NATS connection: %w", err)
+		return fmt.Errorf("drain NATS connection: %w", ctx.Err())
 	}
 
 	return nil
