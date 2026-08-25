@@ -57,3 +57,40 @@ func (e Event) Validate() error {
 	}
 	return nil
 }
+
+type SubscriberCacheRequest struct {
+	Username string
+	Domain   string
+}
+
+type Route struct {
+	ID       string
+	Carrier  string
+	Prefix   string
+	URI      string
+	Priority int
+	Enabled  bool
+}
+
+type Dialog struct {
+	ID         string
+	CallID     string
+	FromURI    string
+	ToURI      string
+	State      string
+	StartedAt  time.Time
+	Duration   time.Duration
+}
+
+type AccessEntry struct {
+	Address   string
+	Reason    string
+	ExpiresAt time.Time
+}
+
+type Statistics struct {
+	ActiveCalls       int64
+	CPS               float64
+	Registrations     int64
+	Dialogs           int64
+}
