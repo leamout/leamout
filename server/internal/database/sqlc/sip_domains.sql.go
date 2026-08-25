@@ -23,7 +23,7 @@ FROM tenants AS t
 WHERE t.id = $1
 AND t.status = 'active'
 AND t.deleted_at IS NULL
-RETURNING id, tenant_id, domain, status, created_at
+RETURNING id, tenant_id, domain, status, created_at, updated_at
 `
 
 type CreateSipDomainParams struct {
@@ -40,6 +40,7 @@ func (q *Queries) CreateSipDomain(ctx context.Context, arg CreateSipDomainParams
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -85,7 +86,7 @@ func (q *Queries) EnableSipDomain(ctx context.Context, arg EnableSipDomainParams
 }
 
 const getSipDomainByDomain = `-- name: GetSipDomainByDomain :one
-SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at
+SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
 JOIN tenants AS t ON t.id = sd.tenant_id
 WHERE sd.domain = $1
@@ -110,12 +111,13 @@ func (q *Queries) GetSipDomainByDomain(ctx context.Context, arg GetSipDomainByDo
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const getSipDomainByID = `-- name: GetSipDomainByID :one
-SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at
+SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
 JOIN tenants AS t ON t.id = sd.tenant_id
 WHERE sd.id = $1
@@ -140,12 +142,13 @@ func (q *Queries) GetSipDomainByID(ctx context.Context, arg GetSipDomainByIDPara
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listSipDomainsByTenantID = `-- name: ListSipDomainsByTenantID :many
-SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at
+SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
 JOIN tenants AS t ON t.id = sd.tenant_id
 WHERE sd.tenant_id = $1
@@ -170,6 +173,7 @@ func (q *Queries) ListSipDomainsByTenantID(ctx context.Context, tenantID uuid.UU
 			&i.Domain,
 			&i.Status,
 			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -189,7 +193,7 @@ SET
 WHERE id = $2
 AND tenant_id = $3
 AND status = 'active'
-RETURNING id, tenant_id, domain, status, created_at
+RETURNING id, tenant_id, domain, status, created_at, updated_at
 `
 
 type UpdateSipDomainParams struct {
@@ -207,6 +211,7 @@ func (q *Queries) UpdateSipDomain(ctx context.Context, arg UpdateSipDomainParams
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

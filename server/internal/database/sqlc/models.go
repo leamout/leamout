@@ -11,6 +11,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApiKey struct {
+	ID          uuid.UUID          `db:"id" json:"id"`
+	TenantID    uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	CreatedBy   uuid.UUID          `db:"created_by" json:"created_by"`
+	Name        string             `db:"name" json:"name"`
+	Description *string            `db:"description" json:"description"`
+	TokenHash   string             `db:"token_hash" json:"token_hash"`
+	TokenPrefix string             `db:"token_prefix" json:"token_prefix"`
+	Scopes      []byte             `db:"scopes" json:"scopes"`
+	LastUsedAt  pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	LastUsedIp  *netip.Addr        `db:"last_used_ip" json:"last_used_ip"`
+	ExpiresAt   pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type AuthChallenge struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
 	AuthTransactionID *uuid.UUID         `db:"auth_transaction_id" json:"auth_transaction_id"`
@@ -36,6 +52,30 @@ type AuthTransaction struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type OutboxEvent struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	Subject       string             `db:"subject" json:"subject"`
+	AggregateType string             `db:"aggregate_type" json:"aggregate_type"`
+	AggregateID   uuid.UUID          `db:"aggregate_id" json:"aggregate_id"`
+	Payload       []byte             `db:"payload" json:"payload"`
+	Headers       []byte             `db:"headers" json:"headers"`
+	AvailableAt   pgtype.Timestamptz `db:"available_at" json:"available_at"`
+	PublishedAt   pgtype.Timestamptz `db:"published_at" json:"published_at"`
+	Attempts      int32              `db:"attempts" json:"attempts"`
+	LastError     *string            `db:"last_error" json:"last_error"`
+	LockedAt      pgtype.Timestamptz `db:"locked_at" json:"locked_at"`
+	LockedBy      *string            `db:"locked_by" json:"locked_by"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type ProcessedEvent struct {
+	ConsumerName string             `db:"consumer_name" json:"consumer_name"`
+	EventID      uuid.UUID          `db:"event_id" json:"event_id"`
+	ProcessedAt  pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
+	Metadata     []byte             `db:"metadata" json:"metadata"`
+}
+
 type Session struct {
 	ID         uuid.UUID          `db:"id" json:"id"`
 	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
@@ -54,6 +94,7 @@ type SipDomain struct {
 	Domain    string             `db:"domain" json:"domain"`
 	Status    string             `db:"status" json:"status"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Subscriber struct {
@@ -81,6 +122,22 @@ type Tenant struct {
 	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 }
 
+type TenantInvitation struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	TenantID   uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	InvitedBy  uuid.UUID          `db:"invited_by" json:"invited_by"`
+	Email      string             `db:"email" json:"email"`
+	Role       string             `db:"role" json:"role"`
+	TokenHash  string             `db:"token_hash" json:"token_hash"`
+	Status     string             `db:"status" json:"status"`
+	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	AcceptedAt pgtype.Timestamptz `db:"accepted_at" json:"accepted_at"`
+	DeclinedAt pgtype.Timestamptz `db:"declined_at" json:"declined_at"`
+	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type TenantMember struct {
 	TenantID  uuid.UUID          `db:"tenant_id" json:"tenant_id"`
 	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
@@ -99,4 +156,50 @@ type User struct {
 	DisabledAt    pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
 	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type WebhookDelivery struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	EventID        uuid.UUID          `db:"event_id" json:"event_id"`
+	EndpointID     uuid.UUID          `db:"endpoint_id" json:"endpoint_id"`
+	Status         string             `db:"status" json:"status"`
+	AttemptCount   int32              `db:"attempt_count" json:"attempt_count"`
+	ReplayCount    int32              `db:"replay_count" json:"replay_count"`
+	NextAttemptAt  pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	LastAttemptAt  pgtype.Timestamptz `db:"last_attempt_at" json:"last_attempt_at"`
+	LastReplayedAt pgtype.Timestamptz `db:"last_replayed_at" json:"last_replayed_at"`
+	ResponseStatus *int32             `db:"response_status" json:"response_status"`
+	ResponseBody   *string            `db:"response_body" json:"response_body"`
+	LastError      *string            `db:"last_error" json:"last_error"`
+	DeliveredAt    pgtype.Timestamptz `db:"delivered_at" json:"delivered_at"`
+	LockedAt       pgtype.Timestamptz `db:"locked_at" json:"locked_at"`
+	LockedBy       *string            `db:"locked_by" json:"locked_by"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type WebhookEndpoint struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	TenantID            uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	Url                 string             `db:"url" json:"url"`
+	SigningSecret       []byte             `db:"signing_secret" json:"signing_secret"`
+	Enabled             bool               `db:"enabled" json:"enabled"`
+	SubscribedEvents    []string           `db:"subscribed_events" json:"subscribed_events"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DisabledAt          pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	ConsecutiveFailures int32              `db:"consecutive_failures" json:"consecutive_failures"`
+	LastFailureAt       pgtype.Timestamptz `db:"last_failure_at" json:"last_failure_at"`
+	DisabledReason      *string            `db:"disabled_reason" json:"disabled_reason"`
+}
+
+type WebhookEvent struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	TenantID   uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	EventType  string             `db:"event_type" json:"event_type"`
+	ObjectType string             `db:"object_type" json:"object_type"`
+	ObjectID   *uuid.UUID         `db:"object_id" json:"object_id"`
+	Payload    []byte             `db:"payload" json:"payload"`
+	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }

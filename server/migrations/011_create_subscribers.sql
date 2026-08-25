@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS subscribers (
     sip_domain_id UUID NOT NULL REFERENCES sip_domains(id) ON DELETE CASCADE,
 
     username VARCHAR(64) NOT NULL,
-    domain TEXT NOT NULL,
+    domain CITEXT NOT NULL,
 
     ha1_md5 VARCHAR(255),
     ha1_sha256 VARCHAR(255),
