@@ -12,7 +12,7 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 	}
 
 	command := "originate"
-	if prefix := variables(req.Variables); prefix != "" {
+	if prefix := formatVariables(req.Variables); prefix != "" {
 		command += " " + prefix
 	}
 	if req.CallerID != "" {
@@ -41,7 +41,7 @@ func (c *Client) Hangup(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.ok(ctx, "uuid_kill "+callID)
+	return c.commandOK(ctx, "uuid_kill "+callID)
 }
 
 func (c *Client) Hold(ctx context.Context, callID string) error {
@@ -49,7 +49,7 @@ func (c *Client) Hold(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.ok(ctx, "uuid_hold "+callID)
+	return c.commandOK(ctx, "uuid_hold "+callID)
 }
 
 func (c *Client) Unhold(ctx context.Context, callID string) error {
@@ -57,7 +57,7 @@ func (c *Client) Unhold(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.ok(ctx, "uuid_unhold "+callID)
+	return c.commandOK(ctx, "uuid_unhold "+callID)
 }
 
 func (c *Client) Break(ctx context.Context, callID string) error {
@@ -65,7 +65,7 @@ func (c *Client) Break(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.ok(ctx, "uuid_break "+callID+" all")
+	return c.commandOK(ctx, "uuid_break "+callID+" all")
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
@@ -79,7 +79,7 @@ func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
 	if req.Context != "" {
 		args = append(args, req.Context)
 	}
-	return c.ok(ctx, "uuid_transfer "+strings.Join(args, " "))
+	return c.commandOK(ctx, "uuid_transfer "+strings.Join(args, " "))
 }
 
 func (c *Client) Record(ctx context.Context, req RecordRequest) error {
@@ -93,5 +93,5 @@ func (c *Client) Record(ctx context.Context, req RecordRequest) error {
 	if action != "start" && action != "stop" {
 		return fmt.Errorf("FreeSWITCH record action must be start or stop, got %q", action)
 	}
-	return c.ok(ctx, "uuid_record "+req.CallID+" "+action+" "+req.Path)
+	return c.commandOK(ctx, "uuid_record "+req.CallID+" "+action+" "+req.Path)
 }
