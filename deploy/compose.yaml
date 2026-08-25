@@ -49,8 +49,8 @@ services:
     image: opensips/opensips:3.4
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5060:5060/udp"
-      - "127.0.0.1:5060:5060/tcp"
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
     volumes:
       - ./opensips/opensips.cfg:/etc/opensips/opensips.cfg:ro
       - ./opensips/tls.cfg:/etc/opensips/tls.cfg:ro
@@ -90,6 +90,9 @@ services:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD}
     volumes:
       - freeswitch_recordings:/var/lib/freeswitch/recordings
+    expose:
+      - "5060/udp"
+      - "5060/tcp"
     networks:
       - leamout-core
 
@@ -99,12 +102,14 @@ services:
       context: ./rtpengine
       dockerfile: Dockerfile
       args:
-        RTPENGINE_REF: mr26.2.0.0
+        RTPENGINE_REF: mr26.2.1
     restart: unless-stopped
     environment:
       RTPENGINE_PUBLIC_IP: ${RTPENGINE_PUBLIC_IP}
     ports:
       - "23000-32768:23000-32768/udp"
+    expose:
+      - "22222/udp"
     networks:
       leamout-core:
         ipv4_address: 172.30.0.10
