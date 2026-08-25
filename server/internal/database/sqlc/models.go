@@ -231,13 +231,23 @@ type User struct {
 }
 
 type VoiceApplication struct {
-	ID          uuid.UUID          `db:"id" json:"id"`
-	TenantID    uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	Name        string             `db:"name" json:"name"`
-	Description *string            `db:"description" json:"description"`
-	Status      string             `db:"status" json:"status"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	TenantID           uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	Name               string             `db:"name" json:"name"`
+	RingTimeoutSeconds int32              `db:"ring_timeout_seconds" json:"ring_timeout_seconds"`
+	CallerID           *string            `db:"caller_id" json:"caller_id"`
+	Status             string             `db:"status" json:"status"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type VoiceBinding struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	VoiceApplicationID uuid.UUID          `db:"voice_application_id" json:"voice_application_id"`
+	PhoneNumberID      *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
+	SipDomainID        *uuid.UUID         `db:"sip_domain_id" json:"sip_domain_id"`
+	SubscriberID       *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type WebhookDelivery struct {
