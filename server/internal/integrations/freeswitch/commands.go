@@ -152,7 +152,7 @@ func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (Confere
 		return ConferenceResult{}, err
 	}
 
-	return ConferenceResult{Text: reply.Text, Body: reply.Body}, nil
+	return ConferenceResult(reply), nil
 }
 
 func (c *Client) MuteMember(ctx context.Context, conference, memberID string) error {
