@@ -1,4 +1,4 @@
-h1:1ON/acotorX3g44L51ySe6l3oyN0vPJ2Z4Tci0yTgDY=
+h1:9asI0BO7BjkQcILxcDyN78lTB13TfsJ7NFgFaTZt0yc=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -12,3 +12,9 @@ h1:1ON/acotorX3g44L51ySe6l3oyN0vPJ2Z4Tci0yTgDY=
 011_create_subscribers.sql h1:rlaCmcXOHYQM/w0ELbzmPcBBi5xPguTKPrz+Z9P8OqU=
 012_create_webhook.sql h1:yYEeaHzcJS6HFCLypi9cJ2icYsaozhjiheLpFK+RoNk=
 013_create_outbox.sql h1:SFfg7S+MnC24OorT+xRcd5R+UZDhycrl2owM3ZFYc0M=
+014_create_voice_applications.sql h1:e0lmeJJx32M/x0PDyvGYtac0hY6PKXPn/YmiUewlJ+E=
+015_create_calls.sql h1:p/M+xo7wusZXaWhjZTRbiR6qzOPjoNgu4rFvsbaOCg8=
+016_create_call_participants.sql h1:dtKOJPp9P2SENlGwYG5cPrJQcvUS7sOIurSCtdD6bZY=
+017_create_recordings.sql h1:TFT7Gef2H7Jgw4ZtZ/gEIvGHCuGb+02XsqxZwpWYUn4=
+018_create_conferences.sql h1:HUkfxLM3qIxnXaqbo8Vr+waHIzKrosgWaWAVeUcwshg=
+019_create_conference_participants.sql h1:r1cTO1HHJ96O28fQTvGQdpb39syYWF8WjZXI5kkPJSU=

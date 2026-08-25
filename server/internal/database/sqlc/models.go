@@ -52,6 +52,64 @@ type AuthTransaction struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type Call struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	TenantID      uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	ApplicationID *uuid.UUID         `db:"application_id" json:"application_id"`
+	Direction     string             `db:"direction" json:"direction"`
+	State         string             `db:"state" json:"state"`
+	FromUri       string             `db:"from_uri" json:"from_uri"`
+	ToUri         string             `db:"to_uri" json:"to_uri"`
+	SipCallID     *string            `db:"sip_call_id" json:"sip_call_id"`
+	ProviderID    *uuid.UUID         `db:"provider_id" json:"provider_id"`
+	StartedAt     pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	AnsweredAt    pgtype.Timestamptz `db:"answered_at" json:"answered_at"`
+	EndedAt       pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	HangupReason  *string            `db:"hangup_reason" json:"hangup_reason"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CallParticipant struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	CallID       uuid.UUID          `db:"call_id" json:"call_id"`
+	SubscriberID *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
+	Role         string             `db:"role" json:"role"`
+	Address      *string            `db:"address" json:"address"`
+	Direction    *string            `db:"direction" json:"direction"`
+	State        string             `db:"state" json:"state"`
+	JoinedAt     pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	LeftAt       pgtype.Timestamptz `db:"left_at" json:"left_at"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Conference struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	TenantID      uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	ApplicationID *uuid.UUID         `db:"application_id" json:"application_id"`
+	Name          string             `db:"name" json:"name"`
+	State         string             `db:"state" json:"state"`
+	StartedAt     pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	EndedAt       pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type ConferenceParticipant struct {
+	ID                uuid.UUID          `db:"id" json:"id"`
+	TenantID          uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	ConferenceID      uuid.UUID          `db:"conference_id" json:"conference_id"`
+	CallParticipantID *uuid.UUID         `db:"call_participant_id" json:"call_participant_id"`
+	State             string             `db:"state" json:"state"`
+	Muted             bool               `db:"muted" json:"muted"`
+	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	LeftAt            pgtype.Timestamptz `db:"left_at" json:"left_at"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type OutboxEvent struct {
 	ID            uuid.UUID          `db:"id" json:"id"`
 	Subject       string             `db:"subject" json:"subject"`
@@ -74,6 +132,20 @@ type ProcessedEvent struct {
 	EventID      uuid.UUID          `db:"event_id" json:"event_id"`
 	ProcessedAt  pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
 	Metadata     []byte             `db:"metadata" json:"metadata"`
+}
+
+type Recording struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	TenantID        uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	CallID          uuid.UUID          `db:"call_id" json:"call_id"`
+	Status          string             `db:"status" json:"status"`
+	StorageKey      *string            `db:"storage_key" json:"storage_key"`
+	Format          *string            `db:"format" json:"format"`
+	DurationSeconds *int32             `db:"duration_seconds" json:"duration_seconds"`
+	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	CompletedAt     pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Session struct {
@@ -156,6 +228,16 @@ type User struct {
 	DisabledAt    pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
 	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type VoiceApplication struct {
+	ID          uuid.UUID          `db:"id" json:"id"`
+	TenantID    uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	Name        string             `db:"name" json:"name"`
+	Description *string            `db:"description" json:"description"`
+	Status      string             `db:"status" json:"status"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type WebhookDelivery struct {
