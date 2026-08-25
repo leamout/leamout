@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 )
@@ -41,7 +40,9 @@ func (c *Client) Events(ctx context.Context, path string, handler EventHandler) 
 	if err != nil {
 		return fmt.Errorf("connect to OpenSIPS events: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("OpenSIPS events returned HTTP %d", resp.StatusCode)
@@ -66,9 +67,6 @@ func (c *Client) Events(ctx context.Context, path string, handler EventHandler) 
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		if err == io.EOF {
-			return nil
-		}
 		return fmt.Errorf("read OpenSIPS events: %w", err)
 	}
 
