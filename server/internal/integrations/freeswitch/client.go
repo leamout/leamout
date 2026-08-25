@@ -3,6 +3,7 @@ package freeswitch
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -20,9 +21,19 @@ type Client struct {
 	commandTimeout time.Duration
 	dialer         *net.Dialer
 
-	mu     sync.Mutex
-	conn   net.Conn
-	reader *bufio.Reader
+	mu       sync.Mutex
+	conn     net.Conn
+	reader   *bufio.Reader
+	done     chan struct{}
+	readErr  chan error
+	replyCh  chan Frame
+	closeErr error
+
+	writeMu   sync.Mutex
+	commandMu sync.Mutex
+
+	handlersMu sync.RWMutex
+	handlers   []EventHandler
 }
 
 func New(cfg Config) (*Client, error) {
@@ -45,11 +56,11 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.conn != nil {
+		c.mu.Unlock()
 		return nil
 	}
+	c.mu.Unlock()
 
 	conn, err := c.dialer.DialContext(ctx, "tcp", c.address)
 	if err != nil {
@@ -82,22 +93,40 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("FreeSWITCH authentication failed: %s", frame.ReplyText())
 	}
 
+	c.mu.Lock()
+	if c.conn != nil {
+		c.mu.Unlock()
+		_ = conn.Close()
+		return nil
+	}
 	c.conn = conn
 	c.reader = reader
+	c.done = make(chan struct{})
+	c.readErr = make(chan error, 1)
+	c.replyCh = make(chan Frame)
+	c.mu.Unlock()
+
+	go c.readLoop(conn, reader)
 	return nil
 }
 
 func (c *Client) Close() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	if c.conn == nil {
+		c.mu.Unlock()
 		return nil
 	}
-
-	err := c.conn.Close()
+	conn := c.conn
 	c.conn = nil
 	c.reader = nil
+	done := c.done
+	c.done = nil
+	c.mu.Unlock()
+
+	err := conn.Close()
+	if done != nil {
+		<-done
+	}
 	return err
 }
 
@@ -105,11 +134,21 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	if ctx == nil {
 		return Frame{}, fmt.Errorf("FreeSWITCH context is required")
 	}
+	command = strings.TrimSpace(command)
+	if command == "" {
+		return Frame{}, fmt.Errorf("FreeSWITCH command is required")
+	}
+
+	c.commandMu.Lock()
+	defer c.commandMu.Unlock()
 
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.conn == nil || c.reader == nil {
+	conn := c.conn
+	replyCh := c.replyCh
+	done := c.done
+	readErr := c.readErr
+	c.mu.Unlock()
+	if conn == nil || replyCh == nil || done == nil || readErr == nil {
 		return Frame{}, fmt.Errorf("FreeSWITCH client is not connected")
 	}
 
@@ -117,21 +156,104 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	if !ok {
 		deadline = time.Now().Add(c.commandTimeout)
 	}
-	if err := c.conn.SetDeadline(deadline); err != nil {
+	if err := conn.SetWriteDeadline(deadline); err != nil {
 		return Frame{}, fmt.Errorf("set FreeSWITCH command deadline: %w", err)
 	}
-	defer func() { _ = c.conn.SetDeadline(time.Time{}) }()
 
-	if _, err := writeCommand(c.conn, command); err != nil {
+	c.writeMu.Lock()
+	_, err := writeCommand(conn, command)
+	c.writeMu.Unlock()
+	if err != nil {
 		return Frame{}, fmt.Errorf("write FreeSWITCH command: %w", err)
 	}
 
-	frame, err := readFrame(c.reader)
-	if err != nil {
+	select {
+	case frame := <-replyCh:
+		return frame, nil
+	case err := <-readErr:
 		return Frame{}, fmt.Errorf("read FreeSWITCH response: %w", err)
+	case <-done:
+		return Frame{}, fmt.Errorf("FreeSWITCH connection closed")
+	case <-ctx.Done():
+		return Frame{}, fmt.Errorf("FreeSWITCH command: %w", ctx.Err())
+	}
+}
+
+func (c *Client) readLoop(conn net.Conn, reader *bufio.Reader) {
+	defer func() {
+		c.mu.Lock()
+		if c.conn == conn {
+			c.conn = nil
+			c.reader = nil
+			if c.readErr != nil {
+				select {
+				case c.readErr <- io.EOF:
+				default:
+				}
+			}
+			if c.done != nil {
+				close(c.done)
+			}
+		}
+		c.mu.Unlock()
+	}()
+
+	for {
+		frame, err := readFrame(reader)
+		if err != nil {
+			c.mu.Lock()
+			if c.readErr != nil {
+				select {
+				case c.readErr <- err:
+				default:
+				}
+			}
+			c.mu.Unlock()
+			return
+		}
+
+		switch frame.ContentType {
+		case ContentTypeCommandReply, ContentTypeAPIResponse:
+			c.replyCh <- frame
+		case ContentTypeEventPlain, ContentTypeEventJSON:
+			c.dispatchEvent(frame)
+		}
+	}
+}
+
+func (c *Client) dispatchEvent(frame Frame) {
+	event, err := eventFromFrame(frame)
+	if err != nil {
+		return
 	}
 
-	return frame, nil
+	c.handlersMu.RLock()
+	handlers := append([]EventHandler(nil), c.handlers...)
+	c.handlersMu.RUnlock()
+
+	for _, handler := range handlers {
+		_ = handler(context.Background(), event)
+	}
+}
+
+func eventFromFrame(frame Frame) (Event, error) {
+	event := Event{
+		Headers: frame.Headers,
+		Body:    frame.Body,
+		Name:    frame.Header("Event-Name"),
+	}
+	if frame.ContentType != ContentTypeEventJSON {
+		return event, nil
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(frame.Body), &payload); err != nil {
+		return Event{}, fmt.Errorf("decode FreeSWITCH JSON event: %w", err)
+	}
+	if name, ok := payload["Event-Name"].(string); ok {
+		event.Name = name
+	}
+	return event, nil
 }
 
 func writeCommand(conn net.Conn, command string) (int, error) {
@@ -158,7 +280,6 @@ func readFrame(reader *bufio.Reader) (Frame, error) {
 		headers[key] = value
 	}
 
-	contentType := headers["Content-Type"]
 	length := 0
 	if raw := headers["Content-Length"]; raw != "" {
 		var err error
@@ -176,7 +297,7 @@ func readFrame(reader *bufio.Reader) (Frame, error) {
 	}
 
 	return Frame{
-		ContentType: contentType,
+		ContentType: headers["Content-Type"],
 		Headers:     headers,
 		Body:        string(body),
 	}, nil
