@@ -16,21 +16,12 @@ func (c *Client) Publish(ctx context.Context, subject string, payload []byte) er
 }
 
 func (c *Client) PublishWithOptions(ctx context.Context, subject string, payload []byte, headers map[string]string, messageID string) error {
-	if err := c.validate(); err != nil {
+	if err := c.validatePublish(ctx, subject, payload); err != nil {
 		return err
 	}
-	if ctx == nil {
-		return fmt.Errorf("NATS context is required")
-	}
-	subject = strings.TrimSpace(subject)
-	if subject == "" {
-		return fmt.Errorf("NATS subject is required")
-	}
-	if len(payload) > MaxMessageSize {
-		return fmt.Errorf("NATS message payload is %d bytes; maximum is %d", len(payload), MaxMessageSize)
-	}
 
-	msg := &natsgo.Msg{Subject: subject, Data: payload}
+	msg := natsgo.NewMsg(subject)
+	msg.Data = payload
 	for key, value := range headers {
 		key = strings.TrimSpace(key)
 		if key != "" {
@@ -38,13 +29,30 @@ func (c *Client) PublishWithOptions(ctx context.Context, subject string, payload
 		}
 	}
 
-	var options []natsjs.PublishOpt
+	var opts []natsjs.PublishOpt
 	if messageID = strings.TrimSpace(messageID); messageID != "" {
-		options = append(options, natsjs.WithMsgID(messageID))
+		opts = append(opts, natsjs.WithMsgID(messageID))
 	}
 
-	if _, err := c.jetStream.PublishMsg(ctx, msg, options...); err != nil {
-		return fmt.Errorf("publish NATS message to %s: %w", subject, err)
+	if _, err := c.jetStream.PublishMsg(ctx, msg, opts...); err != nil {
+		return fmt.Errorf("publish NATS message to %q: %w", subject, err)
+	}
+
+	return nil
+}
+
+func (c *Client) validatePublish(ctx context.Context, subject string, payload []byte) error {
+	if err := c.validate(); err != nil {
+		return err
+	}
+	if ctx == nil {
+		return fmt.Errorf("NATS context is required")
+	}
+	if subject = strings.TrimSpace(subject); subject == "" {
+		return fmt.Errorf("NATS subject is required")
+	}
+	if len(payload) > MaxMessageSize {
+		return fmt.Errorf("NATS message payload is %d bytes; maximum is %d", len(payload), MaxMessageSize)
 	}
 
 	return nil
