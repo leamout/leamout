@@ -39,6 +39,7 @@ func (c *Client) BGAPI(ctx context.Context, command string) (Job, error) {
 	if !frame.OK() {
 		return Job{}, fmt.Errorf("FreeSWITCH background command failed: %s", frame.ReplyText())
 	}
+
 	return Job{ID: frame.Header("Job-UUID")}, nil
 }
 
@@ -61,6 +62,21 @@ func requiredArgument(name, value string) (string, error) {
 	return value, nil
 }
 
+func commandWord(value string) string {
+	if strings.ContainsAny(value, " \t\r\n\"'") {
+		return `"` + strings.ReplaceAll(value, `"`, `\"`) + `"`
+	}
+	return value
+}
+
+func commandWords(values ...string) string {
+	words := make([]string, 0, len(values))
+	for _, value := range values {
+		words = append(words, commandWord(value))
+	}
+	return strings.Join(words, " ")
+}
+
 func formatVariables(values map[string]string) string {
 	if len(values) == 0 {
 		return ""
@@ -74,7 +90,7 @@ func formatVariables(values map[string]string) string {
 
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
-		parts = append(parts, key+"="+values[key])
+		parts = append(parts, key+"="+commandWord(values[key]))
 	}
 	return "{" + strings.Join(parts, ",") + "}"
 }
