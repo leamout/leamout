@@ -1,6 +1,10 @@
-h1:xY7oslKwTmKLEjO9At2eO2k47mebGM9fSl1DmeB3hYs=
+h1:710a/u47xETcnCc6mrM84h3LW2n0t2fUpAdao4RN7iw=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
 004_create_auth_challenges.sql h1:yVvJgzsUttMAkx/yVjazq8LokrrXXvK/j/4a79eIq+c=
 005_create_sessions.sql h1:nlyKsvtY7V3JyBtUQf2fhX2CUi/AddcV+vF0Pl5rXqc=
+006_create_tenants.sql h1:trjyXdamKhN0EruoNYf4MqEpvtJNNDVjFCaTS6iNR2Q=
+007_create_tenant_members.sql h1:TppwHOVK8fbERvTmFU9J74quXFRf9n9ggswdT4cQ1kM=
+008_create_sip_domains.sql h1:2KI+NjkEYKsGOdeduqtDhlZ1GkSl/kDGxaWP9NU/iEA=
+009_create_subscribers.sql h1:IoC18NE78mhCLlhHDuEMhfTTUKUZM6IeCwe1MeT13Hg=

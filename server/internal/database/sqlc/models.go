@@ -48,6 +48,48 @@ type Session struct {
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type SipDomain struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	TenantID  uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	Domain    string             `db:"domain" json:"domain"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type Subscriber struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	SipDomainID  uuid.UUID          `db:"sip_domain_id" json:"sip_domain_id"`
+	Username     string             `db:"username" json:"username"`
+	Domain       string             `db:"domain" json:"domain"`
+	Ha1Md5       *string            `db:"ha1_md5" json:"ha1_md5"`
+	Ha1Sha256    *string            `db:"ha1_sha256" json:"ha1_sha256"`
+	Ha1Sha512256 *string            `db:"ha1_sha512_256" json:"ha1_sha512_256"`
+	DisplayName  *string            `db:"display_name" json:"display_name"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Tenant struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Slug      string             `db:"slug" json:"slug"`
+	Name      string             `db:"name" json:"name"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type TenantMember struct {
+	TenantID  uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	Role      string             `db:"role" json:"role"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type User struct {
 	ID            uuid.UUID          `db:"id" json:"id"`
 	Email         string             `db:"email" json:"email"`
