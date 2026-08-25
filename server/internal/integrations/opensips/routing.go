@@ -3,7 +3,6 @@ package opensips
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 )
 
@@ -34,18 +33,27 @@ func (c *Client) ListRoutes(ctx context.Context) (Response, error) {
 
 func routeParams(route Route) map[string]any {
 	return map[string]any{
-		"id": strings.TrimSpace(route.ID), "carrier": strings.TrimSpace(route.Carrier),
-		"prefix": strings.TrimSpace(route.Prefix), "uri": strings.TrimSpace(route.URI),
-		"priority": route.Priority, "enabled": route.Enabled,
+		"id":       strings.TrimSpace(route.ID),
+		"carrier":  strings.TrimSpace(route.Carrier),
+		"prefix":   strings.TrimSpace(route.Prefix),
+		"uri":      strings.TrimSpace(route.URI),
+		"priority": route.Priority,
+		"enabled":  route.Enabled,
 	}
 }
 
 func validateRoute(route Route) error {
-	if strings.TrimSpace(route.ID) == "" { return fmt.Errorf("OpenSIPS route ID is required") }
-	if strings.TrimSpace(route.Carrier) == "" { return fmt.Errorf("OpenSIPS route carrier is required") }
-	if strings.TrimSpace(route.URI) == "" { return fmt.Errorf("OpenSIPS route URI is required") }
-	if route.Priority < 0 { return fmt.Errorf("OpenSIPS route priority must not be negative") }
+	if strings.TrimSpace(route.ID) == "" {
+		return fmt.Errorf("OpenSIPS route ID is required")
+	}
+	if strings.TrimSpace(route.Carrier) == "" {
+		return fmt.Errorf("OpenSIPS route carrier is required")
+	}
+	if strings.TrimSpace(route.URI) == "" {
+		return fmt.Errorf("OpenSIPS route URI is required")
+	}
+	if route.Priority < 0 {
+		return fmt.Errorf("OpenSIPS route priority must not be negative")
+	}
 	return nil
 }
-
-var _ = strconv.IntSize
