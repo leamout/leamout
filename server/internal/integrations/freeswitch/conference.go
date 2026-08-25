@@ -2,13 +2,12 @@ package freeswitch
 
 import (
 	"context"
-	"fmt"
 	"strings"
 )
 
 func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (ConferenceResult, error) {
-	if strings.TrimSpace(req.Name) == "" || strings.TrimSpace(req.Command) == "" {
-		return ConferenceResult{}, fmt.Errorf("FreeSWITCH conference name and command are required")
+	if err := req.Validate(); err != nil {
+		return ConferenceResult{}, err
 	}
 	args := append([]string{req.Name, req.Command}, req.Arguments...)
 	reply, err := c.Command(ctx, "conference "+strings.Join(args, " "))
