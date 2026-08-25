@@ -19,6 +19,8 @@ INSERT INTO conference_participants (
     call_participant_id,
     state,
     muted,
+    deaf,
+    speaking,
     joined_at
 ) VALUES (
     $1,
@@ -26,9 +28,11 @@ INSERT INTO conference_participants (
     $3,
     COALESCE($4, 'joining'),
     COALESCE($5, false),
-    $6
+    COALESCE($6, false),
+    COALESCE($7, false),
+    $8
 )
-RETURNING id, tenant_id, conference_id, call_participant_id, state, muted, joined_at, left_at, created_at, updated_at
+RETURNING id, tenant_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
 `
 
 type CreateConferenceParticipantParams struct {
@@ -37,6 +41,8 @@ type CreateConferenceParticipantParams struct {
 	CallParticipantID *uuid.UUID         `db:"call_participant_id" json:"call_participant_id"`
 	State             interface{}        `db:"state" json:"state"`
 	Muted             interface{}        `db:"muted" json:"muted"`
+	Deaf              interface{}        `db:"deaf" json:"deaf"`
+	Speaking          interface{}        `db:"speaking" json:"speaking"`
 	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
 }
 
@@ -47,6 +53,8 @@ func (q *Queries) CreateConferenceParticipant(ctx context.Context, arg CreateCon
 		arg.CallParticipantID,
 		arg.State,
 		arg.Muted,
+		arg.Deaf,
+		arg.Speaking,
 		arg.JoinedAt,
 	)
 	var i ConferenceParticipant
@@ -57,6 +65,8 @@ func (q *Queries) CreateConferenceParticipant(ctx context.Context, arg CreateCon
 		&i.CallParticipantID,
 		&i.State,
 		&i.Muted,
+		&i.Deaf,
+		&i.Speaking,
 		&i.JoinedAt,
 		&i.LeftAt,
 		&i.CreatedAt,
@@ -66,7 +76,7 @@ func (q *Queries) CreateConferenceParticipant(ctx context.Context, arg CreateCon
 }
 
 const getConferenceParticipant = `-- name: GetConferenceParticipant :one
-SELECT id, tenant_id, conference_id, call_participant_id, state, muted, joined_at, left_at, created_at, updated_at
+SELECT id, tenant_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
 FROM conference_participants
 WHERE tenant_id = $1
   AND id = $2
@@ -88,6 +98,8 @@ func (q *Queries) GetConferenceParticipant(ctx context.Context, arg GetConferenc
 		&i.CallParticipantID,
 		&i.State,
 		&i.Muted,
+		&i.Deaf,
+		&i.Speaking,
 		&i.JoinedAt,
 		&i.LeftAt,
 		&i.CreatedAt,
@@ -97,7 +109,7 @@ func (q *Queries) GetConferenceParticipant(ctx context.Context, arg GetConferenc
 }
 
 const listConferenceParticipants = `-- name: ListConferenceParticipants :many
-SELECT id, tenant_id, conference_id, call_participant_id, state, muted, joined_at, left_at, created_at, updated_at
+SELECT id, tenant_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
 FROM conference_participants
 WHERE tenant_id = $1
   AND conference_id = $2
@@ -125,6 +137,8 @@ func (q *Queries) ListConferenceParticipants(ctx context.Context, arg ListConfer
 			&i.CallParticipantID,
 			&i.State,
 			&i.Muted,
+			&i.Deaf,
+			&i.Speaking,
 			&i.JoinedAt,
 			&i.LeftAt,
 			&i.CreatedAt,
@@ -145,6 +159,8 @@ UPDATE conference_participants
 SET
     state = $1,
     muted = COALESCE($2, muted),
+    deaf = COALESCE($3, deaf),
+    speaking = COALESCE($4, speaking),
     joined_at = CASE
         WHEN $1::text = 'joined' THEN COALESCE(joined_at, NOW())
         ELSE joined_at
@@ -154,14 +170,16 @@ SET
         ELSE left_at
     END,
     updated_at = NOW()
-WHERE tenant_id = $3
-  AND id = $4
-RETURNING id, tenant_id, conference_id, call_participant_id, state, muted, joined_at, left_at, created_at, updated_at
+WHERE tenant_id = $5
+  AND id = $6
+RETURNING id, tenant_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
 `
 
 type UpdateConferenceParticipantStateParams struct {
 	State    string    `db:"state" json:"state"`
 	Muted    *bool     `db:"muted" json:"muted"`
+	Deaf     *bool     `db:"deaf" json:"deaf"`
+	Speaking *bool     `db:"speaking" json:"speaking"`
 	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
 	ID       uuid.UUID `db:"id" json:"id"`
 }
@@ -170,6 +188,8 @@ func (q *Queries) UpdateConferenceParticipantState(ctx context.Context, arg Upda
 	row := q.db.QueryRow(ctx, updateConferenceParticipantState,
 		arg.State,
 		arg.Muted,
+		arg.Deaf,
+		arg.Speaking,
 		arg.TenantID,
 		arg.ID,
 	)
@@ -181,6 +201,8 @@ func (q *Queries) UpdateConferenceParticipantState(ctx context.Context, arg Upda
 		&i.CallParticipantID,
 		&i.State,
 		&i.Muted,
+		&i.Deaf,
+		&i.Speaking,
 		&i.JoinedAt,
 		&i.LeftAt,
 		&i.CreatedAt,

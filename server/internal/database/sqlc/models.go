@@ -104,6 +104,8 @@ type ConferenceParticipant struct {
 	CallParticipantID *uuid.UUID         `db:"call_participant_id" json:"call_participant_id"`
 	State             string             `db:"state" json:"state"`
 	Muted             bool               `db:"muted" json:"muted"`
+	Deaf              bool               `db:"deaf" json:"deaf"`
+	Speaking          bool               `db:"speaking" json:"speaking"`
 	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
 	LeftAt            pgtype.Timestamptz `db:"left_at" json:"left_at"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
