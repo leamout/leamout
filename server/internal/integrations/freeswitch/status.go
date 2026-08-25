@@ -2,6 +2,8 @@ package freeswitch
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 )
 
@@ -53,4 +55,43 @@ func (c *Client) SofiaStatus(ctx context.Context, profile string) (SIPProfileSta
 		return SIPProfileStatus{}, err
 	}
 	return SIPProfileStatus{Profile: profile, Raw: reply.Body}, nil
+}
+
+func decodeRows[T any](body string, mapRow func(map[string]any) T) ([]T, error) {
+	rows, err := responseRows(body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]T, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, mapRow(row))
+	}
+	return result, nil
+}
+
+func responseRows(body string) ([]map[string]any, error) {
+	var rows []map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(body)), &rows); err == nil {
+		return rows, nil
+	}
+
+	var envelope struct {
+		Rows []map[string]any `json:"rows"`
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSpace(body)), &envelope); err != nil {
+		return nil, fmt.Errorf("decode FreeSWITCH status response: %w", err)
+	}
+	if envelope.Rows == nil {
+		return nil, fmt.Errorf("decode FreeSWITCH status response: missing rows field")
+	}
+	return envelope.Rows, nil
+}
+
+func stringField(row map[string]any, key string) string {
+	value, ok := row[key]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprint(value)
 }
