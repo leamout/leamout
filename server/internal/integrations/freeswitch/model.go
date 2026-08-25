@@ -88,3 +88,71 @@ const (
 	EventFormatPlain EventFormat = "plain"
 	EventFormatJSON  EventFormat = "json"
 )
+
+type OriginateRequest struct {
+	Endpoint    string
+	Destination string
+	CallerID    string
+	Variables   map[string]string
+}
+
+type TransferRequest struct {
+	CallID      string
+	Destination string
+	Dialplan    string
+	Context     string
+}
+
+type RecordRequest struct {
+	CallID string
+	Path   string
+	Action string
+}
+
+type Channel struct {
+	UUID  string
+	Name  string
+	State string
+}
+
+type Call struct {
+	UUID         string
+	CallerName   string
+	CallerNumber string
+	Destination  string
+	State        string
+}
+
+type Endpoint struct {
+	Name string
+	Type string
+	Data string
+}
+
+type SIPProfileStatus struct {
+	Profile string
+	Raw     string
+}
+
+type ConferenceRequest struct {
+	Name      string
+	Command   string
+	Arguments []string
+}
+
+type ConferenceResult struct {
+	Text string
+	Body string
+}
+
+type ConferenceMember struct {
+	ID       string
+	CallerID string
+	Muted    bool
+	Deaf     bool
+}
+
+type ConferenceMembers struct {
+	Conference string
+	Members    []ConferenceMember
+}
