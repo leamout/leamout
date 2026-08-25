@@ -70,6 +70,9 @@ services:
     command:
       - --config
       - /etc/coturn/turnserver.conf
+      - --realm=${TURN_REALM:?TURN_REALM is required}
+      - --static-auth-secret=${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+      - --external-ip=${TURN_EXTERNAL_IP:?TURN_EXTERNAL_IP is required}
     volumes:
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
     ports:
