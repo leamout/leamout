@@ -10,7 +10,7 @@ func (c *Client) SetVariable(ctx context.Context, callID, name, value string) er
 	if strings.TrimSpace(callID) == "" || strings.TrimSpace(name) == "" {
 		return fmt.Errorf("FreeSWITCH call ID and variable name are required")
 	}
-	return c.ok(ctx, "uuid_setvar "+callID+" "+name+" "+value)
+	return c.commandOK(ctx, "uuid_setvar "+callID+" "+name+" "+value)
 }
 
 func (c *Client) GetVariable(ctx context.Context, callID, name string) (string, error) {
