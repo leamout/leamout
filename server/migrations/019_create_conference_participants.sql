@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS conference_participants (
     call_participant_id UUID REFERENCES call_participants(id) ON DELETE SET NULL,
     state TEXT NOT NULL DEFAULT 'joined',
     muted BOOLEAN NOT NULL DEFAULT false,
+    deaf BOOLEAN NOT NULL DEFAULT false,
+    speaking BOOLEAN NOT NULL DEFAULT false,
     joined_at TIMESTAMPTZ,
     left_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
