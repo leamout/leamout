@@ -65,7 +65,9 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 	if err != nil {
 		return Response{}, fmt.Errorf("execute OpenSIPS command: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return Response{}, fmt.Errorf("OpenSIPS command returned HTTP %d", resp.StatusCode)
