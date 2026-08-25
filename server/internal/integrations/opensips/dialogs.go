@@ -29,5 +29,5 @@ func (c *Client) dialogCommand(ctx context.Context, command, dialogID string) (R
 	if dialogID == "" {
 		return Response{}, fmt.Errorf("OpenSIPS dialog ID is required")
 	}
-	return c.Command(ctx, Command{Name: command, Params: map[string]string{"id": dialogID}})
+	return c.Command(ctx, Command{Name: command, Params: map[string]any{"id": dialogID}})
 }
