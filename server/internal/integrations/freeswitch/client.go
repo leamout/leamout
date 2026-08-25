@@ -12,10 +12,26 @@ import (
 	"time"
 )
 
-type Client struct {
-	address  string
-	password string
+// MediaController defines the contract for FreeSWITCH media server operations.
+// This interface enables testability and allows swapping implementations.
+type MediaController interface {
+	// Lifecycle
+	Connect(ctx context.Context) error
+	Close() error
+	HealthCheck(ctx context.Context) error
 
+	// Low-level commands
+	Command(ctx context.Context, command string) (Reply, error)
+	BGAPI(ctx context.Context, command string) (Job, error)
+
+	// Events
+	Subscribe(ctx context.Context, format EventFormat, events []string, handler EventHandler) error
+}
+
+// Client implements MediaController via ESL (Event Socket Layer).
+type Client struct {
+	address        string
+	password       string
 	connectTimeout time.Duration
 	commandTimeout time.Duration
 	dialer         *net.Dialer
@@ -34,11 +50,11 @@ type Client struct {
 	handlers   []EventHandler
 }
 
-func New(cfg Config) (*Client, error) {
+// New returns a MediaController (not *Client) for better testability.
+func New(cfg Config) (MediaController, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
-
 	return &Client{
 		address:        cfg.Address,
 		password:       cfg.Password,
@@ -66,11 +82,13 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	reader := bufio.NewReader(conn)
+
 	frame, err := readFrame(reader)
 	if err != nil {
 		_ = conn.Close()
 		return fmt.Errorf("read FreeSWITCH authentication request: %w", err)
 	}
+
 	if frame.ContentType != ContentTypeAuthRequest {
 		_ = conn.Close()
 		return fmt.Errorf("unexpected FreeSWITCH greeting: %q", frame.ContentType)
@@ -86,6 +104,7 @@ func (c *Client) Connect(ctx context.Context) error {
 		_ = conn.Close()
 		return fmt.Errorf("read FreeSWITCH authentication response: %w", err)
 	}
+
 	if frame.ContentType != ContentTypeCommandReply || !frame.OK() {
 		_ = conn.Close()
 		return fmt.Errorf("FreeSWITCH authentication failed: %s", frame.ReplyText())
@@ -105,6 +124,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Unlock()
 
 	go c.readLoop(conn, reader)
+
 	return nil
 }
 
@@ -128,10 +148,29 @@ func (c *Client) Close() error {
 	return err
 }
 
+// HealthCheck verifies FreeSWITCH is alive without sending a heavy command.
+// Used by Kubernetes liveness/readiness probes and worker health monitoring.
+func (c *Client) HealthCheck(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	reply, err := c.Command(ctx, "status")
+	if err != nil {
+		return fmt.Errorf("FreeSWITCH health check failed: %w", err)
+	}
+
+	if !strings.Contains(strings.ToUpper(reply.Text), "UP") {
+		return fmt.Errorf("FreeSWITCH is not running properly")
+	}
+
+	return nil
+}
+
 func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	if ctx == nil {
 		return Frame{}, fmt.Errorf("FreeSWITCH context is required")
 	}
+
 	command = strings.TrimSpace(command)
 	if command == "" {
 		return Frame{}, fmt.Errorf("FreeSWITCH command is required")
@@ -146,6 +185,7 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	done := c.done
 	readErr := c.readErr
 	c.mu.Unlock()
+
 	if conn == nil || replyCh == nil || done == nil || readErr == nil {
 		return Frame{}, fmt.Errorf("FreeSWITCH client is not connected")
 	}
@@ -154,6 +194,7 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	if !ok {
 		deadline = time.Now().Add(c.commandTimeout)
 	}
+
 	if err := conn.SetWriteDeadline(deadline); err != nil {
 		return Frame{}, fmt.Errorf("set FreeSWITCH command deadline: %w", err)
 	}
@@ -161,6 +202,7 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	c.writeMu.Lock()
 	_, err := writeCommand(conn, command)
 	c.writeMu.Unlock()
+
 	if err != nil {
 		return Frame{}, fmt.Errorf("write FreeSWITCH command: %w", err)
 	}
@@ -219,6 +261,9 @@ func (c *Client) readLoop(conn net.Conn, reader *bufio.Reader) {
 	}
 }
 
+// dispatchEvent sends events to all registered handlers asynchronously.
+// Each handler runs in its own goroutine with a 5-second timeout to prevent
+// slow handlers from blocking the event read loop.
 func (c *Client) dispatchEvent(frame Frame) {
 	event := Event{
 		Headers: frame.Headers,
@@ -231,7 +276,14 @@ func (c *Client) dispatchEvent(frame Frame) {
 	c.handlersMu.RUnlock()
 
 	for _, handler := range handlers {
-		_ = handler(context.Background(), event)
+		go func(h EventHandler) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := h(ctx, event); err != nil {
+				// TODO: Replace with your actual logger (e.g., slog or zap)
+				// log.Printf("FreeSWITCH event handler error: %v", err)
+			}
+		}(handler)
 	}
 }
 
@@ -241,7 +293,6 @@ func writeCommand(conn net.Conn, command string) (int, error) {
 
 func readFrame(reader *bufio.Reader) (Frame, error) {
 	headers := make(map[string]string)
-
 	for {
 		line, err := reader.ReadString('\n')
 		if err != nil {
@@ -251,7 +302,6 @@ func readFrame(reader *bufio.Reader) (Frame, error) {
 		if line == "" {
 			break
 		}
-
 		key, value, ok := strings.Cut(line, ": ")
 		if !ok {
 			return Frame{}, fmt.Errorf("invalid FreeSWITCH header %q", line)
