@@ -2,7 +2,6 @@ package freeswitch
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -43,14 +42,13 @@ func (c *Client) BGAPI(ctx context.Context, command string) (Job, error) {
 	return Job{ID: frame.Header("Job-UUID")}, nil
 }
 
-func (c *Client) ok(ctx context.Context, command string) error {
+func (c *Client) commandOK(ctx context.Context, command string) error {
 	reply, err := c.Command(ctx, command)
 	if err != nil {
 		return err
 	}
-	body := strings.TrimSpace(reply.Body)
-	if strings.HasPrefix(body, "-ERR") {
-		return fmt.Errorf("FreeSWITCH command failed: %s", body)
+	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(reply.Body)), "-ERR") {
+		return fmt.Errorf("FreeSWITCH command failed: %s", strings.TrimSpace(reply.Body))
 	}
 	return nil
 }
@@ -63,7 +61,7 @@ func requiredArgument(name, value string) (string, error) {
 	return value, nil
 }
 
-func variables(values map[string]string) string {
+func formatVariables(values map[string]string) string {
 	if len(values) == 0 {
 		return ""
 	}
@@ -79,48 +77,4 @@ func variables(values map[string]string) string {
 		parts = append(parts, key+"="+values[key])
 	}
 	return "{" + strings.Join(parts, ",") + "}"
-}
-
-func decodeRows[T any](body string, mapRow func(map[string]any) T) ([]T, error) {
-	rows, err := responseRows(body)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]T, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, mapRow(row))
-	}
-	return result, nil
-}
-
-func responseRows(body string) ([]map[string]any, error) {
-	var raw json.RawMessage
-	if err := json.Unmarshal([]byte(strings.TrimSpace(body)), &raw); err != nil {
-		return nil, fmt.Errorf("decode FreeSWITCH JSON response: %w", err)
-	}
-
-	var rows []map[string]any
-	if err := json.Unmarshal(raw, &rows); err == nil {
-		return rows, nil
-	}
-
-	var envelope struct {
-		Rows []map[string]any `json:"rows"`
-	}
-	if err := json.Unmarshal(raw, &envelope); err != nil {
-		return nil, fmt.Errorf("decode FreeSWITCH JSON response envelope: %w", err)
-	}
-	if envelope.Rows == nil {
-		return nil, fmt.Errorf("decode FreeSWITCH JSON response: missing rows field")
-	}
-	return envelope.Rows, nil
-}
-
-func stringField(row map[string]any, key string) string {
-	value, ok := row[key]
-	if !ok {
-		return ""
-	}
-	return fmt.Sprint(value)
 }
