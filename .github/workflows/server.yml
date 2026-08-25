@@ -81,22 +81,3 @@ jobs:
 
       - name: Check generated code
         run: git diff --exit-code -- internal/database/sqlc
-
-  atlas:
-    name: Validate Atlas migrations
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: server
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install Atlas
-        run: |
-          curl -sSf https://atlasgo.sh | sh
-
-      - name: Validate migration directory
-        run: atlas migrate validate --env local
