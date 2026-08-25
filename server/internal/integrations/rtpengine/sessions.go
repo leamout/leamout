@@ -26,8 +26,8 @@ func (s Session) WithToTag(toTag string) Session {
 
 func (s Session) params(sdp string, flags []string) map[string]any {
 	params := map[string]any{
-		"call-id":  s.CallID,
-		"from-tag": s.FromTag,
+		"call-id":    s.CallID,
+		"from-tag":   s.FromTag,
 		"via-branch": s.Branch,
 	}
 
