@@ -133,7 +133,6 @@ func (c *Client) Channels(ctx context.Context) ([]Channel, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return decodeRows(reply.Body, func(row map[string]any) Channel {
 		return Channel{UUID: stringField(row, "uuid"), Name: stringField(row, "name"), State: stringField(row, "state")}
 	})
@@ -144,7 +143,6 @@ func (c *Client) Calls(ctx context.Context) ([]Call, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return decodeRows(reply.Body, func(row map[string]any) Call {
 		return Call{
 			UUID:         stringField(row, "uuid"),
@@ -161,7 +159,6 @@ func (c *Client) Endpoints(ctx context.Context) ([]Endpoint, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return decodeRows(reply.Body, func(row map[string]any) Endpoint {
 		return Endpoint{Name: stringField(row, "name"), Type: stringField(row, "type"), Data: stringField(row, "data")}
 	})
@@ -205,8 +202,7 @@ func (c *Client) ListConferenceMembers(ctx context.Context, conference string) (
 		return ConferenceMembers{}, err
 	}
 
-	members := parseConferenceMembers(reply.Body)
-	return ConferenceMembers{Conference: conference, Members: members}, nil
+	return ConferenceMembers{Conference: conference, Members: parseConferenceMembers(reply.Body)}, nil
 }
 
 func (c *Client) MuteMember(ctx context.Context, conference, memberID string) error {
@@ -238,21 +234,24 @@ func (c *Client) UnlockConference(ctx context.Context, conference string) error 
 }
 
 func (c *Client) conferenceMemberCommand(ctx context.Context, conference, command, memberID string) error {
-	if strings.TrimSpace(memberID) == "" {
-		return fmt.Errorf("FreeSWITCH conference member ID is required")
+	memberID, err := requiredArgument("conference member ID", memberID)
+	if err != nil {
+		return err
 	}
 	return c.conferenceCommand(ctx, conference, command, memberID)
 }
 
 func (c *Client) conferenceCommand(ctx context.Context, conference, command string, args ...string) error {
-	if strings.TrimSpace(conference) == "" {
-		return fmt.Errorf("FreeSWITCH conference name is required")
+	conference, err := requiredArgument("conference name", conference)
+	if err != nil {
+		return err
 	}
-	if strings.TrimSpace(command) == "" {
-		return fmt.Errorf("FreeSWITCH conference command is required")
+	command, err = requiredArgument("conference command", command)
+	if err != nil {
+		return err
 	}
 
-	_, err := c.Conference(ctx, ConferenceRequest{Name: conference, Command: command, Arguments: args})
+	_, err = c.Conference(ctx, ConferenceRequest{Name: conference, Command: command, Arguments: args})
 	return err
 }
 
@@ -301,20 +300,15 @@ func mergeVariable(prefix, key, value string) string {
 	return strings.TrimSuffix(prefix, "}") + "," + key + "=" + value + "}"
 }
 
-func decodeRows(body string, mapRow func(map[string]any) any) ([]Channel, error) {
+func decodeRows[T any](body string, mapRow func(map[string]any) T) ([]T, error) {
 	rows, err := responseRows(body)
 	if err != nil {
 		return nil, err
 	}
 
-	result := make([]Channel, 0, len(rows))
+	result := make([]T, 0, len(rows))
 	for _, row := range rows {
-		value := mapRow(row)
-		channel, ok := value.(Channel)
-		if !ok {
-			return nil, fmt.Errorf("unexpected FreeSWITCH channel response type")
-		}
-		result = append(result, channel)
+		result = append(result, mapRow(row))
 	}
 	return result, nil
 }
