@@ -49,19 +49,19 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 }
 
 func (c *Client) Hangup(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_kill "+required("call ID", callID))
+	return c.ok(ctx, "uuid_kill "+requireArgument("call ID", callID))
 }
 
 func (c *Client) Hold(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_hold "+required("call ID", callID))
+	return c.ok(ctx, "uuid_hold "+requireArgument("call ID", callID))
 }
 
 func (c *Client) Unhold(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_unhold "+required("call ID", callID))
+	return c.ok(ctx, "uuid_unhold "+requireArgument("call ID", callID))
 }
 
 func (c *Client) Break(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_break "+required("call ID", callID)+" all")
+	return c.ok(ctx, "uuid_break "+requireArgument("call ID", callID)+" all")
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
@@ -69,15 +69,15 @@ func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
 		return fmt.Errorf("FreeSWITCH transfer call ID and destination are required")
 	}
 
-	command := "uuid_transfer " + req.CallID + " " + req.Destination
+	args := []string{req.CallID, req.Destination}
 	if req.Dialplan != "" {
-		command += " " + req.Dialplan
+		args = append(args, req.Dialplan)
 	}
 	if req.Context != "" {
-		command += " " + req.Context
+		args = append(args, req.Context)
 	}
 
-	return c.ok(ctx, command)
+	return c.ok(ctx, "uuid_transfer "+strings.Join(args, " "))
 }
 
 func (c *Client) Record(ctx context.Context, req RecordRequest) error {
@@ -85,7 +85,7 @@ func (c *Client) Record(ctx context.Context, req RecordRequest) error {
 		return fmt.Errorf("FreeSWITCH record call ID and path are required")
 	}
 
-	action := req.Action
+	action := strings.TrimSpace(req.Action)
 	if action == "" {
 		action = "start"
 	}
@@ -138,10 +138,7 @@ func (c *Client) SofiaStatus(ctx context.Context, profile string) (SIPProfileSta
 		return SIPProfileStatus{}, err
 	}
 
-	return SIPProfileStatus{
-		Profile: profile,
-		Raw:     reply.Body,
-	}, nil
+	return SIPProfileStatus{Profile: profile, Raw: reply.Body}, nil
 }
 
 func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (ConferenceResult, error) {
@@ -149,44 +146,35 @@ func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (Confere
 		return ConferenceResult{}, fmt.Errorf("FreeSWITCH conference name and command are required")
 	}
 
-	command := "conference " + req.Name + " " + req.Command
-	if len(req.Arguments) > 0 {
-		command += " " + strings.Join(req.Arguments, " ")
-	}
-
-	reply, err := c.Command(ctx, command)
+	args := append([]string{req.Name, req.Command}, req.Arguments...)
+	reply, err := c.Command(ctx, "conference "+strings.Join(args, " "))
 	if err != nil {
 		return ConferenceResult{}, err
 	}
 
-	return ConferenceResult{
-		Text: reply.Text,
-		Body: reply.Body,
-	}, nil
+	return ConferenceResult{Text: reply.Text, Body: reply.Body}, nil
 }
 
 func (c *Client) MuteMember(ctx context.Context, conference, memberID string) error {
-	_, err := c.Conference(ctx, ConferenceRequest{
-		Name:      conference,
-		Command:   "mute",
-		Arguments: []string{memberID},
-	})
-	return err
+	return c.conferenceMemberCommand(ctx, conference, "mute", memberID)
 }
 
 func (c *Client) UnmuteMember(ctx context.Context, conference, memberID string) error {
-	_, err := c.Conference(ctx, ConferenceRequest{
-		Name:      conference,
-		Command:   "unmute",
-		Arguments: []string{memberID},
-	})
-	return err
+	return c.conferenceMemberCommand(ctx, conference, "unmute", memberID)
 }
 
 func (c *Client) KickMember(ctx context.Context, conference, memberID string) error {
+	return c.conferenceMemberCommand(ctx, conference, "kick", memberID)
+}
+
+func (c *Client) conferenceMemberCommand(ctx context.Context, conference, command, memberID string) error {
+	if strings.TrimSpace(conference) == "" || strings.TrimSpace(memberID) == "" {
+		return fmt.Errorf("FreeSWITCH conference and member ID are required")
+	}
+
 	_, err := c.Conference(ctx, ConferenceRequest{
 		Name:      conference,
-		Command:   "kick",
+		Command:   command,
 		Arguments: []string{memberID},
 	})
 	return err
@@ -197,17 +185,17 @@ func (c *Client) ok(ctx context.Context, command string) error {
 	if err != nil {
 		return err
 	}
-	if strings.HasPrefix(reply.Body, "-ERR") {
+	if strings.HasPrefix(strings.TrimSpace(reply.Body), "-ERR") {
 		return fmt.Errorf("FreeSWITCH command failed: %s", strings.TrimSpace(reply.Body))
 	}
 
 	return nil
 }
 
-func required(name, value string) string {
+func requireArgument(name, value string) string {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return ""
+		panic("required argument: " + name)
 	}
 	return value
 }
