@@ -104,6 +104,8 @@ type ConferenceParticipant struct {
 	CallParticipantID *uuid.UUID         `db:"call_participant_id" json:"call_participant_id"`
 	State             string             `db:"state" json:"state"`
 	Muted             bool               `db:"muted" json:"muted"`
+	Deaf              bool               `db:"deaf" json:"deaf"`
+	Speaking          bool               `db:"speaking" json:"speaking"`
 	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
 	LeftAt            pgtype.Timestamptz `db:"left_at" json:"left_at"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -140,6 +142,10 @@ type Recording struct {
 	CallID          uuid.UUID          `db:"call_id" json:"call_id"`
 	Status          string             `db:"status" json:"status"`
 	StorageKey      *string            `db:"storage_key" json:"storage_key"`
+	StorageProvider *string            `db:"storage_provider" json:"storage_provider"`
+	StorageBucket   *string            `db:"storage_bucket" json:"storage_bucket"`
+	StorageUrl      *string            `db:"storage_url" json:"storage_url"`
+	FileSizeBytes   *int64             `db:"file_size_bytes" json:"file_size_bytes"`
 	Format          *string            `db:"format" json:"format"`
 	DurationSeconds *int32             `db:"duration_seconds" json:"duration_seconds"`
 	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`

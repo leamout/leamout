@@ -5,6 +5,8 @@ INSERT INTO conference_participants (
     call_participant_id,
     state,
     muted,
+    deaf,
+    speaking,
     joined_at
 ) VALUES (
     sqlc.arg(tenant_id),
@@ -12,6 +14,8 @@ INSERT INTO conference_participants (
     sqlc.narg(call_participant_id),
     COALESCE(sqlc.narg(state), 'joining'),
     COALESCE(sqlc.narg(muted), false),
+    COALESCE(sqlc.narg(deaf), false),
+    COALESCE(sqlc.narg(speaking), false),
     sqlc.narg(joined_at)
 )
 RETURNING *;
@@ -35,6 +39,8 @@ UPDATE conference_participants
 SET
     state = sqlc.arg(state),
     muted = COALESCE(sqlc.narg(muted), muted),
+    deaf = COALESCE(sqlc.narg(deaf), deaf),
+    speaking = COALESCE(sqlc.narg(speaking), speaking),
     joined_at = CASE
         WHEN sqlc.arg(state)::text = 'joined' THEN COALESCE(joined_at, NOW())
         ELSE joined_at

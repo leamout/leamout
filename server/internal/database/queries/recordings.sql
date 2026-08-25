@@ -4,6 +4,10 @@ INSERT INTO recordings (
     call_id,
     status,
     storage_key,
+    storage_provider,
+    storage_bucket,
+    storage_url,
+    file_size_bytes,
     format,
     started_at
 ) VALUES (
@@ -11,6 +15,10 @@ INSERT INTO recordings (
     sqlc.arg(call_id),
     COALESCE(sqlc.narg(status), 'recording'),
     sqlc.narg(storage_key),
+    sqlc.narg(storage_provider),
+    sqlc.narg(storage_bucket),
+    sqlc.narg(storage_url),
+    sqlc.narg(file_size_bytes),
     sqlc.narg(format),
     sqlc.narg(started_at)
 )
@@ -35,8 +43,12 @@ UPDATE recordings
 SET
     status = 'completed',
     storage_key = COALESCE(sqlc.narg(storage_key), storage_key),
+    storage_provider = COALESCE(sqlc.narg(storage_provider), storage_provider),
+    storage_bucket = COALESCE(sqlc.narg(storage_bucket), storage_bucket),
+    storage_url = COALESCE(sqlc.narg(storage_url), storage_url),
+    file_size_bytes = COALESCE(sqlc.narg(file_size_bytes), file_size_bytes),
     format = COALESCE(sqlc.narg(format), format),
-    duration_seconds = sqlc.narg(duration_seconds),
+    duration_seconds = COALESCE(sqlc.narg(duration_seconds), duration_seconds),
     completed_at = COALESCE(completed_at, NOW()),
     updated_at = NOW()
 WHERE tenant_id = sqlc.arg(tenant_id)
