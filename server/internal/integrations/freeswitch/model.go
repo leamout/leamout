@@ -144,3 +144,15 @@ type ConferenceResult struct {
 	Text string
 	Body string
 }
+
+type ConferenceMember struct {
+	ID       string
+	CallerID string
+	Muted    bool
+	Deaf     bool
+}
+
+type ConferenceMembers struct {
+	Conference string
+	Members    []ConferenceMember
+}
