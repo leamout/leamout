@@ -86,7 +86,7 @@ func (c *Client) do(ctx context.Context, command Command, params map[string]any)
 
 	return Response{}, fmt.Errorf(
 		"RTPEngine command failed after %d attempts: %w",
-		attempts(c.maxRetry, lastErr),
+		c.maxRetry+1,
 		lastErr,
 	)
 }
@@ -125,14 +125,7 @@ func (c *Client) doOnce(ctx context.Context, command Command, params map[string]
 
 func retryable(err error) bool {
 	var netErr net.Error
-	return errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary())
-}
-
-func attempts(maxRetry int, err error) int {
-	if err == nil {
-		return 0
-	}
-	return maxRetry + 1
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 func waitRetry(ctx context.Context, delay time.Duration) error {
