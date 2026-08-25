@@ -13,7 +13,11 @@ type Config struct {
 }
 
 func DefaultConfig(url string) Config {
-	return Config{URL: strings.TrimSpace(url), ConnectTimeout: 5 * time.Second, RequestTimeout: 5 * time.Second}
+	return Config{
+		URL:            strings.TrimSpace(url),
+		ConnectTimeout: 5 * time.Second,
+		RequestTimeout: 5 * time.Second,
+	}
 }
 
 type Command struct {
@@ -29,9 +33,9 @@ func (c Command) Validate() error {
 }
 
 type Response struct {
-	JSONRPC string `json:"jsonrpc"`
-	ID      any    `json:"id"`
-	Result  any    `json:"result,omitempty"`
+	JSONRPC string    `json:"jsonrpc"`
+	ID      any       `json:"id"`
+	Result  any       `json:"result,omitempty"`
 	Error   *RPCError `json:"error,omitempty"`
 }
 
@@ -57,9 +61,19 @@ type Event struct {
 	Params    map[string]string `json:"params,omitempty"`
 }
 
-type SubscriberCacheRequest struct { Username, Domain string }
+type SubscriberCacheRequest struct {
+	Username string
+	Domain   string
+}
 
-type Route struct { ID, Carrier, Prefix, URI string; Priority int; Enabled bool }
+type Route struct {
+	ID       string
+	Carrier  string
+	Prefix   string
+	URI      string
+	Priority int
+	Enabled  bool
+}
 
 type Dialog struct {
 	ID       string `json:"ID,omitempty"`
@@ -75,12 +89,16 @@ type DialogList struct {
 	Dialogs []Dialog `json:"Dialogs"`
 }
 
-type AccessEntry struct { Address, Reason string; ExpiresAt time.Time }
+type AccessEntry struct {
+	Address   string
+	Reason    string
+	ExpiresAt time.Time
+}
 
 type Statistics struct {
-	ActiveDialogs   int64
-	EarlyDialogs    int64
+	ActiveDialogs    int64
+	EarlyDialogs     int64
 	ProcessedDialogs int64
-	ExpiredDialogs  int64
-	FailedDialogs   int64
+	ExpiredDialogs   int64
+	FailedDialogs    int64
 }
