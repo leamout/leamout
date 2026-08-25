@@ -3,7 +3,6 @@ package freeswitch
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -27,7 +26,6 @@ type Client struct {
 	done     chan struct{}
 	readErr  chan error
 	replyCh  chan Frame
-	closeErr error
 
 	writeMu   sync.Mutex
 	commandMu sync.Mutex
@@ -215,16 +213,17 @@ func (c *Client) readLoop(conn net.Conn, reader *bufio.Reader) {
 		switch frame.ContentType {
 		case ContentTypeCommandReply, ContentTypeAPIResponse:
 			c.replyCh <- frame
-		case ContentTypeEventPlain, ContentTypeEventJSON:
+		case ContentTypeEventPlain:
 			c.dispatchEvent(frame)
 		}
 	}
 }
 
 func (c *Client) dispatchEvent(frame Frame) {
-	event, err := eventFromFrame(frame)
-	if err != nil {
-		return
+	event := Event{
+		Headers: frame.Headers,
+		Body:    frame.Body,
+		Name:    frame.Header("Event-Name"),
 	}
 
 	c.handlersMu.RLock()
@@ -234,26 +233,6 @@ func (c *Client) dispatchEvent(frame Frame) {
 	for _, handler := range handlers {
 		_ = handler(context.Background(), event)
 	}
-}
-
-func eventFromFrame(frame Frame) (Event, error) {
-	event := Event{
-		Headers: frame.Headers,
-		Body:    frame.Body,
-		Name:    frame.Header("Event-Name"),
-	}
-	if frame.ContentType != ContentTypeEventJSON {
-		return event, nil
-	}
-
-	var payload map[string]any
-	if err := json.Unmarshal([]byte(frame.Body), &payload); err != nil {
-		return Event{}, fmt.Errorf("decode FreeSWITCH JSON event: %w", err)
-	}
-	if name, ok := payload["Event-Name"].(string); ok {
-		event.Name = name
-	}
-	return event, nil
 }
 
 func writeCommand(conn net.Conn, command string) (int, error) {
