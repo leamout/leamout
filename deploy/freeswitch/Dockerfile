@@ -1,80 +1,39 @@
 # syntax=docker/dockerfile:1
 
-FROM debian:bookworm-slim
+# SignalWire's maintained public FreeSWITCH foundation already contains the
+# packaged FreeSWITCH runtime and its native dependencies. Do not rebuild the
+# dependency graph in this repository.
+#
+# The Bookworm image is pinned by its complete immutable manifest digest.
+# Docker Hub reports this exact linux/amd64 manifest as:
+# sha256:790ee70a1ae2725297ff00f5137acd93943267c242948af19799a9df325d767d
+FROM signalwire/freeswitch-public-base:bookworm@sha256:790ee70a1ae2725297ff00f5137acd93943267c242948af19799a9df325d767d
 
-ARG FREESWITCH_PACKAGE_VERSION=1.10.12-1~bookworm+1
+USER root
 
-ENV DEBIAN_FRONTEND=noninteractive
-
-# ------------------------------------------------------------
-# Base dependencies
-# ------------------------------------------------------------
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    ca-certificates \
-    curl \
-    gnupg \
-    procps \
-    tini \
-    && rm -rf /var/lib/apt/lists/*
-
-# ------------------------------------------------------------
-# FreeSWITCH repository
-# ------------------------------------------------------------
-
-RUN mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://packages.signalwire.com/repo/deb/debian-release/signalwire-unstable.gpg \
-    -o /etc/apt/keyrings/signalwire.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/signalwire.gpg] https://packages.signalwire.com/repo/deb/debian-release/ bookworm main" \
-    > /etc/apt/sources.list.d/freeswitch.list
-
-# ------------------------------------------------------------
-# FreeSWITCH
-# ------------------------------------------------------------
-# Pin every FreeSWITCH package to the same Debian package release.
-# This prevents a rebuild from silently pulling a newer FreeSWITCH.
-# ------------------------------------------------------------
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-    "freeswitch=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-commands=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-dptools=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-event-socket=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-sofia=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-console=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-logfile=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-dialplan-xml=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-codec-pcm=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-codec-g722=${FREESWITCH_PACKAGE_VERSION}" \
-    "freeswitch-mod-codec-opus=${FREESWITCH_PACKAGE_VERSION}" \
-    && rm -rf /var/lib/apt/lists/*
-
-# ------------------------------------------------------------
-# Leamout configuration
-# ------------------------------------------------------------
-
+# Keep Leamout configuration in the image rather than mounting it as a
+# mutable production volume. The existing configuration files themselves are
+# intentionally unchanged.
 COPY autoload_configs/ /leamout-config/autoload_configs/
 COPY sip_profiles/ /leamout-config/sip_profiles/
 COPY dialplan/ /leamout-config/dialplan/
+COPY entrypoint.d/10-leamout-config.sh /docker-entrypoint.d/10-leamout-config.sh
+COPY entrypoint.sh /usr/local/bin/leamout-freeswitch-entrypoint
 
-COPY entrypoint.d/10-leamout-config.sh \
-    /docker-entrypoint.d/10-leamout-config.sh
-COPY entrypoint.sh /entrypoint.sh
+RUN chmod 0755 \
+      /docker-entrypoint.d/10-leamout-config.sh \
+      /usr/local/bin/leamout-freeswitch-entrypoint \
+    && mkdir -p /etc/freeswitch/autoload_configs \
+      /etc/freeswitch/sip_profiles \
+      /etc/freeswitch/dialplan
 
-RUN chmod +x /docker-entrypoint.d/10-leamout-config.sh /entrypoint.sh
+WORKDIR /etc/freeswitch
 
-# ------------------------------------------------------------
-# FreeSWITCH runtime
-# ------------------------------------------------------------
-
-WORKDIR /var/lib/freeswitch
-
+# SIP and RTP are intentionally documented here. Docker Compose decides which
+# ports are actually published. ESL 8021 is deliberately NOT exposed/published.
 EXPOSE 5060/udp
 EXPOSE 5060/tcp
-
-# RTP range used by the internal SIP profile.
 EXPOSE 16384-32768/udp
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/entrypoint.sh"]
+ENTRYPOINT ["/usr/local/bin/leamout-freeswitch-entrypoint"]
+CMD ["freeswitch", "-nf"]
