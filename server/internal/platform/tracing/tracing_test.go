@@ -3,8 +3,6 @@ package tracing
 import (
 	"context"
 	"testing"
-
-	"go.opentelemetry.io/otel/trace"
 )
 
 func TestNewUsesDefaultInstrumentationName(t *testing.T) {
@@ -31,5 +29,3 @@ func TestStart(t *testing.T) {
 
 	span.End()
 }
-
-var _ trace.Tracer = (*Tracer)(nil)
