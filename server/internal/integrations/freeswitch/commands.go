@@ -2,6 +2,7 @@ package freeswitch
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -38,30 +39,44 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 	if err != nil {
 		return Call{}, err
 	}
-	if !strings.HasPrefix(reply.Body, "+OK") {
-		return Call{}, fmt.Errorf("FreeSWITCH originate failed: %s", strings.TrimSpace(reply.Body))
+	body := strings.TrimSpace(reply.Body)
+	if !strings.HasPrefix(body, "+OK") {
+		return Call{}, fmt.Errorf("FreeSWITCH originate failed: %s", body)
 	}
 
-	return Call{
-		UUID:        strings.TrimSpace(strings.TrimPrefix(reply.Body, "+OK")),
-		Destination: req.Destination,
-	}, nil
+	return Call{UUID: strings.TrimSpace(strings.TrimPrefix(body, "+OK")), Destination: req.Destination}, nil
 }
 
 func (c *Client) Hangup(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_kill "+requireArgument("call ID", callID))
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	return c.ok(ctx, "uuid_kill "+callID)
 }
 
 func (c *Client) Hold(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_hold "+requireArgument("call ID", callID))
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	return c.ok(ctx, "uuid_hold "+callID)
 }
 
 func (c *Client) Unhold(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_unhold "+requireArgument("call ID", callID))
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	return c.ok(ctx, "uuid_unhold "+callID)
 }
 
 func (c *Client) Break(ctx context.Context, callID string) error {
-	return c.ok(ctx, "uuid_break "+requireArgument("call ID", callID)+" all")
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	return c.ok(ctx, "uuid_break "+callID+" all")
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
@@ -76,7 +91,6 @@ func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
 	if req.Context != "" {
 		args = append(args, req.Context)
 	}
-
 	return c.ok(ctx, "uuid_transfer "+strings.Join(args, " "))
 }
 
@@ -89,7 +103,9 @@ func (c *Client) Record(ctx context.Context, req RecordRequest) error {
 	if action == "" {
 		action = "start"
 	}
-
+	if action != "start" && action != "stop" {
+		return fmt.Errorf("FreeSWITCH record action must be start or stop")
+	}
 	return c.ok(ctx, "uuid_record "+req.CallID+" "+action+" "+req.Path)
 }
 
@@ -97,7 +113,6 @@ func (c *Client) SetVariable(ctx context.Context, callID, name, value string) er
 	if strings.TrimSpace(callID) == "" || strings.TrimSpace(name) == "" {
 		return fmt.Errorf("FreeSWITCH call ID and variable name are required")
 	}
-
 	return c.ok(ctx, "uuid_setvar "+callID+" "+name+" "+value)
 }
 
@@ -110,34 +125,59 @@ func (c *Client) GetVariable(ctx context.Context, callID, name string) (string, 
 	if err != nil {
 		return "", err
 	}
-
 	return strings.TrimSpace(reply.Body), nil
 }
 
-func (c *Client) Channels(ctx context.Context) (Reply, error) {
-	return c.Command(ctx, "show channels")
+func (c *Client) Channels(ctx context.Context) ([]Channel, error) {
+	reply, err := c.Command(ctx, "show channels as json")
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeRows(reply.Body, func(row map[string]any) Channel {
+		return Channel{UUID: stringField(row, "uuid"), Name: stringField(row, "name"), State: stringField(row, "state")}
+	})
 }
 
-func (c *Client) Calls(ctx context.Context) (Reply, error) {
-	return c.Command(ctx, "show calls")
+func (c *Client) Calls(ctx context.Context) ([]Call, error) {
+	reply, err := c.Command(ctx, "show calls as json")
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeRows(reply.Body, func(row map[string]any) Call {
+		return Call{
+			UUID:         stringField(row, "uuid"),
+			CallerName:   stringField(row, "cid_name"),
+			CallerNumber: stringField(row, "cid_num"),
+			Destination:  stringField(row, "dest"),
+			State:        stringField(row, "state"),
+		}
+	})
 }
 
-func (c *Client) Endpoints(ctx context.Context) (Reply, error) {
-	return c.Command(ctx, "show endpoints")
+func (c *Client) Endpoints(ctx context.Context) ([]Endpoint, error) {
+	reply, err := c.Command(ctx, "show endpoints as json")
+	if err != nil {
+		return nil, err
+	}
+
+	return decodeRows(reply.Body, func(row map[string]any) Endpoint {
+		return Endpoint{Name: stringField(row, "name"), Type: stringField(row, "type"), Data: stringField(row, "data")}
+	})
 }
 
 func (c *Client) SofiaStatus(ctx context.Context, profile string) (SIPProfileStatus, error) {
 	profile = strings.TrimSpace(profile)
 	command := "sofia status"
 	if profile != "" {
-		command += " " + profile
+		command += " profile " + profile
 	}
 
 	reply, err := c.Command(ctx, command)
 	if err != nil {
 		return SIPProfileStatus{}, err
 	}
-
 	return SIPProfileStatus{Profile: profile, Raw: reply.Body}, nil
 }
 
@@ -151,8 +191,22 @@ func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (Confere
 	if err != nil {
 		return ConferenceResult{}, err
 	}
-
 	return ConferenceResult(reply), nil
+}
+
+func (c *Client) ListConferenceMembers(ctx context.Context, conference string) (ConferenceMembers, error) {
+	conference, err := requiredArgument("conference name", conference)
+	if err != nil {
+		return ConferenceMembers{}, err
+	}
+
+	reply, err := c.Conference(ctx, ConferenceRequest{Name: conference, Command: "list"})
+	if err != nil {
+		return ConferenceMembers{}, err
+	}
+
+	members := parseConferenceMembers(reply.Body)
+	return ConferenceMembers{Conference: conference, Members: members}, nil
 }
 
 func (c *Client) MuteMember(ctx context.Context, conference, memberID string) error {
@@ -167,16 +221,38 @@ func (c *Client) KickMember(ctx context.Context, conference, memberID string) er
 	return c.conferenceMemberCommand(ctx, conference, "kick", memberID)
 }
 
+func (c *Client) DeafMember(ctx context.Context, conference, memberID string) error {
+	return c.conferenceMemberCommand(ctx, conference, "deaf", memberID)
+}
+
+func (c *Client) UndeafMember(ctx context.Context, conference, memberID string) error {
+	return c.conferenceMemberCommand(ctx, conference, "undeaf", memberID)
+}
+
+func (c *Client) LockConference(ctx context.Context, conference string) error {
+	return c.conferenceCommand(ctx, conference, "lock")
+}
+
+func (c *Client) UnlockConference(ctx context.Context, conference string) error {
+	return c.conferenceCommand(ctx, conference, "unlock")
+}
+
 func (c *Client) conferenceMemberCommand(ctx context.Context, conference, command, memberID string) error {
-	if strings.TrimSpace(conference) == "" || strings.TrimSpace(memberID) == "" {
-		return fmt.Errorf("FreeSWITCH conference and member ID are required")
+	if strings.TrimSpace(memberID) == "" {
+		return fmt.Errorf("FreeSWITCH conference member ID is required")
+	}
+	return c.conferenceCommand(ctx, conference, command, memberID)
+}
+
+func (c *Client) conferenceCommand(ctx context.Context, conference, command string, args ...string) error {
+	if strings.TrimSpace(conference) == "" {
+		return fmt.Errorf("FreeSWITCH conference name is required")
+	}
+	if strings.TrimSpace(command) == "" {
+		return fmt.Errorf("FreeSWITCH conference command is required")
 	}
 
-	_, err := c.Conference(ctx, ConferenceRequest{
-		Name:      conference,
-		Command:   command,
-		Arguments: []string{memberID},
-	})
+	_, err := c.Conference(ctx, ConferenceRequest{Name: conference, Command: command, Arguments: args})
 	return err
 }
 
@@ -185,19 +261,19 @@ func (c *Client) ok(ctx context.Context, command string) error {
 	if err != nil {
 		return err
 	}
-	if strings.HasPrefix(strings.TrimSpace(reply.Body), "-ERR") {
-		return fmt.Errorf("FreeSWITCH command failed: %s", strings.TrimSpace(reply.Body))
+	body := strings.TrimSpace(reply.Body)
+	if strings.HasPrefix(body, "-ERR") {
+		return fmt.Errorf("FreeSWITCH command failed: %s", body)
 	}
-
 	return nil
 }
 
-func requireArgument(name, value string) string {
+func requiredArgument(name, value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		panic("required argument: " + name)
+		return "", fmt.Errorf("FreeSWITCH %s is required", name)
 	}
-	return value
+	return value, nil
 }
 
 func variables(values map[string]string) string {
@@ -215,7 +291,6 @@ func variables(values map[string]string) string {
 	for _, key := range keys {
 		parts = append(parts, key+"="+values[key])
 	}
-
 	return "{" + strings.Join(parts, ",") + "}"
 }
 
@@ -223,8 +298,87 @@ func mergeVariable(prefix, key, value string) string {
 	if prefix == "" {
 		return "{" + key + "=" + value + "}"
 	}
-
 	return strings.TrimSuffix(prefix, "}") + "," + key + "=" + value + "}"
+}
+
+func decodeRows(body string, mapRow func(map[string]any) any) ([]Channel, error) {
+	rows, err := responseRows(body)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]Channel, 0, len(rows))
+	for _, row := range rows {
+		value := mapRow(row)
+		channel, ok := value.(Channel)
+		if !ok {
+			return nil, fmt.Errorf("unexpected FreeSWITCH channel response type")
+		}
+		result = append(result, channel)
+	}
+	return result, nil
+}
+
+func responseRows(body string) ([]map[string]any, error) {
+	var raw json.RawMessage
+	if err := json.Unmarshal([]byte(strings.TrimSpace(body)), &raw); err != nil {
+		return nil, fmt.Errorf("decode FreeSWITCH JSON response: %w", err)
+	}
+
+	var rows []map[string]any
+	if err := json.Unmarshal(raw, &rows); err == nil {
+		return rows, nil
+	}
+
+	var envelope struct {
+		Rows []map[string]any `json:"rows"`
+	}
+	if err := json.Unmarshal(raw, &envelope); err != nil || envelope.Rows == nil {
+		return nil, fmt.Errorf("decode FreeSWITCH JSON response rows")
+	}
+	return envelope.Rows, nil
+}
+
+func stringField(row map[string]any, key string) string {
+	value, ok := row[key]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprint(value)
+}
+
+func parseConferenceMembers(body string) []ConferenceMember {
+	var members []ConferenceMember
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.Contains(strings.ToLower(line), "member id") {
+			continue
+		}
+
+		fields := strings.FieldsFunc(line, func(r rune) bool { return r == '|' || r == ',' })
+		if len(fields) == 0 {
+			continue
+		}
+
+		member := ConferenceMember{ID: strings.TrimSpace(fields[0])}
+		if member.ID == "" || !isMemberID(member.ID) {
+			continue
+		}
+		if len(fields) > 1 {
+			member.CallerID = strings.TrimSpace(fields[1])
+		}
+		members = append(members, member)
+	}
+	return members
+}
+
+func isMemberID(value string) bool {
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return value != ""
 }
 
 func (c *Client) BGAPI(ctx context.Context, command string) (Job, error) {
@@ -240,6 +394,5 @@ func (c *Client) BGAPI(ctx context.Context, command string) (Job, error) {
 	if !frame.OK() {
 		return Job{}, fmt.Errorf("FreeSWITCH background command failed: %s", frame.ReplyText())
 	}
-
 	return Job{ID: frame.Header("Job-UUID")}, nil
 }
