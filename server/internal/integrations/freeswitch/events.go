@@ -12,23 +12,21 @@ func (c *Client) Subscribe(ctx context.Context, format EventFormat, events []str
 	if handler == nil {
 		return fmt.Errorf("FreeSWITCH event handler is required")
 	}
-	if format != EventFormatPlain && format != EventFormatJSON {
+	if format != EventFormatPlain {
 		return fmt.Errorf("unsupported FreeSWITCH event format: %q", format)
 	}
 
-	command := "event " + string(format)
-	if len(events) > 0 {
-		clean := make([]string, 0, len(events))
-		for _, event := range events {
-			event = strings.TrimSpace(event)
-			if event == "" {
-				continue
-			}
+	clean := make([]string, 0, len(events))
+	for _, event := range events {
+		event = strings.TrimSpace(event)
+		if event != "" {
 			clean = append(clean, event)
 		}
-		if len(clean) > 0 {
-			command += " " + strings.Join(clean, " ")
-		}
+	}
+
+	command := "event " + string(format)
+	if len(clean) > 0 {
+		command += " " + strings.Join(clean, " ")
 	}
 
 	frame, err := c.command(ctx, command)
@@ -38,6 +36,10 @@ func (c *Client) Subscribe(ctx context.Context, format EventFormat, events []str
 	if !frame.OK() {
 		return fmt.Errorf("FreeSWITCH event subscription failed: %s", frame.ReplyText())
 	}
+
+	c.handlersMu.Lock()
+	c.handlers = append(c.handlers, handler)
+	c.handlersMu.Unlock()
 
 	return nil
 }
