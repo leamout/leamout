@@ -2,6 +2,7 @@ package rtpengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -38,14 +39,13 @@ func New(cfg Config) (*Client, error) {
 	}, nil
 }
 
-// HealthCheck verifies RTPEngine is responding to a control command.
+// HealthCheck verifies that RTPEngine responds to a control command.
 func (c *Client) HealthCheck(ctx context.Context) error {
 	if ctx == nil {
-		return fmt.Errorf("RTPEngine context is required")
+		return errors.New("RTPEngine context is required")
 	}
 
-	_, err := c.do(ctx, CommandPing, nil)
-	if err != nil {
+	if _, err := c.do(ctx, CommandPing, nil); err != nil {
 		return fmt.Errorf("RTPEngine health check failed: %w", err)
 	}
 	return nil
@@ -58,10 +58,10 @@ func (c *Client) Close() error {
 
 func (c *Client) do(ctx context.Context, command Command, params map[string]any) (Response, error) {
 	if ctx == nil {
-		return Response{}, fmt.Errorf("RTPEngine context is required")
+		return Response{}, errors.New("RTPEngine context is required")
 	}
 	if command == "" {
-		return Response{}, fmt.Errorf("RTPEngine command is required")
+		return Response{}, errors.New("RTPEngine command is required")
 	}
 
 	var lastErr error
@@ -75,7 +75,7 @@ func (c *Client) do(ctx context.Context, command Command, params map[string]any)
 		if ctx.Err() != nil {
 			return Response{}, ctx.Err()
 		}
-		if attempt == c.maxRetry {
+		if !retryable(err) || attempt == c.maxRetry {
 			break
 		}
 
@@ -86,7 +86,7 @@ func (c *Client) do(ctx context.Context, command Command, params map[string]any)
 
 	return Response{}, fmt.Errorf(
 		"RTPEngine command failed after %d attempts: %w",
-		c.maxRetry+1,
+		attempts(c.maxRetry, lastErr),
 		lastErr,
 	)
 }
@@ -121,6 +121,18 @@ func (c *Client) doOnce(ctx context.Context, command Command, params map[string]
 	}
 
 	return decodeResponse(buffer[:n], cookie)
+}
+
+func retryable(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && (netErr.Timeout() || netErr.Temporary())
+}
+
+func attempts(maxRetry int, err error) int {
+	if err == nil {
+		return 0
+	}
+	return maxRetry + 1
 }
 
 func waitRetry(ctx context.Context, delay time.Duration) error {
