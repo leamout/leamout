@@ -1,6 +1,10 @@
 package opensips
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 type Config struct {
 	URL            string
@@ -10,25 +14,46 @@ type Config struct {
 
 func DefaultConfig(url string) Config {
 	return Config{
-		URL:            url,
+		URL:            strings.TrimSpace(url),
 		ConnectTimeout: 5 * time.Second,
 		RequestTimeout: 5 * time.Second,
 	}
 }
 
 type Command struct {
-	Name   string
-	Params map[string]string
+	Name   string            `json:"name"`
+	Params map[string]string `json:"params,omitempty"`
+}
+
+func (c Command) Validate() error {
+	if strings.TrimSpace(c.Name) == "" {
+		return fmt.Errorf("OpenSIPS command name is required")
+	}
+	return nil
 }
 
 type Response struct {
-	Code    int
-	Message string
-	Params  map[string]string
+	Code    int               `json:"code"`
+	Message string            `json:"message"`
+	Params  map[string]string `json:"params,omitempty"`
+}
+
+func (r Response) Validate() error {
+	if r.Code < 0 {
+		return fmt.Errorf("invalid OpenSIPS response code: %d", r.Code)
+	}
+	return nil
 }
 
 type Event struct {
-	Name      string
-	Timestamp time.Time
-	Params    map[string]string
+	Name      string            `json:"name"`
+	Timestamp time.Time         `json:"timestamp"`
+	Params    map[string]string `json:"params,omitempty"`
+}
+
+func (e Event) Validate() error {
+	if strings.TrimSpace(e.Name) == "" {
+		return fmt.Errorf("OpenSIPS event name is required")
+	}
+	return nil
 }
