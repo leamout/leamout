@@ -35,20 +35,18 @@ func New(ctx context.Context, cfg Config) (*Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = (&net.Dialer{Timeout: cfg.ConnectTimeout}).DialContext
 
-	client := &Client{
+	return &Client{
 		httpClient: &http.Client{Transport: transport, Timeout: cfg.RequestTimeout},
 		baseURL:    baseURL,
-	}
-
-	return client, nil
+	}, nil
 }
 
 func (c *Client) Command(ctx context.Context, command Command) (Response, error) {
 	if err := c.validate(ctx); err != nil {
 		return Response{}, err
 	}
-	if strings.TrimSpace(command.Name) == "" {
-		return Response{}, fmt.Errorf("OpenSIPS command name is required")
+	if err := command.Validate(); err != nil {
+		return Response{}, err
 	}
 
 	payload, err := json.Marshal(command)
@@ -60,6 +58,7 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 	if err != nil {
 		return Response{}, fmt.Errorf("create OpenSIPS request: %w", err)
 	}
+	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -77,6 +76,9 @@ func (c *Client) Command(ctx context.Context, command Command) (Response, error)
 		return Response{}, fmt.Errorf("decode OpenSIPS response: %w", err)
 	}
 
+	if err := result.Validate(); err != nil {
+		return Response{}, err
+	}
 	return result, nil
 }
 
