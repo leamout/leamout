@@ -7,8 +7,8 @@ import (
 )
 
 func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, error) {
-	if strings.TrimSpace(req.Endpoint) == "" || strings.TrimSpace(req.Destination) == "" {
-		return Call{}, fmt.Errorf("FreeSWITCH originate endpoint and destination are required")
+	if err := req.Validate(); err != nil {
+		return Call{}, err
 	}
 
 	command := "originate"
@@ -69,8 +69,8 @@ func (c *Client) Break(ctx context.Context, callID string) error {
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
-	if strings.TrimSpace(req.CallID) == "" || strings.TrimSpace(req.Destination) == "" {
-		return fmt.Errorf("FreeSWITCH transfer call ID and destination are required")
+	if err := req.Validate(); err != nil {
+		return err
 	}
 	args := []string{req.CallID, req.Destination}
 	if req.Dialplan != "" {
@@ -83,15 +83,12 @@ func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
 }
 
 func (c *Client) Record(ctx context.Context, req RecordRequest) error {
-	if strings.TrimSpace(req.CallID) == "" || strings.TrimSpace(req.Path) == "" {
-		return fmt.Errorf("FreeSWITCH record call ID and path are required")
+	if err := req.Validate(); err != nil {
+		return err
 	}
-	action := strings.TrimSpace(req.Action)
+	action := req.Action
 	if action == "" {
 		action = "start"
-	}
-	if action != "start" && action != "stop" {
-		return fmt.Errorf("FreeSWITCH record action must be start or stop, got %q", action)
 	}
 	return c.commandOK(ctx, "uuid_record "+req.CallID+" "+action+" "+req.Path)
 }
