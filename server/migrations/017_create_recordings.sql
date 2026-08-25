@@ -4,6 +4,10 @@ CREATE TABLE IF NOT EXISTS recordings (
     call_id UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'recording',
     storage_key TEXT,
+    storage_provider TEXT,
+    storage_bucket TEXT,
+    storage_url TEXT,
+    file_size_bytes BIGINT,
     format TEXT,
     duration_seconds INTEGER,
     started_at TIMESTAMPTZ,
@@ -16,6 +20,9 @@ CREATE TABLE IF NOT EXISTS recordings (
     ),
     CONSTRAINT chk_recordings_duration CHECK (
         duration_seconds IS NULL OR duration_seconds >= 0
+    ),
+    CONSTRAINT chk_recordings_file_size CHECK (
+        file_size_bytes IS NULL OR file_size_bytes >= 0
     ),
     CONSTRAINT chk_recordings_completed_at CHECK (
         completed_at IS NULL OR started_at IS NULL OR completed_at >= started_at
