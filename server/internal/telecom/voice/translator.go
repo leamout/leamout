@@ -50,7 +50,7 @@ func TranslateEvent(fsEvent freeswitch.Event, appID, tenantID string) (*CallEven
 			To:            fsEvent.Header("Caller-Destination-Number"),
 			Direction:     determineDirection(fsEvent),
 			Status:        mapHangupCause(fsEvent.Header("Hangup-Cause")),
-			DurationSec:   parseInt(fsEvent.Header("billmsec")) / 1000,
+			DurationSec:   int(parseInt(fsEvent.Header("billmsec")) / 1000),
 			OccurredAt:    occurredAt,
 		}, nil
 	}
