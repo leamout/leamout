@@ -8,19 +8,17 @@ import (
 	"github.com/leamout/leamout/internal/platform/tracing"
 )
 
+const httpServerSpanName = "http.server"
+
 // Tracing instruments inbound HTTP requests with OpenTelemetry server spans.
-// Trace context is extracted from incoming requests and propagated through the
-// request context for downstream application and integration instrumentation.
+// Incoming trace context is extracted by otelhttp and made available through
+// the request context to downstream application and integration instrumentation.
 func Tracing(tracer *tracing.Tracer) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return otelhttp.NewHandler(
 			next,
-			"HTTP "+tracingOperation(next),
+			httpServerSpanName,
 			otelhttp.WithTracer(tracer.Tracer()),
 		)
 	}
-}
-
-func tracingOperation(http.Handler) string {
-	return "request"
 }
