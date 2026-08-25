@@ -13,7 +13,11 @@ func (c *Client) Channels(ctx context.Context) ([]Channel, error) {
 		return nil, err
 	}
 	return decodeRows(reply.Body, func(row map[string]any) Channel {
-		return Channel{UUID: stringField(row, "uuid"), Name: stringField(row, "name"), State: stringField(row, "state")}
+		return Channel{
+			UUID:  stringField(row, "uuid"),
+			Name:  stringField(row, "name"),
+			State: stringField(row, "state"),
+		}
 	})
 }
 
@@ -39,7 +43,11 @@ func (c *Client) Endpoints(ctx context.Context) ([]Endpoint, error) {
 		return nil, err
 	}
 	return decodeRows(reply.Body, func(row map[string]any) Endpoint {
-		return Endpoint{Name: stringField(row, "name"), Type: stringField(row, "type"), Data: stringField(row, "data")}
+		return Endpoint{
+			Name: stringField(row, "name"),
+			Type: stringField(row, "type"),
+			Data: stringField(row, "data"),
+		}
 	})
 }
 
@@ -47,14 +55,17 @@ func (c *Client) SofiaStatus(ctx context.Context, profile string) (SIPProfileSta
 	profile = strings.TrimSpace(profile)
 	command := "sofia status"
 	if profile != "" {
-		command += " profile " + profile
+		command += " profile " + commandWord(profile)
 	}
 
 	reply, err := c.Command(ctx, command)
 	if err != nil {
 		return SIPProfileStatus{}, err
 	}
-	return SIPProfileStatus{Profile: profile, Raw: reply.Body}, nil
+	return SIPProfileStatus{
+		Profile: profile,
+		Raw:     reply.Body,
+	}, nil
 }
 
 func decodeRows[T any](body string, mapRow func(map[string]any) T) ([]T, error) {
@@ -71,15 +82,17 @@ func decodeRows[T any](body string, mapRow func(map[string]any) T) ([]T, error) 
 }
 
 func responseRows(body string) ([]map[string]any, error) {
+	body = strings.TrimSpace(body)
+
 	var rows []map[string]any
-	if err := json.Unmarshal([]byte(strings.TrimSpace(body)), &rows); err == nil {
+	if err := json.Unmarshal([]byte(body), &rows); err == nil {
 		return rows, nil
 	}
 
 	var envelope struct {
 		Rows []map[string]any `json:"rows"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(body)), &envelope); err != nil {
+	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
 		return nil, fmt.Errorf("decode FreeSWITCH status response: %w", err)
 	}
 	if envelope.Rows == nil {
