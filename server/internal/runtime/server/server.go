@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/leamout/leamout/internal/config"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/runtime/middleware"
@@ -14,17 +15,14 @@ import (
 )
 
 type Server struct {
+	Config  config.Config
 	DB      *pgxpool.Pool
 	Router  *chi.Mux
 	Modules Modules
 }
 
-func New(ctx context.Context, databaseURL string) (*Server, error) {
-	if databaseURL == "" {
-		return nil, fmt.Errorf("database URL is required")
-	}
-
-	db, err := pgxpool.New(ctx, databaseURL)
+func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect database: %w", err)
 	}
@@ -44,6 +42,7 @@ func New(ctx context.Context, databaseURL string) (*Server, error) {
 	RegisterRoutes(router, modules)
 
 	return &Server{
+		Config:  cfg,
 		DB:      db,
 		Router:  router,
 		Modules: modules,
