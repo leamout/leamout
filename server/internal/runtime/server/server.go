@@ -3,11 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/leamout/leamout/internal/config"
+	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/runtime/middleware"
@@ -15,14 +16,19 @@ import (
 )
 
 type Server struct {
-	Config  config.Config
 	DB      *pgxpool.Pool
 	Router  *chi.Mux
 	Modules Modules
 }
 
-func New(ctx context.Context, cfg config.Config) (*Server, error) {
-	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+func New() (*Server, error) {
+	ctx := context.Background()
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is required")
+	}
+
+	db, err := pgxpool.New(ctx, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect database: %w", err)
 	}
@@ -42,7 +48,6 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	RegisterRoutes(router, modules)
 
 	return &Server{
-		Config:  cfg,
 		DB:      db,
 		Router:  router,
 		Modules: modules,
@@ -50,10 +55,12 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 }
 
 func NewModules(db *pgxpool.Pool) (Modules, error) {
-	sessionRepository := session.NewRepository(db)
+	queries := sqlc.New(db)
+
+	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
 
-	authRepository := auth.NewRepository(db)
+	authRepository := auth.NewRepository(queries)
 	authService := auth.NewService(authRepository)
 
 	resolver := authn.NewResolver(
@@ -67,7 +74,7 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 		Auth: AuthModule{
 			Repository: authRepository,
 			Service:    authService,
-			Handler:    auth.NewHandler(authService),
+			Handler:    auth.NewHandler(authService, sessionService),
 		},
 		Session: SessionModule{
 			Repository: sessionRepository,
