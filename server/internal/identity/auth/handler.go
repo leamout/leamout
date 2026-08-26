@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -9,6 +8,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/pkg/apperror"
+	"github.com/leamout/leamout/pkg/helper"
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
@@ -31,7 +31,7 @@ func (h *Handler) Start(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	req, err := decodeJSON[startRequest](r)
+	req, err := helper.DecodeJSON[startRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -65,7 +65,7 @@ func (h *Handler) LoginWithPassword(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	req, err := decodeJSON[passwordLoginRequest](r)
+	req, err := helper.DecodeJSON[passwordLoginRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -94,7 +94,7 @@ func (h *Handler) SendOTP(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	req, err := decodeJSON[sendOTPRequest](r)
+	req, err := helper.DecodeJSON[sendOTPRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -126,7 +126,7 @@ func (h *Handler) VerifyOTP(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	req, err := decodeJSON[verifyOTPRequest](r)
+	req, err := helper.DecodeJSON[verifyOTPRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -155,7 +155,7 @@ func (h *Handler) SetPassword(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	req, err := decodeJSON[setPasswordRequest](r)
+	req, err := helper.DecodeJSON[setPasswordRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -201,8 +201,8 @@ func (h *Handler) createSession(
 	token, sess, err := h.sessionService.Create(
 		r.Context(),
 		userID,
-		clientIP(r),
-		userAgent(r),
+		helper.ClientIP(r),
+		helper.UserAgent(r),
 	)
 	if err != nil {
 		httputil.Error(w, err)
@@ -222,34 +222,6 @@ func (h *Handler) createSession(
 			SessionExpiry: sess.ExpiresAt.Time.Format(http.TimeFormat),
 		},
 	)
-}
-
-func decodeJSON[T any](r *http.Request) (T, error) {
-	var value T
-
-	if err := json.NewDecoder(r.Body).Decode(&value); err != nil {
-		return value, apperror.NewBadRequest("invalid request body")
-	}
-
-	return value, nil
-}
-
-func clientIP(r *http.Request) *string {
-	value := r.RemoteAddr
-	if value == "" {
-		return nil
-	}
-
-	return &value
-}
-
-func userAgent(r *http.Request) *string {
-	value := r.Header.Get("User-Agent")
-	if value == "" {
-		return nil
-	}
-
-	return &value
 }
 
 func authenticationMethods() []string {
