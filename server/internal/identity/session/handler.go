@@ -25,13 +25,9 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) userID(
 	r *http.Request,
 ) (uuid.UUID, error) {
-	userID, ok := authn.UserIDFromContext(
-		r.Context(),
-	)
+	userID, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
-		return uuid.Nil, apperror.NewUnauthorized(
-			"authentication required",
-		)
+		return uuid.Nil, apperror.NewUnauthorized("authentication required")
 	}
 
 	return userID, nil
@@ -40,25 +36,17 @@ func (h *Handler) userID(
 func (h *Handler) sessionID(
 	r *http.Request,
 ) (uuid.UUID, error) {
-	principal, ok := authn.PrincipalFromContext(
-		r.Context(),
-	)
+	principal, ok := authn.PrincipalFromContext(r.Context())
 	if !ok {
-		return uuid.Nil, apperror.NewUnauthorized(
-			"session authentication required",
-		)
+		return uuid.Nil, apperror.NewUnauthorized("session authentication required")
 	}
 
 	if principal.Credential.Type != authn.CredentialSession {
-		return uuid.Nil, apperror.NewUnauthorized(
-			"session authentication required",
-		)
+		return uuid.Nil, apperror.NewUnauthorized("session authentication required")
 	}
 
 	if principal.Credential.ID == uuid.Nil {
-		return uuid.Nil, apperror.NewUnauthorized(
-			"session authentication required",
-		)
+		return uuid.Nil, apperror.NewUnauthorized("session authentication required")
 	}
 
 	return principal.Credential.ID, nil
@@ -74,34 +62,18 @@ func (h *Handler) List(
 		return
 	}
 
-	sessions, err := h.service.List(
-		r.Context(),
-		userID,
-	)
+	sessions, err := h.service.List(r.Context(), userID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
-	items := make(
-		[]Response,
-		0,
-		len(sessions),
-	)
-
+	items := make([]Response, 0, len(sessions))
 	for _, session := range sessions {
-		items = append(
-			items,
-			newResponse(session),
-		)
+		items = append(items, toResponse(session))
 	}
 
-	httputil.OK(
-		w,
-		map[string]any{
-			"sessions": items,
-		},
-	)
+	httputil.OK(w, map[string]any{"sessions": items})
 }
 
 func (h *Handler) Revoke(
@@ -114,24 +86,13 @@ func (h *Handler) Revoke(
 		return
 	}
 
-	sessionID, err := uuid.Parse(
-		chi.URLParam(r, "id"),
-	)
+	sessionID, err := uuid.Parse(chi.URLParam(r, "id"))
 	if err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest(
-				"invalid session id",
-			),
-		)
+		httputil.Error(w, apperror.NewBadRequest("invalid session id"))
 		return
 	}
 
-	if err := h.service.Revoke(
-		r.Context(),
-		sessionID,
-		userID,
-	); err != nil {
+	if err := h.service.Revoke(r.Context(), sessionID, userID); err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -141,12 +102,7 @@ func (h *Handler) Revoke(
 		ClearCookie(w)
 	}
 
-	httputil.OK(
-		w,
-		map[string]string{
-			"message": "session revoked",
-		},
-	)
+	httputil.OK(w, map[string]string{"message": "session revoked"})
 }
 
 func (h *Handler) RevokeAll(
@@ -159,22 +115,14 @@ func (h *Handler) RevokeAll(
 		return
 	}
 
-	if err := h.service.RevokeAll(
-		r.Context(),
-		userID,
-	); err != nil {
+	if err := h.service.RevokeAll(r.Context(), userID); err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
 	ClearCookie(w)
 
-	httputil.OK(
-		w,
-		map[string]string{
-			"message": "logged out from all sessions",
-		},
-	)
+	httputil.OK(w, map[string]string{"message": "logged out from all sessions"})
 }
 
 func SetCookie(
@@ -182,39 +130,30 @@ func SetCookie(
 	token string,
 	expiresAt time.Time,
 ) {
-	maxAge := int(
-		time.Until(expiresAt).Seconds(),
-	)
-
+	maxAge := int(time.Until(expiresAt).Seconds())
 	if maxAge < 0 {
 		maxAge = 0
 	}
 
-	http.SetCookie(
-		w,
-		&http.Cookie{
-			Name:     "leamout-session",
-			Value:    token,
-			Path:     "/",
-			MaxAge:   maxAge,
-			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteLaxMode,
-		},
-	)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "leamout-session",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 func ClearCookie(w http.ResponseWriter) {
-	http.SetCookie(
-		w,
-		&http.Cookie{
-			Name:     "leamout-session",
-			Value:    "",
-			Path:     "/",
-			MaxAge:   -1,
-			HttpOnly: true,
-			Secure:   true,
-			SameSite: http.SameSiteLaxMode,
-		},
-	)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "leamout-session",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
