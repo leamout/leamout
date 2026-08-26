@@ -134,7 +134,6 @@ type PhoneNumber struct {
 	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
 	Number       string             `db:"number" json:"number"`
 	CountryCode  string             `db:"country_code" json:"country_code"`
-	Label        *string            `db:"label" json:"label"`
 	ProviderID   *uuid.UUID         `db:"provider_id" json:"provider_id"`
 	VoiceEnabled bool               `db:"voice_enabled" json:"voice_enabled"`
 	SmsEnabled   bool               `db:"sms_enabled" json:"sms_enabled"`
