@@ -27,9 +27,8 @@ CREATE TABLE IF NOT EXISTS voice_bindings (
     voice_application_id UUID NOT NULL
         REFERENCES voice_applications(id) ON DELETE CASCADE,
 
-    -- Exactly one target may be bound. phone_number_id remains unreferenced
-    -- until the phone-number domain is introduced.
-    phone_number_id UUID,
+    -- Exactly one target may be bound.
+    phone_number_id UUID REFERENCES phone_numbers(id) ON DELETE CASCADE,
     sip_domain_id UUID REFERENCES sip_domains(id) ON DELETE CASCADE,
     subscriber_id UUID REFERENCES subscribers(id) ON DELETE CASCADE,
 

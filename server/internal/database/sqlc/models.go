@@ -129,6 +129,19 @@ type OutboxEvent struct {
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type PhoneNumber struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	Number       string             `db:"number" json:"number"`
+	CountryCode  string             `db:"country_code" json:"country_code"`
+	ProviderID   *uuid.UUID         `db:"provider_id" json:"provider_id"`
+	VoiceEnabled bool               `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled   bool               `db:"sms_enabled" json:"sms_enabled"`
+	Status       string             `db:"status" json:"status"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type ProcessedEvent struct {
 	ConsumerName string             `db:"consumer_name" json:"consumer_name"`
 	EventID      uuid.UUID          `db:"event_id" json:"event_id"`
