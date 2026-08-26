@@ -31,9 +31,8 @@ func (h *Handler) Start(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	var req startRequest
-
-	if err := decodeJSON(r, &req); err != nil {
+	req, err := decodeJSON[startRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -66,9 +65,8 @@ func (h *Handler) LoginWithPassword(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	var req passwordLoginRequest
-
-	if err := decodeJSON(r, &req); err != nil {
+	req, err := decodeJSON[passwordLoginRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -96,9 +94,8 @@ func (h *Handler) SendOTP(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	var req sendOTPRequest
-
-	if err := decodeJSON(r, &req); err != nil {
+	req, err := decodeJSON[sendOTPRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -129,9 +126,8 @@ func (h *Handler) VerifyOTP(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	var req verifyOTPRequest
-
-	if err := decodeJSON(r, &req); err != nil {
+	req, err := decodeJSON[verifyOTPRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -159,9 +155,8 @@ func (h *Handler) SetPassword(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
-	var req setPasswordRequest
-
-	if err := decodeJSON(r, &req); err != nil {
+	req, err := decodeJSON[setPasswordRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -229,15 +224,14 @@ func (h *Handler) createSession(
 	)
 }
 
-func decodeJSON(
-	r *http.Request,
-	value any,
-) error {
-	if err := json.NewDecoder(r.Body).Decode(value); err != nil {
-		return apperror.NewBadRequest("invalid request body")
+func decodeJSON[T any](r *http.Request) (T, error) {
+	var value T
+
+	if err := json.NewDecoder(r.Body).Decode(&value); err != nil {
+		return value, apperror.NewBadRequest("invalid request body")
 	}
 
-	return nil
+	return value, nil
 }
 
 func clientIP(r *http.Request) *string {
