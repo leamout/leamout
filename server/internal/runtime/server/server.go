@@ -11,6 +11,8 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/platform/config"
+	"github.com/leamout/leamout/internal/platform/logging"
+	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 )
@@ -19,6 +21,9 @@ type Server struct {
 	DB      *pgxpool.Pool
 	Router  *chi.Mux
 	Modules Modules
+
+	Logger  *logging.Logger
+	Metrics *metrics.Registry
 }
 
 func New(ctx context.Context, cfg config.Config) (*Server, error) {
@@ -36,6 +41,9 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
+	logger := logging.New()
+	metricsRegistry := metrics.New()
+
 	modules, err := NewModules(db)
 	if err != nil {
 		db.Close()
@@ -44,21 +52,24 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 
 	router := chi.NewRouter()
 
-	// 	router.Use(
-	// 	middleware.Recovery,
-	// 	middleware.RequestID,
-	// 	middleware.Logging,
-	// 	middleware.Secure,
-	// 	middleware.Metrics(),
-	// 	middleware.Tracing(),
-	// 	middleware.CORS(cfg.CORSOrigins),
-	// )
+	router.Use(
+		middleware.Recovery,
+		middleware.Tracing(),
+		middleware.Request(),
+		middleware.Logging(logger),
+		middleware.Metrics(metricsRegistry),
+		middleware.Secure,
+		middleware.CORS(cfg.CORSOrigins, cfg.IsDevelopment()),
+	)
+
 	RegisterRoutes(router, modules)
 
 	return &Server{
 		DB:      db,
 		Router:  router,
 		Modules: modules,
+		Logger:  logger,
+		Metrics: metricsRegistry,
 	}, nil
 }
 
