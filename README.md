@@ -1,2 +1,105 @@
-# leamout
-control plane.
+# Leamout
+
+**Leamout** is a programmable communications control plane for building and operating voice, messaging, numbering, routing, and carrier-connected telecom products.
+
+Leamout starts with self-hosted programmable voice and BYOC, then grows toward managed deployments, multi-carrier orchestration, number provisioning, direct carrier connectivity, messaging, realtime media, and AI communications.
+
+The goal is to give applications a stable communications API without forcing customers to give up control of their telecom infrastructure or carrier relationships.
+
+## Platform model
+
+```text
+                         Leamout
+                            │
+             ┌──────────────┼──────────────┐
+             │              │              │
+           Voice           SMS           Numbers
+             │              │              │
+             └──────────────┼──────────────┘
+                            │
+                     Routing engine
+                            │
+          ┌─────────────────┼─────────────────┐
+          │                 │                 │
+     Customer BYOC       Leamout       Other carrier
+          │                 │                 │
+          └─────────────────┼─────────────────┘
+                            │
+                       Telecom networks
+```
+
+BYOC remains a first-class model. Carrier-specific behavior belongs behind adapters so the same control plane can work with customer-owned carriers, Leamout-managed connectivity, and multiple markets.
+
+## Current implementation
+
+The repository currently contains the foundations of the Leamout control plane:
+
+- users, accounts, memberships, projects, and account tokens
+- project-scoped SIP domains and endpoints
+- rotation-safe SIP digest credentials
+- carrier providers, project carrier connections, trunks, and multiple physical SIP endpoints
+- inbound and outbound routing primitives
+- phone-number inventory and project assignments
+- calls, call legs, and durable call events
+- transactional outbox primitives for asynchronous workflows
+- SQLC-generated database access and Atlas-managed schema workflow
+- a deployable development telecom stack around OpenSIPS, RTPengine, FreeSWITCH, PostgreSQL, Redis, and NATS
+
+Some capabilities described in the documentation are intentionally **roadmap design**, not current product behavior. In particular, full billing/rating, SMPP messaging, realtime AI media, production HA, and hosted carrier products are not presented as complete.
+
+## Architecture
+
+Leamout separates control-plane business logic from telecom data-plane components.
+
+```text
+Applications / API clients
+          │
+          ▼
+   Leamout control plane
+          │
+          ├── PostgreSQL ── source of truth
+          ├── Redis ─────── ephemeral state / coordination
+          └── NATS ──────── durable asynchronous workflows
+          │
+          ▼
+       OpenSIPS
+          │
+     ┌────┴────┐
+     │         │
+RTPengine   FreeSWITCH
+     │         │
+     └────┬────┘
+          │
+   SIP carriers / PSTN
+```
+
+**OpenSIPS** owns SIP signaling and routing. **RTPengine** handles media relay and NAT/media anchoring. **FreeSWITCH** is used when calls require application media such as IVR, playback, recording, conferencing, or similar programmable media workloads.
+
+## Core principles
+
+- **BYOC stays open.** Customers should not be forced onto Leamout carrier connectivity.
+- **The control plane owns business logic.** Routing, policy, usage, rating, billing, provisioning, and events should not be delegated to upstream carriers.
+- **Carrier integrations stay behind adapters.** Market-specific connectivity should not leak into core platform APIs.
+- **Telecom history is durable.** Historical calls, legs, events, and number assignments must not disappear through cascading configuration deletes.
+- **Tenant boundaries are database-enforced where practical.** Cross-project telecom references should be rejected by relational constraints, not merely application convention.
+- **Build from stable primitives.** Higher-level CPaaS products should depend on reliable voice, routing, events, usage, and billing foundations.
+
+## Roadmap
+
+```text
+0. Control-plane primitives
+        ↓
+1. Self-hosted programmable voice
+        ↓
+2. Managed programmable voice
+        ↓
+3. BYOC + multi-carrier orchestration
+        ↓
+4. Number abstraction + provisioning
+        ↓
+5. Direct carrier connectivity
+        ↓
+6. Messaging + realtime media + AI
+        ↓
+7. Hosted carrier products / full CPaaS
+```
