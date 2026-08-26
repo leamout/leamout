@@ -14,7 +14,8 @@ func RegisterRoutes(
 	router.Route("/users", func(r chi.Router) {
 		r.Use(authMiddleware)
 
-		r.Get("/me", handler.Current)
-		r.Patch("/me", handler.UpdateProfile)
+		r.Get("/me", handler.GetMe)
+		r.Patch("/me", handler.UpdateMe)
+		r.Delete("/me", handler.DeleteMe)
 	})
 }
