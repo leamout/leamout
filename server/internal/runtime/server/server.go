@@ -43,6 +43,16 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	}
 
 	router := chi.NewRouter()
+
+	// 	router.Use(
+	// 	middleware.Recovery,
+	// 	middleware.RequestID,
+	// 	middleware.Logging,
+	// 	middleware.Secure,
+	// 	middleware.Metrics(),
+	// 	middleware.Tracing(),
+	// 	middleware.CORS(cfg.CORSOrigins),
+	// )
 	RegisterRoutes(router, modules)
 
 	return &Server{
