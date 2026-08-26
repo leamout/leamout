@@ -38,14 +38,15 @@ func (h *Handler) Start(
 		return
 	}
 
-	if err := validateStartRequest(req); err != nil {
+	email, err := validateStartRequest(req)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
 	transaction, err := h.service.Start(
 		r.Context(),
-		normalizeEmail(req.Email),
+		email,
 	)
 	if err != nil {
 		httputil.Error(w, err)
@@ -72,17 +73,9 @@ func (h *Handler) LoginWithPassword(
 		return
 	}
 
-	if err := validatePasswordLoginRequest(req); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	transactionID, err := parseUUID(req.TransactionID)
+	transactionID, err := validatePasswordLoginRequest(req)
 	if err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest("invalid transaction_id"),
-		)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -110,17 +103,9 @@ func (h *Handler) SendOTP(
 		return
 	}
 
-	if err := validateSendOTPRequest(req); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	transactionID, err := parseUUID(req.TransactionID)
+	transactionID, err := validateSendOTPRequest(req)
 	if err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest("invalid transaction_id"),
-		)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -151,24 +136,16 @@ func (h *Handler) VerifyOTP(
 		return
 	}
 
-	if err := validateVerifyOTPRequest(req); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	transactionID, err := parseUUID(req.TransactionID)
+	transactionID, code, err := validateVerifyOTPRequest(req)
 	if err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest("invalid transaction_id"),
-		)
+		httputil.Error(w, err)
 		return
 	}
 
 	user, err := h.service.VerifyOTP(
 		r.Context(),
 		transactionID,
-		normalizeOTP(req.Code),
+		code,
 	)
 	if err != nil {
 		httputil.Error(w, err)
