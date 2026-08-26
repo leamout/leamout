@@ -5,8 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/security/authn"
 )
 
 type Service struct {
@@ -74,6 +76,22 @@ func (s *Service) Get(
 	}
 
 	return session, nil
+}
+
+// ResolveSession resolves a session token for the authentication layer.
+func (s *Service) ResolveSession(
+	ctx context.Context,
+	token string,
+) (authn.Session, error) {
+	session, err := s.Get(ctx, token)
+	if err != nil {
+		return authn.Session{}, err
+	}
+
+	return authn.Session{
+		ID:     session.ID,
+		UserID: session.UserID,
+	}, nil
 }
 
 func (s *Service) List(
