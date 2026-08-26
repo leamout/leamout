@@ -17,10 +17,10 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) Current(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authn.UserIDFromContext(r.Context())
-	if !ok {
-		httputil.Error(w, apperror.NewUnauthorized("authentication required"))
+func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
+	userID, err := authenticatedUserID(r)
+	if err != nil {
+		httputil.Error(w, err)
 		return
 	}
 
@@ -33,10 +33,10 @@ func (h *Handler) Current(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, toResponse(user))
 }
 
-func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authn.UserIDFromContext(r.Context())
-	if !ok {
-		httputil.Error(w, apperror.NewUnauthorized("authentication required"))
+func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	userID, err := authenticatedUserID(r)
+	if err != nil {
+		httputil.Error(w, err)
 		return
 	}
 
@@ -58,4 +58,28 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.OK(w, toResponse(user))
+}
+
+func (h *Handler) DeleteMe(w http.ResponseWriter, r *http.Request) {
+	userID, err := authenticatedUserID(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	if err := h.service.Delete(r.Context(), userID); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func authenticatedUserID(r *http.Request) (interface{ String() string }, error) {
+	userID, ok := authn.UserIDFromContext(r.Context())
+	if !ok {
+		return nil, apperror.NewUnauthorized("authentication required")
+	}
+
+	return userID, nil
 }
