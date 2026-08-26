@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/leamout/leamout/internal/config"
 	"github.com/leamout/leamout/internal/runtime/server"
 )
 
@@ -22,12 +21,7 @@ func main() {
 	)
 	defer stop()
 
-	cfg, err := config.Load()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	srv, err := server.New(ctx, cfg)
+	srv, err := server.New()
 	if err != nil {
 		log.Fatal(err)
 	}
