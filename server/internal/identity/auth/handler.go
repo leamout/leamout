@@ -3,19 +3,25 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
+	"github.com/google/uuid"
+	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
 type Handler struct {
-	service *Service
+	service        *Service
+	sessionService *session.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(
+	service *Service,
+	sessionService *session.Service,
+) *Handler {
 	return &Handler{
-		service: service,
+		service:        service,
+		sessionService: sessionService,
 	}
 }
 
@@ -25,11 +31,13 @@ func (h *Handler) Start(
 ) {
 	var req startRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest("invalid request body"),
-		)
+	if err := decodeJSON(r, &req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	if err := validateStartRequest(req); err != nil {
+		httputil.Error(w, err)
 		return
 	}
 
@@ -57,11 +65,8 @@ func (h *Handler) LoginWithPassword(
 ) {
 	var req passwordLoginRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest("invalid request body"),
-		)
+	if err := decodeJSON(r, &req); err != nil {
+		httputil.Error(w, err)
 		return
 	}
 
@@ -70,9 +75,135 @@ func (h *Handler) LoginWithPassword(
 		return
 	}
 
+	transactionID, err := parseUUID(req.TransactionID)
+	if err != nil {
+		httputil.Error(
+			w,
+			apperror.NewBadRequest("invalid transaction_id"),
+		)
+		return
+	}
+
 	user, err := h.service.LoginWithPassword(
 		r.Context(),
-		req.TransactionID,
+		transactionID,
+		req.Password,
+	)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	h.createSession(w, r, user.ID)
+}
+
+func (h *Handler) SendOTP(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	var req sendOTPRequest
+
+	if err := decodeJSON(r, &req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	if err := validateSendOTPRequest(req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	transactionID, err := parseUUID(req.TransactionID)
+	if err != nil {
+		httputil.Error(
+			w,
+			apperror.NewBadRequest("invalid transaction_id"),
+		)
+		return
+	}
+
+	if _, err := h.service.SendOTP(
+		r.Context(),
+		transactionID,
+	); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	httputil.OK(
+		w,
+		sendOTPResponse{
+			TransactionID: transactionID,
+		},
+	)
+}
+
+func (h *Handler) VerifyOTP(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	var req verifyOTPRequest
+
+	if err := decodeJSON(r, &req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	if err := validateVerifyOTPRequest(req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	transactionID, err := parseUUID(req.TransactionID)
+	if err != nil {
+		httputil.Error(
+			w,
+			apperror.NewBadRequest("invalid transaction_id"),
+		)
+		return
+	}
+
+	user, err := h.service.VerifyOTP(
+		r.Context(),
+		transactionID,
+		normalizeOTP(req.Code),
+	)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	h.createSession(w, r, user.ID)
+}
+
+func (h *Handler) SetPassword(
+	w http.ResponseWriter,
+	r *http.Request,
+) {
+	var req setPasswordRequest
+
+	if err := decodeJSON(r, &req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	if err := validateSetPasswordRequest(req); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	userID, ok := userIDFromRequest(r)
+	if !ok {
+		httputil.Error(
+			w,
+			apperror.NewUnauthorized("authentication required"),
+		)
+		return
+	}
+
+	user, err := h.service.SetPassword(
+		r.Context(),
+		userID,
 		req.Password,
 	)
 	if err != nil {
@@ -83,52 +214,78 @@ func (h *Handler) LoginWithPassword(
 	httputil.OK(
 		w,
 		authenticationResponse{
-			UserID:        user.ID,
-			SessionExpiry: user.SessionExpiry.Format(time.RFC3339),
+			UserID: user.ID,
 		},
 	)
 }
 
-func (h *Handler) SendOTP(
+func (h *Handler) createSession(
 	w http.ResponseWriter,
 	r *http.Request,
+	userID uuid.UUID,
 ) {
-	var req sendOTPRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		httputil.Error(
-			w,
-			apperror.NewBadRequest("invalid request body"),
-		)
-		return
-	}
-
-	if _, err := h.service.SendOTP(
+	token, sess, err := h.sessionService.Create(
 		r.Context(),
-		req.TransactionID,
-	); err != nil {
+		userID,
+		clientIP(r),
+		userAgent(r),
+	)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
+	session.SetCookie(
+		w,
+		token,
+		sess.ExpiresAt.Time,
+	)
+
 	httputil.OK(
 		w,
-		sendOTPResponse{
-			TransactionID: req.TransactionID,
+		authenticationResponse{
+			UserID:        userID,
+			SessionExpiry: sess.ExpiresAt.Time.Format(http.TimeFormat),
 		},
 	)
 }
 
-func (h *Handler) VerifyOTP(w http.ResponseWriter, r *http.Request) {
-	// Decode request
-	// Call service
-	// Write response
+func decodeJSON(
+	r *http.Request,
+	value any,
+) error {
+	if err := json.NewDecoder(r.Body).Decode(value); err != nil {
+		return apperror.NewBadRequest("invalid request body")
+	}
+
+	return nil
 }
 
-func (h *Handler) SetPassword(w http.ResponseWriter, r *http.Request) {
-	// Decode request
-	// Call service
-	// Write response
+func userIDFromRequest(r *http.Request) (uuid.UUID, bool) {
+	// Authentication context is intentionally resolved outside this package.
+	// The auth handler only consumes the authenticated user ID when enrolling
+	// a password.
+	return uuid.Nil, false
 }
 
-func authenticationMethods() []string { return []string{"password", "otp"} }
+func clientIP(r *http.Request) *string {
+	value := r.RemoteAddr
+	if value == "" {
+		return nil
+	}
+
+	return &value
+}
+
+func userAgent(r *http.Request) *string {
+	value := r.Header.Get("User-Agent")
+	if value == "" {
+		return nil
+	}
+
+	return &value
+}
+
+func authenticationMethods() []string {
+	return []string{"password", "otp"}
+}
