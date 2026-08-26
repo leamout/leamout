@@ -19,10 +19,6 @@ func normalizeTransactionID(value string) string {
 	return strings.TrimSpace(value)
 }
 
-func normalizePassword(password string) string {
-	return strings.TrimSpace(password)
-}
-
 func parseUUID(value string) (uuid.UUID, error) {
 	return uuid.Parse(normalizeTransactionID(value))
 }
@@ -44,7 +40,7 @@ func validatePasswordLoginRequest(req passwordLoginRequest) error {
 		return apperror.NewBadRequest("invalid transaction_id")
 	}
 
-	if normalizePassword(req.Password) == "" {
+	if req.Password == "" {
 		return apperror.NewBadRequest("password is required")
 	}
 
@@ -80,7 +76,7 @@ func validateVerifyOTPRequest(req verifyOTPRequest) error {
 }
 
 func validateSetPasswordRequest(req setPasswordRequest) error {
-	if normalizePassword(req.Password) == "" {
+	if req.Password == "" {
 		return apperror.NewBadRequest("password is required")
 	}
 
