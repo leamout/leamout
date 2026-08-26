@@ -3,6 +3,7 @@ package users
 import (
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/helper"
@@ -75,10 +76,10 @@ func (h *Handler) DeleteMe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func authenticatedUserID(r *http.Request) (interface{ String() string }, error) {
+func authenticatedUserID(r *http.Request) (uuid.UUID, error) {
 	userID, ok := authn.UserIDFromContext(r.Context())
-	if !ok {
-		return nil, apperror.NewUnauthorized("authentication required")
+	if !ok || userID == uuid.Nil {
+		return uuid.Nil, apperror.NewUnauthorized("authentication required")
 	}
 
 	return userID, nil
