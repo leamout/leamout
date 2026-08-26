@@ -2,45 +2,98 @@ package server
 
 import (
 	"context"
-	"errors"
-	"net/http"
-	"time"
+	"fmt"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/leamout/leamout/internal/config"
+	"github.com/leamout/leamout/internal/identity/auth"
+	"github.com/leamout/leamout/internal/identity/session"
+	"github.com/leamout/leamout/internal/runtime/middleware"
+	"github.com/leamout/leamout/internal/security/authn"
 )
 
 type Server struct {
-	httpServer *http.Server
+	Config  config.Config
+	DB      *pgxpool.Pool
+	Router  *chi.Mux
+	Modules Modules
 }
 
-func New() (*Server, error) {
-	// Build application dependencies.
-	// Build modules.
-	// Build router.
-	// Build HTTP server.
+func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("connect database: %w", err)
+	}
+
+	if err := db.Ping(ctx); err != nil {
+		db.Close()
+
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	modules, err := NewModules(ctx, cfg, db)
+	if err != nil {
+		db.Close()
+
+		return nil, fmt.Errorf("initialize modules: %w", err)
+	}
+
+	router := chi.NewRouter()
+
+	RegisterRoutes(
+		router,
+		modules,
+	)
 
 	return &Server{
-		httpServer: &http.Server{
-			Addr: ":8080",
-			// Handler: router,
-
-			ReadHeaderTimeout: 10 * time.Second,
-			ReadTimeout:       30 * time.Second,
-			WriteTimeout:      30 * time.Second,
-			IdleTimeout:       60 * time.Second,
-			MaxHeaderBytes:    1 << 20,
-		},
+		Config:  cfg,
+		DB:      db,
+		Router:  router,
+		Modules: modules,
 	}, nil
 }
 
-func (s *Server) Start() error {
-	err := s.httpServer.ListenAndServe()
+func NewModules(ctx context.Context, cfg config.Config, db *pgxpool.Pool) (Modules, error) {
 
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
+	sessionRepository := session.NewRepository(db)
+	sessionService := session.NewService(sessionRepository)
 
-	return err
+	authRepository := auth.NewRepository(db)
+	authService := auth.NewService(authRepository)
+
+	sessionResolver := session.NewResolver(
+		sessionService,
+	)
+
+	resolver := authn.NewResolver(
+		sessionResolver,
+	)
+
+	authMiddleware := middleware.NewAuthnMiddleware(
+		resolver,
+	)
+
+	return Modules{
+		Auth: AuthModule{
+			Repository: authRepository,
+			Service:    authService,
+			Handler:    auth.NewHandler(authService),
+		},
+
+		Session: SessionModule{
+			Repository: sessionRepository,
+			Service:    sessionService,
+			Handler:    session.NewHandler(sessionService),
+		},
+
+		Authn: authMiddleware,
+	}, nil
 }
 
-func (s *Server) Shutdown(ctx context.Context) error {
-	return s.httpServer.Shutdown(ctx)
+func (s *Server) Close() {
+	if s.DB != nil {
+		s.DB.Close()
+	}
 }
