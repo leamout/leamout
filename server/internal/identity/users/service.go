@@ -46,7 +46,7 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, name *str
 
 	user, err := s.repo.UpdateProfile(ctx, sqlc.UpdateUserProfileParams{
 		ID:   userID,
-		Name: pgconv.NullableText(name),
+		Name: name,
 	})
 	if err != nil {
 		return sqlc.User{}, apperror.NewNotFound("user not found")
