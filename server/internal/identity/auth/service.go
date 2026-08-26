@@ -24,14 +24,6 @@ func (s *Service) Start(
 	ctx context.Context,
 	email string,
 ) (sqlc.AuthTransaction, error) {
-	email = normalizeEmail(email)
-
-	if email == "" {
-		return sqlc.AuthTransaction{}, apperror.NewBadRequest(
-			"email is required",
-		)
-	}
-
 	user, err := s.repo.GetUserByEmail(ctx, email)
 	if err != nil {
 		return sqlc.AuthTransaction{}, err
@@ -202,8 +194,6 @@ func (s *Service) VerifyOTP(
 		)
 	}
 
-	code = normalizeOTP(code)
-
 	expectedHash := hashToken(code)
 
 	if subtleCompare(expectedHash, challenge.SecretHash) == false {
@@ -298,18 +288,10 @@ func (s *Service) getOrCreateOTPUser(
 		)
 	}
 
-	email := normalizeEmail(transaction.Identifier)
-
-	if email == "" {
-		return sqlc.User{}, apperror.NewBadRequest(
-			"authentication identifier is missing",
-		)
-	}
-
 	return s.repo.CreateUser(
 		ctx,
 		sqlc.CreateUserParams{
-			Email: email,
+			Email: transaction.Identifier,
 		},
 	)
 }
