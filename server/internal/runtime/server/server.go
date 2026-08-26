@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,6 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
+	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 )
@@ -21,14 +21,12 @@ type Server struct {
 	Modules Modules
 }
 
-func New() (*Server, error) {
-	ctx := context.Background()
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		return nil, fmt.Errorf("DATABASE_URL is required")
+func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	if cfg.DatabaseURL == "" {
+		return nil, fmt.Errorf("database URL is required")
 	}
 
-	db, err := pgxpool.New(ctx, databaseURL)
+	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect database: %w", err)
 	}

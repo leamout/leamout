@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/runtime/server"
 )
 
@@ -21,7 +22,12 @@ func main() {
 	)
 	defer stop()
 
-	srv, err := server.New()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	srv, err := server.New(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,6 +44,7 @@ func main() {
 	}
 
 	serverErr := make(chan error, 1)
+
 	go func() {
 		log.Printf("server listening on %s", httpServer.Addr)
 		serverErr <- httpServer.ListenAndServe()
@@ -48,6 +55,7 @@ func main() {
 		if !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
+
 	case <-ctx.Done():
 	}
 
