@@ -7,11 +7,11 @@ INSERT INTO phone_numbers (
     sms_enabled
 )
 SELECT
-    sqlc.arg(tenant_id),
-    sqlc.arg(number),
-    sqlc.arg(country_code),
-    COALESCE(sqlc.narg(voice_enabled), true),
-    COALESCE(sqlc.narg(sms_enabled), false)
+    sqlc.arg(tenant_id) as tenant_id,
+    sqlc.arg(number) as number,
+    sqlc.arg(country_code) as country_code,
+    COALESCE(sqlc.narg(voice_enabled), true) as voice_enabled,
+    COALESCE(sqlc.narg(sms_enabled), false) as sms_enabled
 FROM tenants AS t
 WHERE t.id = sqlc.arg(tenant_id)
   AND t.status = 'active'
@@ -40,15 +40,6 @@ WHERE pn.number = sqlc.arg(number)
   AND t.deleted_at IS NULL
 LIMIT 1;
 
--- name: GetPhoneNumberByNumberAnyTenant :one
-SELECT pn.*
-FROM phone_numbers AS pn
-JOIN tenants AS t ON t.id = pn.tenant_id
-WHERE pn.number = sqlc.arg(number)
-  AND pn.status = 'active'
-  AND t.status = 'active'
-  AND t.deleted_at IS NULL
-LIMIT 1;
 
 -- name: ListPhoneNumbersByTenantID :many
 SELECT pn.*

@@ -256,6 +256,8 @@ type VoiceApplication struct {
 	RingTimeoutSeconds int32              `db:"ring_timeout_seconds" json:"ring_timeout_seconds"`
 	CallerID           *string            `db:"caller_id" json:"caller_id"`
 	Status             string             `db:"status" json:"status"`
+	VoiceUrl           *string            `db:"voice_url" json:"voice_url"`
+	CallbackUrl        *string            `db:"callback_url" json:"callback_url"`
 	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }

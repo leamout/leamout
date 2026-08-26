@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS voice_applications (
     ring_timeout_seconds INTEGER NOT NULL DEFAULT 30,
     caller_id TEXT,
     status TEXT NOT NULL DEFAULT 'active',
+    voice_url TEXT,
+    callback_url TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -16,7 +18,13 @@ CREATE TABLE IF NOT EXISTS voice_applications (
     CONSTRAINT chk_voice_applications_caller_id CHECK (
         caller_id IS NULL OR length(trim(caller_id)) > 0
     ),
-    CONSTRAINT chk_voice_applications_status CHECK (status IN ('active', 'disabled'))
+    CONSTRAINT chk_voice_applications_status CHECK (status IN ('active', 'disabled')),
+    CONSTRAINT chk_voice_applications_voice_url CHECK (
+        voice_url IS NULL OR voice_url ~ '^https?://'
+    ),
+    CONSTRAINT chk_voice_applications_callback_url CHECK (
+        callback_url IS NULL OR callback_url ~ '^https?://'
+    )
 );
 
 CREATE INDEX IF NOT EXISTS idx_voice_applications_tenant_status
