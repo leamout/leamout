@@ -10,6 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
+	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
@@ -82,6 +83,9 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 	authRepository := auth.NewRepository(queries)
 	authService := auth.NewService(authRepository)
 
+	usersRepository := users.NewRepository(queries)
+	usersService := users.NewService(usersRepository)
+
 	resolver := authn.NewResolver(
 		sessionService,
 		nil,
@@ -99,6 +103,11 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 			Repository: sessionRepository,
 			Service:    sessionService,
 			Handler:    session.NewHandler(sessionService),
+		},
+		Users: UsersModule{
+			Repository: usersRepository,
+			Service:    usersService,
+			Handler:    users.NewHandler(usersService),
 		},
 		Authn: authMiddleware,
 	}, nil
