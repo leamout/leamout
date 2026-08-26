@@ -5,7 +5,9 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+
 	"github.com/leamout/leamout/internal/identity/session"
+	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/httputil"
 )
@@ -192,7 +194,7 @@ func (h *Handler) SetPassword(
 		return
 	}
 
-	userID, ok := userIDFromRequest(r)
+	userID, ok := authn.UserIDFromContext(r.Context())
 	if !ok {
 		httputil.Error(
 			w,
@@ -259,13 +261,6 @@ func decodeJSON(
 	}
 
 	return nil
-}
-
-func userIDFromRequest(r *http.Request) (uuid.UUID, bool) {
-	// Authentication context is intentionally resolved outside this package.
-	// The auth handler only consumes the authenticated user ID when enrolling
-	// a password.
-	return uuid.Nil, false
 }
 
 func clientIP(r *http.Request) *string {
