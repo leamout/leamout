@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
 
     number TEXT NOT NULL,
     country_code CHAR(2) NOT NULL,
-    label TEXT,
     provider_id UUID,
     voice_enabled BOOLEAN NOT NULL DEFAULT true,
     sms_enabled BOOLEAN NOT NULL DEFAULT false,
@@ -19,9 +18,6 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     ),
     CONSTRAINT chk_phone_numbers_country_code CHECK (
         country_code ~ '^[A-Z]{2}$'
-    ),
-    CONSTRAINT chk_phone_numbers_label CHECK (
-        label IS NULL OR length(trim(label)) > 0
     ),
     CONSTRAINT chk_phone_numbers_status CHECK (
         status IN ('active', 'disabled', 'porting', 'released')
