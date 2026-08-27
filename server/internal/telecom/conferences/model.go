@@ -45,9 +45,32 @@ type ParticipantResponse struct {
 }
 
 func conferenceResponse(value sqlc.Conference) ConferenceResponse {
-	return ConferenceResponse{ID: value.ID, OrganizationID: value.OrganizationID, ApplicationID: value.ApplicationID, Name: value.Name, State: value.State, StartedAt: pgconv.TimestamptzToTimePtr(value.StartedAt), EndedAt: pgconv.TimestamptzToTimePtr(value.EndedAt), CreatedAt: pgconv.TimestamptzToTime(value.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(value.UpdatedAt)}
+	return ConferenceResponse{
+		ID:             value.ID,
+		OrganizationID: value.OrganizationID,
+		ApplicationID:  value.ApplicationID,
+		Name:           value.Name,
+		State:          value.State,
+		StartedAt:      pgconv.TimestamptzToTimePtr(value.StartedAt),
+		EndedAt:        pgconv.TimestamptzToTimePtr(value.EndedAt),
+		CreatedAt:      pgconv.TimestamptzToTime(value.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(value.UpdatedAt),
+	}
 }
 
 func participantResponse(value sqlc.ConferenceParticipant) ParticipantResponse {
-	return ParticipantResponse{ID: value.ID, OrganizationID: value.OrganizationID, ConferenceID: value.ConferenceID, CallParticipantID: value.CallParticipantID, State: value.State, Muted: value.Muted, Deaf: value.Deaf, Speaking: value.Speaking, JoinedAt: pgconv.TimestamptzToTimePtr(value.JoinedAt), LeftAt: pgconv.TimestamptzToTimePtr(value.LeftAt), CreatedAt: pgconv.TimestamptzToTime(value.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(value.UpdatedAt)}
+	return ParticipantResponse{
+		ID:                value.ID,
+		OrganizationID:    value.OrganizationID,
+		ConferenceID:      value.ConferenceID,
+		CallParticipantID: value.CallParticipantID,
+		State:             value.State,
+		Muted:             value.Muted,
+		Deaf:              value.Deaf,
+		Speaking:          value.Speaking,
+		JoinedAt:          pgconv.TimestamptzToTimePtr(value.JoinedAt),
+		LeftAt:            pgconv.TimestamptzToTimePtr(value.LeftAt),
+		CreatedAt:         pgconv.TimestamptzToTime(value.CreatedAt),
+		UpdatedAt:         pgconv.TimestamptzToTime(value.UpdatedAt),
+	}
 }
