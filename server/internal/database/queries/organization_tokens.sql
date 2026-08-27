@@ -26,7 +26,7 @@ AND t.status = 'active'
 AND t.deleted_at IS NULL
 AND u.disabled_at IS NULL
 AND tm.status = 'active'
-AND tm.role = 'admin'
+AND tm.role IN ('owner', 'admin')
 RETURNING *;
 
 -- name: GetOrganizationTokenByTokenHash :one

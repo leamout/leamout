@@ -22,7 +22,7 @@ AND t.status = 'active'
 AND t.deleted_at IS NULL
 AND u.disabled_at IS NULL
 AND tm.status = 'active'
-AND tm.role = 'admin'  -- Only admins can invite
+AND tm.role IN ('owner', 'admin')  -- Only owners and admins can invite
 RETURNING *;
 
 -- name: GetInvitationByTokenHash :one
@@ -54,7 +54,7 @@ AND i.expires_at > NOW()
 ORDER BY i.created_at DESC;
 
 -- name: ListInvitationsForEmail :many
-SELECT i.*, t.slug AS organization_slug, t.name AS organization_name
+SELECT i.*, t.name AS organization_name
 FROM organization_invitations AS i
 JOIN organizations AS t ON t.id = i.organization_id
 WHERE i.email = sqlc.arg(email)

@@ -9,30 +9,79 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createOrganization = `-- name: CreateOrganization :one
 INSERT INTO organizations (
-    slug,
     name
 ) VALUES (
-    $1,
-    $2
+    $1
 )
-RETURNING id, slug, name, status, created_at, updated_at, deleted_at
+RETURNING id, name, status, created_at, updated_at, deleted_at
 `
 
-type CreateOrganizationParams struct {
-	Slug string `db:"slug" json:"slug"`
-	Name string `db:"name" json:"name"`
-}
-
-func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error) {
-	row := q.db.QueryRow(ctx, createOrganization, arg.Slug, arg.Name)
+func (q *Queries) CreateOrganization(ctx context.Context, name string) (Organization, error) {
+	row := q.db.QueryRow(ctx, createOrganization, name)
 	var i Organization
 	err := row.Scan(
 		&i.ID,
-		&i.Slug,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const createOrganizationWithOwner = `-- name: CreateOrganizationWithOwner :one
+WITH new_organization AS (
+    INSERT INTO organizations (
+        name
+    )
+    SELECT $1
+    FROM users AS u
+    WHERE u.id = $2
+    AND u.disabled_at IS NULL
+    RETURNING id, name, status, created_at, updated_at, deleted_at
+), owner_membership AS (
+    INSERT INTO organization_members (
+        organization_id,
+        user_id,
+        role
+    )
+    SELECT
+        o.id,
+        $2,
+        'owner'
+    FROM new_organization AS o
+    RETURNING organization_id
+)
+SELECT o.id, o.name, o.status, o.created_at, o.updated_at, o.deleted_at
+FROM new_organization AS o
+JOIN owner_membership AS om ON om.organization_id = o.id
+`
+
+type CreateOrganizationWithOwnerParams struct {
+	Name   string    `db:"name" json:"name"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+type CreateOrganizationWithOwnerRow struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Name      string             `db:"name" json:"name"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+func (q *Queries) CreateOrganizationWithOwner(ctx context.Context, arg CreateOrganizationWithOwnerParams) (CreateOrganizationWithOwnerRow, error) {
+	row := q.db.QueryRow(ctx, createOrganizationWithOwner, arg.Name, arg.UserID)
+	var i CreateOrganizationWithOwnerRow
+	err := row.Scan(
+		&i.ID,
 		&i.Name,
 		&i.Status,
 		&i.CreatedAt,
@@ -58,7 +107,7 @@ func (q *Queries) DeleteOrganization(ctx context.Context, id uuid.UUID) error {
 }
 
 const getOrganizationByID = `-- name: GetOrganizationByID :one
-SELECT id, slug, name, status, created_at, updated_at, deleted_at
+SELECT id, name, status, created_at, updated_at, deleted_at
 FROM organizations
 WHERE id = $1
 AND status = 'active'
@@ -71,31 +120,6 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 	var i Organization
 	err := row.Scan(
 		&i.ID,
-		&i.Slug,
-		&i.Name,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
-const getOrganizationBySlug = `-- name: GetOrganizationBySlug :one
-SELECT id, slug, name, status, created_at, updated_at, deleted_at
-FROM organizations
-WHERE slug = $1
-AND status = 'active'
-AND deleted_at IS NULL
-LIMIT 1
-`
-
-func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organization, error) {
-	row := q.db.QueryRow(ctx, getOrganizationBySlug, slug)
-	var i Organization
-	err := row.Scan(
-		&i.ID,
-		&i.Slug,
 		&i.Name,
 		&i.Status,
 		&i.CreatedAt,
@@ -106,7 +130,7 @@ func (q *Queries) GetOrganizationBySlug(ctx context.Context, slug string) (Organ
 }
 
 const listOrganizationsByUserID = `-- name: ListOrganizationsByUserID :many
-SELECT t.id, t.slug, t.name, t.status, t.created_at, t.updated_at, t.deleted_at
+SELECT t.id, t.name, t.status, t.created_at, t.updated_at, t.deleted_at, tm.role AS member_role
 FROM organizations AS t
 JOIN organization_members AS tm ON tm.organization_id = t.id
 JOIN users AS u ON u.id = tm.user_id
@@ -118,23 +142,33 @@ AND t.deleted_at IS NULL
 ORDER BY t.created_at DESC
 `
 
-func (q *Queries) ListOrganizationsByUserID(ctx context.Context, userID uuid.UUID) ([]Organization, error) {
+type ListOrganizationsByUserIDRow struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	Name       string             `db:"name" json:"name"`
+	Status     string             `db:"status" json:"status"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	MemberRole string             `db:"member_role" json:"member_role"`
+}
+
+func (q *Queries) ListOrganizationsByUserID(ctx context.Context, userID uuid.UUID) ([]ListOrganizationsByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, listOrganizationsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Organization{}
+	items := []ListOrganizationsByUserIDRow{}
 	for rows.Next() {
-		var i Organization
+		var i ListOrganizationsByUserIDRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.Slug,
 			&i.Name,
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.MemberRole,
 		); err != nil {
 			return nil, err
 		}
@@ -150,26 +184,23 @@ const updateOrganization = `-- name: UpdateOrganization :one
 UPDATE organizations
 SET
     name = COALESCE($1, name),
-    slug = COALESCE($2, slug),
     updated_at = NOW()
-WHERE id = $3
+WHERE id = $2
 AND status = 'active'
 AND deleted_at IS NULL
-RETURNING id, slug, name, status, created_at, updated_at, deleted_at
+RETURNING id, name, status, created_at, updated_at, deleted_at
 `
 
 type UpdateOrganizationParams struct {
 	Name *string   `db:"name" json:"name"`
-	Slug *string   `db:"slug" json:"slug"`
 	ID   uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateOrganization(ctx context.Context, arg UpdateOrganizationParams) (Organization, error) {
-	row := q.db.QueryRow(ctx, updateOrganization, arg.Name, arg.Slug, arg.ID)
+	row := q.db.QueryRow(ctx, updateOrganization, arg.Name, arg.ID)
 	var i Organization
 	err := row.Scan(
 		&i.ID,
-		&i.Slug,
 		&i.Name,
 		&i.Status,
 		&i.CreatedAt,

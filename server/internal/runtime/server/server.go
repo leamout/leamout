@@ -16,6 +16,8 @@ import (
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/internal/tenancy/members"
+	"github.com/leamout/leamout/internal/tenancy/organization"
 )
 
 type Server struct {
@@ -86,6 +88,12 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 	usersRepository := users.NewRepository(queries)
 	usersService := users.NewService(usersRepository)
 
+	organizationRepository := organization.NewRepository(queries)
+	organizationService := organization.NewService(organizationRepository)
+
+	membersRepository := members.NewRepository(queries)
+	membersService := members.NewService(membersRepository)
+
 	resolver := authn.NewResolver(
 		sessionService,
 		nil,
@@ -108,6 +116,16 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 			Repository: usersRepository,
 			Service:    usersService,
 			Handler:    users.NewHandler(usersService),
+		},
+		Organizations: OrganizationModule{
+			Repository: organizationRepository,
+			Service:    organizationService,
+			Handler:    organization.NewHandler(organizationService),
+		},
+		Members: MembersModule{
+			Repository: membersRepository,
+			Service:    membersService,
+			Handler:    members.NewHandler(membersService),
 		},
 		Authn: authMiddleware,
 	}, nil

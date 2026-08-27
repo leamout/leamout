@@ -24,6 +24,14 @@ SELECT
 FROM users AS u
 WHERE u.id = $2
 AND u.disabled_at IS NULL
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = $1
+    AND actor.user_id = $4
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
 RETURNING organization_id, user_id, role, status, created_at, updated_at
 `
 
@@ -31,10 +39,16 @@ type AddOrganizationMemberParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
 	Role           string    `db:"role" json:"role"`
+	ActorUserID    uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
 }
 
 func (q *Queries) AddOrganizationMember(ctx context.Context, arg AddOrganizationMemberParams) (OrganizationMember, error) {
-	row := q.db.QueryRow(ctx, addOrganizationMember, arg.OrganizationID, arg.UserID, arg.Role)
+	row := q.db.QueryRow(ctx, addOrganizationMember,
+		arg.OrganizationID,
+		arg.UserID,
+		arg.Role,
+		arg.ActorUserID,
+	)
 	var i OrganizationMember
 	err := row.Scan(
 		&i.OrganizationID,
@@ -48,42 +62,62 @@ func (q *Queries) AddOrganizationMember(ctx context.Context, arg AddOrganization
 }
 
 const disableOrganizationMember = `-- name: DisableOrganizationMember :exec
-UPDATE organization_members
+UPDATE organization_members AS target
 SET
     status = 'disabled',
     updated_at = NOW()
-WHERE organization_id = $1
-AND user_id = $2
-AND status = 'active'
+WHERE target.organization_id = $1
+AND target.user_id = $2
+AND target.status = 'active'
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = $3
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner'
 `
 
 type DisableOrganizationMemberParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	ActorUserID    uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
 }
 
 func (q *Queries) DisableOrganizationMember(ctx context.Context, arg DisableOrganizationMemberParams) error {
-	_, err := q.db.Exec(ctx, disableOrganizationMember, arg.OrganizationID, arg.UserID)
+	_, err := q.db.Exec(ctx, disableOrganizationMember, arg.OrganizationID, arg.UserID, arg.ActorUserID)
 	return err
 }
 
 const enableOrganizationMember = `-- name: EnableOrganizationMember :exec
-UPDATE organization_members
+UPDATE organization_members AS target
 SET
     status = 'active',
     updated_at = NOW()
-WHERE organization_id = $1
-AND user_id = $2
-AND status = 'disabled'
+WHERE target.organization_id = $1
+AND target.user_id = $2
+AND target.status = 'disabled'
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = $3
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner'
 `
 
 type EnableOrganizationMemberParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	ActorUserID    uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
 }
 
 func (q *Queries) EnableOrganizationMember(ctx context.Context, arg EnableOrganizationMemberParams) error {
-	_, err := q.db.Exec(ctx, enableOrganizationMember, arg.OrganizationID, arg.UserID)
+	_, err := q.db.Exec(ctx, enableOrganizationMember, arg.OrganizationID, arg.UserID, arg.ActorUserID)
 	return err
 }
 
@@ -193,40 +227,65 @@ func (q *Queries) ListOrganizationMembershipsByUserID(ctx context.Context, userI
 }
 
 const removeOrganizationMember = `-- name: RemoveOrganizationMember :exec
-DELETE FROM organization_members
-WHERE organization_id = $1
-AND user_id = $2
+DELETE FROM organization_members AS target
+WHERE target.organization_id = $1
+AND target.user_id = $2
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = $3
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner'
 `
 
 type RemoveOrganizationMemberParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	ActorUserID    uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
 }
 
 func (q *Queries) RemoveOrganizationMember(ctx context.Context, arg RemoveOrganizationMemberParams) error {
-	_, err := q.db.Exec(ctx, removeOrganizationMember, arg.OrganizationID, arg.UserID)
+	_, err := q.db.Exec(ctx, removeOrganizationMember, arg.OrganizationID, arg.UserID, arg.ActorUserID)
 	return err
 }
 
 const updateMemberRole = `-- name: UpdateMemberRole :one
-UPDATE organization_members
+UPDATE organization_members AS target
 SET
     role = $1,
     updated_at = NOW()
-WHERE organization_id = $2
-AND user_id = $3
-AND status = 'active'
-RETURNING organization_id, user_id, role, status, created_at, updated_at
+WHERE target.organization_id = $2
+AND target.user_id = $3
+AND target.status = 'active'
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = $4
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner'
+RETURNING target.organization_id, target.user_id, target.role, target.status, target.created_at, target.updated_at
 `
 
 type UpdateMemberRoleParams struct {
 	Role           string    `db:"role" json:"role"`
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	UserID         uuid.UUID `db:"user_id" json:"user_id"`
+	ActorUserID    uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
 }
 
 func (q *Queries) UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (OrganizationMember, error) {
-	row := q.db.QueryRow(ctx, updateMemberRole, arg.Role, arg.OrganizationID, arg.UserID)
+	row := q.db.QueryRow(ctx, updateMemberRole,
+		arg.Role,
+		arg.OrganizationID,
+		arg.UserID,
+		arg.ActorUserID,
+	)
 	var i OrganizationMember
 	err := row.Scan(
 		&i.OrganizationID,
