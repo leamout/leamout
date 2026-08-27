@@ -33,15 +33,20 @@ SELECT
     $6,
     $7::jsonb,
     $8::timestamptz
-FROM organizations AS t
+FROM organizations AS o
 JOIN users AS u ON u.id = $2
-JOIN organization_members AS tm ON tm.organization_id = t.id AND tm.user_id = u.id
-WHERE t.id = $1
-AND t.status = 'active'
-AND t.deleted_at IS NULL
+WHERE o.id = $1
+AND o.status = 'active'
+AND o.deleted_at IS NULL
 AND u.disabled_at IS NULL
-AND tm.status = 'active'
-AND tm.role IN ('owner', 'admin')
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = o.id
+    AND actor.user_id = $2
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
 RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, disabled_at, created_at, updated_at
 `
 
@@ -87,11 +92,43 @@ func (q *Queries) CreateOrganizationToken(ctx context.Context, arg CreateOrganiz
 	return i, err
 }
 
+const disableOrganizationToken = `-- name: DisableOrganizationToken :exec
+UPDATE organization_tokens AS target
+SET
+    disabled_at = NOW(),
+    updated_at = NOW()
+WHERE target.id = $1
+AND target.organization_id = $2
+AND target.disabled_at IS NULL
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = $3
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+`
+
+type DisableOrganizationTokenParams struct {
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ActorUserID    uuid.UUID `db:"actor_user_id" json:"actor_user_id"`
+}
+
+func (q *Queries) DisableOrganizationToken(ctx context.Context, arg DisableOrganizationTokenParams) error {
+	_, err := q.db.Exec(ctx, disableOrganizationToken, arg.ID, arg.OrganizationID, arg.ActorUserID)
+	return err
+}
+
 const getOrganizationTokenByID = `-- name: GetOrganizationTokenByID :one
-SELECT ak.id, ak.organization_id, ak.created_by, ak.name, ak.description, ak.token_hash, ak.token_prefix, ak.scopes, ak.last_used_at, ak.last_used_ip, ak.expires_at, ak.disabled_at, ak.created_at, ak.updated_at
-FROM organization_tokens AS ak
-WHERE ak.id = $1
-AND ak.organization_id = $2
+SELECT ot.id, ot.organization_id, ot.created_by, ot.name, ot.description, ot.token_hash, ot.token_prefix, ot.scopes, ot.last_used_at, ot.last_used_ip, ot.expires_at, ot.disabled_at, ot.created_at, ot.updated_at
+FROM organization_tokens AS ot
+JOIN organizations AS o ON o.id = ot.organization_id
+WHERE ot.id = $1
+AND ot.organization_id = $2
+AND o.status = 'active'
+AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -123,13 +160,14 @@ func (q *Queries) GetOrganizationTokenByID(ctx context.Context, arg GetOrganizat
 }
 
 const getOrganizationTokenByTokenHash = `-- name: GetOrganizationTokenByTokenHash :one
-SELECT ak.id, ak.organization_id, ak.created_by, ak.name, ak.description, ak.token_hash, ak.token_prefix, ak.scopes, ak.last_used_at, ak.last_used_ip, ak.expires_at, ak.disabled_at, ak.created_at, ak.updated_at
-FROM organization_tokens AS ak
-JOIN organizations AS t ON t.id = ak.organization_id
-WHERE ak.token_hash = $1
-AND (ak.expires_at IS NULL OR ak.expires_at > NOW())
-AND t.status = 'active'
-AND t.deleted_at IS NULL
+SELECT ot.id, ot.organization_id, ot.created_by, ot.name, ot.description, ot.token_hash, ot.token_prefix, ot.scopes, ot.last_used_at, ot.last_used_ip, ot.expires_at, ot.disabled_at, ot.created_at, ot.updated_at
+FROM organization_tokens AS ot
+JOIN organizations AS o ON o.id = ot.organization_id
+WHERE ot.token_hash = $1
+AND ot.disabled_at IS NULL
+AND (ot.expires_at IS NULL OR ot.expires_at > NOW())
+AND o.status = 'active'
+AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -157,20 +195,23 @@ func (q *Queries) GetOrganizationTokenByTokenHash(ctx context.Context, tokenHash
 
 const listOrganizationTokensByOrganizationID = `-- name: ListOrganizationTokensByOrganizationID :many
 SELECT
-    ak.id,
-    ak.name,
-    ak.description,
-    ak.token_prefix,
-    ak.scopes,
-    ak.last_used_at,
-    ak.last_used_ip,
-    ak.expires_at,
-    ak.created_at,
+    ot.id,
+    ot.name,
+    ot.description,
+    ot.token_prefix,
+    ot.scopes,
+    ot.last_used_at,
+    ot.last_used_ip,
+    ot.expires_at,
+    ot.created_at,
     u.name AS created_by
-FROM organization_tokens AS ak
-JOIN users AS u ON u.id = ak.created_by
-WHERE ak.organization_id = $1
-ORDER BY ak.created_at DESC
+FROM organization_tokens AS ot
+JOIN organizations AS o ON o.id = ot.organization_id
+LEFT JOIN users AS u ON u.id = ot.created_by
+WHERE ot.organization_id = $1
+AND o.status = 'active'
+AND o.deleted_at IS NULL
+ORDER BY ot.created_at DESC
 `
 
 type ListOrganizationTokensByOrganizationIDRow struct {
@@ -224,6 +265,8 @@ SET
     last_used_ip = $1::inet,
     updated_at = NOW()
 WHERE id = $2
+AND disabled_at IS NULL
+AND (expires_at IS NULL OR expires_at > NOW())
 AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '1 minute')
 `
 
@@ -238,16 +281,28 @@ func (q *Queries) TouchOrganizationToken(ctx context.Context, arg TouchOrganizat
 }
 
 const updateOrganizationToken = `-- name: UpdateOrganizationToken :one
-UPDATE organization_tokens
+UPDATE organization_tokens AS target
 SET
-    name = COALESCE($1, name),
-    description = COALESCE($2, description),
-    scopes = COALESCE($3::jsonb, scopes),
-    expires_at = COALESCE($4, expires_at),
+    name = COALESCE($1, target.name),
+    description = COALESCE($2, target.description),
+    scopes = COALESCE($3::jsonb, target.scopes),
+    expires_at = COALESCE($4, target.expires_at),
     updated_at = NOW()
-WHERE id = $5
-AND organization_id = $6
-RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, disabled_at, created_at, updated_at
+FROM organizations AS o
+WHERE target.id = $5
+AND target.organization_id = $6
+AND o.id = target.organization_id
+AND o.status = 'active'
+AND o.deleted_at IS NULL
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = $7
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+RETURNING target.id, target.organization_id, target.created_by, target.name, target.description, target.token_hash, target.token_prefix, target.scopes, target.last_used_at, target.last_used_ip, target.expires_at, target.disabled_at, target.created_at, target.updated_at
 `
 
 type UpdateOrganizationTokenParams struct {
@@ -257,6 +312,7 @@ type UpdateOrganizationTokenParams struct {
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ActorUserID    uuid.UUID          `db:"actor_user_id" json:"actor_user_id"`
 }
 
 func (q *Queries) UpdateOrganizationToken(ctx context.Context, arg UpdateOrganizationTokenParams) (OrganizationToken, error) {
@@ -267,6 +323,7 @@ func (q *Queries) UpdateOrganizationToken(ctx context.Context, arg UpdateOrganiz
 		arg.ExpiresAt,
 		arg.ID,
 		arg.OrganizationID,
+		arg.ActorUserID,
 	)
 	var i OrganizationToken
 	err := row.Scan(
