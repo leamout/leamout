@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/internal/tenancy/credentials"
 )
 
 var (
@@ -31,8 +32,9 @@ type Session struct {
 }
 
 type OrganizationToken struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	Scopes         []string
 }
 
 type Resolver struct {
@@ -74,10 +76,11 @@ func (r *Resolver) resolveSession(
 	ctx context.Context,
 	token string,
 ) (Principal, error) {
-	session, err := r.sessions.ResolveSession(
-		ctx,
-		token,
-	)
+	if r.sessions == nil {
+		return Principal{}, ErrInvalidCredential
+	}
+
+	session, err := r.sessions.ResolveSession(ctx, token)
 	if err != nil {
 		return Principal{}, ErrInvalidCredential
 	}
@@ -97,25 +100,51 @@ func (r *Resolver) resolveSession(
 
 func (r *Resolver) resolveOrganizationToken(
 	ctx context.Context,
-	key string,
+	token string,
 ) (Principal, error) {
-	organizationToken, err := r.organizationTokens.ResolveOrganizationToken(
-		ctx,
-		key,
-	)
+	if r.organizationTokens == nil {
+		return Principal{}, ErrInvalidCredential
+	}
+
+	organizationToken, err := r.organizationTokens.ResolveOrganizationToken(ctx, token)
 	if err != nil {
 		return Principal{}, ErrInvalidCredential
 	}
 
 	return Principal{
 		Subject: Subject{
-			ID:   organizationToken.UserID,
-			Type: SubjectUser,
+			ID:   organizationToken.ID,
+			Type: SubjectOrganizationToken,
 		},
 		Credential: Credential{
 			ID:   organizationToken.ID,
 			Type: CredentialOrganizationToken,
 		},
 		Assurance: AssuranceUnknown,
+	}, nil
+}
+
+type credentialResolver struct {
+	service *credentials.Service
+}
+
+func NewOrganizationTokenResolver(service *credentials.Service) OrganizationTokenResolver {
+	return credentialResolver{service: service}
+}
+
+func (r credentialResolver) ResolveOrganizationToken(ctx context.Context, token string) (OrganizationToken, error) {
+	if r.service == nil {
+		return OrganizationToken{}, ErrInvalidCredential
+	}
+
+	credential, err := r.service.Authenticate(ctx, token)
+	if err != nil {
+		return OrganizationToken{}, ErrInvalidCredential
+	}
+
+	return OrganizationToken{
+		ID:             credential.ID,
+		OrganizationID: credential.OrganizationID,
+		Scopes:         credential.Scopes,
 	}, nil
 }
