@@ -12,10 +12,7 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
-var (
-	ErrInvalidInput = errors.New("invalid credential input")
-	ErrInvalidToken = errors.New("invalid organization token")
-)
+var ErrInvalidInput = errors.New("invalid credential input")
 
 type Service struct {
 	repository *Repository
@@ -144,17 +141,9 @@ func listRowToCredential(row sqlc.ListOrganizationTokensByOrganizationIDRow) (Cr
 	if err := ValidateScopes(scopes); err != nil {
 		return Credential{}, fmt.Errorf("invalid credential scopes: %w", err)
 	}
-	var createdBy *uuid.UUID
-	if row.CreatedBy != nil {
-		id, err := uuid.Parse(*row.CreatedBy)
-		if err != nil {
-			return Credential{}, fmt.Errorf("parse credential creator: %w", err)
-		}
-		createdBy = &id
-	}
 	return Credential{
 		ID: row.ID, Name: row.Name, Description: row.Description, TokenPrefix: row.TokenPrefix,
-		Scopes: scopes, CreatedBy: createdBy, LastUsedAt: pgconv.TimestamptzToTimePtr(row.LastUsedAt),
+		Scopes: scopes, LastUsedAt: pgconv.TimestamptzToTimePtr(row.LastUsedAt),
 		ExpiresAt: pgconv.TimestamptzToTimePtr(row.ExpiresAt), CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt),
 	}, nil
 }
