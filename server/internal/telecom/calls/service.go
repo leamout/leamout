@@ -96,28 +96,64 @@ func (s *Service) List(ctx context.Context, organizationID uuid.UUID, state *str
 	return s.repo.List(ctx, organizationID, state, offset, limit)
 }
 
-func (s *Service) Answer(ctx context.Context, org, id uuid.UUID) (sqlc.Call, error) {
-	call, externalID, err := s.controlCall(ctx, org, id)
+func (s *Service) Answer(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	call, externalID, err := s.controlCall(ctx, organizationID, id)
 	if err != nil {
 		return sqlc.Call{}, err
 	}
+
+	switch call.State {
+	case "answered", "active":
+		return call, nil
+	case "initiating", "ringing":
+		// These are the only states accepted by MarkAnswered as well.
+	default:
+		return sqlc.Call{}, apperror.NewConflict("call cannot be answered from state: " + call.State)
+	}
+
 	if err := s.controller.Answer(ctx, externalID); err != nil {
 		return sqlc.Call{}, mediaError("answer call", err)
 	}
-	updated, err := s.repo.MarkAnswered(ctx, org, call.ID)
-	return updated, writeError(err, "answer call")
+
+	updated, err := s.repo.MarkAnswered(ctx, organizationID, call.ID)
+	if err == nil {
+		return updated, nil
+	}
+
+	// The media operation cannot be rolled back. If another actor won the
+	// state transition, return the now-authoritative database state.
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s.Get(ctx, organizationID, call.ID)
+	}
+	return sqlc.Call{}, writeError(err, "answer call")
 }
 
-func (s *Service) Hangup(ctx context.Context, org, id uuid.UUID) (sqlc.Call, error) {
-	call, externalID, err := s.controlCall(ctx, org, id)
+func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	call, externalID, err := s.controlCall(ctx, organizationID, id)
 	if err != nil {
 		return sqlc.Call{}, err
 	}
+
+	switch call.State {
+	case "completed", "failed", "cancelled":
+		return call, nil
+	}
+
 	if err := s.controller.Hangup(ctx, externalID); err != nil {
 		return sqlc.Call{}, mediaError("hang up call", err)
 	}
-	updated, err := s.repo.MarkCompleted(ctx, org, call.ID)
-	return updated, writeError(err, "hang up call")
+
+	updated, err := s.repo.MarkCompleted(ctx, organizationID, call.ID, nil)
+	if err == nil {
+		return updated, nil
+	}
+
+	// Hangup is irreversible at the media layer. If the DB transition lost a
+	// race with another terminal transition, return the authoritative state.
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s.Get(ctx, organizationID, call.ID)
+	}
+	return sqlc.Call{}, writeError(err, "hang up call")
 }
 
 func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferRequest) error {
