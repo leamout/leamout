@@ -73,7 +73,7 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 }
 
 const listOrganizationsByUserID = `-- name: ListOrganizationsByUserID :many
-SELECT t.id, t.name, t.status, t.created_at, t.updated_at, t.deleted_at
+SELECT t.id, t.name, t.status, t.created_at, t.updated_at, t.deleted_at, tm.role AS member_role
 FROM organizations AS t
 JOIN organization_members AS tm ON tm.organization_id = t.id
 JOIN users AS u ON u.id = tm.user_id
@@ -85,15 +85,25 @@ AND t.deleted_at IS NULL
 ORDER BY t.created_at DESC
 `
 
-func (q *Queries) ListOrganizationsByUserID(ctx context.Context, userID uuid.UUID) ([]Organization, error) {
+type ListOrganizationsByUserIDRow struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	Name       string             `db:"name" json:"name"`
+	Status     string             `db:"status" json:"status"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	MemberRole string             `db:"member_role" json:"member_role"`
+}
+
+func (q *Queries) ListOrganizationsByUserID(ctx context.Context, userID uuid.UUID) ([]ListOrganizationsByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, listOrganizationsByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Organization{}
+	items := []ListOrganizationsByUserIDRow{}
 	for rows.Next() {
-		var i Organization
+		var i ListOrganizationsByUserIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -101,6 +111,7 @@ func (q *Queries) ListOrganizationsByUserID(ctx context.Context, userID uuid.UUI
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.MemberRole,
 		); err != nil {
 			return nil, err
 		}
