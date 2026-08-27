@@ -19,6 +19,13 @@ func (r *Repository) Create(ctx context.Context, name string) (sqlc.Organization
 	return r.queries.CreateOrganization(ctx, name)
 }
 
+func (r *Repository) CreateWithOwner(ctx context.Context, name string, userID uuid.UUID) (sqlc.Organization, error) {
+	return r.queries.CreateOrganizationWithOwner(ctx, sqlc.CreateOrganizationWithOwnerParams{
+		Name:   name,
+		UserID: userID,
+	})
+}
+
 func (r *Repository) AddMember(ctx context.Context, arg sqlc.AddOrganizationMemberParams) (sqlc.OrganizationMember, error) {
 	return r.queries.AddOrganizationMember(ctx, arg)
 }
