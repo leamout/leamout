@@ -167,7 +167,7 @@ func (h *Handler) Undeaf(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Kick(w http.ResponseWriter, r *http.Request) {
-	h.participantAction(w, r, "left", nil, nil)
+	h.participantAction(w, r, "failed", nil, nil)
 }
 
 func (h *Handler) participantAction(
