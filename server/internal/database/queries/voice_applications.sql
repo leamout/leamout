@@ -161,6 +161,7 @@ ORDER BY vb.created_at DESC;
 -- name: DeleteVoiceBinding :exec
 DELETE FROM voice_bindings
 WHERE voice_bindings.id = sqlc.arg(id)
+  AND voice_bindings.voice_application_id = sqlc.arg(voice_application_id)
   AND voice_application_id IN (
       SELECT va.id FROM voice_applications AS va
       WHERE va.organization_id = sqlc.arg(organization_id)
