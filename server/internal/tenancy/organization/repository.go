@@ -27,14 +27,7 @@ func (r *Repository) CreateWithOwner(ctx context.Context, name string, userID uu
 	if err != nil {
 		return sqlc.Organization{}, err
 	}
-	return sqlc.Organization{
-		ID:        row.ID,
-		Name:      row.Name,
-		Status:    row.Status,
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
-		DeletedAt: row.DeletedAt,
-	}, nil
+	return sqlc.Organization(row), nil
 }
 
 func (r *Repository) AddMember(ctx context.Context, arg sqlc.AddOrganizationMemberParams) (sqlc.OrganizationMember, error) {
