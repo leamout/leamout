@@ -20,10 +20,21 @@ func (r *Repository) Create(ctx context.Context, name string) (sqlc.Organization
 }
 
 func (r *Repository) CreateWithOwner(ctx context.Context, name string, userID uuid.UUID) (sqlc.Organization, error) {
-	return r.queries.CreateOrganizationWithOwner(ctx, sqlc.CreateOrganizationWithOwnerParams{
+	row, err := r.queries.CreateOrganizationWithOwner(ctx, sqlc.CreateOrganizationWithOwnerParams{
 		Name:   name,
 		UserID: userID,
 	})
+	if err != nil {
+		return sqlc.Organization{}, err
+	}
+	return sqlc.Organization{
+		ID:        row.ID,
+		Name:      row.Name,
+		Status:    row.Status,
+		CreatedAt: row.CreatedAt,
+		UpdatedAt: row.UpdatedAt,
+		DeletedAt: row.DeletedAt,
+	}, nil
 }
 
 func (r *Repository) AddMember(ctx context.Context, arg sqlc.AddOrganizationMemberParams) (sqlc.OrganizationMember, error) {
