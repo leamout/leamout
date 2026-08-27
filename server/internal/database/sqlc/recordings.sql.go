@@ -150,6 +150,46 @@ func (q *Queries) CreateRecording(ctx context.Context, arg CreateRecordingParams
 	return i, err
 }
 
+const deleteRecording = `-- name: DeleteRecording :one
+UPDATE recordings
+SET
+    status = 'deleted',
+    storage_url = NULL,
+    updated_at = NOW()
+WHERE organization_id = $1
+  AND id = $2
+  AND status <> 'deleted'
+RETURNING id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+`
+
+type DeleteRecordingParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) DeleteRecording(ctx context.Context, arg DeleteRecordingParams) (Recording, error) {
+	row := q.db.QueryRow(ctx, deleteRecording, arg.OrganizationID, arg.ID)
+	var i Recording
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CallID,
+		&i.Status,
+		&i.StorageKey,
+		&i.StorageProvider,
+		&i.StorageBucket,
+		&i.StorageUrl,
+		&i.FileSizeBytes,
+		&i.Format,
+		&i.DurationSeconds,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const failRecording = `-- name: FailRecording :one
 UPDATE recordings
 SET
@@ -241,6 +281,58 @@ type ListCallRecordingsParams struct {
 
 func (q *Queries) ListCallRecordings(ctx context.Context, arg ListCallRecordingsParams) ([]Recording, error) {
 	rows, err := q.db.Query(ctx, listCallRecordings, arg.OrganizationID, arg.CallID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Recording{}
+	for rows.Next() {
+		var i Recording
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.CallID,
+			&i.Status,
+			&i.StorageKey,
+			&i.StorageProvider,
+			&i.StorageBucket,
+			&i.StorageUrl,
+			&i.FileSizeBytes,
+			&i.Format,
+			&i.DurationSeconds,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecordings = `-- name: ListRecordings :many
+SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+FROM recordings
+WHERE organization_id = $1
+  AND status <> 'deleted'
+ORDER BY created_at DESC
+LIMIT $3
+OFFSET $2
+`
+
+type ListRecordingsParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	PageOffset     int32     `db:"page_offset" json:"page_offset"`
+	PageLimit      int32     `db:"page_limit" json:"page_limit"`
+}
+
+func (q *Queries) ListRecordings(ctx context.Context, arg ListRecordingsParams) ([]Recording, error) {
+	rows, err := q.db.Query(ctx, listRecordings, arg.OrganizationID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}

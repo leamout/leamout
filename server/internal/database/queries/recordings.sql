@@ -66,3 +66,23 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND status = 'recording'
 RETURNING *;
+
+-- name: ListRecordings :many
+SELECT *
+FROM recordings
+WHERE organization_id = sqlc.arg(organization_id)
+  AND status <> 'deleted'
+ORDER BY created_at DESC
+LIMIT sqlc.arg(page_limit)
+OFFSET sqlc.arg(page_offset);
+
+-- name: DeleteRecording :one
+UPDATE recordings
+SET
+    status = 'deleted',
+    storage_url = NULL,
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND status <> 'deleted'
+RETURNING *;
