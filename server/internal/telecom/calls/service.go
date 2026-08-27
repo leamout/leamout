@@ -30,6 +30,13 @@ type Service struct {
 }
 
 func NewService(repo *Repository, controller Controller) *Service {
+	if repo == nil {
+		panic("calls: repository is required")
+	}
+	if controller == nil {
+		panic("calls: controller is required")
+	}
+
 	return &Service{
 		repo:       repo,
 		controller: controller,
@@ -43,6 +50,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err := validateCreateRequest(&req); err != nil {
 		return sqlc.Call{}, err
 	}
+
 	sipCallID, err := s.controller.Originate(ctx, req)
 	if err != nil {
 		return sqlc.Call{}, mediaError("originate call", err)
@@ -50,8 +58,22 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if sipCallID == "" {
 		return sqlc.Call{}, apperror.NewServiceUnavailable("media server returned an empty call id", nil)
 	}
+
 	call, err := s.repo.Create(ctx, organizationID, req, sipCallID)
-	return call, writeError(err, "create call")
+	if err == nil {
+		return call, nil
+	}
+
+	// Origination succeeded but persistence failed. Best-effort cleanup prevents
+	// a live media-server call from being left without a database record.
+	if hangupErr := s.controller.Hangup(ctx, sipCallID); hangupErr != nil {
+		return sqlc.Call{}, apperror.NewInternal(
+			"create call and clean up media call",
+			errors.Join(err, hangupErr),
+		)
+	}
+
+	return sqlc.Call{}, writeError(err, "create call")
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
@@ -196,6 +218,7 @@ func writeError(err error, message string) error {
 	}
 	return nil
 }
+
 func mediaError(message string, err error) error {
 	if err != nil {
 		return apperror.NewServiceUnavailable(message, err)
