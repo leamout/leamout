@@ -22,6 +22,14 @@ func NewOrganizationMiddleware() *OrganizationMiddleware {
 	return &OrganizationMiddleware{}
 }
 
+// RequireAuthenticated returns middleware that accepts either a session cookie
+// paired with X-Organization-ID or an organization bearer token.
+func (m *OrganizationMiddleware) RequireAuthenticated(authnMiddleware *AuthnMiddleware) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return authnMiddleware.RequireAuthenticated(m.Require(next))
+	}
+}
+
 func (m *OrganizationMiddleware) Require(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		principal, ok := authn.PrincipalFromContext(r.Context())
