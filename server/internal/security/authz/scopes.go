@@ -8,5 +8,16 @@ const (
 	ScopeMembersRead      Scope = "members:read"
 	ScopeMembersWrite     Scope = "members:write"
 	ScopeCredentialsRead  Scope = "credentials:read"
-	ScopeCredentialsWrite Scope = "credentials:write"
 )
+
+func (s Scope) IsValid() bool {
+	switch s {
+	case ScopeOrganizationRead,
+		ScopeMembersRead,
+		ScopeMembersWrite,
+		ScopeCredentialsRead:
+		return true
+	default:
+		return false
+	}
+}
