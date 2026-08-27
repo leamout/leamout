@@ -2,9 +2,12 @@ package credentials
 
 import (
 	"context"
+	"encoding/json"
 	"net/netip"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -17,6 +20,11 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, input CreateInput, tokenHash, tokenPrefix string) (sqlc.OrganizationToken, error) {
+	scopes, err := json.Marshal(input.Scopes)
+	if err != nil {
+		return sqlc.OrganizationToken{}, err
+	}
+
 	return r.queries.CreateOrganizationToken(ctx, sqlc.CreateOrganizationTokenParams{
 		OrganizationID: input.OrganizationID,
 		CreatedBy:      &input.CreatedBy,
@@ -24,8 +32,8 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, tokenHash, t
 		Description:    input.Description,
 		TokenHash:      tokenHash,
 		TokenPrefix:    tokenPrefix,
-		Scopes:         input.scopesJSON(),
-		ExpiresAt:      timestamptz(input.ExpiresAt),
+		Scopes:         scopes,
+		ExpiresAt:      toTimestamptz(input.ExpiresAt),
 	})
 }
 
@@ -45,14 +53,23 @@ func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc
 }
 
 func (r *Repository) Update(ctx context.Context, input UpdateInput, actorID uuid.UUID) (sqlc.OrganizationToken, error) {
+	var scopes []byte
+	if input.Scopes != nil {
+		var err error
+		scopes, err = json.Marshal(*input.Scopes)
+		if err != nil {
+			return sqlc.OrganizationToken{}, err
+		}
+	}
+
 	return r.queries.UpdateOrganizationToken(ctx, sqlc.UpdateOrganizationTokenParams{
 		ID:             input.ID,
 		OrganizationID: input.OrganizationID,
 		ActorUserID:    actorID,
 		Name:           input.Name,
 		Description:    input.Description,
-		Scopes:         derefScopes(input.Scopes),
-		ExpiresAt:      timestamptz(input.ExpiresAt),
+		Scopes:         scopes,
+		ExpiresAt:      toTimestamptz(input.ExpiresAt),
 	})
 }
 
@@ -71,6 +88,9 @@ func (r *Repository) Touch(ctx context.Context, id uuid.UUID, ip netip.Addr) err
 	})
 }
 
-func timestamptz(value interface{ IsZero() bool }) (result pgtype.Timestamptz) {
-	return result
+func toTimestamptz(value *time.Time) pgtype.Timestamptz {
+	if value == nil {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{Time: *value, Valid: true}
 }
