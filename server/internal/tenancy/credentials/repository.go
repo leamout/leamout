@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/netip"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -33,7 +32,7 @@ func (r *Repository) Create(ctx context.Context, input CreateInput, tokenHash, t
 		TokenHash:      tokenHash,
 		TokenPrefix:    tokenPrefix,
 		Scopes:         scopes,
-		ExpiresAt:      toTimestamptz(input.ExpiresAt),
+		ExpiresAt:      pgconv.NullableTimestamptz(input.ExpiresAt),
 	})
 }
 
@@ -69,7 +68,7 @@ func (r *Repository) Update(ctx context.Context, input UpdateInput, actorID uuid
 		Name:           input.Name,
 		Description:    input.Description,
 		Scopes:         scopes,
-		ExpiresAt:      toTimestamptz(input.ExpiresAt),
+		ExpiresAt:      pgconv.NullableTimestamptz(input.ExpiresAt),
 	})
 }
 
@@ -86,11 +85,4 @@ func (r *Repository) Touch(ctx context.Context, id uuid.UUID, ip netip.Addr) err
 		ID:         id,
 		LastUsedIp: &ip,
 	})
-}
-
-func toTimestamptz(value *time.Time) pgtype.Timestamptz {
-	if value == nil {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: *value, Valid: true}
 }
