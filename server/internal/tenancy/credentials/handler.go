@@ -2,7 +2,6 @@ package credentials
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -18,20 +17,6 @@ type Handler struct {
 
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
-}
-
-type createRequest struct {
-	Name        string     `json:"name"`
-	Description *string    `json:"description"`
-	Scopes      []string   `json:"scopes"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-}
-
-type updateRequest struct {
-	Name        *string    `json:"name"`
-	Description *string    `json:"description"`
-	Scopes      *[]string  `json:"scopes"`
-	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
