@@ -100,7 +100,7 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 
 	resolver := authn.NewResolver(
 		sessionService,
-		nil,
+		credentialsService,
 	)
 
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)
