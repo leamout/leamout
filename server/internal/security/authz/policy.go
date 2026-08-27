@@ -4,12 +4,14 @@ package authz
 func Allows(role Role, permission Permission) bool {
 	switch role {
 	case RoleOwner:
-		return true
+		return permission.IsValid()
 	case RoleAdmin:
 		switch permission {
 		case PermissionOrganizationRead, PermissionOrganizationUpdate,
-			PermissionMembersRead, PermissionMembersWrite,
-			PermissionCredentialsRead, PermissionCredentialsWrite:
+			PermissionMembersRead, PermissionMembersAdd,
+			PermissionMembersUpdate, PermissionMembersRemove,
+			PermissionCredentialsRead, PermissionCredentialsCreate,
+			PermissionCredentialsRevoke:
 			return true
 		}
 	case RoleMember:
