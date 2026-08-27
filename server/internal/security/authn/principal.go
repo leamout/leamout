@@ -18,3 +18,15 @@ type Principal struct {
 	Credential Credential
 	Assurance  AssuranceLevel
 }
+
+func (p Principal) IsValid() bool {
+	return p.Subject.ID != uuid.Nil && p.Subject.Type != "" && p.Credential.Type != ""
+}
+
+func (p Principal) UserID() (uuid.UUID, bool) {
+	if p.Subject.Type != SubjectUser || p.Subject.ID == uuid.Nil {
+		return uuid.Nil, false
+	}
+
+	return p.Subject.ID, true
+}
