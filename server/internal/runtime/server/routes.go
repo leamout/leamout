@@ -9,6 +9,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
@@ -65,6 +66,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		recordings.RegisterRoutes(
 			r,
 			modules.Recordings.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
+		conferences.RegisterRoutes(
+			r,
+			modules.Conferences.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
 	})

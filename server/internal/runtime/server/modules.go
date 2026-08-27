@@ -6,6 +6,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
@@ -23,6 +24,7 @@ type Modules struct {
 	Voice                VoiceModule
 	Calls                CallsModule
 	Recordings           RecordingsModule
+	Conferences          ConferencesModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
@@ -79,4 +81,10 @@ type RecordingsModule struct {
 	Repository *recordings.Repository
 	Service    *recordings.Service
 	Handler    *recordings.Handler
+}
+
+type ConferencesModule struct {
+	Repository *conferences.Repository
+	Service    *conferences.Service
+	Handler    *conferences.Handler
 }
