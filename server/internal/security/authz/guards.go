@@ -1,8 +1,14 @@
 package authz
 
-// Guard evaluates a role against a required permission.
-func Guard(role Role, permission Permission) bool {
-	return Allows(role, permission)
+// Guard evaluates whether a principal has a permission.
+func Guard(principal Principal, permission Permission) bool {
+	return Access{}.Allows(principal, permission)
+}
+
+// ScopedGuard evaluates whether a principal has a permission and, when the
+// principal represents a scoped credential, the required scope.
+func ScopedGuard(principal Principal, permission Permission, scope Scope) bool {
+	return Access{}.AllowsScoped(principal, permission, scope)
 }
 
 // HasScope reports whether a credential contains a scope.
