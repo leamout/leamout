@@ -16,6 +16,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
 )
@@ -94,6 +95,9 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 	membersRepository := members.NewRepository(queries)
 	membersService := members.NewService(membersRepository)
 
+	credentialsRepository := credentials.NewRepository(queries)
+	credentialsService := credentials.NewService(credentialsRepository)
+
 	resolver := authn.NewResolver(
 		sessionService,
 		nil,
@@ -126,6 +130,11 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 			Repository: membersRepository,
 			Service:    membersService,
 			Handler:    members.NewHandler(membersService),
+		},
+		Credentials: CredentialsModule{
+			Repository: credentialsRepository,
+			Service:    credentialsService,
+			Handler:    credentials.NewHandler(credentialsService),
 		},
 		Authn: authMiddleware,
 	}, nil
