@@ -34,7 +34,7 @@ WHERE id = sqlc.arg(id)
 AND deleted_at IS NULL;
 
 -- name: ListOrganizationsByUserID :many
-SELECT t.*
+SELECT t.*, tm.role AS member_role
 FROM organizations AS t
 JOIN organization_members AS tm ON tm.organization_id = t.id
 JOIN users AS u ON u.id = tm.user_id

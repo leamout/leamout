@@ -39,6 +39,6 @@ func (r *Repository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.queries.DeleteOrganization(ctx, id)
 }
 
-func (r *Repository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]sqlc.Organization, error) {
+func (r *Repository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]sqlc.ListOrganizationsByUserIDRow, error) {
 	return r.queries.ListOrganizationsByUserID(ctx, userID)
 }
