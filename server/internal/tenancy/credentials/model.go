@@ -50,3 +50,17 @@ type CreatedCredential struct {
 	Credential Credential
 	Token      string
 }
+
+type createRequest struct {
+	Name        string     `json:"name"`
+	Description *string    `json:"description"`
+	Scopes      []string   `json:"scopes"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+}
+
+type updateRequest struct {
+	Name        *string    `json:"name"`
+	Description *string    `json:"description"`
+	Scopes      *[]string  `json:"scopes"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+}
