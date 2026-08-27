@@ -1,3 +1,23 @@
 package members
 
-// Define member API routes here
+import (
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
+
+func RegisterRoutes(
+	router chi.Router,
+	handler *Handler,
+	authMiddleware func(http.Handler) http.Handler,
+) {
+	router.Route("/organizations/{organization_id}/members", func(r chi.Router) {
+		r.Use(authMiddleware)
+
+		r.Post("/", handler.Add)
+		r.Get("/", handler.List)
+		r.Get("/{member_id}", handler.Get)
+		r.Patch("/{member_id}", handler.Update)
+		r.Delete("/{member_id}", handler.Delete)
+	})
+}
