@@ -16,6 +16,8 @@ import (
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -102,6 +104,12 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 	voiceRepository := voice.NewRepository(queries)
 	voiceService := voice.NewService(voiceRepository)
 
+	callsRepository := calls.NewRepository(queries)
+	callsService := calls.NewService(callsRepository)
+
+	recordingsRepository := recordings.NewRepository(queries)
+	recordingsService := recordings.NewService(recordingsRepository)
+
 	resolver := authn.NewResolver(
 		sessionService,
 		credentialsService,
@@ -145,6 +153,16 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 			Repository: voiceRepository,
 			Service:    voiceService,
 			Handler:    voice.NewHandler(voiceService),
+		},
+		Calls: CallsModule{
+			Repository: callsRepository,
+			Service:    callsService,
+			Handler:    calls.NewHandler(callsService),
+		},
+		Recordings: RecordingsModule{
+			Repository: recordingsRepository,
+			Service:    recordingsService,
+			Handler:    recordings.NewHandler(recordingsService),
 		},
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,

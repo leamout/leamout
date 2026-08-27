@@ -29,10 +29,16 @@ type PlaybackResponse struct {
 
 func recordingResponse(recording sqlc.Recording) RecordingResponse {
 	return RecordingResponse{
-		ID: recording.ID, OrganizationID: recording.OrganizationID, CallID: recording.CallID,
-		Status: recording.Status, FileSizeBytes: recording.FileSizeBytes, Format: recording.Format,
-		DurationSeconds: recording.DurationSeconds, StartedAt: pgconv.TimestamptzToTimePtr(recording.StartedAt),
-		CompletedAt: pgconv.TimestamptzToTimePtr(recording.CompletedAt),
-		CreatedAt:   pgconv.TimestamptzToTime(recording.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(recording.UpdatedAt),
+		ID:              recording.ID,
+		OrganizationID:  recording.OrganizationID,
+		CallID:          recording.CallID,
+		Status:          recording.Status,
+		FileSizeBytes:   recording.FileSizeBytes,
+		Format:          recording.Format,
+		DurationSeconds: recording.DurationSeconds,
+		StartedAt:       pgconv.TimestamptzToTimePtr(recording.StartedAt),
+		CompletedAt:     pgconv.TimestamptzToTimePtr(recording.CompletedAt),
+		CreatedAt:       pgconv.TimestamptzToTime(recording.CreatedAt),
+		UpdatedAt:       pgconv.TimestamptzToTime(recording.UpdatedAt),
 	}
 }
