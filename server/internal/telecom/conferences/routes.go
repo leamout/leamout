@@ -13,7 +13,7 @@ func RegisterRoutes(
 ) {
 	router.Route("/conferences", func(r chi.Router) {
 		r.Use(authMiddleware)
-		
+
 		r.Post("/", handler.Create)
 		r.Get("/", handler.List)
 		r.Get("/{id}", handler.Get)
