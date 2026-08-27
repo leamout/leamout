@@ -1,35 +1,35 @@
 -- name: CreateWebhookEndpoint :one
 INSERT INTO webhook_endpoints (
-    tenant_id,
+    organization_id,
     url,
     signing_secret,
     subscribed_events,
     enabled
 )
 SELECT
-    sqlc.arg(tenant_id) as tenant_id,
+    sqlc.arg(organization_id) as organization_id,
     sqlc.arg(url) as url,
     sqlc.arg(signing_secret) as signing_secret,
     sqlc.arg(subscribed_events)::text[] as subscribed_events,
     COALESCE(sqlc.narg(enabled), true) as enabled
-FROM tenants
-WHERE tenants.id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+FROM organizations
+WHERE organizations.id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
 RETURNING *;
 
 -- name: GetWebhookEndpointByID :one
 SELECT webhook_endpoints.*
 FROM webhook_endpoints
-JOIN tenants ON tenants.id = webhook_endpoints.tenant_id
+JOIN organizations ON organizations.id = webhook_endpoints.organization_id
 WHERE webhook_endpoints.id = sqlc.arg(id)
-  AND webhook_endpoints.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+  AND webhook_endpoints.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
 LIMIT 1;
 
--- name: ListWebhookEndpointsByTenantID :many
+-- name: ListWebhookEndpointsByOrganizationID :many
 SELECT *
 FROM webhook_endpoints
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
 ORDER BY created_at DESC;
 
 -- name: UpdateWebhookEndpoint :one
@@ -43,7 +43,7 @@ SET
     disabled_reason = CASE WHEN sqlc.narg(enabled)::boolean = false THEN 'manual' ELSE disabled_reason END,
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-  AND tenant_id = sqlc.arg(tenant_id)
+  AND organization_id = sqlc.arg(organization_id)
 RETURNING *;
 
 -- name: DisableWebhookEndpoint :exec
@@ -54,7 +54,7 @@ SET
     disabled_reason = 'manual',
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-  AND tenant_id = sqlc.arg(tenant_id)
+  AND organization_id = sqlc.arg(organization_id)
   AND enabled = true;
 
 -- name: EnableWebhookEndpoint :exec
@@ -65,7 +65,7 @@ SET
     disabled_reason = NULL,
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-  AND tenant_id = sqlc.arg(tenant_id)
+  AND organization_id = sqlc.arg(organization_id)
   AND enabled = false;
 
 -- name: RecordWebhookEndpointFailure :one
@@ -75,7 +75,7 @@ SET
     last_failure_at = NOW(),
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-  AND tenant_id = sqlc.arg(tenant_id)
+  AND organization_id = sqlc.arg(organization_id)
 RETURNING *;
 
 -- name: ResetWebhookEndpointFailures :exec
@@ -86,4 +86,4 @@ SET
     disabled_reason = NULL,
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-  AND tenant_id = sqlc.arg(tenant_id);
+  AND organization_id = sqlc.arg(organization_id);

@@ -1,6 +1,6 @@
 -- name: CreateRecording :one
 INSERT INTO recordings (
-    tenant_id,
+    organization_id,
     call_id,
     status,
     storage_key,
@@ -11,7 +11,7 @@ INSERT INTO recordings (
     format,
     started_at
 ) VALUES (
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.arg(call_id),
     COALESCE(sqlc.narg(status), 'recording'),
     sqlc.narg(storage_key),
@@ -27,14 +27,14 @@ RETURNING *;
 -- name: GetRecording :one
 SELECT *
 FROM recordings
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 LIMIT 1;
 
 -- name: ListCallRecordings :many
 SELECT *
 FROM recordings
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND call_id = sqlc.arg(call_id)
 ORDER BY created_at DESC;
 
@@ -51,7 +51,7 @@ SET
     duration_seconds = COALESCE(sqlc.narg(duration_seconds), duration_seconds),
     completed_at = COALESCE(completed_at, NOW()),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND status = 'recording'
 RETURNING *;
@@ -62,7 +62,7 @@ SET
     status = 'failed',
     completed_at = COALESCE(completed_at, NOW()),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND status = 'recording'
 RETURNING *;

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS voice_applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
     name TEXT NOT NULL,
     ring_timeout_seconds INTEGER NOT NULL DEFAULT 30,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS voice_applications (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_voice_applications_tenant_name UNIQUE (tenant_id, name),
+    CONSTRAINT uq_voice_applications_organization_name UNIQUE (organization_id, name),
     CONSTRAINT chk_voice_applications_name CHECK (length(trim(name)) > 0),
     CONSTRAINT chk_voice_applications_ring_timeout CHECK (ring_timeout_seconds BETWEEN 1 AND 300),
     CONSTRAINT chk_voice_applications_caller_id CHECK (
@@ -27,8 +27,8 @@ CREATE TABLE IF NOT EXISTS voice_applications (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_voice_applications_tenant_status
-    ON voice_applications (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_voice_applications_organization_status
+    ON voice_applications (organization_id, status);
 
 CREATE TABLE IF NOT EXISTS voice_bindings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

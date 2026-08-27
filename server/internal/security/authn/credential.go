@@ -9,8 +9,8 @@ import (
 type CredentialType string
 
 const (
-	CredentialSession CredentialType = "session"
-	CredentialAPIKey  CredentialType = "api_key"
+	CredentialSession           CredentialType = "session"
+	CredentialOrganizationToken CredentialType = "organization_token"
 )
 
 type Credential struct {
@@ -29,7 +29,7 @@ func (c CredentialInput) Validate() error {
 	}
 
 	switch c.Type {
-	case CredentialSession, CredentialAPIKey:
+	case CredentialSession, CredentialOrganizationToken:
 		return nil
 	default:
 		return errors.New("invalid credential")

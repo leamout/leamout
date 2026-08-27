@@ -1,7 +1,7 @@
 -- name: CreateWebhookEvent :one
 INSERT INTO webhook_events (
     id,
-    tenant_id,
+    organization_id,
     event_type,
     object_type,
     object_id,
@@ -9,7 +9,7 @@ INSERT INTO webhook_events (
     occurred_at
 ) VALUES (
     sqlc.arg(id),
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.arg(event_type),
     sqlc.arg(object_type),
     sqlc.narg(object_id),
@@ -22,18 +22,18 @@ RETURNING *;
 -- name: GetWebhookEvent :one
 SELECT webhook_events.*
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_events.id = sqlc.arg(id)
-  AND webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+  AND webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
 LIMIT 1;
 
 -- name: ListWebhookEvents :many
 SELECT webhook_events.*
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
-WHERE webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
 ORDER BY webhook_events.created_at DESC
 LIMIT sqlc.arg(limit_count)
 OFFSET sqlc.arg(offset_count);
@@ -41,11 +41,11 @@ OFFSET sqlc.arg(offset_count);
 -- name: ListWebhookEventsForObject :many
 SELECT webhook_events.*
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
-WHERE webhook_events.tenant_id = sqlc.arg(tenant_id)
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_events.organization_id = sqlc.arg(organization_id)
   AND webhook_events.object_type = sqlc.arg(object_type)
   AND webhook_events.object_id IS NOT DISTINCT FROM sqlc.narg(object_id)
-  AND tenants.status = 'active'
+  AND organizations.status = 'active'
 ORDER BY webhook_events.occurred_at DESC, webhook_events.created_at DESC
 LIMIT sqlc.arg(limit_count)
 OFFSET sqlc.arg(offset_count);
@@ -53,9 +53,9 @@ OFFSET sqlc.arg(offset_count);
 -- name: ListWebhookEventsFiltered :many
 SELECT webhook_events.*
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
-WHERE webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
   AND (sqlc.narg(event_type)::text IS NULL OR webhook_events.event_type = sqlc.narg(event_type))
   AND (sqlc.narg(object_type)::text IS NULL OR webhook_events.object_type = sqlc.narg(object_type))
   AND (sqlc.narg(object_id)::uuid IS NULL OR webhook_events.object_id = sqlc.narg(object_id))

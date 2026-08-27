@@ -15,7 +15,7 @@ import (
 const createWebhookEvent = `-- name: CreateWebhookEvent :one
 INSERT INTO webhook_events (
     id,
-    tenant_id,
+    organization_id,
     event_type,
     object_type,
     object_id,
@@ -31,23 +31,23 @@ INSERT INTO webhook_events (
     $7
 )
 ON CONFLICT (id) DO NOTHING
-RETURNING id, tenant_id, event_type, object_type, object_id, payload, occurred_at, created_at
+RETURNING id, organization_id, event_type, object_type, object_id, payload, occurred_at, created_at
 `
 
 type CreateWebhookEventParams struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	TenantID   uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	EventType  string             `db:"event_type" json:"event_type"`
-	ObjectType string             `db:"object_type" json:"object_type"`
-	ObjectID   *uuid.UUID         `db:"object_id" json:"object_id"`
-	Payload    []byte             `db:"payload" json:"payload"`
-	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	EventType      string             `db:"event_type" json:"event_type"`
+	ObjectType     string             `db:"object_type" json:"object_type"`
+	ObjectID       *uuid.UUID         `db:"object_id" json:"object_id"`
+	Payload        []byte             `db:"payload" json:"payload"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 }
 
 func (q *Queries) CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error) {
 	row := q.db.QueryRow(ctx, createWebhookEvent,
 		arg.ID,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.EventType,
 		arg.ObjectType,
 		arg.ObjectID,
@@ -57,7 +57,7 @@ func (q *Queries) CreateWebhookEvent(ctx context.Context, arg CreateWebhookEvent
 	var i WebhookEvent
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.EventType,
 		&i.ObjectType,
 		&i.ObjectID,
@@ -69,26 +69,26 @@ func (q *Queries) CreateWebhookEvent(ctx context.Context, arg CreateWebhookEvent
 }
 
 const getWebhookEvent = `-- name: GetWebhookEvent :one
-SELECT webhook_events.id, webhook_events.tenant_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
+SELECT webhook_events.id, webhook_events.organization_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_events.id = $1
-  AND webhook_events.tenant_id = $2
-  AND tenants.status = 'active'
+  AND webhook_events.organization_id = $2
+  AND organizations.status = 'active'
 LIMIT 1
 `
 
 type GetWebhookEventParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetWebhookEvent(ctx context.Context, arg GetWebhookEventParams) (WebhookEvent, error) {
-	row := q.db.QueryRow(ctx, getWebhookEvent, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getWebhookEvent, arg.ID, arg.OrganizationID)
 	var i WebhookEvent
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.EventType,
 		&i.ObjectType,
 		&i.ObjectID,
@@ -100,24 +100,24 @@ func (q *Queries) GetWebhookEvent(ctx context.Context, arg GetWebhookEventParams
 }
 
 const listWebhookEvents = `-- name: ListWebhookEvents :many
-SELECT webhook_events.id, webhook_events.tenant_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
+SELECT webhook_events.id, webhook_events.organization_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
-WHERE webhook_events.tenant_id = $1
-  AND tenants.status = 'active'
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_events.organization_id = $1
+  AND organizations.status = 'active'
 ORDER BY webhook_events.created_at DESC
 LIMIT $3
 OFFSET $2
 `
 
 type ListWebhookEventsParams struct {
-	TenantID    uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	OffsetCount int32     `db:"offset_count" json:"offset_count"`
-	LimitCount  int32     `db:"limit_count" json:"limit_count"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	OffsetCount    int32     `db:"offset_count" json:"offset_count"`
+	LimitCount     int32     `db:"limit_count" json:"limit_count"`
 }
 
 func (q *Queries) ListWebhookEvents(ctx context.Context, arg ListWebhookEventsParams) ([]WebhookEvent, error) {
-	rows, err := q.db.Query(ctx, listWebhookEvents, arg.TenantID, arg.OffsetCount, arg.LimitCount)
+	rows, err := q.db.Query(ctx, listWebhookEvents, arg.OrganizationID, arg.OffsetCount, arg.LimitCount)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (q *Queries) ListWebhookEvents(ctx context.Context, arg ListWebhookEventsPa
 		var i WebhookEvent
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.EventType,
 			&i.ObjectType,
 			&i.ObjectID,
@@ -146,11 +146,11 @@ func (q *Queries) ListWebhookEvents(ctx context.Context, arg ListWebhookEventsPa
 }
 
 const listWebhookEventsFiltered = `-- name: ListWebhookEventsFiltered :many
-SELECT webhook_events.id, webhook_events.tenant_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
+SELECT webhook_events.id, webhook_events.organization_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
-WHERE webhook_events.tenant_id = $1
-  AND tenants.status = 'active'
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_events.organization_id = $1
+  AND organizations.status = 'active'
   AND ($2::text IS NULL OR webhook_events.event_type = $2)
   AND ($3::text IS NULL OR webhook_events.object_type = $3)
   AND ($4::uuid IS NULL OR webhook_events.object_id = $4)
@@ -160,7 +160,7 @@ LIMIT $6
 `
 
 type ListWebhookEventsFilteredParams struct {
-	TenantID         uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	OrganizationID   uuid.UUID          `db:"organization_id" json:"organization_id"`
 	EventType        *string            `db:"event_type" json:"event_type"`
 	ObjectType       *string            `db:"object_type" json:"object_type"`
 	ObjectID         *uuid.UUID         `db:"object_id" json:"object_id"`
@@ -170,7 +170,7 @@ type ListWebhookEventsFilteredParams struct {
 
 func (q *Queries) ListWebhookEventsFiltered(ctx context.Context, arg ListWebhookEventsFilteredParams) ([]WebhookEvent, error) {
 	rows, err := q.db.Query(ctx, listWebhookEventsFiltered,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.EventType,
 		arg.ObjectType,
 		arg.ObjectID,
@@ -186,7 +186,7 @@ func (q *Queries) ListWebhookEventsFiltered(ctx context.Context, arg ListWebhook
 		var i WebhookEvent
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.EventType,
 			&i.ObjectType,
 			&i.ObjectID,
@@ -205,29 +205,29 @@ func (q *Queries) ListWebhookEventsFiltered(ctx context.Context, arg ListWebhook
 }
 
 const listWebhookEventsForObject = `-- name: ListWebhookEventsForObject :many
-SELECT webhook_events.id, webhook_events.tenant_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
+SELECT webhook_events.id, webhook_events.organization_id, webhook_events.event_type, webhook_events.object_type, webhook_events.object_id, webhook_events.payload, webhook_events.occurred_at, webhook_events.created_at
 FROM webhook_events
-JOIN tenants ON tenants.id = webhook_events.tenant_id
-WHERE webhook_events.tenant_id = $1
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_events.organization_id = $1
   AND webhook_events.object_type = $2
   AND webhook_events.object_id IS NOT DISTINCT FROM $3
-  AND tenants.status = 'active'
+  AND organizations.status = 'active'
 ORDER BY webhook_events.occurred_at DESC, webhook_events.created_at DESC
 LIMIT $5
 OFFSET $4
 `
 
 type ListWebhookEventsForObjectParams struct {
-	TenantID    uuid.UUID  `db:"tenant_id" json:"tenant_id"`
-	ObjectType  string     `db:"object_type" json:"object_type"`
-	ObjectID    *uuid.UUID `db:"object_id" json:"object_id"`
-	OffsetCount int32      `db:"offset_count" json:"offset_count"`
-	LimitCount  int32      `db:"limit_count" json:"limit_count"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+	ObjectType     string     `db:"object_type" json:"object_type"`
+	ObjectID       *uuid.UUID `db:"object_id" json:"object_id"`
+	OffsetCount    int32      `db:"offset_count" json:"offset_count"`
+	LimitCount     int32      `db:"limit_count" json:"limit_count"`
 }
 
 func (q *Queries) ListWebhookEventsForObject(ctx context.Context, arg ListWebhookEventsForObjectParams) ([]WebhookEvent, error) {
 	rows, err := q.db.Query(ctx, listWebhookEventsForObject,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.ObjectType,
 		arg.ObjectID,
 		arg.OffsetCount,
@@ -242,7 +242,7 @@ func (q *Queries) ListWebhookEventsForObject(ctx context.Context, arg ListWebhoo
 		var i WebhookEvent
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.EventType,
 			&i.ObjectType,
 			&i.ObjectID,

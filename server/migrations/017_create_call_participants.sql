@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS call_participants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     call_id UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
     subscriber_id UUID REFERENCES subscribers(id) ON DELETE SET NULL,
     role TEXT NOT NULL,
@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS call_participants (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_call_participants_tenant_id
-    ON call_participants (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_call_participants_organization_id
+    ON call_participants (organization_id);
 
 CREATE INDEX IF NOT EXISTS idx_call_participants_call_id
     ON call_participants (call_id, created_at);

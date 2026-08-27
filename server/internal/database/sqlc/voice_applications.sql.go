@@ -13,7 +13,7 @@ import (
 
 const createVoiceApplication = `-- name: CreateVoiceApplication :one
 INSERT INTO voice_applications (
-    tenant_id,
+    organization_id,
     name,
     ring_timeout_seconds,
     caller_id,
@@ -21,21 +21,21 @@ INSERT INTO voice_applications (
     callback_url
 )
 SELECT
-    $1 as tenant_id,
+    $1 as organization_id,
     $2 as name,
     COALESCE($3, 30) as ring_timeout_seconds,
     $4 as caller_id,
     $5 as voice_url,
     $6 as callback_url
-FROM tenants AS t
+FROM organizations AS t
 WHERE t.id = $1
   AND t.status = 'active'
   AND t.deleted_at IS NULL
-RETURNING id, tenant_id, name, ring_timeout_seconds, caller_id, status, voice_url, callback_url, created_at, updated_at
+RETURNING id, organization_id, name, ring_timeout_seconds, caller_id, status, voice_url, callback_url, created_at, updated_at
 `
 
 type CreateVoiceApplicationParams struct {
-	TenantID           uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	OrganizationID     uuid.UUID `db:"organization_id" json:"organization_id"`
 	Name               string    `db:"name" json:"name"`
 	RingTimeoutSeconds *int32    `db:"ring_timeout_seconds" json:"ring_timeout_seconds"`
 	CallerID           *string   `db:"caller_id" json:"caller_id"`
@@ -45,7 +45,7 @@ type CreateVoiceApplicationParams struct {
 
 func (q *Queries) CreateVoiceApplication(ctx context.Context, arg CreateVoiceApplicationParams) (VoiceApplication, error) {
 	row := q.db.QueryRow(ctx, createVoiceApplication,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.Name,
 		arg.RingTimeoutSeconds,
 		arg.CallerID,
@@ -55,7 +55,7 @@ func (q *Queries) CreateVoiceApplication(ctx context.Context, arg CreateVoiceApp
 	var i VoiceApplication
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.RingTimeoutSeconds,
 		&i.CallerID,
@@ -81,9 +81,9 @@ SELECT
     $3::uuid,
     $4::uuid
 FROM voice_applications AS va
-JOIN tenants AS t ON t.id = va.tenant_id
+JOIN organizations AS t ON t.id = va.organization_id
 WHERE va.id = $1
-  AND va.tenant_id = $5
+  AND va.organization_id = $5
   AND va.status = 'active'
   AND t.status = 'active'
   AND t.deleted_at IS NULL
@@ -95,7 +95,7 @@ type CreateVoiceBindingParams struct {
 	PhoneNumberID      *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
 	SipDomainID        *uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
 	SubscriberID       *uuid.UUID `db:"subscriber_id" json:"subscriber_id"`
-	TenantID           uuid.UUID  `db:"tenant_id" json:"tenant_id"`
+	OrganizationID     uuid.UUID  `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CreateVoiceBinding(ctx context.Context, arg CreateVoiceBindingParams) (VoiceBinding, error) {
@@ -104,7 +104,7 @@ func (q *Queries) CreateVoiceBinding(ctx context.Context, arg CreateVoiceBinding
 		arg.PhoneNumberID,
 		arg.SipDomainID,
 		arg.SubscriberID,
-		arg.TenantID,
+		arg.OrganizationID,
 	)
 	var i VoiceBinding
 	err := row.Scan(
@@ -123,17 +123,17 @@ DELETE FROM voice_bindings
 WHERE voice_bindings.id = $1
   AND voice_application_id IN (
       SELECT va.id FROM voice_applications AS va
-      WHERE va.tenant_id = $2
+      WHERE va.organization_id = $2
   )
 `
 
 type DeleteVoiceBindingParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) DeleteVoiceBinding(ctx context.Context, arg DeleteVoiceBindingParams) error {
-	_, err := q.db.Exec(ctx, deleteVoiceBinding, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, deleteVoiceBinding, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -143,17 +143,17 @@ SET
     status = 'disabled',
     updated_at = NOW()
 WHERE id = $1
-  AND tenant_id = $2
+  AND organization_id = $2
   AND status = 'active'
 `
 
 type DisableVoiceApplicationParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) DisableVoiceApplication(ctx context.Context, arg DisableVoiceApplicationParams) error {
-	_, err := q.db.Exec(ctx, disableVoiceApplication, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, disableVoiceApplication, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -163,26 +163,26 @@ SET
     status = 'active',
     updated_at = NOW()
 WHERE id = $1
-  AND tenant_id = $2
+  AND organization_id = $2
   AND status = 'disabled'
 `
 
 type EnableVoiceApplicationParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) EnableVoiceApplication(ctx context.Context, arg EnableVoiceApplicationParams) error {
-	_, err := q.db.Exec(ctx, enableVoiceApplication, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, enableVoiceApplication, arg.ID, arg.OrganizationID)
 	return err
 }
 
 const getVoiceApplicationByID = `-- name: GetVoiceApplicationByID :one
-SELECT va.id, va.tenant_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
+SELECT va.id, va.organization_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
 FROM voice_applications AS va
-JOIN tenants AS t ON t.id = va.tenant_id
+JOIN organizations AS t ON t.id = va.organization_id
 WHERE va.id = $1
-  AND va.tenant_id = $2
+  AND va.organization_id = $2
   AND va.status = 'active'
   AND t.status = 'active'
   AND t.deleted_at IS NULL
@@ -190,16 +190,16 @@ LIMIT 1
 `
 
 type GetVoiceApplicationByIDParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetVoiceApplicationByID(ctx context.Context, arg GetVoiceApplicationByIDParams) (VoiceApplication, error) {
-	row := q.db.QueryRow(ctx, getVoiceApplicationByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getVoiceApplicationByID, arg.ID, arg.OrganizationID)
 	var i VoiceApplication
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.RingTimeoutSeconds,
 		&i.CallerID,
@@ -213,10 +213,10 @@ func (q *Queries) GetVoiceApplicationByID(ctx context.Context, arg GetVoiceAppli
 }
 
 const getVoiceApplicationByName = `-- name: GetVoiceApplicationByName :one
-SELECT va.id, va.tenant_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
+SELECT va.id, va.organization_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
 FROM voice_applications AS va
-JOIN tenants AS t ON t.id = va.tenant_id
-WHERE va.tenant_id = $1
+JOIN organizations AS t ON t.id = va.organization_id
+WHERE va.organization_id = $1
   AND va.name = $2
   AND va.status = 'active'
   AND t.status = 'active'
@@ -225,16 +225,16 @@ LIMIT 1
 `
 
 type GetVoiceApplicationByNameParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	Name     string    `db:"name" json:"name"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Name           string    `db:"name" json:"name"`
 }
 
 func (q *Queries) GetVoiceApplicationByName(ctx context.Context, arg GetVoiceApplicationByNameParams) (VoiceApplication, error) {
-	row := q.db.QueryRow(ctx, getVoiceApplicationByName, arg.TenantID, arg.Name)
+	row := q.db.QueryRow(ctx, getVoiceApplicationByName, arg.OrganizationID, arg.Name)
 	var i VoiceApplication
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.RingTimeoutSeconds,
 		&i.CallerID,
@@ -251,9 +251,9 @@ const getVoiceBindingByID = `-- name: GetVoiceBindingByID :one
 SELECT vb.id, vb.voice_application_id, vb.phone_number_id, vb.sip_domain_id, vb.subscriber_id, vb.created_at
 FROM voice_bindings AS vb
 JOIN voice_applications AS va ON va.id = vb.voice_application_id
-JOIN tenants AS t ON t.id = va.tenant_id
+JOIN organizations AS t ON t.id = va.organization_id
 WHERE vb.id = $1
-  AND va.tenant_id = $2
+  AND va.organization_id = $2
   AND va.status = 'active'
   AND t.status = 'active'
   AND t.deleted_at IS NULL
@@ -261,12 +261,12 @@ LIMIT 1
 `
 
 type GetVoiceBindingByIDParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetVoiceBindingByID(ctx context.Context, arg GetVoiceBindingByIDParams) (VoiceBinding, error) {
-	row := q.db.QueryRow(ctx, getVoiceBindingByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getVoiceBindingByID, arg.ID, arg.OrganizationID)
 	var i VoiceBinding
 	err := row.Scan(
 		&i.ID,
@@ -283,9 +283,9 @@ const getVoiceBindingByPhoneNumberID = `-- name: GetVoiceBindingByPhoneNumberID 
 SELECT vb.id, vb.voice_application_id, vb.phone_number_id, vb.sip_domain_id, vb.subscriber_id, vb.created_at
 FROM voice_bindings AS vb
 JOIN voice_applications AS va ON va.id = vb.voice_application_id
-JOIN tenants AS t ON t.id = va.tenant_id
+JOIN organizations AS t ON t.id = va.organization_id
 WHERE vb.phone_number_id = $1
-  AND va.tenant_id = $2
+  AND va.organization_id = $2
   AND va.status = 'active'
   AND t.status = 'active'
   AND t.deleted_at IS NULL
@@ -293,12 +293,12 @@ LIMIT 1
 `
 
 type GetVoiceBindingByPhoneNumberIDParams struct {
-	PhoneNumberID *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
-	TenantID      uuid.UUID  `db:"tenant_id" json:"tenant_id"`
+	PhoneNumberID  *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetVoiceBindingByPhoneNumberID(ctx context.Context, arg GetVoiceBindingByPhoneNumberIDParams) (VoiceBinding, error) {
-	row := q.db.QueryRow(ctx, getVoiceBindingByPhoneNumberID, arg.PhoneNumberID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getVoiceBindingByPhoneNumberID, arg.PhoneNumberID, arg.OrganizationID)
 	var i VoiceBinding
 	err := row.Scan(
 		&i.ID,
@@ -315,9 +315,9 @@ const getVoiceBindingBySipDomainID = `-- name: GetVoiceBindingBySipDomainID :one
 SELECT vb.id, vb.voice_application_id, vb.phone_number_id, vb.sip_domain_id, vb.subscriber_id, vb.created_at
 FROM voice_bindings AS vb
 JOIN voice_applications AS va ON va.id = vb.voice_application_id
-JOIN tenants AS t ON t.id = va.tenant_id
+JOIN organizations AS t ON t.id = va.organization_id
 WHERE vb.sip_domain_id = $1
-  AND va.tenant_id = $2
+  AND va.organization_id = $2
   AND va.status = 'active'
   AND t.status = 'active'
   AND t.deleted_at IS NULL
@@ -325,12 +325,12 @@ LIMIT 1
 `
 
 type GetVoiceBindingBySipDomainIDParams struct {
-	SipDomainID *uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
-	TenantID    uuid.UUID  `db:"tenant_id" json:"tenant_id"`
+	SipDomainID    *uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetVoiceBindingBySipDomainID(ctx context.Context, arg GetVoiceBindingBySipDomainIDParams) (VoiceBinding, error) {
-	row := q.db.QueryRow(ctx, getVoiceBindingBySipDomainID, arg.SipDomainID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getVoiceBindingBySipDomainID, arg.SipDomainID, arg.OrganizationID)
 	var i VoiceBinding
 	err := row.Scan(
 		&i.ID,
@@ -347,9 +347,9 @@ const getVoiceBindingBySubscriberID = `-- name: GetVoiceBindingBySubscriberID :o
 SELECT vb.id, vb.voice_application_id, vb.phone_number_id, vb.sip_domain_id, vb.subscriber_id, vb.created_at
 FROM voice_bindings AS vb
 JOIN voice_applications AS va ON va.id = vb.voice_application_id
-JOIN tenants AS t ON t.id = va.tenant_id
+JOIN organizations AS t ON t.id = va.organization_id
 WHERE vb.subscriber_id = $1
-  AND va.tenant_id = $2
+  AND va.organization_id = $2
   AND va.status = 'active'
   AND t.status = 'active'
   AND t.deleted_at IS NULL
@@ -357,12 +357,12 @@ LIMIT 1
 `
 
 type GetVoiceBindingBySubscriberIDParams struct {
-	SubscriberID *uuid.UUID `db:"subscriber_id" json:"subscriber_id"`
-	TenantID     uuid.UUID  `db:"tenant_id" json:"tenant_id"`
+	SubscriberID   *uuid.UUID `db:"subscriber_id" json:"subscriber_id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetVoiceBindingBySubscriberID(ctx context.Context, arg GetVoiceBindingBySubscriberIDParams) (VoiceBinding, error) {
-	row := q.db.QueryRow(ctx, getVoiceBindingBySubscriberID, arg.SubscriberID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getVoiceBindingBySubscriberID, arg.SubscriberID, arg.OrganizationID)
 	var i VoiceBinding
 	err := row.Scan(
 		&i.ID,
@@ -375,16 +375,16 @@ func (q *Queries) GetVoiceBindingBySubscriberID(ctx context.Context, arg GetVoic
 	return i, err
 }
 
-const listVoiceApplicationsByTenantID = `-- name: ListVoiceApplicationsByTenantID :many
-SELECT va.id, va.tenant_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
+const listVoiceApplicationsByOrganizationID = `-- name: ListVoiceApplicationsByOrganizationID :many
+SELECT va.id, va.organization_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
 FROM voice_applications AS va
-WHERE va.tenant_id = $1
+WHERE va.organization_id = $1
   AND va.status = 'active'
 ORDER BY va.created_at DESC
 `
 
-func (q *Queries) ListVoiceApplicationsByTenantID(ctx context.Context, tenantID uuid.UUID) ([]VoiceApplication, error) {
-	rows, err := q.db.Query(ctx, listVoiceApplicationsByTenantID, tenantID)
+func (q *Queries) ListVoiceApplicationsByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]VoiceApplication, error) {
+	rows, err := q.db.Query(ctx, listVoiceApplicationsByOrganizationID, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (q *Queries) ListVoiceApplicationsByTenantID(ctx context.Context, tenantID 
 		var i VoiceApplication
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.Name,
 			&i.RingTimeoutSeconds,
 			&i.CallerID,
@@ -419,17 +419,17 @@ SELECT vb.id, vb.voice_application_id, vb.phone_number_id, vb.sip_domain_id, vb.
 FROM voice_bindings AS vb
 JOIN voice_applications AS va ON va.id = vb.voice_application_id
 WHERE vb.voice_application_id = $1
-  AND va.tenant_id = $2
+  AND va.organization_id = $2
 ORDER BY vb.created_at DESC
 `
 
 type ListVoiceBindingsByApplicationIDParams struct {
 	VoiceApplicationID uuid.UUID `db:"voice_application_id" json:"voice_application_id"`
-	TenantID           uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	OrganizationID     uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) ListVoiceBindingsByApplicationID(ctx context.Context, arg ListVoiceBindingsByApplicationIDParams) ([]VoiceBinding, error) {
-	rows, err := q.db.Query(ctx, listVoiceBindingsByApplicationID, arg.VoiceApplicationID, arg.TenantID)
+	rows, err := q.db.Query(ctx, listVoiceBindingsByApplicationID, arg.VoiceApplicationID, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -465,9 +465,9 @@ SET
     callback_url = COALESCE($5, callback_url),
     updated_at = NOW()
 WHERE id = $6
-  AND tenant_id = $7
+  AND organization_id = $7
   AND status = 'active'
-RETURNING id, tenant_id, name, ring_timeout_seconds, caller_id, status, voice_url, callback_url, created_at, updated_at
+RETURNING id, organization_id, name, ring_timeout_seconds, caller_id, status, voice_url, callback_url, created_at, updated_at
 `
 
 type UpdateVoiceApplicationParams struct {
@@ -477,7 +477,7 @@ type UpdateVoiceApplicationParams struct {
 	VoiceUrl           *string   `db:"voice_url" json:"voice_url"`
 	CallbackUrl        *string   `db:"callback_url" json:"callback_url"`
 	ID                 uuid.UUID `db:"id" json:"id"`
-	TenantID           uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	OrganizationID     uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) UpdateVoiceApplication(ctx context.Context, arg UpdateVoiceApplicationParams) (VoiceApplication, error) {
@@ -488,12 +488,12 @@ func (q *Queries) UpdateVoiceApplication(ctx context.Context, arg UpdateVoiceApp
 		arg.VoiceUrl,
 		arg.CallbackUrl,
 		arg.ID,
-		arg.TenantID,
+		arg.OrganizationID,
 	)
 	var i VoiceApplication
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Name,
 		&i.RingTimeoutSeconds,
 		&i.CallerID,

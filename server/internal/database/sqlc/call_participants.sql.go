@@ -14,7 +14,7 @@ import (
 
 const createCallParticipant = `-- name: CreateCallParticipant :one
 INSERT INTO call_participants (
-    tenant_id,
+    organization_id,
     call_id,
     subscriber_id,
     role,
@@ -32,23 +32,23 @@ INSERT INTO call_participants (
     COALESCE($7, 'joining'),
     $8
 )
-RETURNING id, tenant_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
+RETURNING id, organization_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
 `
 
 type CreateCallParticipantParams struct {
-	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	CallID       uuid.UUID          `db:"call_id" json:"call_id"`
-	SubscriberID *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
-	Role         string             `db:"role" json:"role"`
-	Address      *string            `db:"address" json:"address"`
-	Direction    *string            `db:"direction" json:"direction"`
-	State        interface{}        `db:"state" json:"state"`
-	JoinedAt     pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CallID         uuid.UUID          `db:"call_id" json:"call_id"`
+	SubscriberID   *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
+	Role           string             `db:"role" json:"role"`
+	Address        *string            `db:"address" json:"address"`
+	Direction      *string            `db:"direction" json:"direction"`
+	State          interface{}        `db:"state" json:"state"`
+	JoinedAt       pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
 }
 
 func (q *Queries) CreateCallParticipant(ctx context.Context, arg CreateCallParticipantParams) (CallParticipant, error) {
 	row := q.db.QueryRow(ctx, createCallParticipant,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.CallID,
 		arg.SubscriberID,
 		arg.Role,
@@ -60,7 +60,7 @@ func (q *Queries) CreateCallParticipant(ctx context.Context, arg CreateCallParti
 	var i CallParticipant
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.SubscriberID,
 		&i.Role,
@@ -76,24 +76,24 @@ func (q *Queries) CreateCallParticipant(ctx context.Context, arg CreateCallParti
 }
 
 const getCallParticipant = `-- name: GetCallParticipant :one
-SELECT id, tenant_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
+SELECT id, organization_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
 FROM call_participants
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
 LIMIT 1
 `
 
 type GetCallParticipantParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) GetCallParticipant(ctx context.Context, arg GetCallParticipantParams) (CallParticipant, error) {
-	row := q.db.QueryRow(ctx, getCallParticipant, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, getCallParticipant, arg.OrganizationID, arg.ID)
 	var i CallParticipant
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.SubscriberID,
 		&i.Role,
@@ -109,20 +109,20 @@ func (q *Queries) GetCallParticipant(ctx context.Context, arg GetCallParticipant
 }
 
 const listCallParticipants = `-- name: ListCallParticipants :many
-SELECT id, tenant_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
+SELECT id, organization_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
 FROM call_participants
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND call_id = $2
 ORDER BY created_at ASC
 `
 
 type ListCallParticipantsParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	CallID   uuid.UUID `db:"call_id" json:"call_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	CallID         uuid.UUID `db:"call_id" json:"call_id"`
 }
 
 func (q *Queries) ListCallParticipants(ctx context.Context, arg ListCallParticipantsParams) ([]CallParticipant, error) {
-	rows, err := q.db.Query(ctx, listCallParticipants, arg.TenantID, arg.CallID)
+	rows, err := q.db.Query(ctx, listCallParticipants, arg.OrganizationID, arg.CallID)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +132,7 @@ func (q *Queries) ListCallParticipants(ctx context.Context, arg ListCallParticip
 		var i CallParticipant
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.CallID,
 			&i.SubscriberID,
 			&i.Role,
@@ -167,23 +167,23 @@ SET
         ELSE left_at
     END,
     updated_at = NOW()
-WHERE tenant_id = $2
+WHERE organization_id = $2
   AND id = $3
-RETURNING id, tenant_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
+RETURNING id, organization_id, call_id, subscriber_id, role, address, direction, state, joined_at, left_at, created_at, updated_at
 `
 
 type UpdateCallParticipantStateParams struct {
-	State    string    `db:"state" json:"state"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	State          string    `db:"state" json:"state"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateCallParticipantState(ctx context.Context, arg UpdateCallParticipantStateParams) (CallParticipant, error) {
-	row := q.db.QueryRow(ctx, updateCallParticipantState, arg.State, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, updateCallParticipantState, arg.State, arg.OrganizationID, arg.ID)
 	var i CallParticipant
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.SubscriberID,
 		&i.Role,

@@ -13,30 +13,30 @@ import (
 
 const createSipDomain = `-- name: CreateSipDomain :one
 INSERT INTO sip_domains (
-    tenant_id,
+    organization_id,
     domain
 )
 SELECT
     $1,
     $2
-FROM tenants AS t
+FROM organizations AS t
 WHERE t.id = $1
 AND t.status = 'active'
 AND t.deleted_at IS NULL
-RETURNING id, tenant_id, domain, status, created_at, updated_at
+RETURNING id, organization_id, domain, status, created_at, updated_at
 `
 
 type CreateSipDomainParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	Domain   string    `db:"domain" json:"domain"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Domain         string    `db:"domain" json:"domain"`
 }
 
 func (q *Queries) CreateSipDomain(ctx context.Context, arg CreateSipDomainParams) (SipDomain, error) {
-	row := q.db.QueryRow(ctx, createSipDomain, arg.TenantID, arg.Domain)
+	row := q.db.QueryRow(ctx, createSipDomain, arg.OrganizationID, arg.Domain)
 	var i SipDomain
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
@@ -51,17 +51,17 @@ SET
     status = 'disabled',
     updated_at = NOW()
 WHERE id = $1
-AND tenant_id = $2
+AND organization_id = $2
 AND status = 'active'
 `
 
 type DisableSipDomainParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) DisableSipDomain(ctx context.Context, arg DisableSipDomainParams) error {
-	_, err := q.db.Exec(ctx, disableSipDomain, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, disableSipDomain, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -71,26 +71,26 @@ SET
     status = 'active',
     updated_at = NOW()
 WHERE id = $1
-AND tenant_id = $2
+AND organization_id = $2
 AND status = 'disabled'
 `
 
 type EnableSipDomainParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) EnableSipDomain(ctx context.Context, arg EnableSipDomainParams) error {
-	_, err := q.db.Exec(ctx, enableSipDomain, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, enableSipDomain, arg.ID, arg.OrganizationID)
 	return err
 }
 
 const getSipDomainByDomain = `-- name: GetSipDomainByDomain :one
-SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at, sd.updated_at
+SELECT sd.id, sd.organization_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
-JOIN tenants AS t ON t.id = sd.tenant_id
+JOIN organizations AS t ON t.id = sd.organization_id
 WHERE sd.domain = $1
-AND sd.tenant_id = $2
+AND sd.organization_id = $2
 AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -98,16 +98,16 @@ LIMIT 1
 `
 
 type GetSipDomainByDomainParams struct {
-	Domain   string    `db:"domain" json:"domain"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	Domain         string    `db:"domain" json:"domain"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetSipDomainByDomain(ctx context.Context, arg GetSipDomainByDomainParams) (SipDomain, error) {
-	row := q.db.QueryRow(ctx, getSipDomainByDomain, arg.Domain, arg.TenantID)
+	row := q.db.QueryRow(ctx, getSipDomainByDomain, arg.Domain, arg.OrganizationID)
 	var i SipDomain
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
@@ -117,11 +117,11 @@ func (q *Queries) GetSipDomainByDomain(ctx context.Context, arg GetSipDomainByDo
 }
 
 const getSipDomainByID = `-- name: GetSipDomainByID :one
-SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at, sd.updated_at
+SELECT sd.id, sd.organization_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
-JOIN tenants AS t ON t.id = sd.tenant_id
+JOIN organizations AS t ON t.id = sd.organization_id
 WHERE sd.id = $1
-AND sd.tenant_id = $2
+AND sd.organization_id = $2
 AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -129,16 +129,16 @@ LIMIT 1
 `
 
 type GetSipDomainByIDParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetSipDomainByID(ctx context.Context, arg GetSipDomainByIDParams) (SipDomain, error) {
-	row := q.db.QueryRow(ctx, getSipDomainByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getSipDomainByID, arg.ID, arg.OrganizationID)
 	var i SipDomain
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,
@@ -147,19 +147,19 @@ func (q *Queries) GetSipDomainByID(ctx context.Context, arg GetSipDomainByIDPara
 	return i, err
 }
 
-const listSipDomainsByTenantID = `-- name: ListSipDomainsByTenantID :many
-SELECT sd.id, sd.tenant_id, sd.domain, sd.status, sd.created_at, sd.updated_at
+const listSipDomainsByOrganizationID = `-- name: ListSipDomainsByOrganizationID :many
+SELECT sd.id, sd.organization_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
-JOIN tenants AS t ON t.id = sd.tenant_id
-WHERE sd.tenant_id = $1
+JOIN organizations AS t ON t.id = sd.organization_id
+WHERE sd.organization_id = $1
 AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 ORDER BY sd.created_at ASC
 `
 
-func (q *Queries) ListSipDomainsByTenantID(ctx context.Context, tenantID uuid.UUID) ([]SipDomain, error) {
-	rows, err := q.db.Query(ctx, listSipDomainsByTenantID, tenantID)
+func (q *Queries) ListSipDomainsByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]SipDomain, error) {
+	rows, err := q.db.Query(ctx, listSipDomainsByOrganizationID, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -169,7 +169,7 @@ func (q *Queries) ListSipDomainsByTenantID(ctx context.Context, tenantID uuid.UU
 		var i SipDomain
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.Domain,
 			&i.Status,
 			&i.CreatedAt,
@@ -191,23 +191,23 @@ SET
     domain = COALESCE($1, domain),
     updated_at = NOW()
 WHERE id = $2
-AND tenant_id = $3
+AND organization_id = $3
 AND status = 'active'
-RETURNING id, tenant_id, domain, status, created_at, updated_at
+RETURNING id, organization_id, domain, status, created_at, updated_at
 `
 
 type UpdateSipDomainParams struct {
-	Domain   *string   `db:"domain" json:"domain"`
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	Domain         *string   `db:"domain" json:"domain"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) UpdateSipDomain(ctx context.Context, arg UpdateSipDomainParams) (SipDomain, error) {
-	row := q.db.QueryRow(ctx, updateSipDomain, arg.Domain, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, updateSipDomain, arg.Domain, arg.ID, arg.OrganizationID)
 	var i SipDomain
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Domain,
 		&i.Status,
 		&i.CreatedAt,

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS webhook_endpoints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     url TEXT NOT NULL,
     signing_secret BYTEA NOT NULL,
     enabled BOOLEAN NOT NULL DEFAULT true,
@@ -32,16 +32,16 @@ CREATE TABLE IF NOT EXISTS webhook_endpoints (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_tenant_created
-    ON webhook_endpoints (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_organization_created
+    ON webhook_endpoints (organization_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_tenant_enabled
-    ON webhook_endpoints (tenant_id, id)
+CREATE INDEX IF NOT EXISTS idx_webhook_endpoints_organization_enabled
+    ON webhook_endpoints (organization_id, id)
     WHERE enabled;
 
 CREATE TABLE IF NOT EXISTS webhook_events (
     id UUID PRIMARY KEY,
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     event_type TEXT NOT NULL,
     object_type TEXT NOT NULL,
     object_id UUID,
@@ -56,11 +56,11 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     CONSTRAINT chk_webhook_event_payload CHECK (jsonb_typeof(payload) = 'object')
 );
 
-CREATE INDEX IF NOT EXISTS idx_webhook_events_tenant_created
-    ON webhook_events (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_webhook_events_organization_created
+    ON webhook_events (organization_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_webhook_events_object
-    ON webhook_events (tenant_id, object_type, object_id, occurred_at DESC);
+    ON webhook_events (organization_id, object_type, object_id, occurred_at DESC);
 
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

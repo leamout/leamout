@@ -13,7 +13,7 @@ import (
 
 const createCall = `-- name: CreateCall :one
 INSERT INTO calls (
-    tenant_id,
+    organization_id,
     application_id,
     direction,
     state,
@@ -29,22 +29,22 @@ INSERT INTO calls (
     $6,
     $7
 )
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type CreateCallParams struct {
-	TenantID      uuid.UUID   `db:"tenant_id" json:"tenant_id"`
-	ApplicationID *uuid.UUID  `db:"application_id" json:"application_id"`
-	Direction     string      `db:"direction" json:"direction"`
-	State         interface{} `db:"state" json:"state"`
-	FromUri       string      `db:"from_uri" json:"from_uri"`
-	ToUri         string      `db:"to_uri" json:"to_uri"`
-	SipCallID     *string     `db:"sip_call_id" json:"sip_call_id"`
+	OrganizationID uuid.UUID   `db:"organization_id" json:"organization_id"`
+	ApplicationID  *uuid.UUID  `db:"application_id" json:"application_id"`
+	Direction      string      `db:"direction" json:"direction"`
+	State          interface{} `db:"state" json:"state"`
+	FromUri        string      `db:"from_uri" json:"from_uri"`
+	ToUri          string      `db:"to_uri" json:"to_uri"`
+	SipCallID      *string     `db:"sip_call_id" json:"sip_call_id"`
 }
 
 func (q *Queries) CreateCall(ctx context.Context, arg CreateCallParams) (Call, error) {
 	row := q.db.QueryRow(ctx, createCall,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.ApplicationID,
 		arg.Direction,
 		arg.State,
@@ -55,7 +55,7 @@ func (q *Queries) CreateCall(ctx context.Context, arg CreateCallParams) (Call, e
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -74,24 +74,24 @@ func (q *Queries) CreateCall(ctx context.Context, arg CreateCallParams) (Call, e
 }
 
 const getCall = `-- name: GetCall :one
-SELECT id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+SELECT id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 FROM calls
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
 LIMIT 1
 `
 
 type GetCallParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) GetCall(ctx context.Context, arg GetCallParams) (Call, error) {
-	row := q.db.QueryRow(ctx, getCall, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, getCall, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -110,24 +110,24 @@ func (q *Queries) GetCall(ctx context.Context, arg GetCallParams) (Call, error) 
 }
 
 const getCallBySIPCallID = `-- name: GetCallBySIPCallID :one
-SELECT id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+SELECT id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 FROM calls
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND sip_call_id = $2
 LIMIT 1
 `
 
 type GetCallBySIPCallIDParams struct {
-	TenantID  uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	SipCallID *string   `db:"sip_call_id" json:"sip_call_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	SipCallID      *string   `db:"sip_call_id" json:"sip_call_id"`
 }
 
 func (q *Queries) GetCallBySIPCallID(ctx context.Context, arg GetCallBySIPCallIDParams) (Call, error) {
-	row := q.db.QueryRow(ctx, getCallBySIPCallID, arg.TenantID, arg.SipCallID)
+	row := q.db.QueryRow(ctx, getCallBySIPCallID, arg.OrganizationID, arg.SipCallID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -146,9 +146,9 @@ func (q *Queries) GetCallBySIPCallID(ctx context.Context, arg GetCallBySIPCallID
 }
 
 const listCalls = `-- name: ListCalls :many
-SELECT id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+SELECT id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 FROM calls
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND ($2::text IS NULL OR state = $2::text)
 ORDER BY created_at DESC
 LIMIT $4
@@ -156,15 +156,15 @@ OFFSET $3
 `
 
 type ListCallsParams struct {
-	TenantID   uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	State      *string   `db:"state" json:"state"`
-	PageOffset int32     `db:"page_offset" json:"page_offset"`
-	PageLimit  int32     `db:"page_limit" json:"page_limit"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	State          *string   `db:"state" json:"state"`
+	PageOffset     int32     `db:"page_offset" json:"page_offset"`
+	PageLimit      int32     `db:"page_limit" json:"page_limit"`
 }
 
 func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]Call, error) {
 	rows, err := q.db.Query(ctx, listCalls,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.State,
 		arg.PageOffset,
 		arg.PageLimit,
@@ -178,7 +178,7 @@ func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]Call, e
 		var i Call
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.ApplicationID,
 			&i.Direction,
 			&i.State,
@@ -206,23 +206,23 @@ func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]Call, e
 const markCallActive = `-- name: MarkCallActive :one
 UPDATE calls
 SET state = 'active', updated_at = NOW()
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
   AND state IN ('answered', 'ringing')
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type MarkCallActiveParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) MarkCallActive(ctx context.Context, arg MarkCallActiveParams) (Call, error) {
-	row := q.db.QueryRow(ctx, markCallActive, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, markCallActive, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -246,23 +246,23 @@ SET
     state = 'answered',
     answered_at = COALESCE(answered_at, NOW()),
     updated_at = NOW()
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
   AND state IN ('initiating', 'ringing')
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type MarkCallAnsweredParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) MarkCallAnswered(ctx context.Context, arg MarkCallAnsweredParams) (Call, error) {
-	row := q.db.QueryRow(ctx, markCallAnswered, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, markCallAnswered, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -287,24 +287,24 @@ SET
     ended_at = COALESCE(ended_at, NOW()),
     hangup_reason = COALESCE($1, hangup_reason),
     updated_at = NOW()
-WHERE tenant_id = $2
+WHERE organization_id = $2
   AND id = $3
   AND state IN ('initiating', 'ringing')
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type MarkCallCancelledParams struct {
-	HangupReason *string   `db:"hangup_reason" json:"hangup_reason"`
-	TenantID     uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID           uuid.UUID `db:"id" json:"id"`
+	HangupReason   *string   `db:"hangup_reason" json:"hangup_reason"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) MarkCallCancelled(ctx context.Context, arg MarkCallCancelledParams) (Call, error) {
-	row := q.db.QueryRow(ctx, markCallCancelled, arg.HangupReason, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, markCallCancelled, arg.HangupReason, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -329,24 +329,24 @@ SET
     ended_at = COALESCE(ended_at, NOW()),
     hangup_reason = COALESCE($1, hangup_reason),
     updated_at = NOW()
-WHERE tenant_id = $2
+WHERE organization_id = $2
   AND id = $3
   AND state NOT IN ('completed', 'failed', 'cancelled')
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type MarkCallCompletedParams struct {
-	HangupReason *string   `db:"hangup_reason" json:"hangup_reason"`
-	TenantID     uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID           uuid.UUID `db:"id" json:"id"`
+	HangupReason   *string   `db:"hangup_reason" json:"hangup_reason"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) MarkCallCompleted(ctx context.Context, arg MarkCallCompletedParams) (Call, error) {
-	row := q.db.QueryRow(ctx, markCallCompleted, arg.HangupReason, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, markCallCompleted, arg.HangupReason, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -371,24 +371,24 @@ SET
     ended_at = COALESCE(ended_at, NOW()),
     hangup_reason = COALESCE($1, hangup_reason),
     updated_at = NOW()
-WHERE tenant_id = $2
+WHERE organization_id = $2
   AND id = $3
   AND state NOT IN ('completed', 'failed', 'cancelled')
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type MarkCallFailedParams struct {
-	HangupReason *string   `db:"hangup_reason" json:"hangup_reason"`
-	TenantID     uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID           uuid.UUID `db:"id" json:"id"`
+	HangupReason   *string   `db:"hangup_reason" json:"hangup_reason"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) MarkCallFailed(ctx context.Context, arg MarkCallFailedParams) (Call, error) {
-	row := q.db.QueryRow(ctx, markCallFailed, arg.HangupReason, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, markCallFailed, arg.HangupReason, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -409,23 +409,23 @@ func (q *Queries) MarkCallFailed(ctx context.Context, arg MarkCallFailedParams) 
 const markCallRinging = `-- name: MarkCallRinging :one
 UPDATE calls
 SET state = 'ringing', updated_at = NOW()
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
   AND state = 'initiating'
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type MarkCallRingingParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) MarkCallRinging(ctx context.Context, arg MarkCallRingingParams) (Call, error) {
-	row := q.db.QueryRow(ctx, markCallRinging, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, markCallRinging, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,
@@ -448,23 +448,23 @@ UPDATE calls
 SET
     state = $1,
     updated_at = NOW()
-WHERE tenant_id = $2
+WHERE organization_id = $2
   AND id = $3
-RETURNING id, tenant_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+RETURNING id, organization_id, application_id, direction, state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 `
 
 type UpdateCallStateParams struct {
-	State    string    `db:"state" json:"state"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	State          string    `db:"state" json:"state"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateCallState(ctx context.Context, arg UpdateCallStateParams) (Call, error) {
-	row := q.db.QueryRow(ctx, updateCallState, arg.State, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, updateCallState, arg.State, arg.OrganizationID, arg.ID)
 	var i Call
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Direction,
 		&i.State,

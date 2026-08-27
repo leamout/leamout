@@ -11,22 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type ApiKey struct {
-	ID          uuid.UUID          `db:"id" json:"id"`
-	TenantID    uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	CreatedBy   uuid.UUID          `db:"created_by" json:"created_by"`
-	Name        string             `db:"name" json:"name"`
-	Description *string            `db:"description" json:"description"`
-	TokenHash   string             `db:"token_hash" json:"token_hash"`
-	TokenPrefix string             `db:"token_prefix" json:"token_prefix"`
-	Scopes      []byte             `db:"scopes" json:"scopes"`
-	LastUsedAt  pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
-	LastUsedIp  *netip.Addr        `db:"last_used_ip" json:"last_used_ip"`
-	ExpiresAt   pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type AuthChallenge struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
 	AuthTransactionID *uuid.UUID         `db:"auth_transaction_id" json:"auth_transaction_id"`
@@ -53,53 +37,53 @@ type AuthTransaction struct {
 }
 
 type Call struct {
-	ID            uuid.UUID          `db:"id" json:"id"`
-	TenantID      uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	ApplicationID *uuid.UUID         `db:"application_id" json:"application_id"`
-	Direction     string             `db:"direction" json:"direction"`
-	State         string             `db:"state" json:"state"`
-	FromUri       string             `db:"from_uri" json:"from_uri"`
-	ToUri         string             `db:"to_uri" json:"to_uri"`
-	SipCallID     *string            `db:"sip_call_id" json:"sip_call_id"`
-	ProviderID    *uuid.UUID         `db:"provider_id" json:"provider_id"`
-	StartedAt     pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	AnsweredAt    pgtype.Timestamptz `db:"answered_at" json:"answered_at"`
-	EndedAt       pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
-	HangupReason  *string            `db:"hangup_reason" json:"hangup_reason"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ApplicationID  *uuid.UUID         `db:"application_id" json:"application_id"`
+	Direction      string             `db:"direction" json:"direction"`
+	State          string             `db:"state" json:"state"`
+	FromUri        string             `db:"from_uri" json:"from_uri"`
+	ToUri          string             `db:"to_uri" json:"to_uri"`
+	SipCallID      *string            `db:"sip_call_id" json:"sip_call_id"`
+	ProviderID     *uuid.UUID         `db:"provider_id" json:"provider_id"`
+	StartedAt      pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	AnsweredAt     pgtype.Timestamptz `db:"answered_at" json:"answered_at"`
+	EndedAt        pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	HangupReason   *string            `db:"hangup_reason" json:"hangup_reason"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type CallParticipant struct {
-	ID           uuid.UUID          `db:"id" json:"id"`
-	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	CallID       uuid.UUID          `db:"call_id" json:"call_id"`
-	SubscriberID *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
-	Role         string             `db:"role" json:"role"`
-	Address      *string            `db:"address" json:"address"`
-	Direction    *string            `db:"direction" json:"direction"`
-	State        string             `db:"state" json:"state"`
-	JoinedAt     pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
-	LeftAt       pgtype.Timestamptz `db:"left_at" json:"left_at"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CallID         uuid.UUID          `db:"call_id" json:"call_id"`
+	SubscriberID   *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
+	Role           string             `db:"role" json:"role"`
+	Address        *string            `db:"address" json:"address"`
+	Direction      *string            `db:"direction" json:"direction"`
+	State          string             `db:"state" json:"state"`
+	JoinedAt       pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	LeftAt         pgtype.Timestamptz `db:"left_at" json:"left_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Conference struct {
-	ID            uuid.UUID          `db:"id" json:"id"`
-	TenantID      uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	ApplicationID *uuid.UUID         `db:"application_id" json:"application_id"`
-	Name          string             `db:"name" json:"name"`
-	State         string             `db:"state" json:"state"`
-	StartedAt     pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	EndedAt       pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ApplicationID  *uuid.UUID         `db:"application_id" json:"application_id"`
+	Name           string             `db:"name" json:"name"`
+	State          string             `db:"state" json:"state"`
+	StartedAt      pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	EndedAt        pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type ConferenceParticipant struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
-	TenantID          uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
 	ConferenceID      uuid.UUID          `db:"conference_id" json:"conference_id"`
 	CallParticipantID *uuid.UUID         `db:"call_participant_id" json:"call_participant_id"`
 	State             string             `db:"state" json:"state"`
@@ -110,6 +94,57 @@ type ConferenceParticipant struct {
 	LeftAt            pgtype.Timestamptz `db:"left_at" json:"left_at"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Organization struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Slug      string             `db:"slug" json:"slug"`
+	Name      string             `db:"name" json:"name"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+type OrganizationInvitation struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	InvitedBy      uuid.UUID          `db:"invited_by" json:"invited_by"`
+	Email          string             `db:"email" json:"email"`
+	Role           string             `db:"role" json:"role"`
+	TokenHash      string             `db:"token_hash" json:"token_hash"`
+	Status         string             `db:"status" json:"status"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	AcceptedAt     pgtype.Timestamptz `db:"accepted_at" json:"accepted_at"`
+	DeclinedAt     pgtype.Timestamptz `db:"declined_at" json:"declined_at"`
+	RevokedAt      pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type OrganizationMember struct {
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
+	Role           string             `db:"role" json:"role"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type OrganizationToken struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CreatedBy      uuid.UUID          `db:"created_by" json:"created_by"`
+	Name           string             `db:"name" json:"name"`
+	Description    *string            `db:"description" json:"description"`
+	TokenHash      string             `db:"token_hash" json:"token_hash"`
+	TokenPrefix    string             `db:"token_prefix" json:"token_prefix"`
+	Scopes         []byte             `db:"scopes" json:"scopes"`
+	LastUsedAt     pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	LastUsedIp     *netip.Addr        `db:"last_used_ip" json:"last_used_ip"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type OutboxEvent struct {
@@ -130,16 +165,16 @@ type OutboxEvent struct {
 }
 
 type PhoneNumber struct {
-	ID           uuid.UUID          `db:"id" json:"id"`
-	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	Number       string             `db:"number" json:"number"`
-	CountryCode  string             `db:"country_code" json:"country_code"`
-	ProviderID   *uuid.UUID         `db:"provider_id" json:"provider_id"`
-	VoiceEnabled bool               `db:"voice_enabled" json:"voice_enabled"`
-	SmsEnabled   bool               `db:"sms_enabled" json:"sms_enabled"`
-	Status       string             `db:"status" json:"status"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Number         string             `db:"number" json:"number"`
+	CountryCode    string             `db:"country_code" json:"country_code"`
+	ProviderID     *uuid.UUID         `db:"provider_id" json:"provider_id"`
+	VoiceEnabled   bool               `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled     bool               `db:"sms_enabled" json:"sms_enabled"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type ProcessedEvent struct {
@@ -151,7 +186,7 @@ type ProcessedEvent struct {
 
 type Recording struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
-	TenantID        uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
 	CallID          uuid.UUID          `db:"call_id" json:"call_id"`
 	Status          string             `db:"status" json:"status"`
 	StorageKey      *string            `db:"storage_key" json:"storage_key"`
@@ -180,62 +215,27 @@ type Session struct {
 }
 
 type SipDomain struct {
-	ID        uuid.UUID          `db:"id" json:"id"`
-	TenantID  uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	Domain    string             `db:"domain" json:"domain"`
-	Status    string             `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Domain         string             `db:"domain" json:"domain"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Subscriber struct {
-	ID           uuid.UUID          `db:"id" json:"id"`
-	TenantID     uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	SipDomainID  uuid.UUID          `db:"sip_domain_id" json:"sip_domain_id"`
-	Username     string             `db:"username" json:"username"`
-	Domain       string             `db:"domain" json:"domain"`
-	Ha1Md5       *string            `db:"ha1_md5" json:"ha1_md5"`
-	Ha1Sha256    *string            `db:"ha1_sha256" json:"ha1_sha256"`
-	Ha1Sha512256 *string            `db:"ha1_sha512_256" json:"ha1_sha512_256"`
-	DisplayName  *string            `db:"display_name" json:"display_name"`
-	Status       string             `db:"status" json:"status"`
-	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type Tenant struct {
-	ID        uuid.UUID          `db:"id" json:"id"`
-	Slug      string             `db:"slug" json:"slug"`
-	Name      string             `db:"name" json:"name"`
-	Status    string             `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-}
-
-type TenantInvitation struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	TenantID   uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	InvitedBy  uuid.UUID          `db:"invited_by" json:"invited_by"`
-	Email      string             `db:"email" json:"email"`
-	Role       string             `db:"role" json:"role"`
-	TokenHash  string             `db:"token_hash" json:"token_hash"`
-	Status     string             `db:"status" json:"status"`
-	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	AcceptedAt pgtype.Timestamptz `db:"accepted_at" json:"accepted_at"`
-	DeclinedAt pgtype.Timestamptz `db:"declined_at" json:"declined_at"`
-	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type TenantMember struct {
-	TenantID  uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
-	Role      string             `db:"role" json:"role"`
-	Status    string             `db:"status" json:"status"`
-	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	SipDomainID    uuid.UUID          `db:"sip_domain_id" json:"sip_domain_id"`
+	Username       string             `db:"username" json:"username"`
+	Domain         string             `db:"domain" json:"domain"`
+	Ha1Md5         *string            `db:"ha1_md5" json:"ha1_md5"`
+	Ha1Sha256      *string            `db:"ha1_sha256" json:"ha1_sha256"`
+	Ha1Sha512256   *string            `db:"ha1_sha512_256" json:"ha1_sha512_256"`
+	DisplayName    *string            `db:"display_name" json:"display_name"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type User struct {
@@ -251,7 +251,7 @@ type User struct {
 
 type VoiceApplication struct {
 	ID                 uuid.UUID          `db:"id" json:"id"`
-	TenantID           uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Name               string             `db:"name" json:"name"`
 	RingTimeoutSeconds int32              `db:"ring_timeout_seconds" json:"ring_timeout_seconds"`
 	CallerID           *string            `db:"caller_id" json:"caller_id"`
@@ -293,7 +293,7 @@ type WebhookDelivery struct {
 
 type WebhookEndpoint struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	TenantID            uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Url                 string             `db:"url" json:"url"`
 	SigningSecret       []byte             `db:"signing_secret" json:"signing_secret"`
 	Enabled             bool               `db:"enabled" json:"enabled"`
@@ -307,12 +307,12 @@ type WebhookEndpoint struct {
 }
 
 type WebhookEvent struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	TenantID   uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	EventType  string             `db:"event_type" json:"event_type"`
-	ObjectType string             `db:"object_type" json:"object_type"`
-	ObjectID   *uuid.UUID         `db:"object_id" json:"object_id"`
-	Payload    []byte             `db:"payload" json:"payload"`
-	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	EventType      string             `db:"event_type" json:"event_type"`
+	ObjectType     string             `db:"object_type" json:"object_type"`
+	ObjectID       *uuid.UUID         `db:"object_id" json:"object_id"`
+	Payload        []byte             `db:"payload" json:"payload"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
