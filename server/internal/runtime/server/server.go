@@ -11,6 +11,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
@@ -25,9 +26,10 @@ import (
 )
 
 type Server struct {
-	DB      *pgxpool.Pool
-	Router  *chi.Mux
-	Modules Modules
+	DB         *pgxpool.Pool
+	Router     *chi.Mux
+	Modules    Modules
+	FreeSWITCH freeswitch.MediaController
 
 	Logger  *logging.Logger
 	Metrics *metrics.Registry
@@ -48,11 +50,26 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
+	freeSwitch, err := freeswitch.New(
+		freeswitch.DefaultConfig("127.0.0.1:8021", cfg.FreeSWITCHESLPassword),
+	)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("initialize FreeSWITCH client: %w", err)
+	}
+	if err := freeSwitch.Connect(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connect FreeSWITCH: %w", err)
+	}
+
+	controller := calls.NewFreeSWITCHController(freeSwitch)
+
 	logger := logging.New()
 	metricsRegistry := metrics.New()
 
-	modules, err := NewModules(db)
+	modules, err := NewModules(db, controller)
 	if err != nil {
+		_ = freeSwitch.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
@@ -72,15 +89,16 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	RegisterRoutes(router, modules)
 
 	return &Server{
-		DB:      db,
-		Router:  router,
-		Modules: modules,
-		Logger:  logger,
-		Metrics: metricsRegistry,
+		DB:         db,
+		Router:     router,
+		Modules:    modules,
+		FreeSWITCH: freeSwitch,
+		Logger:     logger,
+		Metrics:    metricsRegistry,
 	}, nil
 }
 
-func NewModules(db *pgxpool.Pool) (Modules, error) {
+func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) {
 	queries := sqlc.New(db)
 
 	sessionRepository := session.NewRepository(queries)
@@ -105,10 +123,10 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 	voiceService := voice.NewService(voiceRepository)
 
 	callsRepository := calls.NewRepository(queries)
-	callsService := calls.NewService(callsRepository)
+	callsService := calls.NewService(callsRepository, controller)
 
 	recordingsRepository := recordings.NewRepository(queries)
-	recordingsService := recordings.NewService(recordingsRepository)
+	recordingsService := recordings.NewService(recordingsRepository, nil)
 
 	resolver := authn.NewResolver(
 		sessionService,
@@ -170,6 +188,9 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 }
 
 func (s *Server) Close() {
+	if s.FreeSWITCH != nil {
+		_ = s.FreeSWITCH.Close()
+	}
 	if s.DB != nil {
 		s.DB.Close()
 	}
