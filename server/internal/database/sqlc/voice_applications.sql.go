@@ -121,19 +121,21 @@ func (q *Queries) CreateVoiceBinding(ctx context.Context, arg CreateVoiceBinding
 const deleteVoiceBinding = `-- name: DeleteVoiceBinding :exec
 DELETE FROM voice_bindings
 WHERE voice_bindings.id = $1
+  AND voice_bindings.voice_application_id = $2
   AND voice_application_id IN (
       SELECT va.id FROM voice_applications AS va
-      WHERE va.organization_id = $2
+      WHERE va.organization_id = $3
   )
 `
 
 type DeleteVoiceBindingParams struct {
-	ID             uuid.UUID `db:"id" json:"id"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID                 uuid.UUID `db:"id" json:"id"`
+	VoiceApplicationID uuid.UUID `db:"voice_application_id" json:"voice_application_id"`
+	OrganizationID     uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) DeleteVoiceBinding(ctx context.Context, arg DeleteVoiceBindingParams) error {
-	_, err := q.db.Exec(ctx, deleteVoiceBinding, arg.ID, arg.OrganizationID)
+	_, err := q.db.Exec(ctx, deleteVoiceBinding, arg.ID, arg.VoiceApplicationID, arg.OrganizationID)
 	return err
 }
 

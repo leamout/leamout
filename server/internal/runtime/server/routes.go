@@ -8,6 +8,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
@@ -55,4 +56,17 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			modules.Authn.RequireSession,
 		)
 	})
+
+	registerAPIRoutes(r, modules)
+}
+
+func registerAPIRoutes(r *chi.Mux, modules Modules) {
+	r.Route("/api/v1", func(r chi.Router) {
+		voice.RegisterRoutes(
+			r,
+			modules.Voice.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
+	})
+
 }
