@@ -78,6 +78,7 @@ func determineDirection(event freeswitch.Event) CallDirection {
 	if strings.EqualFold(event.Header("variable_sip_direction"), "inbound") {
 		return DirectionInbound
 	}
+
 	return DirectionOutbound
 }
 
@@ -114,6 +115,7 @@ func calculateDuration(event freeswitch.Event, answered bool) int {
 	if startErr == nil && endErr == nil && !end.Before(start) {
 		return int(end.Sub(start).Seconds())
 	}
+
 	return 0
 }
 
@@ -146,5 +148,6 @@ func parseInt(value string) int64 {
 	if err != nil {
 		return 0
 	}
+
 	return parsed
 }
