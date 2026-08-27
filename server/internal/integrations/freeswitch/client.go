@@ -23,21 +23,6 @@ type MediaController interface {
 	Subscribe(ctx context.Context, format EventFormat, events []string, handler EventHandler) error
 }
 
-// CallController defines the FreeSWITCH operations required by call control.
-type CallController interface {
-	MediaController
-	Originate(ctx context.Context, req OriginateRequest) (Call, error)
-	Answer(ctx context.Context, callID string) error
-	Hangup(ctx context.Context, callID string) error
-	Transfer(ctx context.Context, req TransferRequest) error
-	Hold(ctx context.Context, callID string) error
-	Unhold(ctx context.Context, callID string) error
-	PlayAudio(ctx context.Context, callID, path string) error
-	Break(ctx context.Context, callID string) error
-	Record(ctx context.Context, req RecordRequest) error
-	SendDTMF(ctx context.Context, callID, digits string) error
-}
-
 type Client struct {
 	address        string
 	password       string
@@ -59,7 +44,7 @@ type Client struct {
 	handlers   []EventHandler
 }
 
-func New(cfg Config) (CallController, error) {
+func New(cfg Config) (*Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
