@@ -27,6 +27,19 @@ func TranslateEvent(fsEvent freeswitch.Event, appID, organizationID string) (*Ca
 			OccurredAt:     occurredAt,
 		}, nil
 
+	case "CHANNEL_RINGING", "CHANNEL_PROGRESS":
+		return &CallEvent{
+			EventType:      EventCallRinging,
+			CallID:         callID,
+			ApplicationID:  appID,
+			OrganizationID: organizationID,
+			From:           fsEvent.Header("Caller-Caller-ID-Number"),
+			To:             fsEvent.Header("Caller-Destination-Number"),
+			Direction:      determineDirection(fsEvent),
+			Status:         StatusRinging,
+			OccurredAt:     occurredAt,
+		}, nil
+
 	case "CHANNEL_ANSWER":
 		return &CallEvent{
 			EventType:      EventCallAnswered,
@@ -41,8 +54,16 @@ func TranslateEvent(fsEvent freeswitch.Event, appID, organizationID string) (*Ca
 		}, nil
 
 	case "CHANNEL_HANGUP_COMPLETE":
+		answered := strings.EqualFold(fsEvent.Header("Answered"), "true") ||
+			strings.EqualFold(fsEvent.Header("variable_answered"), "true")
+
+		eventType := EventCallCompleted
+		if !answered {
+			eventType = EventCallFailed
+		}
+
 		return &CallEvent{
-			EventType:      EventCallCompleted,
+			EventType:      eventType,
 			CallID:         callID,
 			ApplicationID:  appID,
 			OrganizationID: organizationID,
@@ -50,7 +71,7 @@ func TranslateEvent(fsEvent freeswitch.Event, appID, organizationID string) (*Ca
 			To:             fsEvent.Header("Caller-Destination-Number"),
 			Direction:      determineDirection(fsEvent),
 			Status:         mapHangupCause(fsEvent.Header("Hangup-Cause")),
-			DurationSec:    int(parseInt(fsEvent.Header("billmsec")) / 1000),
+			DurationSec:    calculateDuration(fsEvent),
 			OccurredAt:     occurredAt,
 		}, nil
 	}
@@ -76,6 +97,10 @@ func mapHangupCause(cause string) CallStatus {
 	default:
 		return StatusFailed
 	}
+}
+
+func calculateDuration(event freeswitch.Event) int {
+	return int(parseInt(event.Header("billmsec")) / 1000)
 }
 
 func parseTimestamp(value string) time.Time {
