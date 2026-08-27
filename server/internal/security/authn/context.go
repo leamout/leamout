@@ -29,3 +29,21 @@ func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
 
 	return principal.UserID()
 }
+
+func OrganizationIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok || principal.OrganizationID == uuid.Nil {
+		return uuid.Nil, false
+	}
+
+	return principal.OrganizationID, true
+}
+
+func CredentialScopesFromContext(ctx context.Context) ([]string, bool) {
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok || principal.Credential.Type != CredentialOrganizationToken {
+		return nil, false
+	}
+
+	return principal.Scopes, true
+}

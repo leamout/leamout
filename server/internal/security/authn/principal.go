@@ -15,9 +15,11 @@ type Subject struct {
 }
 
 type Principal struct {
-	Subject    Subject
-	Credential Credential
-	Assurance  AssuranceLevel
+	Subject        Subject
+	Credential     Credential
+	OrganizationID uuid.UUID
+	Scopes         []string
+	Assurance      AssuranceLevel
 }
 
 func (p Principal) IsValid() bool {
@@ -30,4 +32,12 @@ func (p Principal) UserID() (uuid.UUID, bool) {
 	}
 
 	return p.Subject.ID, true
+}
+
+func (p Principal) OrganizationToken() (uuid.UUID, uuid.UUID, []string, bool) {
+	if p.Subject.Type != SubjectOrganizationToken || p.Subject.ID == uuid.Nil || p.OrganizationID == uuid.Nil {
+		return uuid.Nil, uuid.Nil, nil, false
+	}
+
+	return p.Subject.ID, p.OrganizationID, p.Scopes, true
 }

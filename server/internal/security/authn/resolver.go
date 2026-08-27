@@ -80,8 +80,10 @@ func (r *Resolver) resolveOrganizationToken(ctx context.Context, token string) (
 	}
 
 	return Principal{
-		Subject:    Subject{ID: organizationToken.ID, Type: SubjectOrganizationToken},
-		Credential: Credential{ID: organizationToken.ID, Type: CredentialOrganizationToken},
-		Assurance:  AssuranceUnknown,
+		Subject:        Subject{ID: organizationToken.ID, Type: SubjectOrganizationToken},
+		Credential:     Credential{ID: organizationToken.ID, Type: CredentialOrganizationToken},
+		OrganizationID: organizationToken.OrganizationID,
+		Scopes:         organizationToken.Scopes,
+		Assurance:      AssuranceUnknown,
 	}, nil
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/security/authn"
 )
 
 var ErrInvalidInput = errors.New("invalid credential input")
@@ -145,5 +146,19 @@ func listRowToCredential(row sqlc.ListOrganizationTokensByOrganizationIDRow) (Cr
 		ID: row.ID, Name: row.Name, Description: row.Description, TokenPrefix: row.TokenPrefix,
 		Scopes: scopes, LastUsedAt: pgconv.TimestamptzToTimePtr(row.LastUsedAt),
 		ExpiresAt: pgconv.TimestamptzToTimePtr(row.ExpiresAt), CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt),
+	}, nil
+}
+
+// ResolveOrganizationToken resolves an organization token for the authentication layer.
+func (s *Service) ResolveOrganizationToken(ctx context.Context, token string) (authn.OrganizationToken, error) {
+	credential, err := s.Authenticate(ctx, token)
+	if err != nil {
+		return authn.OrganizationToken{}, err
+	}
+
+	return authn.OrganizationToken{
+		ID:             credential.ID,
+		OrganizationID: credential.OrganizationID,
+		Scopes:         credential.Scopes,
 	}, nil
 }
