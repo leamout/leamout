@@ -7,29 +7,16 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 )
 
-type freeSWITCHClient interface {
-	Originate(context.Context, freeswitch.OriginateRequest) (freeswitch.Call, error)
-	Answer(context.Context, string) error
-	Hangup(context.Context, string) error
-	Transfer(context.Context, freeswitch.TransferRequest) error
-	Hold(context.Context, string) error
-	Unhold(context.Context, string) error
-	PlayAudio(context.Context, string, string) error
-	Break(context.Context, string) error
-	Record(context.Context, freeswitch.RecordRequest) error
-	SendDTMF(context.Context, string, string) error
-}
-
 // FreeSWITCHController adapts the FreeSWITCH client to the calls.Controller interface.
 // It translates domain-level call operations into FreeSWITCH-specific commands.
 type FreeSWITCHController struct {
-	client freeSWITCHClient
+	client *freeswitch.Client
 }
 
 var _ Controller = (*FreeSWITCHController)(nil)
 
 // NewFreeSWITCHController creates a new adapter wrapping the FreeSWITCH client.
-func NewFreeSWITCHController(client freeSWITCHClient) *FreeSWITCHController {
+func NewFreeSWITCHController(client *freeswitch.Client) *FreeSWITCHController {
 	if client == nil {
 		panic("calls: FreeSWITCH client is required")
 	}
