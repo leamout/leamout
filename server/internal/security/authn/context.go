@@ -45,5 +45,5 @@ func CredentialScopesFromContext(ctx context.Context) ([]string, bool) {
 		return nil, false
 	}
 
-	return principal.Scopes, true
+	return append([]string(nil), principal.Scopes...), true
 }

@@ -23,7 +23,11 @@ func NewAuthnMiddleware(resolver *authn.Resolver) *AuthnMiddleware {
 
 func (m *AuthnMiddleware) RequireAuthenticated(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		principal, ok := m.resolveBearerToken(r)
+		principal, bearerAttempted, ok := m.resolveBearerToken(r)
+		if bearerAttempted && !ok {
+			httputil.Error(w, apperror.NewUnauthorized("authentication required"))
+			return
+		}
 		if !ok {
 			principal, ok = m.resolveSessionCookie(r)
 		}
@@ -39,7 +43,7 @@ func (m *AuthnMiddleware) RequireAuthenticated(next http.Handler) http.Handler {
 
 func (m *AuthnMiddleware) RequireOrganizationToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		principal, ok := m.resolveBearerToken(r)
+		principal, _, ok := m.resolveBearerToken(r)
 		if !ok {
 			httputil.Error(w, apperror.NewUnauthorized("organization token required"))
 			return
@@ -80,20 +84,29 @@ func (m *AuthnMiddleware) resolveSessionCookie(r *http.Request) (authn.Principal
 	return principal, true
 }
 
-func (m *AuthnMiddleware) resolveBearerToken(r *http.Request) (authn.Principal, bool) {
+func (m *AuthnMiddleware) resolveBearerToken(r *http.Request) (authn.Principal, bool, bool) {
 	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if header == "" {
+		return authn.Principal{}, false, false
+	}
+
 	scheme, token, ok := strings.Cut(header, " ")
-	if !ok || !strings.EqualFold(scheme, "Bearer") || strings.TrimSpace(token) == "" {
-		return authn.Principal{}, false
+	if !ok || !strings.EqualFold(scheme, "Bearer") {
+		return authn.Principal{}, false, false
+	}
+
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return authn.Principal{}, true, false
 	}
 
 	principal, err := m.resolver.Resolve(r.Context(), authn.CredentialInput{
 		Type:  authn.CredentialOrganizationToken,
-		Value: strings.TrimSpace(token),
+		Value: token,
 	})
 	if err != nil {
-		return authn.Principal{}, false
+		return authn.Principal{}, true, false
 	}
 
-	return principal, true
+	return principal, true, true
 }
