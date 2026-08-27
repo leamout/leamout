@@ -8,6 +8,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
 )
@@ -45,6 +46,12 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		members.RegisterRoutes(
 			r,
 			modules.Members.Handler,
+			modules.Authn.RequireSession,
+		)
+
+		credentials.RegisterRoutes(
+			r,
+			modules.Credentials.Handler,
 			modules.Authn.RequireSession,
 		)
 	})
