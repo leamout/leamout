@@ -30,7 +30,10 @@ type Service struct {
 }
 
 func NewService(repo *Repository, controller Controller) *Service {
-	return &Service{repo: repo, controller: controller}
+	return &Service{
+		repo:       repo,
+		controller: controller,
+	}
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
@@ -50,12 +53,14 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	call, err := s.repo.Create(ctx, organizationID, req, sipCallID)
 	return call, writeError(err, "create call")
 }
+
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return sqlc.Call{}, err
 	}
 	return readCall(s.repo.Get(ctx, organizationID, id))
 }
+
 func (s *Service) List(ctx context.Context, organizationID uuid.UUID, state *string, offset, limit int32) ([]sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return nil, err
@@ -68,6 +73,7 @@ func (s *Service) List(ctx context.Context, organizationID uuid.UUID, state *str
 	}
 	return s.repo.List(ctx, organizationID, state, offset, limit)
 }
+
 func (s *Service) Answer(ctx context.Context, org, id uuid.UUID) (sqlc.Call, error) {
 	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -79,6 +85,7 @@ func (s *Service) Answer(ctx context.Context, org, id uuid.UUID) (sqlc.Call, err
 	updated, err := s.repo.MarkAnswered(ctx, org, call.ID)
 	return updated, writeError(err, "answer call")
 }
+
 func (s *Service) Hangup(ctx context.Context, org, id uuid.UUID) (sqlc.Call, error) {
 	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -90,6 +97,7 @@ func (s *Service) Hangup(ctx context.Context, org, id uuid.UUID) (sqlc.Call, err
 	updated, err := s.repo.MarkCompleted(ctx, org, call.ID)
 	return updated, writeError(err, "hang up call")
 }
+
 func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferRequest) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -100,6 +108,7 @@ func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferR
 	}
 	return mediaError("transfer call", s.controller.Transfer(ctx, externalID, req))
 }
+
 func (s *Service) Hold(ctx context.Context, org, id uuid.UUID) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -107,6 +116,7 @@ func (s *Service) Hold(ctx context.Context, org, id uuid.UUID) error {
 	}
 	return mediaError("hold call", s.controller.Hold(ctx, externalID))
 }
+
 func (s *Service) Unhold(ctx context.Context, org, id uuid.UUID) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -114,6 +124,7 @@ func (s *Service) Unhold(ctx context.Context, org, id uuid.UUID) error {
 	}
 	return mediaError("resume call", s.controller.Unhold(ctx, externalID))
 }
+
 func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -124,6 +135,7 @@ func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) 
 	}
 	return mediaError("play audio", s.controller.Play(ctx, externalID, req.Path))
 }
+
 func (s *Service) Stop(ctx context.Context, org, id uuid.UUID) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -131,6 +143,7 @@ func (s *Service) Stop(ctx context.Context, org, id uuid.UUID) error {
 	}
 	return mediaError("stop audio", s.controller.Stop(ctx, externalID))
 }
+
 func (s *Service) Record(ctx context.Context, org, id uuid.UUID, req RecordRequest) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -141,6 +154,7 @@ func (s *Service) Record(ctx context.Context, org, id uuid.UUID, req RecordReque
 	}
 	return mediaError("record call", s.controller.Record(ctx, externalID, req))
 }
+
 func (s *Service) DTMF(ctx context.Context, org, id uuid.UUID, req DTMFRequest) error {
 	_, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
@@ -151,6 +165,7 @@ func (s *Service) DTMF(ctx context.Context, org, id uuid.UUID, req DTMFRequest) 
 	}
 	return mediaError("send DTMF", s.controller.DTMF(ctx, externalID, req.Digits))
 }
+
 func (s *Service) controlCall(ctx context.Context, org, id uuid.UUID) (sqlc.Call, string, error) {
 	call, err := s.Get(ctx, org, id)
 	if err != nil {
@@ -161,6 +176,7 @@ func (s *Service) controlCall(ctx context.Context, org, id uuid.UUID) (sqlc.Call
 	}
 	return call, *call.SipCallID, nil
 }
+
 func readCall(call sqlc.Call, err error) (sqlc.Call, error) {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sqlc.Call{}, apperror.NewNotFound("call not found")
@@ -170,6 +186,7 @@ func readCall(call sqlc.Call, err error) (sqlc.Call, error) {
 	}
 	return call, nil
 }
+
 func writeError(err error, message string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperror.NewNotFound("call not found")
