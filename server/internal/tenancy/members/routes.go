@@ -16,8 +16,8 @@ func RegisterRoutes(
 
 		r.Post("/", handler.Add)
 		r.Get("/", handler.List)
-		r.Get("/{member_id}", handler.Get)
-		r.Patch("/{member_id}", handler.Update)
-		r.Delete("/{member_id}", handler.Delete)
+		r.Get("/{user_id}", handler.Get)
+		r.Patch("/{user_id}", handler.Update)
+		r.Delete("/{user_id}", handler.Delete)
 	})
 }

@@ -31,6 +31,9 @@ func (s *Service) Add(ctx context.Context, requesterID, organizationID uuid.UUID
 	if err != nil {
 		return sqlc.OrganizationMember{}, err
 	}
+	if role == roleOwner {
+		return sqlc.OrganizationMember{}, apperror.NewConflict("organization owner must be transferred explicitly")
+	}
 
 	member, err := s.repo.Add(ctx, sqlc.AddOrganizationMemberParams{OrganizationID: organizationID, UserID: req.UserID, Role: role})
 	if err != nil {
@@ -47,7 +50,7 @@ func (s *Service) Get(ctx context.Context, requesterID, organizationID, memberID
 	if err := s.requireMember(ctx, requesterID, organizationID); err != nil {
 		return sqlc.OrganizationMember{}, err
 	}
-	if err := validateUserID(memberID, "member_id"); err != nil {
+	if err := validateUserID(memberID, "user_id"); err != nil {
 		return sqlc.OrganizationMember{}, err
 	}
 
@@ -71,13 +74,24 @@ func (s *Service) Update(ctx context.Context, requesterID, organizationID, membe
 	if err := s.requireAdmin(ctx, requesterID, organizationID); err != nil {
 		return sqlc.OrganizationMember{}, err
 	}
-	if err := validateUserID(memberID, "member_id"); err != nil {
+	if err := validateUserID(memberID, "user_id"); err != nil {
 		return sqlc.OrganizationMember{}, err
 	}
 
 	role, err := normalizeRole(req.Role)
 	if err != nil {
 		return sqlc.OrganizationMember{}, err
+	}
+	if role == roleOwner {
+		return sqlc.OrganizationMember{}, apperror.NewConflict("organization owner must be transferred explicitly")
+	}
+
+	current, err := s.repo.Get(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: organizationID, UserID: memberID})
+	if err != nil {
+		return sqlc.OrganizationMember{}, apperror.NewNotFound("organization member not found")
+	}
+	if current.Role == roleOwner {
+		return sqlc.OrganizationMember{}, apperror.NewConflict("organization owner cannot be demoted")
 	}
 
 	member, err := s.repo.UpdateRole(ctx, sqlc.UpdateMemberRoleParams{OrganizationID: organizationID, UserID: memberID, Role: role})
@@ -92,12 +106,16 @@ func (s *Service) Delete(ctx context.Context, requesterID, organizationID, membe
 	if err := s.requireAdmin(ctx, requesterID, organizationID); err != nil {
 		return err
 	}
-	if err := validateUserID(memberID, "member_id"); err != nil {
+	if err := validateUserID(memberID, "user_id"); err != nil {
 		return err
 	}
 
-	if _, err := s.repo.Get(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: organizationID, UserID: memberID}); err != nil {
+	member, err := s.repo.Get(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: organizationID, UserID: memberID})
+	if err != nil {
 		return apperror.NewNotFound("organization member not found")
+	}
+	if member.Role == roleOwner {
+		return apperror.NewConflict("organization owner cannot be removed")
 	}
 
 	return s.repo.Disable(ctx, sqlc.DisableOrganizationMemberParams{OrganizationID: organizationID, UserID: memberID})
@@ -139,12 +157,11 @@ func (s *Service) requireAdmin(ctx context.Context, requesterID, organizationID 
 
 func toResponse(member sqlc.OrganizationMember) Response {
 	return Response{
-		OrganizationID: member.OrganizationID,
-		UserID:         member.UserID,
-		Role:           member.Role,
-		Status:         member.Status,
-		CreatedAt:      pgconv.TimestamptzToTime(member.CreatedAt),
-		UpdatedAt:      pgconv.TimestamptzToTime(member.UpdatedAt),
+		UserID:    member.UserID,
+		Role:      member.Role,
+		Status:    member.Status,
+		CreatedAt: pgconv.TimestamptzToTime(member.CreatedAt),
+		UpdatedAt: pgconv.TimestamptzToTime(member.UpdatedAt),
 	}
 }
 

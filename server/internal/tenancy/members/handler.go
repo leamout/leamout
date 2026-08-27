@@ -130,9 +130,9 @@ func requestMemberIDs(r *http.Request) (uuid.UUID, uuid.UUID, uuid.UUID, error) 
 		return uuid.Nil, uuid.Nil, uuid.Nil, err
 	}
 
-	memberID, err := uuid.Parse(chi.URLParam(r, "member_id"))
+	memberID, err := uuid.Parse(chi.URLParam(r, "user_id"))
 	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid member_id")
+		return uuid.Nil, uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid user_id")
 	}
 
 	return requesterID, organizationID, memberID, nil
