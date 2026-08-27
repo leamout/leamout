@@ -35,6 +35,62 @@ func (q *Queries) CreateOrganization(ctx context.Context, name string) (Organiza
 	return i, err
 }
 
+const createOrganizationWithOwner = `-- name: CreateOrganizationWithOwner :one
+WITH new_organization AS (
+    INSERT INTO organizations (
+        name
+    )
+    SELECT $1
+    FROM users AS u
+    WHERE u.id = $2
+    AND u.disabled_at IS NULL
+    RETURNING id, name, status, created_at, updated_at, deleted_at
+), owner_membership AS (
+    INSERT INTO organization_members (
+        organization_id,
+        user_id,
+        role
+    )
+    SELECT
+        o.id,
+        $2,
+        'owner'
+    FROM new_organization AS o
+    RETURNING organization_id
+)
+SELECT o.id, o.name, o.status, o.created_at, o.updated_at, o.deleted_at
+FROM new_organization AS o
+JOIN owner_membership AS om ON om.organization_id = o.id
+`
+
+type CreateOrganizationWithOwnerParams struct {
+	Name   string    `db:"name" json:"name"`
+	UserID uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+type CreateOrganizationWithOwnerRow struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Name      string             `db:"name" json:"name"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+}
+
+func (q *Queries) CreateOrganizationWithOwner(ctx context.Context, arg CreateOrganizationWithOwnerParams) (CreateOrganizationWithOwnerRow, error) {
+	row := q.db.QueryRow(ctx, createOrganizationWithOwner, arg.Name, arg.UserID)
+	var i CreateOrganizationWithOwnerRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const deleteOrganization = `-- name: DeleteOrganization :exec
 UPDATE organizations
 SET

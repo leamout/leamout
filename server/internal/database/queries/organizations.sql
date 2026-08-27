@@ -6,6 +6,33 @@ INSERT INTO organizations (
 )
 RETURNING *;
 
+-- name: CreateOrganizationWithOwner :one
+WITH new_organization AS (
+    INSERT INTO organizations (
+        name
+    )
+    SELECT sqlc.arg(name)
+    FROM users AS u
+    WHERE u.id = sqlc.arg(user_id)
+    AND u.disabled_at IS NULL
+    RETURNING *
+), owner_membership AS (
+    INSERT INTO organization_members (
+        organization_id,
+        user_id,
+        role
+    )
+    SELECT
+        o.id,
+        sqlc.arg(user_id),
+        'owner'
+    FROM new_organization AS o
+    RETURNING organization_id
+)
+SELECT o.*
+FROM new_organization AS o
+JOIN owner_membership AS om ON om.organization_id = o.id;
+
 -- name: GetOrganizationByID :one
 SELECT *
 FROM organizations

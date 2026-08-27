@@ -11,6 +11,14 @@ SELECT
 FROM users AS u
 WHERE u.id = sqlc.arg(user_id)
 AND u.disabled_at IS NULL
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = sqlc.arg(organization_id)
+    AND actor.user_id = sqlc.arg(actor_user_id)
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
 RETURNING *;
 
 -- name: GetOrganizationMember :one
@@ -43,34 +51,70 @@ AND t.deleted_at IS NULL
 ORDER BY tm.created_at ASC;
 
 -- name: UpdateMemberRole :one
-UPDATE organization_members
+UPDATE organization_members AS target
 SET
     role = sqlc.arg(role),
     updated_at = NOW()
-WHERE organization_id = sqlc.arg(organization_id)
-AND user_id = sqlc.arg(user_id)
-AND status = 'active'
-RETURNING *;
+WHERE target.organization_id = sqlc.arg(organization_id)
+AND target.user_id = sqlc.arg(user_id)
+AND target.status = 'active'
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = sqlc.arg(actor_user_id)
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner'
+RETURNING target.*;
 
 -- name: DisableOrganizationMember :exec
-UPDATE organization_members
+UPDATE organization_members AS target
 SET
     status = 'disabled',
     updated_at = NOW()
-WHERE organization_id = sqlc.arg(organization_id)
-AND user_id = sqlc.arg(user_id)
-AND status = 'active';
+WHERE target.organization_id = sqlc.arg(organization_id)
+AND target.user_id = sqlc.arg(user_id)
+AND target.status = 'active'
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = sqlc.arg(actor_user_id)
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner';
 
 -- name: EnableOrganizationMember :exec
-UPDATE organization_members
+UPDATE organization_members AS target
 SET
     status = 'active',
     updated_at = NOW()
-WHERE organization_id = sqlc.arg(organization_id)
-AND user_id = sqlc.arg(user_id)
-AND status = 'disabled';
+WHERE target.organization_id = sqlc.arg(organization_id)
+AND target.user_id = sqlc.arg(user_id)
+AND target.status = 'disabled'
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = sqlc.arg(actor_user_id)
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner';
 
 -- name: RemoveOrganizationMember :exec
-DELETE FROM organization_members
-WHERE organization_id = sqlc.arg(organization_id)
-AND user_id = sqlc.arg(user_id);
+DELETE FROM organization_members AS target
+WHERE target.organization_id = sqlc.arg(organization_id)
+AND target.user_id = sqlc.arg(user_id)
+AND EXISTS (
+    SELECT 1
+    FROM organization_members AS actor
+    WHERE actor.organization_id = target.organization_id
+    AND actor.user_id = sqlc.arg(actor_user_id)
+    AND actor.status = 'active'
+    AND actor.role IN ('owner', 'admin')
+)
+AND target.role <> 'owner';

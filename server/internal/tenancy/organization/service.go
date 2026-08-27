@@ -29,14 +29,9 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateReques
 		return Response{}, err
 	}
 
-	org, err := s.repo.Create(ctx, name)
+	org, err := s.repo.CreateWithOwner(ctx, name, userID)
 	if err != nil {
-		return Response{}, err
-	}
-
-	_, err = s.repo.AddMember(ctx, sqlc.AddOrganizationMemberParams{OrganizationID: org.ID, UserID: userID, Role: ownerRole})
-	if err != nil {
-		return Response{}, apperror.NewInternal("create organization membership", err)
+		return Response{}, apperror.NewInternal("create organization", err)
 	}
 
 	return toResponse(org, ownerRole), nil
