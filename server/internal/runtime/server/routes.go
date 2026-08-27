@@ -14,46 +14,46 @@ import (
 	"github.com/leamout/leamout/internal/tenancy/organization"
 )
 
-r.Route("/v1", func(r chi.Router) {
-	auth.RegisterRoutes(
-		r,
-		modules.Auth.Handler,
-		modules.Authn.RequireSession,
-	)
+func RegisterRoutes(r *chi.Mux, modules Modules) {
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 
-	session.RegisterRoutes(
-		r,
-		modules.Session.Handler,
-		modules.Authn.RequireSession,
-	)
-
-	users.RegisterRoutes(
-		r,
-		modules.Users.Handler,
-		modules.Authn.RequireSession,
-	)
-
-	organization.RegisterRoutes(
-		r,
-		modules.Organizations.Handler,
-		modules.Authn.RequireSession,
-	)
-
-	members.RegisterRoutes(
-		r,
-		modules.Members.Handler,
-		modules.Authn.RequireSession,
-	)
-
-	credentials.RegisterRoutes(
-		r,
-		modules.Credentials.Handler,
-		modules.Authn.RequireSession,
-	)
-
-	voice.RegisterRoutes(
-		r,
-		modules.Voice.Handler,
-		modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
-	)
-})
+	r.Route("/v1", func(r chi.Router) {
+		auth.RegisterRoutes(
+			r,
+			modules.Auth.Handler,
+			modules.Authn.RequireSession,
+		)
+		session.RegisterRoutes(
+			r,
+			modules.Session.Handler,
+			modules.Authn.RequireSession,
+		)
+		users.RegisterRoutes(
+			r,
+			modules.Users.Handler,
+			modules.Authn.RequireSession,
+		)
+		organization.RegisterRoutes(
+			r,
+			modules.Organizations.Handler,
+			modules.Authn.RequireSession,
+		)
+		members.RegisterRoutes(
+			r,
+			modules.Members.Handler,
+			modules.Authn.RequireSession,
+		)
+		credentials.RegisterRoutes(
+			r,
+			modules.Credentials.Handler,
+			modules.Authn.RequireSession,
+		)
+		voice.RegisterRoutes(
+			r,
+			modules.Voice.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
+	})
+}
