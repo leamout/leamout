@@ -38,7 +38,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.Created(w, toResponse(org))
+	httputil.Created(w, org)
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -54,7 +54,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.OK(w, toResponse(org))
+	httputil.OK(w, org)
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +76,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.OK(w, toResponse(org))
+	httputil.OK(w, org)
 }
 
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +107,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.OK(w, toResponses(orgs))
+	httputil.OK(w, orgs)
 }
 
 func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
