@@ -12,9 +12,7 @@ type Repository struct {
 }
 
 func NewRepository(queries *sqlc.Queries) *Repository {
-	return &Repository{
-		queries: queries,
-	}
+	return &Repository{queries: queries}
 }
 
 func (r *Repository) Create(
@@ -60,6 +58,17 @@ func (r *Repository) List(
 	})
 }
 
+func (r *Repository) MarkRinging(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.Call, error) {
+	return r.queries.MarkCallRinging(ctx, sqlc.MarkCallRingingParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
+}
+
 func (r *Repository) MarkAnswered(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -71,13 +80,52 @@ func (r *Repository) MarkAnswered(
 	})
 }
 
-func (r *Repository) MarkCompleted(
+func (r *Repository) MarkActive(
 	ctx context.Context,
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.Call, error) {
+	return r.queries.MarkCallActive(ctx, sqlc.MarkCallActiveParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
+}
+
+func (r *Repository) MarkCompleted(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	hangupReason *string,
+) (sqlc.Call, error) {
 	return r.queries.MarkCallCompleted(ctx, sqlc.MarkCallCompletedParams{
 		OrganizationID: organizationID,
 		ID:             id,
+		HangupReason:   hangupReason,
+	})
+}
+
+func (r *Repository) MarkFailed(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	hangupReason *string,
+) (sqlc.Call, error) {
+	return r.queries.MarkCallFailed(ctx, sqlc.MarkCallFailedParams{
+		OrganizationID: organizationID,
+		ID:             id,
+		HangupReason:   hangupReason,
+	})
+}
+
+func (r *Repository) MarkCancelled(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	hangupReason *string,
+) (sqlc.Call, error) {
+	return r.queries.MarkCallCancelled(ctx, sqlc.MarkCallCancelledParams{
+		OrganizationID: organizationID,
+		ID:             id,
+		HangupReason:   hangupReason,
 	})
 }
