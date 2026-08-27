@@ -47,7 +47,7 @@ RETURNING id, organization_id, created_by, name, description, token_hash, token_
 
 type CreateOrganizationTokenParams struct {
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	CreatedBy      uuid.UUID          `db:"created_by" json:"created_by"`
+	CreatedBy      *uuid.UUID         `db:"created_by" json:"created_by"`
 	Name           string             `db:"name" json:"name"`
 	Description    *string            `db:"description" json:"description"`
 	TokenHash      string             `db:"token_hash" json:"token_hash"`

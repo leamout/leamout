@@ -133,7 +133,7 @@ type OrganizationMember struct {
 type OrganizationToken struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	CreatedBy      uuid.UUID          `db:"created_by" json:"created_by"`
+	CreatedBy      *uuid.UUID         `db:"created_by" json:"created_by"`
 	Name           string             `db:"name" json:"name"`
 	Description    *string            `db:"description" json:"description"`
 	TokenHash      string             `db:"token_hash" json:"token_hash"`
