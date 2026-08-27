@@ -1,6 +1,6 @@
 -- name: CreateCallParticipant :one
 INSERT INTO call_participants (
-    tenant_id,
+    organization_id,
     call_id,
     subscriber_id,
     role,
@@ -9,7 +9,7 @@ INSERT INTO call_participants (
     state,
     joined_at
 ) VALUES (
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.arg(call_id),
     sqlc.narg(subscriber_id),
     sqlc.arg(role),
@@ -23,14 +23,14 @@ RETURNING *;
 -- name: GetCallParticipant :one
 SELECT *
 FROM call_participants
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 LIMIT 1;
 
 -- name: ListCallParticipants :many
 SELECT *
 FROM call_participants
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND call_id = sqlc.arg(call_id)
 ORDER BY created_at ASC;
 
@@ -47,6 +47,6 @@ SET
         ELSE left_at
     END,
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 RETURNING *;

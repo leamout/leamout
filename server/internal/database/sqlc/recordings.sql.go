@@ -25,10 +25,10 @@ SET
     duration_seconds = COALESCE($7, duration_seconds),
     completed_at = COALESCE(completed_at, NOW()),
     updated_at = NOW()
-WHERE tenant_id = $8
+WHERE organization_id = $8
   AND id = $9
   AND status = 'recording'
-RETURNING id, tenant_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 `
 
 type CompleteRecordingParams struct {
@@ -39,7 +39,7 @@ type CompleteRecordingParams struct {
 	FileSizeBytes   *int64    `db:"file_size_bytes" json:"file_size_bytes"`
 	Format          *string   `db:"format" json:"format"`
 	DurationSeconds *int32    `db:"duration_seconds" json:"duration_seconds"`
-	TenantID        uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	OrganizationID  uuid.UUID `db:"organization_id" json:"organization_id"`
 	ID              uuid.UUID `db:"id" json:"id"`
 }
 
@@ -52,13 +52,13 @@ func (q *Queries) CompleteRecording(ctx context.Context, arg CompleteRecordingPa
 		arg.FileSizeBytes,
 		arg.Format,
 		arg.DurationSeconds,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.ID,
 	)
 	var i Recording
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.Status,
 		&i.StorageKey,
@@ -78,7 +78,7 @@ func (q *Queries) CompleteRecording(ctx context.Context, arg CompleteRecordingPa
 
 const createRecording = `-- name: CreateRecording :one
 INSERT INTO recordings (
-    tenant_id,
+    organization_id,
     call_id,
     status,
     storage_key,
@@ -100,11 +100,11 @@ INSERT INTO recordings (
     $9,
     $10
 )
-RETURNING id, tenant_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 `
 
 type CreateRecordingParams struct {
-	TenantID        uuid.UUID          `db:"tenant_id" json:"tenant_id"`
+	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
 	CallID          uuid.UUID          `db:"call_id" json:"call_id"`
 	Status          interface{}        `db:"status" json:"status"`
 	StorageKey      *string            `db:"storage_key" json:"storage_key"`
@@ -118,7 +118,7 @@ type CreateRecordingParams struct {
 
 func (q *Queries) CreateRecording(ctx context.Context, arg CreateRecordingParams) (Recording, error) {
 	row := q.db.QueryRow(ctx, createRecording,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.CallID,
 		arg.Status,
 		arg.StorageKey,
@@ -132,7 +132,7 @@ func (q *Queries) CreateRecording(ctx context.Context, arg CreateRecordingParams
 	var i Recording
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.Status,
 		&i.StorageKey,
@@ -156,23 +156,23 @@ SET
     status = 'failed',
     completed_at = COALESCE(completed_at, NOW()),
     updated_at = NOW()
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
   AND status = 'recording'
-RETURNING id, tenant_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 `
 
 type FailRecordingParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) FailRecording(ctx context.Context, arg FailRecordingParams) (Recording, error) {
-	row := q.db.QueryRow(ctx, failRecording, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, failRecording, arg.OrganizationID, arg.ID)
 	var i Recording
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.Status,
 		&i.StorageKey,
@@ -191,24 +191,24 @@ func (q *Queries) FailRecording(ctx context.Context, arg FailRecordingParams) (R
 }
 
 const getRecording = `-- name: GetRecording :one
-SELECT id, tenant_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 FROM recordings
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
 LIMIT 1
 `
 
 type GetRecordingParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) GetRecording(ctx context.Context, arg GetRecordingParams) (Recording, error) {
-	row := q.db.QueryRow(ctx, getRecording, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, getRecording, arg.OrganizationID, arg.ID)
 	var i Recording
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.CallID,
 		&i.Status,
 		&i.StorageKey,
@@ -227,20 +227,20 @@ func (q *Queries) GetRecording(ctx context.Context, arg GetRecordingParams) (Rec
 }
 
 const listCallRecordings = `-- name: ListCallRecordings :many
-SELECT id, tenant_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 FROM recordings
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND call_id = $2
 ORDER BY created_at DESC
 `
 
 type ListCallRecordingsParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	CallID   uuid.UUID `db:"call_id" json:"call_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	CallID         uuid.UUID `db:"call_id" json:"call_id"`
 }
 
 func (q *Queries) ListCallRecordings(ctx context.Context, arg ListCallRecordingsParams) ([]Recording, error) {
-	rows, err := q.db.Query(ctx, listCallRecordings, arg.TenantID, arg.CallID)
+	rows, err := q.db.Query(ctx, listCallRecordings, arg.OrganizationID, arg.CallID)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +250,7 @@ func (q *Queries) ListCallRecordings(ctx context.Context, arg ListCallRecordings
 		var i Recording
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.CallID,
 			&i.Status,
 			&i.StorageKey,

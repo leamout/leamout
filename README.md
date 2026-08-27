@@ -81,7 +81,7 @@ RTPengine   FreeSWITCH
 - **The control plane owns business logic.** Routing, policy, usage, rating, billing, provisioning, and events should not be delegated to upstream carriers.
 - **Carrier integrations stay behind adapters.** Market-specific connectivity should not leak into core platform APIs.
 - **Telecom history is durable.** Historical calls, legs, events, and number assignments must not disappear through cascading configuration deletes.
-- **Tenant boundaries are database-enforced where practical.** Cross-project telecom references should be rejected by relational constraints, not merely application convention.
+- **Organization boundaries are database-enforced where practical.** Cross-project telecom references should be rejected by relational constraints, not merely application convention.
 - **Build from stable primitives.** Higher-level CPaaS products should depend on reliable voice, routing, events, usage, and billing foundations.
 
 ## Roadmap

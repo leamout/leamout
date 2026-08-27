@@ -1,6 +1,6 @@
 -- name: CreateConferenceParticipant :one
 INSERT INTO conference_participants (
-    tenant_id,
+    organization_id,
     conference_id,
     call_participant_id,
     state,
@@ -9,7 +9,7 @@ INSERT INTO conference_participants (
     speaking,
     joined_at
 ) VALUES (
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.arg(conference_id),
     sqlc.narg(call_participant_id),
     COALESCE(sqlc.narg(state), 'joining'),
@@ -23,14 +23,14 @@ RETURNING *;
 -- name: GetConferenceParticipant :one
 SELECT *
 FROM conference_participants
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 LIMIT 1;
 
 -- name: ListConferenceParticipants :many
 SELECT *
 FROM conference_participants
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND conference_id = sqlc.arg(conference_id)
 ORDER BY created_at ASC;
 
@@ -50,6 +50,6 @@ SET
         ELSE left_at
     END,
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 RETURNING *;

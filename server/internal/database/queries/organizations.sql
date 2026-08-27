@@ -1,5 +1,5 @@
--- name: CreateTenant :one
-INSERT INTO tenants (
+-- name: CreateOrganization :one
+INSERT INTO organizations (
     slug,
     name
 ) VALUES (
@@ -8,24 +8,24 @@ INSERT INTO tenants (
 )
 RETURNING *;
 
--- name: GetTenantByID :one
+-- name: GetOrganizationByID :one
 SELECT *
-FROM tenants
+FROM organizations
 WHERE id = sqlc.arg(id)
 AND status = 'active'
 AND deleted_at IS NULL
 LIMIT 1;
 
--- name: GetTenantBySlug :one
+-- name: GetOrganizationBySlug :one
 SELECT *
-FROM tenants
+FROM organizations
 WHERE slug = sqlc.arg(slug)
 AND status = 'active'
 AND deleted_at IS NULL
 LIMIT 1;
 
--- name: UpdateTenant :one
-UPDATE tenants
+-- name: UpdateOrganization :one
+UPDATE organizations
 SET
     name = COALESCE(sqlc.narg(name), name),
     slug = COALESCE(sqlc.narg(slug), slug),
@@ -35,8 +35,8 @@ AND status = 'active'
 AND deleted_at IS NULL
 RETURNING *;
 
--- name: DeleteTenant :exec
-UPDATE tenants
+-- name: DeleteOrganization :exec
+UPDATE organizations
 SET
     status = 'disabled',
     deleted_at = NOW(),
@@ -44,10 +44,10 @@ SET
 WHERE id = sqlc.arg(id)
 AND deleted_at IS NULL;
 
--- name: ListTenantsByUserID :many
+-- name: ListOrganizationsByUserID :many
 SELECT t.*
-FROM tenants AS t
-JOIN tenant_members AS tm ON tm.tenant_id = t.id
+FROM organizations AS t
+JOIN organization_members AS tm ON tm.organization_id = t.id
 JOIN users AS u ON u.id = tm.user_id
 WHERE tm.user_id = sqlc.arg(user_id)
 AND u.disabled_at IS NULL

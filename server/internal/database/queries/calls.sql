@@ -1,6 +1,6 @@
 -- name: CreateCall :one
 INSERT INTO calls (
-    tenant_id,
+    organization_id,
     application_id,
     direction,
     state,
@@ -8,7 +8,7 @@ INSERT INTO calls (
     to_uri,
     sip_call_id
 ) VALUES (
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.narg(application_id),
     sqlc.arg(direction),
     COALESCE(sqlc.narg(state), 'initiating'),
@@ -21,21 +21,21 @@ RETURNING *;
 -- name: GetCall :one
 SELECT *
 FROM calls
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 LIMIT 1;
 
 -- name: GetCallBySIPCallID :one
 SELECT *
 FROM calls
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND sip_call_id = sqlc.arg(sip_call_id)
 LIMIT 1;
 
 -- name: ListCalls :many
 SELECT *
 FROM calls
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
 ORDER BY created_at DESC
 LIMIT sqlc.arg(page_limit)
@@ -46,14 +46,14 @@ UPDATE calls
 SET
     state = sqlc.arg(state),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
 RETURNING *;
 
 -- name: MarkCallRinging :one
 UPDATE calls
 SET state = 'ringing', updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state = 'initiating'
 RETURNING *;
@@ -64,7 +64,7 @@ SET
     state = 'answered',
     answered_at = COALESCE(answered_at, NOW()),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state IN ('initiating', 'ringing')
 RETURNING *;
@@ -72,7 +72,7 @@ RETURNING *;
 -- name: MarkCallActive :one
 UPDATE calls
 SET state = 'active', updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state IN ('answered', 'ringing')
 RETURNING *;
@@ -84,7 +84,7 @@ SET
     ended_at = COALESCE(ended_at, NOW()),
     hangup_reason = COALESCE(sqlc.narg(hangup_reason), hangup_reason),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state NOT IN ('completed', 'failed', 'cancelled')
 RETURNING *;
@@ -96,7 +96,7 @@ SET
     ended_at = COALESCE(ended_at, NOW()),
     hangup_reason = COALESCE(sqlc.narg(hangup_reason), hangup_reason),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state NOT IN ('completed', 'failed', 'cancelled')
 RETURNING *;
@@ -108,7 +108,7 @@ SET
     ended_at = COALESCE(ended_at, NOW()),
     hangup_reason = COALESCE(sqlc.narg(hangup_reason), hangup_reason),
     updated_at = NOW()
-WHERE tenant_id = sqlc.arg(tenant_id)
+WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state IN ('initiating', 'ringing')
 RETURNING *;

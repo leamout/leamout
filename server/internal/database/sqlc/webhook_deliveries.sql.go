@@ -22,17 +22,17 @@ SET status = 'canceled',
 FROM webhook_endpoints
 WHERE webhook_deliveries.endpoint_id = webhook_endpoints.id
   AND webhook_deliveries.endpoint_id = $1
-  AND webhook_endpoints.tenant_id = $2
+  AND webhook_endpoints.organization_id = $2
   AND webhook_deliveries.status IN ('pending', 'retrying')
 `
 
 type CancelWebhookDeliveriesForEndpointParams struct {
-	EndpointID uuid.UUID `db:"endpoint_id" json:"endpoint_id"`
-	TenantID   uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	EndpointID     uuid.UUID `db:"endpoint_id" json:"endpoint_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CancelWebhookDeliveriesForEndpoint(ctx context.Context, arg CancelWebhookDeliveriesForEndpointParams) (int64, error) {
-	result, err := q.db.Exec(ctx, cancelWebhookDeliveriesForEndpoint, arg.EndpointID, arg.TenantID)
+	result, err := q.db.Exec(ctx, cancelWebhookDeliveriesForEndpoint, arg.EndpointID, arg.OrganizationID)
 	if err != nil {
 		return 0, err
 	}
@@ -45,12 +45,12 @@ WITH candidates AS (
     FROM webhook_deliveries
     JOIN webhook_endpoints ON webhook_endpoints.id = webhook_deliveries.endpoint_id
     JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
-    JOIN tenants ON tenants.id = webhook_events.tenant_id
+    JOIN organizations ON organizations.id = webhook_events.organization_id
     WHERE webhook_deliveries.status IN ('pending', 'retrying')
       AND webhook_deliveries.next_attempt_at <= now()
       AND webhook_endpoints.enabled = true
       AND webhook_endpoints.disabled_at IS NULL
-      AND tenants.status = 'active'
+      AND organizations.status = 'active'
       AND (
           webhook_deliveries.locked_at IS NULL
           OR webhook_deliveries.locked_at < $2
@@ -76,7 +76,7 @@ RETURNING
     webhook_deliveries.event_id,
     webhook_deliveries.endpoint_id,
     webhook_deliveries.attempt_count,
-    webhook_events.tenant_id,
+    webhook_events.organization_id,
     webhook_events.event_type,
     webhook_events.payload,
     webhook_events.occurred_at,
@@ -91,16 +91,16 @@ type ClaimWebhookDeliveriesParams struct {
 }
 
 type ClaimWebhookDeliveriesRow struct {
-	ID            uuid.UUID          `db:"id" json:"id"`
-	EventID       uuid.UUID          `db:"event_id" json:"event_id"`
-	EndpointID    uuid.UUID          `db:"endpoint_id" json:"endpoint_id"`
-	AttemptCount  int32              `db:"attempt_count" json:"attempt_count"`
-	TenantID      uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	EventType     string             `db:"event_type" json:"event_type"`
-	Payload       []byte             `db:"payload" json:"payload"`
-	OccurredAt    pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
-	Url           string             `db:"url" json:"url"`
-	SigningSecret []byte             `db:"signing_secret" json:"signing_secret"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	EventID        uuid.UUID          `db:"event_id" json:"event_id"`
+	EndpointID     uuid.UUID          `db:"endpoint_id" json:"endpoint_id"`
+	AttemptCount   int32              `db:"attempt_count" json:"attempt_count"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	EventType      string             `db:"event_type" json:"event_type"`
+	Payload        []byte             `db:"payload" json:"payload"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	Url            string             `db:"url" json:"url"`
+	SigningSecret  []byte             `db:"signing_secret" json:"signing_secret"`
 }
 
 func (q *Queries) ClaimWebhookDeliveries(ctx context.Context, arg ClaimWebhookDeliveriesParams) ([]ClaimWebhookDeliveriesRow, error) {
@@ -117,7 +117,7 @@ func (q *Queries) ClaimWebhookDeliveries(ctx context.Context, arg ClaimWebhookDe
 			&i.EventID,
 			&i.EndpointID,
 			&i.AttemptCount,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.EventType,
 			&i.Payload,
 			&i.OccurredAt,
@@ -143,11 +143,11 @@ SELECT
     $2
 FROM webhook_endpoints
 JOIN webhook_events ON webhook_events.id = $1
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_events.event_type = ANY(webhook_endpoints.subscribed_events)
-  AND tenants.status = 'active'
+  AND organizations.status = 'active'
 ON CONFLICT (event_id, endpoint_id) DO NOTHING
 `
 
@@ -178,11 +178,11 @@ SELECT
     $1
 FROM webhook_events
 JOIN webhook_endpoints ON webhook_endpoints.id = $2
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_events.id = $3
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
-  AND tenants.status = 'active'
+  AND organizations.status = 'active'
 ON CONFLICT (event_id, endpoint_id) DO UPDATE
 SET status = EXCLUDED.status
 RETURNING id, event_id, endpoint_id, status, attempt_count, replay_count, next_attempt_at, last_attempt_at, last_replayed_at, response_status, response_body, last_error, delivered_at, locked_at, locked_by, created_at, updated_at
@@ -223,20 +223,20 @@ const getWebhookDelivery = `-- name: GetWebhookDelivery :one
 SELECT webhook_deliveries.id, webhook_deliveries.event_id, webhook_deliveries.endpoint_id, webhook_deliveries.status, webhook_deliveries.attempt_count, webhook_deliveries.replay_count, webhook_deliveries.next_attempt_at, webhook_deliveries.last_attempt_at, webhook_deliveries.last_replayed_at, webhook_deliveries.response_status, webhook_deliveries.response_body, webhook_deliveries.last_error, webhook_deliveries.delivered_at, webhook_deliveries.locked_at, webhook_deliveries.locked_by, webhook_deliveries.created_at, webhook_deliveries.updated_at
 FROM webhook_deliveries
 JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_deliveries.id = $1
-  AND webhook_events.tenant_id = $2
-  AND tenants.status = 'active'
+  AND webhook_events.organization_id = $2
+  AND organizations.status = 'active'
 LIMIT 1
 `
 
 type GetWebhookDeliveryParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetWebhookDelivery(ctx context.Context, arg GetWebhookDeliveryParams) (WebhookDelivery, error) {
-	row := q.db.QueryRow(ctx, getWebhookDelivery, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getWebhookDelivery, arg.ID, arg.OrganizationID)
 	var i WebhookDelivery
 	err := row.Scan(
 		&i.ID,
@@ -264,26 +264,26 @@ const listWebhookDeliveriesForEvent = `-- name: ListWebhookDeliveriesForEvent :m
 SELECT webhook_deliveries.id, webhook_deliveries.event_id, webhook_deliveries.endpoint_id, webhook_deliveries.status, webhook_deliveries.attempt_count, webhook_deliveries.replay_count, webhook_deliveries.next_attempt_at, webhook_deliveries.last_attempt_at, webhook_deliveries.last_replayed_at, webhook_deliveries.response_status, webhook_deliveries.response_body, webhook_deliveries.last_error, webhook_deliveries.delivered_at, webhook_deliveries.locked_at, webhook_deliveries.locked_by, webhook_deliveries.created_at, webhook_deliveries.updated_at
 FROM webhook_deliveries
 JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_deliveries.event_id = $1
-  AND webhook_events.tenant_id = $2
-  AND tenants.status = 'active'
+  AND webhook_events.organization_id = $2
+  AND organizations.status = 'active'
 ORDER BY webhook_deliveries.created_at DESC
 LIMIT $4
 OFFSET $3
 `
 
 type ListWebhookDeliveriesForEventParams struct {
-	EventID     uuid.UUID `db:"event_id" json:"event_id"`
-	TenantID    uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	OffsetCount int32     `db:"offset_count" json:"offset_count"`
-	LimitCount  int32     `db:"limit_count" json:"limit_count"`
+	EventID        uuid.UUID `db:"event_id" json:"event_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	OffsetCount    int32     `db:"offset_count" json:"offset_count"`
+	LimitCount     int32     `db:"limit_count" json:"limit_count"`
 }
 
 func (q *Queries) ListWebhookDeliveriesForEvent(ctx context.Context, arg ListWebhookDeliveriesForEventParams) ([]WebhookDelivery, error) {
 	rows, err := q.db.Query(ctx, listWebhookDeliveriesForEvent,
 		arg.EventID,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.OffsetCount,
 		arg.LimitCount,
 	)
@@ -542,13 +542,13 @@ SET status = 'pending',
     updated_at = now()
 FROM webhook_events,
      webhook_endpoints,
-     tenants
+     organizations
 WHERE webhook_deliveries.id = $1
   AND webhook_events.id = webhook_deliveries.event_id
   AND webhook_endpoints.id = webhook_deliveries.endpoint_id
-  AND tenants.id = webhook_events.tenant_id
-  AND webhook_events.tenant_id = $2
-  AND tenants.status = 'active'
+  AND organizations.id = webhook_events.organization_id
+  AND webhook_events.organization_id = $2
+  AND organizations.status = 'active'
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_deliveries.status IN ('succeeded', 'failed', 'canceled')
@@ -556,12 +556,12 @@ RETURNING webhook_deliveries.id, webhook_deliveries.event_id, webhook_deliveries
 `
 
 type ReplayWebhookDeliveryParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) ReplayWebhookDelivery(ctx context.Context, arg ReplayWebhookDeliveryParams) (WebhookDelivery, error) {
-	row := q.db.QueryRow(ctx, replayWebhookDelivery, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, replayWebhookDelivery, arg.ID, arg.OrganizationID)
 	var i WebhookDelivery
 	err := row.Scan(
 		&i.ID,
@@ -598,13 +598,13 @@ SET status = 'pending',
     updated_at = now()
 FROM webhook_events,
      webhook_endpoints,
-     tenants
+     organizations
 WHERE webhook_deliveries.id = $1
   AND webhook_events.id = webhook_deliveries.event_id
   AND webhook_endpoints.id = webhook_deliveries.endpoint_id
-  AND tenants.id = webhook_events.tenant_id
-  AND webhook_events.tenant_id = $2
-  AND tenants.status = 'active'
+  AND organizations.id = webhook_events.organization_id
+  AND webhook_events.organization_id = $2
+  AND organizations.status = 'active'
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_deliveries.status = 'failed'
@@ -612,12 +612,12 @@ RETURNING webhook_deliveries.id, webhook_deliveries.event_id, webhook_deliveries
 `
 
 type RetryWebhookDeliveryParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) RetryWebhookDelivery(ctx context.Context, arg RetryWebhookDeliveryParams) (WebhookDelivery, error) {
-	row := q.db.QueryRow(ctx, retryWebhookDelivery, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, retryWebhookDelivery, arg.ID, arg.OrganizationID)
 	var i WebhookDelivery
 	err := row.Scan(
 		&i.ID,

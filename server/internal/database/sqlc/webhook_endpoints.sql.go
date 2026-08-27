@@ -13,26 +13,26 @@ import (
 
 const createWebhookEndpoint = `-- name: CreateWebhookEndpoint :one
 INSERT INTO webhook_endpoints (
-    tenant_id,
+    organization_id,
     url,
     signing_secret,
     subscribed_events,
     enabled
 )
 SELECT
-    $1 as tenant_id,
+    $1 as organization_id,
     $2 as url,
     $3 as signing_secret,
     $4::text[] as subscribed_events,
     COALESCE($5, true) as enabled
-FROM tenants
-WHERE tenants.id = $1
-  AND tenants.status = 'active'
-RETURNING id, tenant_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
+FROM organizations
+WHERE organizations.id = $1
+  AND organizations.status = 'active'
+RETURNING id, organization_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
 `
 
 type CreateWebhookEndpointParams struct {
-	TenantID         uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	OrganizationID   uuid.UUID `db:"organization_id" json:"organization_id"`
 	Url              string    `db:"url" json:"url"`
 	SigningSecret    []byte    `db:"signing_secret" json:"signing_secret"`
 	SubscribedEvents []string  `db:"subscribed_events" json:"subscribed_events"`
@@ -41,7 +41,7 @@ type CreateWebhookEndpointParams struct {
 
 func (q *Queries) CreateWebhookEndpoint(ctx context.Context, arg CreateWebhookEndpointParams) (WebhookEndpoint, error) {
 	row := q.db.QueryRow(ctx, createWebhookEndpoint,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.Url,
 		arg.SigningSecret,
 		arg.SubscribedEvents,
@@ -50,7 +50,7 @@ func (q *Queries) CreateWebhookEndpoint(ctx context.Context, arg CreateWebhookEn
 	var i WebhookEndpoint
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Url,
 		&i.SigningSecret,
 		&i.Enabled,
@@ -73,17 +73,17 @@ SET
     disabled_reason = 'manual',
     updated_at = NOW()
 WHERE id = $1
-  AND tenant_id = $2
+  AND organization_id = $2
   AND enabled = true
 `
 
 type DisableWebhookEndpointParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) DisableWebhookEndpoint(ctx context.Context, arg DisableWebhookEndpointParams) error {
-	_, err := q.db.Exec(ctx, disableWebhookEndpoint, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, disableWebhookEndpoint, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -95,41 +95,41 @@ SET
     disabled_reason = NULL,
     updated_at = NOW()
 WHERE id = $1
-  AND tenant_id = $2
+  AND organization_id = $2
   AND enabled = false
 `
 
 type EnableWebhookEndpointParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) EnableWebhookEndpoint(ctx context.Context, arg EnableWebhookEndpointParams) error {
-	_, err := q.db.Exec(ctx, enableWebhookEndpoint, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, enableWebhookEndpoint, arg.ID, arg.OrganizationID)
 	return err
 }
 
 const getWebhookEndpointByID = `-- name: GetWebhookEndpointByID :one
-SELECT webhook_endpoints.id, webhook_endpoints.tenant_id, webhook_endpoints.url, webhook_endpoints.signing_secret, webhook_endpoints.enabled, webhook_endpoints.subscribed_events, webhook_endpoints.created_at, webhook_endpoints.updated_at, webhook_endpoints.disabled_at, webhook_endpoints.consecutive_failures, webhook_endpoints.last_failure_at, webhook_endpoints.disabled_reason
+SELECT webhook_endpoints.id, webhook_endpoints.organization_id, webhook_endpoints.url, webhook_endpoints.signing_secret, webhook_endpoints.enabled, webhook_endpoints.subscribed_events, webhook_endpoints.created_at, webhook_endpoints.updated_at, webhook_endpoints.disabled_at, webhook_endpoints.consecutive_failures, webhook_endpoints.last_failure_at, webhook_endpoints.disabled_reason
 FROM webhook_endpoints
-JOIN tenants ON tenants.id = webhook_endpoints.tenant_id
+JOIN organizations ON organizations.id = webhook_endpoints.organization_id
 WHERE webhook_endpoints.id = $1
-  AND webhook_endpoints.tenant_id = $2
-  AND tenants.status = 'active'
+  AND webhook_endpoints.organization_id = $2
+  AND organizations.status = 'active'
 LIMIT 1
 `
 
 type GetWebhookEndpointByIDParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetWebhookEndpointByID(ctx context.Context, arg GetWebhookEndpointByIDParams) (WebhookEndpoint, error) {
-	row := q.db.QueryRow(ctx, getWebhookEndpointByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getWebhookEndpointByID, arg.ID, arg.OrganizationID)
 	var i WebhookEndpoint
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Url,
 		&i.SigningSecret,
 		&i.Enabled,
@@ -144,15 +144,15 @@ func (q *Queries) GetWebhookEndpointByID(ctx context.Context, arg GetWebhookEndp
 	return i, err
 }
 
-const listWebhookEndpointsByTenantID = `-- name: ListWebhookEndpointsByTenantID :many
-SELECT id, tenant_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
+const listWebhookEndpointsByOrganizationID = `-- name: ListWebhookEndpointsByOrganizationID :many
+SELECT id, organization_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
 FROM webhook_endpoints
-WHERE tenant_id = $1
+WHERE organization_id = $1
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListWebhookEndpointsByTenantID(ctx context.Context, tenantID uuid.UUID) ([]WebhookEndpoint, error) {
-	rows, err := q.db.Query(ctx, listWebhookEndpointsByTenantID, tenantID)
+func (q *Queries) ListWebhookEndpointsByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]WebhookEndpoint, error) {
+	rows, err := q.db.Query(ctx, listWebhookEndpointsByOrganizationID, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (q *Queries) ListWebhookEndpointsByTenantID(ctx context.Context, tenantID u
 		var i WebhookEndpoint
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.Url,
 			&i.SigningSecret,
 			&i.Enabled,
@@ -191,21 +191,21 @@ SET
     last_failure_at = NOW(),
     updated_at = NOW()
 WHERE id = $1
-  AND tenant_id = $2
-RETURNING id, tenant_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
+  AND organization_id = $2
+RETURNING id, organization_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
 `
 
 type RecordWebhookEndpointFailureParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) RecordWebhookEndpointFailure(ctx context.Context, arg RecordWebhookEndpointFailureParams) (WebhookEndpoint, error) {
-	row := q.db.QueryRow(ctx, recordWebhookEndpointFailure, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, recordWebhookEndpointFailure, arg.ID, arg.OrganizationID)
 	var i WebhookEndpoint
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Url,
 		&i.SigningSecret,
 		&i.Enabled,
@@ -228,16 +228,16 @@ SET
     disabled_reason = NULL,
     updated_at = NOW()
 WHERE id = $1
-  AND tenant_id = $2
+  AND organization_id = $2
 `
 
 type ResetWebhookEndpointFailuresParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) ResetWebhookEndpointFailures(ctx context.Context, arg ResetWebhookEndpointFailuresParams) error {
-	_, err := q.db.Exec(ctx, resetWebhookEndpointFailures, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, resetWebhookEndpointFailures, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -252,8 +252,8 @@ SET
     disabled_reason = CASE WHEN $4::boolean = false THEN 'manual' ELSE disabled_reason END,
     updated_at = NOW()
 WHERE id = $5
-  AND tenant_id = $6
-RETURNING id, tenant_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
+  AND organization_id = $6
+RETURNING id, organization_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
 `
 
 type UpdateWebhookEndpointParams struct {
@@ -262,7 +262,7 @@ type UpdateWebhookEndpointParams struct {
 	SubscribedEvents []string  `db:"subscribed_events" json:"subscribed_events"`
 	Enabled          *bool     `db:"enabled" json:"enabled"`
 	ID               uuid.UUID `db:"id" json:"id"`
-	TenantID         uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	OrganizationID   uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) UpdateWebhookEndpoint(ctx context.Context, arg UpdateWebhookEndpointParams) (WebhookEndpoint, error) {
@@ -272,12 +272,12 @@ func (q *Queries) UpdateWebhookEndpoint(ctx context.Context, arg UpdateWebhookEn
 		arg.SubscribedEvents,
 		arg.Enabled,
 		arg.ID,
-		arg.TenantID,
+		arg.OrganizationID,
 	)
 	var i WebhookEndpoint
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.Url,
 		&i.SigningSecret,
 		&i.Enabled,

@@ -3,17 +3,17 @@ package voice
 import "time"
 
 type CallEvent struct {
-	EventType     CallEventType `json:"event_type"`
-	CallID        string        `json:"call_id"`
-	ApplicationID string        `json:"application_id"`
-	TenantID      string        `json:"tenant_id"`
-	From          string        `json:"from"`
-	To            string        `json:"to"`
-	Direction     CallDirection `json:"direction"`
-	Status        CallStatus    `json:"status"`
-	DurationSec   int           `json:"duration_seconds,omitempty"`
-	OccurredAt    time.Time     `json:"occurred_at"`
-	RecordingURL  string        `json:"recording_url,omitempty"`
+	EventType      CallEventType `json:"event_type"`
+	CallID         string        `json:"call_id"`
+	ApplicationID  string        `json:"application_id"`
+	OrganizationID string        `json:"organization_id"`
+	From           string        `json:"from"`
+	To             string        `json:"to"`
+	Direction      CallDirection `json:"direction"`
+	Status         CallStatus    `json:"status"`
+	DurationSec    int           `json:"duration_seconds,omitempty"`
+	OccurredAt     time.Time     `json:"occurred_at"`
+	RecordingURL   string        `json:"recording_url,omitempty"`
 }
 
 type CallEventType string

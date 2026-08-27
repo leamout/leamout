@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS conference_participants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     conference_id UUID NOT NULL REFERENCES conferences(id) ON DELETE CASCADE,
     call_participant_id UUID REFERENCES call_participants(id) ON DELETE SET NULL,
     state TEXT NOT NULL DEFAULT 'joined',
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS conference_participants (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_conference_participants_tenant_id
-    ON conference_participants (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_conference_participants_organization_id
+    ON conference_participants (organization_id);
 
 CREATE INDEX IF NOT EXISTS idx_conference_participants_conference_id
     ON conference_participants (conference_id, created_at);

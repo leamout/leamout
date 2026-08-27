@@ -14,7 +14,7 @@ import (
 
 const createConference = `-- name: CreateConference :one
 INSERT INTO conferences (
-    tenant_id,
+    organization_id,
     application_id,
     name,
     state,
@@ -26,20 +26,20 @@ INSERT INTO conferences (
     COALESCE($4, 'active'),
     $5
 )
-RETURNING id, tenant_id, application_id, name, state, started_at, ended_at, created_at, updated_at
+RETURNING id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 `
 
 type CreateConferenceParams struct {
-	TenantID      uuid.UUID          `db:"tenant_id" json:"tenant_id"`
-	ApplicationID *uuid.UUID         `db:"application_id" json:"application_id"`
-	Name          string             `db:"name" json:"name"`
-	State         interface{}        `db:"state" json:"state"`
-	StartedAt     pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ApplicationID  *uuid.UUID         `db:"application_id" json:"application_id"`
+	Name           string             `db:"name" json:"name"`
+	State          interface{}        `db:"state" json:"state"`
+	StartedAt      pgtype.Timestamptz `db:"started_at" json:"started_at"`
 }
 
 func (q *Queries) CreateConference(ctx context.Context, arg CreateConferenceParams) (Conference, error) {
 	row := q.db.QueryRow(ctx, createConference,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.ApplicationID,
 		arg.Name,
 		arg.State,
@@ -48,7 +48,7 @@ func (q *Queries) CreateConference(ctx context.Context, arg CreateConferencePara
 	var i Conference
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Name,
 		&i.State,
@@ -61,24 +61,24 @@ func (q *Queries) CreateConference(ctx context.Context, arg CreateConferencePara
 }
 
 const getConference = `-- name: GetConference :one
-SELECT id, tenant_id, application_id, name, state, started_at, ended_at, created_at, updated_at
+SELECT id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 FROM conferences
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND id = $2
 LIMIT 1
 `
 
 type GetConferenceParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) GetConference(ctx context.Context, arg GetConferenceParams) (Conference, error) {
-	row := q.db.QueryRow(ctx, getConference, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, getConference, arg.OrganizationID, arg.ID)
 	var i Conference
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Name,
 		&i.State,
@@ -91,24 +91,24 @@ func (q *Queries) GetConference(ctx context.Context, arg GetConferenceParams) (C
 }
 
 const getConferenceByName = `-- name: GetConferenceByName :one
-SELECT id, tenant_id, application_id, name, state, started_at, ended_at, created_at, updated_at
+SELECT id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 FROM conferences
-WHERE tenant_id = $1
+WHERE organization_id = $1
   AND name = $2
 LIMIT 1
 `
 
 type GetConferenceByNameParams struct {
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	Name     string    `db:"name" json:"name"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Name           string    `db:"name" json:"name"`
 }
 
 func (q *Queries) GetConferenceByName(ctx context.Context, arg GetConferenceByNameParams) (Conference, error) {
-	row := q.db.QueryRow(ctx, getConferenceByName, arg.TenantID, arg.Name)
+	row := q.db.QueryRow(ctx, getConferenceByName, arg.OrganizationID, arg.Name)
 	var i Conference
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Name,
 		&i.State,
@@ -121,22 +121,22 @@ func (q *Queries) GetConferenceByName(ctx context.Context, arg GetConferenceByNa
 }
 
 const listConferences = `-- name: ListConferences :many
-SELECT id, tenant_id, application_id, name, state, started_at, ended_at, created_at, updated_at
+SELECT id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 FROM conferences
-WHERE tenant_id = $1
+WHERE organization_id = $1
 ORDER BY created_at DESC
 LIMIT $3
 OFFSET $2
 `
 
 type ListConferencesParams struct {
-	TenantID   uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	PageOffset int32     `db:"page_offset" json:"page_offset"`
-	PageLimit  int32     `db:"page_limit" json:"page_limit"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	PageOffset     int32     `db:"page_offset" json:"page_offset"`
+	PageLimit      int32     `db:"page_limit" json:"page_limit"`
 }
 
 func (q *Queries) ListConferences(ctx context.Context, arg ListConferencesParams) ([]Conference, error) {
-	rows, err := q.db.Query(ctx, listConferences, arg.TenantID, arg.PageOffset, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listConferences, arg.OrganizationID, arg.PageOffset, arg.PageLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +146,7 @@ func (q *Queries) ListConferences(ctx context.Context, arg ListConferencesParams
 		var i Conference
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.ApplicationID,
 			&i.Name,
 			&i.State,
@@ -174,23 +174,23 @@ SET
         ELSE ended_at
     END,
     updated_at = NOW()
-WHERE tenant_id = $2
+WHERE organization_id = $2
   AND id = $3
-RETURNING id, tenant_id, application_id, name, state, started_at, ended_at, created_at, updated_at
+RETURNING id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 `
 
 type UpdateConferenceStateParams struct {
-	State    string    `db:"state" json:"state"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	ID       uuid.UUID `db:"id" json:"id"`
+	State          string    `db:"state" json:"state"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) UpdateConferenceState(ctx context.Context, arg UpdateConferenceStateParams) (Conference, error) {
-	row := q.db.QueryRow(ctx, updateConferenceState, arg.State, arg.TenantID, arg.ID)
+	row := q.db.QueryRow(ctx, updateConferenceState, arg.State, arg.OrganizationID, arg.ID)
 	var i Conference
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.ApplicationID,
 		&i.Name,
 		&i.State,

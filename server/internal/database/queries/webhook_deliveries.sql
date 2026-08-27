@@ -12,11 +12,11 @@ SELECT
     sqlc.arg(next_attempt_at)
 FROM webhook_events
 JOIN webhook_endpoints ON webhook_endpoints.id = sqlc.arg(endpoint_id)
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_events.id = sqlc.arg(event_id)
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
-  AND tenants.status = 'active'
+  AND organizations.status = 'active'
 ON CONFLICT (event_id, endpoint_id) DO UPDATE
 SET status = EXCLUDED.status
 RETURNING *;
@@ -30,31 +30,31 @@ SELECT
     sqlc.arg(next_attempt_at)
 FROM webhook_endpoints
 JOIN webhook_events ON webhook_events.id = sqlc.arg(event_id)
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_events.event_type = ANY(webhook_endpoints.subscribed_events)
-  AND tenants.status = 'active'
+  AND organizations.status = 'active'
 ON CONFLICT (event_id, endpoint_id) DO NOTHING;
 
 -- name: GetWebhookDelivery :one
 SELECT webhook_deliveries.*
 FROM webhook_deliveries
 JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_deliveries.id = sqlc.arg(id)
-  AND webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+  AND webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
 LIMIT 1;
 
 -- name: ListWebhookDeliveriesForEvent :many
 SELECT webhook_deliveries.*
 FROM webhook_deliveries
 JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
-JOIN tenants ON tenants.id = webhook_events.tenant_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_deliveries.event_id = sqlc.arg(event_id)
-  AND webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+  AND webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
 ORDER BY webhook_deliveries.created_at DESC
 LIMIT sqlc.arg(limit_count)
 OFFSET sqlc.arg(offset_count);
@@ -69,7 +69,7 @@ SET status = 'canceled',
 FROM webhook_endpoints
 WHERE webhook_deliveries.endpoint_id = webhook_endpoints.id
   AND webhook_deliveries.endpoint_id = sqlc.arg(endpoint_id)
-  AND webhook_endpoints.tenant_id = sqlc.arg(tenant_id)
+  AND webhook_endpoints.organization_id = sqlc.arg(organization_id)
   AND webhook_deliveries.status IN ('pending', 'retrying');
 
 -- name: ClaimWebhookDeliveries :many
@@ -78,12 +78,12 @@ WITH candidates AS (
     FROM webhook_deliveries
     JOIN webhook_endpoints ON webhook_endpoints.id = webhook_deliveries.endpoint_id
     JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
-    JOIN tenants ON tenants.id = webhook_events.tenant_id
+    JOIN organizations ON organizations.id = webhook_events.organization_id
     WHERE webhook_deliveries.status IN ('pending', 'retrying')
       AND webhook_deliveries.next_attempt_at <= now()
       AND webhook_endpoints.enabled = true
       AND webhook_endpoints.disabled_at IS NULL
-      AND tenants.status = 'active'
+      AND organizations.status = 'active'
       AND (
           webhook_deliveries.locked_at IS NULL
           OR webhook_deliveries.locked_at < sqlc.arg(stale_before)
@@ -109,7 +109,7 @@ RETURNING
     webhook_deliveries.event_id,
     webhook_deliveries.endpoint_id,
     webhook_deliveries.attempt_count,
-    webhook_events.tenant_id,
+    webhook_events.organization_id,
     webhook_events.event_type,
     webhook_events.payload,
     webhook_events.occurred_at,
@@ -213,13 +213,13 @@ SET status = 'pending',
     updated_at = now()
 FROM webhook_events,
      webhook_endpoints,
-     tenants
+     organizations
 WHERE webhook_deliveries.id = sqlc.arg(id)
   AND webhook_events.id = webhook_deliveries.event_id
   AND webhook_endpoints.id = webhook_deliveries.endpoint_id
-  AND tenants.id = webhook_events.tenant_id
-  AND webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+  AND organizations.id = webhook_events.organization_id
+  AND webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_deliveries.status = 'failed'
@@ -240,13 +240,13 @@ SET status = 'pending',
     updated_at = now()
 FROM webhook_events,
      webhook_endpoints,
-     tenants
+     organizations
 WHERE webhook_deliveries.id = sqlc.arg(id)
   AND webhook_events.id = webhook_deliveries.event_id
   AND webhook_endpoints.id = webhook_deliveries.endpoint_id
-  AND tenants.id = webhook_events.tenant_id
-  AND webhook_events.tenant_id = sqlc.arg(tenant_id)
-  AND tenants.status = 'active'
+  AND organizations.id = webhook_events.organization_id
+  AND webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_deliveries.status IN ('succeeded', 'failed', 'canceled')

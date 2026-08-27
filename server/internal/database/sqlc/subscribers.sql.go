@@ -13,7 +13,7 @@ import (
 
 const createSubscriber = `-- name: CreateSubscriber :one
 INSERT INTO subscribers (
-    tenant_id,
+    organization_id,
     sip_domain_id,
     username,
     domain,
@@ -32,28 +32,28 @@ SELECT
     $6,
     $7
 FROM sip_domains AS sd
-JOIN tenants AS t ON t.id = sd.tenant_id
+JOIN organizations AS t ON t.id = sd.organization_id
 WHERE sd.id = $2
-AND sd.tenant_id = $1
+AND sd.organization_id = $1
 AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
-RETURNING id, tenant_id, sip_domain_id, username, domain, ha1_md5, ha1_sha256, ha1_sha512_256, display_name, status, created_at, updated_at
+RETURNING id, organization_id, sip_domain_id, username, domain, ha1_md5, ha1_sha256, ha1_sha512_256, display_name, status, created_at, updated_at
 `
 
 type CreateSubscriberParams struct {
-	TenantID     uuid.UUID `db:"tenant_id" json:"tenant_id"`
-	SipDomainID  uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
-	Username     string    `db:"username" json:"username"`
-	Ha1Md5       *string   `db:"ha1_md5" json:"ha1_md5"`
-	Ha1Sha256    *string   `db:"ha1_sha256" json:"ha1_sha256"`
-	Ha1Sha512256 *string   `db:"ha1_sha512_256" json:"ha1_sha512_256"`
-	DisplayName  *string   `db:"display_name" json:"display_name"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	SipDomainID    uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
+	Username       string    `db:"username" json:"username"`
+	Ha1Md5         *string   `db:"ha1_md5" json:"ha1_md5"`
+	Ha1Sha256      *string   `db:"ha1_sha256" json:"ha1_sha256"`
+	Ha1Sha512256   *string   `db:"ha1_sha512_256" json:"ha1_sha512_256"`
+	DisplayName    *string   `db:"display_name" json:"display_name"`
 }
 
 func (q *Queries) CreateSubscriber(ctx context.Context, arg CreateSubscriberParams) (Subscriber, error) {
 	row := q.db.QueryRow(ctx, createSubscriber,
-		arg.TenantID,
+		arg.OrganizationID,
 		arg.SipDomainID,
 		arg.Username,
 		arg.Ha1Md5,
@@ -64,7 +64,7 @@ func (q *Queries) CreateSubscriber(ctx context.Context, arg CreateSubscriberPara
 	var i Subscriber
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.SipDomainID,
 		&i.Username,
 		&i.Domain,
@@ -85,17 +85,17 @@ SET
     status = 'disabled',
     updated_at = NOW()
 WHERE id = $1
-AND tenant_id = $2
+AND organization_id = $2
 AND status = 'active'
 `
 
 type DisableSubscriberParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) DisableSubscriber(ctx context.Context, arg DisableSubscriberParams) error {
-	_, err := q.db.Exec(ctx, disableSubscriber, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, disableSubscriber, arg.ID, arg.OrganizationID)
 	return err
 }
 
@@ -105,26 +105,26 @@ SET
     status = 'active',
     updated_at = NOW()
 WHERE id = $1
-AND tenant_id = $2
+AND organization_id = $2
 AND status = 'disabled'
 `
 
 type EnableSubscriberParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) EnableSubscriber(ctx context.Context, arg EnableSubscriberParams) error {
-	_, err := q.db.Exec(ctx, enableSubscriber, arg.ID, arg.TenantID)
+	_, err := q.db.Exec(ctx, enableSubscriber, arg.ID, arg.OrganizationID)
 	return err
 }
 
 const getSubscriberByID = `-- name: GetSubscriberByID :one
-SELECT s.id, s.tenant_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
+SELECT s.id, s.organization_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
 FROM subscribers AS s
-JOIN tenants AS t ON t.id = s.tenant_id
+JOIN organizations AS t ON t.id = s.organization_id
 WHERE s.id = $1
-AND s.tenant_id = $2
+AND s.organization_id = $2
 AND s.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -132,16 +132,16 @@ LIMIT 1
 `
 
 type GetSubscriberByIDParams struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetSubscriberByID(ctx context.Context, arg GetSubscriberByIDParams) (Subscriber, error) {
-	row := q.db.QueryRow(ctx, getSubscriberByID, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, getSubscriberByID, arg.ID, arg.OrganizationID)
 	var i Subscriber
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.SipDomainID,
 		&i.Username,
 		&i.Domain,
@@ -157,12 +157,12 @@ func (q *Queries) GetSubscriberByID(ctx context.Context, arg GetSubscriberByIDPa
 }
 
 const getSubscriberBySIPIdentity = `-- name: GetSubscriberBySIPIdentity :one
-SELECT s.id, s.tenant_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
+SELECT s.id, s.organization_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
 FROM subscribers AS s
-JOIN tenants AS t ON t.id = s.tenant_id
+JOIN organizations AS t ON t.id = s.organization_id
 WHERE s.domain = $1
 AND s.username = $2
-AND s.tenant_id = $3
+AND s.organization_id = $3
 AND s.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -170,17 +170,17 @@ LIMIT 1
 `
 
 type GetSubscriberBySIPIdentityParams struct {
-	Domain   string    `db:"domain" json:"domain"`
-	Username string    `db:"username" json:"username"`
-	TenantID uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	Domain         string    `db:"domain" json:"domain"`
+	Username       string    `db:"username" json:"username"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) GetSubscriberBySIPIdentity(ctx context.Context, arg GetSubscriberBySIPIdentityParams) (Subscriber, error) {
-	row := q.db.QueryRow(ctx, getSubscriberBySIPIdentity, arg.Domain, arg.Username, arg.TenantID)
+	row := q.db.QueryRow(ctx, getSubscriberBySIPIdentity, arg.Domain, arg.Username, arg.OrganizationID)
 	var i Subscriber
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.SipDomainID,
 		&i.Username,
 		&i.Domain,
@@ -195,27 +195,19 @@ func (q *Queries) GetSubscriberBySIPIdentity(ctx context.Context, arg GetSubscri
 	return i, err
 }
 
-const listSubscribersBySipDomainID = `-- name: ListSubscribersBySipDomainID :many
-SELECT s.id, s.tenant_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
+const listSubscribersByOrganizationID = `-- name: ListSubscribersByOrganizationID :many
+SELECT s.id, s.organization_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
 FROM subscribers AS s
-JOIN sip_domains AS sd ON sd.id = s.sip_domain_id
-JOIN tenants AS t ON t.id = sd.tenant_id
-WHERE s.sip_domain_id = $1
-AND s.tenant_id = $2
+JOIN organizations AS t ON t.id = s.organization_id
+WHERE s.organization_id = $1
 AND s.status = 'active'
-AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 ORDER BY s.created_at ASC
 `
 
-type ListSubscribersBySipDomainIDParams struct {
-	SipDomainID uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
-	TenantID    uuid.UUID `db:"tenant_id" json:"tenant_id"`
-}
-
-func (q *Queries) ListSubscribersBySipDomainID(ctx context.Context, arg ListSubscribersBySipDomainIDParams) ([]Subscriber, error) {
-	rows, err := q.db.Query(ctx, listSubscribersBySipDomainID, arg.SipDomainID, arg.TenantID)
+func (q *Queries) ListSubscribersByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]Subscriber, error) {
+	rows, err := q.db.Query(ctx, listSubscribersByOrganizationID, organizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +217,7 @@ func (q *Queries) ListSubscribersBySipDomainID(ctx context.Context, arg ListSubs
 		var i Subscriber
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.SipDomainID,
 			&i.Username,
 			&i.Domain,
@@ -247,19 +239,27 @@ func (q *Queries) ListSubscribersBySipDomainID(ctx context.Context, arg ListSubs
 	return items, nil
 }
 
-const listSubscribersByTenantID = `-- name: ListSubscribersByTenantID :many
-SELECT s.id, s.tenant_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
+const listSubscribersBySipDomainID = `-- name: ListSubscribersBySipDomainID :many
+SELECT s.id, s.organization_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
 FROM subscribers AS s
-JOIN tenants AS t ON t.id = s.tenant_id
-WHERE s.tenant_id = $1
+JOIN sip_domains AS sd ON sd.id = s.sip_domain_id
+JOIN organizations AS t ON t.id = sd.organization_id
+WHERE s.sip_domain_id = $1
+AND s.organization_id = $2
 AND s.status = 'active'
+AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 ORDER BY s.created_at ASC
 `
 
-func (q *Queries) ListSubscribersByTenantID(ctx context.Context, tenantID uuid.UUID) ([]Subscriber, error) {
-	rows, err := q.db.Query(ctx, listSubscribersByTenantID, tenantID)
+type ListSubscribersBySipDomainIDParams struct {
+	SipDomainID    uuid.UUID `db:"sip_domain_id" json:"sip_domain_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) ListSubscribersBySipDomainID(ctx context.Context, arg ListSubscribersBySipDomainIDParams) ([]Subscriber, error) {
+	rows, err := q.db.Query(ctx, listSubscribersBySipDomainID, arg.SipDomainID, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +269,7 @@ func (q *Queries) ListSubscribersByTenantID(ctx context.Context, tenantID uuid.U
 		var i Subscriber
 		if err := rows.Scan(
 			&i.ID,
-			&i.TenantID,
+			&i.OrganizationID,
 			&i.SipDomainID,
 			&i.Username,
 			&i.Domain,
@@ -299,17 +299,17 @@ SET
     ha1_sha512_256 = COALESCE($3, ha1_sha512_256),
     updated_at = NOW()
 WHERE id = $4
-AND tenant_id = $5
+AND organization_id = $5
 AND status = 'active'
-RETURNING id, tenant_id, sip_domain_id, username, domain, ha1_md5, ha1_sha256, ha1_sha512_256, display_name, status, created_at, updated_at
+RETURNING id, organization_id, sip_domain_id, username, domain, ha1_md5, ha1_sha256, ha1_sha512_256, display_name, status, created_at, updated_at
 `
 
 type SetSubscriberPasswordParams struct {
-	Ha1Md5       *string   `db:"ha1_md5" json:"ha1_md5"`
-	Ha1Sha256    *string   `db:"ha1_sha256" json:"ha1_sha256"`
-	Ha1Sha512256 *string   `db:"ha1_sha512_256" json:"ha1_sha512_256"`
-	ID           uuid.UUID `db:"id" json:"id"`
-	TenantID     uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	Ha1Md5         *string   `db:"ha1_md5" json:"ha1_md5"`
+	Ha1Sha256      *string   `db:"ha1_sha256" json:"ha1_sha256"`
+	Ha1Sha512256   *string   `db:"ha1_sha512_256" json:"ha1_sha512_256"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) SetSubscriberPassword(ctx context.Context, arg SetSubscriberPasswordParams) (Subscriber, error) {
@@ -318,12 +318,12 @@ func (q *Queries) SetSubscriberPassword(ctx context.Context, arg SetSubscriberPa
 		arg.Ha1Sha256,
 		arg.Ha1Sha512256,
 		arg.ID,
-		arg.TenantID,
+		arg.OrganizationID,
 	)
 	var i Subscriber
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.SipDomainID,
 		&i.Username,
 		&i.Domain,
@@ -344,23 +344,23 @@ SET
     display_name = COALESCE($1, display_name),
     updated_at = NOW()
 WHERE id = $2
-AND tenant_id = $3
+AND organization_id = $3
 AND status = 'active'
-RETURNING id, tenant_id, sip_domain_id, username, domain, ha1_md5, ha1_sha256, ha1_sha512_256, display_name, status, created_at, updated_at
+RETURNING id, organization_id, sip_domain_id, username, domain, ha1_md5, ha1_sha256, ha1_sha512_256, display_name, status, created_at, updated_at
 `
 
 type UpdateSubscriberParams struct {
-	DisplayName *string   `db:"display_name" json:"display_name"`
-	ID          uuid.UUID `db:"id" json:"id"`
-	TenantID    uuid.UUID `db:"tenant_id" json:"tenant_id"`
+	DisplayName    *string   `db:"display_name" json:"display_name"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) UpdateSubscriber(ctx context.Context, arg UpdateSubscriberParams) (Subscriber, error) {
-	row := q.db.QueryRow(ctx, updateSubscriber, arg.DisplayName, arg.ID, arg.TenantID)
+	row := q.db.QueryRow(ctx, updateSubscriber, arg.DisplayName, arg.ID, arg.OrganizationID)
 	var i Subscriber
 	err := row.Scan(
 		&i.ID,
-		&i.TenantID,
+		&i.OrganizationID,
 		&i.SipDomainID,
 		&i.Username,
 		&i.Domain,

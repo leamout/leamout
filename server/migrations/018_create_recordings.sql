@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS recordings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     call_id UUID NOT NULL REFERENCES calls(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'recording',
     storage_key TEXT,
@@ -29,14 +29,14 @@ CREATE TABLE IF NOT EXISTS recordings (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_recordings_tenant_created
-    ON recordings (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_recordings_organization_created
+    ON recordings (organization_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_recordings_call_created
     ON recordings (call_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_recordings_status
-    ON recordings (tenant_id, status, created_at DESC);
+    ON recordings (organization_id, status, created_at DESC);
 
 CREATE TRIGGER set_recordings_updated_at
 BEFORE UPDATE ON recordings

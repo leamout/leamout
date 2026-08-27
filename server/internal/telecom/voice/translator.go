@@ -9,49 +9,49 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 )
 
-func TranslateEvent(fsEvent freeswitch.Event, appID, tenantID string) (*CallEvent, error) {
+func TranslateEvent(fsEvent freeswitch.Event, appID, organizationID string) (*CallEvent, error) {
 	callID := fsEvent.Header("Unique-ID")
 	occurredAt := parseTimestamp(fsEvent.Header("Event-Date-Timestamp"))
 
 	switch fsEvent.Name {
 	case "CHANNEL_CREATE":
 		return &CallEvent{
-			EventType:     EventCallInitiated,
-			CallID:        callID,
-			ApplicationID: appID,
-			TenantID:      tenantID,
-			From:          fsEvent.Header("Caller-Caller-ID-Number"),
-			To:            fsEvent.Header("Caller-Destination-Number"),
-			Direction:     determineDirection(fsEvent),
-			Status:        StatusInitiated,
-			OccurredAt:    occurredAt,
+			EventType:      EventCallInitiated,
+			CallID:         callID,
+			ApplicationID:  appID,
+			OrganizationID: organizationID,
+			From:           fsEvent.Header("Caller-Caller-ID-Number"),
+			To:             fsEvent.Header("Caller-Destination-Number"),
+			Direction:      determineDirection(fsEvent),
+			Status:         StatusInitiated,
+			OccurredAt:     occurredAt,
 		}, nil
 
 	case "CHANNEL_ANSWER":
 		return &CallEvent{
-			EventType:     EventCallAnswered,
-			CallID:        callID,
-			ApplicationID: appID,
-			TenantID:      tenantID,
-			From:          fsEvent.Header("Caller-Caller-ID-Number"),
-			To:            fsEvent.Header("Caller-Destination-Number"),
-			Direction:     determineDirection(fsEvent),
-			Status:        StatusAnswered,
-			OccurredAt:    occurredAt,
+			EventType:      EventCallAnswered,
+			CallID:         callID,
+			ApplicationID:  appID,
+			OrganizationID: organizationID,
+			From:           fsEvent.Header("Caller-Caller-ID-Number"),
+			To:             fsEvent.Header("Caller-Destination-Number"),
+			Direction:      determineDirection(fsEvent),
+			Status:         StatusAnswered,
+			OccurredAt:     occurredAt,
 		}, nil
 
 	case "CHANNEL_HANGUP_COMPLETE":
 		return &CallEvent{
-			EventType:     EventCallCompleted,
-			CallID:        callID,
-			ApplicationID: appID,
-			TenantID:      tenantID,
-			From:          fsEvent.Header("Caller-Caller-ID-Number"),
-			To:            fsEvent.Header("Caller-Destination-Number"),
-			Direction:     determineDirection(fsEvent),
-			Status:        mapHangupCause(fsEvent.Header("Hangup-Cause")),
-			DurationSec:   int(parseInt(fsEvent.Header("billmsec")) / 1000),
-			OccurredAt:    occurredAt,
+			EventType:      EventCallCompleted,
+			CallID:         callID,
+			ApplicationID:  appID,
+			OrganizationID: organizationID,
+			From:           fsEvent.Header("Caller-Caller-ID-Number"),
+			To:             fsEvent.Header("Caller-Destination-Number"),
+			Direction:      determineDirection(fsEvent),
+			Status:         mapHangupCause(fsEvent.Header("Hangup-Cause")),
+			DurationSec:    int(parseInt(fsEvent.Header("billmsec")) / 1000),
+			OccurredAt:     occurredAt,
 		}, nil
 	}
 

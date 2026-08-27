@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS calls (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     application_id UUID REFERENCES voice_applications(id) ON DELETE SET NULL,
     direction TEXT NOT NULL,
     state TEXT NOT NULL DEFAULT 'initiating',
@@ -29,17 +29,17 @@ CREATE TABLE IF NOT EXISTS calls (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_calls_tenant_created
-    ON calls (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_calls_organization_created
+    ON calls (organization_id, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_calls_tenant_state
-    ON calls (tenant_id, state, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_calls_organization_state
+    ON calls (organization_id, state, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_calls_application_created
     ON calls (application_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_calls_sip_call_id
-    ON calls (tenant_id, sip_call_id)
+    ON calls (organization_id, sip_call_id)
     WHERE sip_call_id IS NOT NULL;
 
 CREATE TRIGGER set_calls_updated_at

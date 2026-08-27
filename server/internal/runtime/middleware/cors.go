@@ -29,7 +29,7 @@ func CORS(allowedOrigins []string, development bool) func(http.Handler) http.Han
 			"Content-Type",
 			"Origin",
 			"X-Request-ID",
-			"X-Tenant-ID",
+			"X-Organization-ID",
 			"X-CSRF-Token",
 		},
 

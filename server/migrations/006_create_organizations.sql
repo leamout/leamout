@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS tenants (
+CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     slug CITEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
@@ -7,17 +7,17 @@ CREATE TABLE IF NOT EXISTS tenants (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT chk_tenants_status CHECK (status IN ('active', 'disabled'))
+    CONSTRAINT chk_organizations_status CHECK (status IN ('active', 'disabled'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_tenants_status
-    ON tenants (status);
+CREATE INDEX IF NOT EXISTS idx_organizations_status
+    ON organizations (status);
 
-CREATE INDEX IF NOT EXISTS idx_tenants_deleted_at
-    ON tenants (deleted_at);
+CREATE INDEX IF NOT EXISTS idx_organizations_deleted_at
+    ON organizations (deleted_at);
 
 -- Trigger to auto-update updated_at
-CREATE TRIGGER set_tenants_updated_at
-BEFORE UPDATE ON tenants
+CREATE TRIGGER set_organizations_updated_at
+BEFORE UPDATE ON organizations
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();

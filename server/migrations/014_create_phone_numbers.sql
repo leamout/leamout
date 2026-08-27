@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS phone_numbers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
 
     number TEXT NOT NULL,
     country_code CHAR(2) NOT NULL,
@@ -24,11 +24,11 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_phone_numbers_tenant_status
-    ON phone_numbers (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_phone_numbers_organization_status
+    ON phone_numbers (organization_id, status);
 
-CREATE INDEX IF NOT EXISTS idx_phone_numbers_tenant_country
-    ON phone_numbers (tenant_id, country_code);
+CREATE INDEX IF NOT EXISTS idx_phone_numbers_organization_country
+    ON phone_numbers (organization_id, country_code);
 
 CREATE INDEX IF NOT EXISTS idx_phone_numbers_number_prefix
     ON phone_numbers (number text_pattern_ops);

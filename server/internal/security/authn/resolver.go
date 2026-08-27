@@ -18,11 +18,11 @@ type SessionResolver interface {
 	) (Session, error)
 }
 
-type APIKeyResolver interface {
-	ResolveAPIKey(
+type OrganizationTokenResolver interface {
+	ResolveOrganizationToken(
 		ctx context.Context,
 		key string,
-	) (APIKey, error)
+	) (OrganizationToken, error)
 }
 
 type Session struct {
@@ -30,23 +30,23 @@ type Session struct {
 	UserID uuid.UUID
 }
 
-type APIKey struct {
+type OrganizationToken struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
 }
 
 type Resolver struct {
-	sessions SessionResolver
-	apiKeys  APIKeyResolver
+	sessions           SessionResolver
+	organizationTokens OrganizationTokenResolver
 }
 
 func NewResolver(
 	sessions SessionResolver,
-	apiKeys APIKeyResolver,
+	organizationTokens OrganizationTokenResolver,
 ) *Resolver {
 	return &Resolver{
-		sessions: sessions,
-		apiKeys:  apiKeys,
+		sessions:           sessions,
+		organizationTokens: organizationTokens,
 	}
 }
 
@@ -62,8 +62,8 @@ func (r *Resolver) Resolve(
 	case CredentialSession:
 		return r.resolveSession(ctx, input.Value)
 
-	case CredentialAPIKey:
-		return r.resolveAPIKey(ctx, input.Value)
+	case CredentialOrganizationToken:
+		return r.resolveOrganizationToken(ctx, input.Value)
 
 	default:
 		return Principal{}, ErrInvalidCredential
@@ -95,11 +95,11 @@ func (r *Resolver) resolveSession(
 	}, nil
 }
 
-func (r *Resolver) resolveAPIKey(
+func (r *Resolver) resolveOrganizationToken(
 	ctx context.Context,
 	key string,
 ) (Principal, error) {
-	apiKey, err := r.apiKeys.ResolveAPIKey(
+	organizationToken, err := r.organizationTokens.ResolveOrganizationToken(
 		ctx,
 		key,
 	)
@@ -109,12 +109,12 @@ func (r *Resolver) resolveAPIKey(
 
 	return Principal{
 		Subject: Subject{
-			ID:   apiKey.UserID,
+			ID:   organizationToken.UserID,
 			Type: SubjectUser,
 		},
 		Credential: Credential{
-			ID:   apiKey.ID,
-			Type: CredentialAPIKey,
+			ID:   organizationToken.ID,
+			Type: CredentialOrganizationToken,
 		},
 		Assurance: AssuranceUnknown,
 	}, nil

@@ -1,6 +1,6 @@
 -- name: CreateSubscriber :one
 INSERT INTO subscribers (
-    tenant_id,
+    organization_id,
     sip_domain_id,
     username,
     domain,
@@ -10,7 +10,7 @@ INSERT INTO subscribers (
     display_name
 )
 SELECT
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.arg(sip_domain_id),
     sqlc.arg(username),
     sd.domain,
@@ -19,9 +19,9 @@ SELECT
     sqlc.narg(ha1_sha512_256),
     sqlc.narg(display_name)
 FROM sip_domains AS sd
-JOIN tenants AS t ON t.id = sd.tenant_id
+JOIN organizations AS t ON t.id = sd.organization_id
 WHERE sd.id = sqlc.arg(sip_domain_id)
-AND sd.tenant_id = sqlc.arg(tenant_id)
+AND sd.organization_id = sqlc.arg(organization_id)
 AND sd.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -30,9 +30,9 @@ RETURNING *;
 -- name: GetSubscriberByID :one
 SELECT s.*
 FROM subscribers AS s
-JOIN tenants AS t ON t.id = s.tenant_id
+JOIN organizations AS t ON t.id = s.organization_id
 WHERE s.id = sqlc.arg(id)
-AND s.tenant_id = sqlc.arg(tenant_id)
+AND s.organization_id = sqlc.arg(organization_id)
 AND s.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -41,20 +41,20 @@ LIMIT 1;
 -- name: GetSubscriberBySIPIdentity :one
 SELECT s.*
 FROM subscribers AS s
-JOIN tenants AS t ON t.id = s.tenant_id
+JOIN organizations AS t ON t.id = s.organization_id
 WHERE s.domain = sqlc.arg(domain)
 AND s.username = sqlc.arg(username)
-AND s.tenant_id = sqlc.arg(tenant_id)
+AND s.organization_id = sqlc.arg(organization_id)
 AND s.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 LIMIT 1;
 
--- name: ListSubscribersByTenantID :many
+-- name: ListSubscribersByOrganizationID :many
 SELECT s.*
 FROM subscribers AS s
-JOIN tenants AS t ON t.id = s.tenant_id
-WHERE s.tenant_id = sqlc.arg(tenant_id)
+JOIN organizations AS t ON t.id = s.organization_id
+WHERE s.organization_id = sqlc.arg(organization_id)
 AND s.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
@@ -64,9 +64,9 @@ ORDER BY s.created_at ASC;
 SELECT s.*
 FROM subscribers AS s
 JOIN sip_domains AS sd ON sd.id = s.sip_domain_id
-JOIN tenants AS t ON t.id = sd.tenant_id
+JOIN organizations AS t ON t.id = sd.organization_id
 WHERE s.sip_domain_id = sqlc.arg(sip_domain_id)
-AND s.tenant_id = sqlc.arg(tenant_id)
+AND s.organization_id = sqlc.arg(organization_id)
 AND s.status = 'active'
 AND sd.status = 'active'
 AND t.status = 'active'
@@ -79,7 +79,7 @@ SET
     display_name = COALESCE(sqlc.narg(display_name), display_name),
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-AND tenant_id = sqlc.arg(tenant_id)
+AND organization_id = sqlc.arg(organization_id)
 AND status = 'active'
 RETURNING *;
 
@@ -91,7 +91,7 @@ SET
     ha1_sha512_256 = COALESCE(sqlc.narg(ha1_sha512_256), ha1_sha512_256),
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-AND tenant_id = sqlc.arg(tenant_id)
+AND organization_id = sqlc.arg(organization_id)
 AND status = 'active'
 RETURNING *;
 
@@ -101,7 +101,7 @@ SET
     status = 'disabled',
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-AND tenant_id = sqlc.arg(tenant_id)
+AND organization_id = sqlc.arg(organization_id)
 AND status = 'active';
 
 -- name: EnableSubscriber :exec
@@ -110,5 +110,5 @@ SET
     status = 'active',
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-AND tenant_id = sqlc.arg(tenant_id)
+AND organization_id = sqlc.arg(organization_id)
 AND status = 'disabled';

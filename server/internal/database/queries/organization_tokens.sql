@@ -1,6 +1,6 @@
--- name: CreateAPIKey :one
-INSERT INTO api_keys (
-    tenant_id,
+-- name: CreateOrganizationToken :one
+INSERT INTO organization_tokens (
+    organization_id,
     created_by,
     name,
     description,
@@ -10,7 +10,7 @@ INSERT INTO api_keys (
     expires_at
 )
 SELECT
-    sqlc.arg(tenant_id),
+    sqlc.arg(organization_id),
     sqlc.arg(created_by),
     sqlc.arg(name),
     sqlc.narg(description),
@@ -18,10 +18,10 @@ SELECT
     sqlc.arg(token_prefix),
     sqlc.arg(scopes)::jsonb,
     sqlc.narg(expires_at)::timestamptz
-FROM tenants AS t
+FROM organizations AS t
 JOIN users AS u ON u.id = sqlc.arg(created_by)
-JOIN tenant_members AS tm ON tm.tenant_id = t.id AND tm.user_id = u.id
-WHERE t.id = sqlc.arg(tenant_id)
+JOIN organization_members AS tm ON tm.organization_id = t.id AND tm.user_id = u.id
+WHERE t.id = sqlc.arg(organization_id)
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 AND u.disabled_at IS NULL
@@ -29,24 +29,24 @@ AND tm.status = 'active'
 AND tm.role = 'admin'
 RETURNING *;
 
--- name: GetAPIKeyByTokenHash :one
+-- name: GetOrganizationTokenByTokenHash :one
 SELECT ak.*
-FROM api_keys AS ak
-JOIN tenants AS t ON t.id = ak.tenant_id
+FROM organization_tokens AS ak
+JOIN organizations AS t ON t.id = ak.organization_id
 WHERE ak.token_hash = sqlc.arg(token_hash)
 AND (ak.expires_at IS NULL OR ak.expires_at > NOW())
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 LIMIT 1;
 
--- name: GetAPIKeyByID :one
+-- name: GetOrganizationTokenByID :one
 SELECT ak.*
-FROM api_keys AS ak
+FROM organization_tokens AS ak
 WHERE ak.id = sqlc.arg(id)
-AND ak.tenant_id = sqlc.arg(tenant_id)
+AND ak.organization_id = sqlc.arg(organization_id)
 LIMIT 1;
 
--- name: ListAPIKeysByTenantID :many
+-- name: ListOrganizationTokensByOrganizationID :many
 SELECT
     ak.id,
     ak.name,
@@ -58,13 +58,13 @@ SELECT
     ak.expires_at,
     ak.created_at,
     u.name AS created_by
-FROM api_keys AS ak
+FROM organization_tokens AS ak
 JOIN users AS u ON u.id = ak.created_by
-WHERE ak.tenant_id = sqlc.arg(tenant_id)
+WHERE ak.organization_id = sqlc.arg(organization_id)
 ORDER BY ak.created_at DESC;
 
--- name: UpdateAPIKey :one
-UPDATE api_keys
+-- name: UpdateOrganizationToken :one
+UPDATE organization_tokens
 SET
     name = COALESCE(sqlc.narg(name), name),
     description = COALESCE(sqlc.narg(description), description),
@@ -72,11 +72,11 @@ SET
     expires_at = COALESCE(sqlc.narg(expires_at), expires_at),
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
-AND tenant_id = sqlc.arg(tenant_id)
+AND organization_id = sqlc.arg(organization_id)
 RETURNING *;
 
--- name: TouchAPIKey :exec
-UPDATE api_keys
+-- name: TouchOrganizationToken :exec
+UPDATE organization_tokens
 SET
     last_used_at = NOW(),
     last_used_ip = sqlc.narg(last_used_ip)::inet,
