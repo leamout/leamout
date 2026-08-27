@@ -15,9 +15,11 @@ type Subject struct {
 }
 
 type Principal struct {
-	Subject    Subject
-	Credential Credential
-	Assurance  AssuranceLevel
+	Subject        Subject
+	Credential     Credential
+	OrganizationID uuid.UUID
+	Scopes         []string
+	Assurance      AssuranceLevel
 }
 
 func (p Principal) IsValid() bool {
