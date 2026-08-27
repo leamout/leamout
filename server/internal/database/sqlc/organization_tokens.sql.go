@@ -42,7 +42,7 @@ AND t.deleted_at IS NULL
 AND u.disabled_at IS NULL
 AND tm.status = 'active'
 AND tm.role = 'admin'
-RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, created_at, updated_at
+RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, disabled_at, created_at, updated_at
 `
 
 type CreateOrganizationTokenParams struct {
@@ -80,6 +80,7 @@ func (q *Queries) CreateOrganizationToken(ctx context.Context, arg CreateOrganiz
 		&i.LastUsedAt,
 		&i.LastUsedIp,
 		&i.ExpiresAt,
+		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -87,7 +88,7 @@ func (q *Queries) CreateOrganizationToken(ctx context.Context, arg CreateOrganiz
 }
 
 const getOrganizationTokenByID = `-- name: GetOrganizationTokenByID :one
-SELECT ak.id, ak.organization_id, ak.created_by, ak.name, ak.description, ak.token_hash, ak.token_prefix, ak.scopes, ak.last_used_at, ak.last_used_ip, ak.expires_at, ak.created_at, ak.updated_at
+SELECT ak.id, ak.organization_id, ak.created_by, ak.name, ak.description, ak.token_hash, ak.token_prefix, ak.scopes, ak.last_used_at, ak.last_used_ip, ak.expires_at, ak.disabled_at, ak.created_at, ak.updated_at
 FROM organization_tokens AS ak
 WHERE ak.id = $1
 AND ak.organization_id = $2
@@ -114,6 +115,7 @@ func (q *Queries) GetOrganizationTokenByID(ctx context.Context, arg GetOrganizat
 		&i.LastUsedAt,
 		&i.LastUsedIp,
 		&i.ExpiresAt,
+		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -121,7 +123,7 @@ func (q *Queries) GetOrganizationTokenByID(ctx context.Context, arg GetOrganizat
 }
 
 const getOrganizationTokenByTokenHash = `-- name: GetOrganizationTokenByTokenHash :one
-SELECT ak.id, ak.organization_id, ak.created_by, ak.name, ak.description, ak.token_hash, ak.token_prefix, ak.scopes, ak.last_used_at, ak.last_used_ip, ak.expires_at, ak.created_at, ak.updated_at
+SELECT ak.id, ak.organization_id, ak.created_by, ak.name, ak.description, ak.token_hash, ak.token_prefix, ak.scopes, ak.last_used_at, ak.last_used_ip, ak.expires_at, ak.disabled_at, ak.created_at, ak.updated_at
 FROM organization_tokens AS ak
 JOIN organizations AS t ON t.id = ak.organization_id
 WHERE ak.token_hash = $1
@@ -146,6 +148,7 @@ func (q *Queries) GetOrganizationTokenByTokenHash(ctx context.Context, tokenHash
 		&i.LastUsedAt,
 		&i.LastUsedIp,
 		&i.ExpiresAt,
+		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -244,7 +247,7 @@ SET
     updated_at = NOW()
 WHERE id = $5
 AND organization_id = $6
-RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, created_at, updated_at
+RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, disabled_at, created_at, updated_at
 `
 
 type UpdateOrganizationTokenParams struct {
@@ -278,6 +281,7 @@ func (q *Queries) UpdateOrganizationToken(ctx context.Context, arg UpdateOrganiz
 		&i.LastUsedAt,
 		&i.LastUsedIp,
 		&i.ExpiresAt,
+		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

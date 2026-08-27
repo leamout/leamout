@@ -143,6 +143,7 @@ type OrganizationToken struct {
 	LastUsedAt     pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
 	LastUsedIp     *netip.Addr        `db:"last_used_ip" json:"last_used_ip"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	DisabledAt     pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
