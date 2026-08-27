@@ -22,7 +22,7 @@ func NewService(repository *Repository) *Service { return &Service{repository: r
 
 func (s *Service) Create(ctx context.Context, input CreateInput) (CreatedCredential, error) {
 	if err := ValidateCreate(input); err != nil {
-		return CreatedCredential{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		return CreatedCredential{}, fmt.Errorf("%w: %w", ErrInvalidInput, err)
 	}
 	token, prefix, hash, err := GenerateToken()
 	if err != nil {
@@ -89,7 +89,7 @@ func (s *Service) Authenticate(ctx context.Context, token string) (Credential, e
 
 func (s *Service) Update(ctx context.Context, input UpdateInput, actorID uuid.UUID) (Credential, error) {
 	if err := ValidateUpdate(input); err != nil {
-		return Credential{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
+		return Credential{}, fmt.Errorf("%w: %w", ErrInvalidInput, err)
 	}
 	if actorID == uuid.Nil {
 		return Credential{}, fmt.Errorf("%w: actor id is required", ErrInvalidInput)
