@@ -19,61 +19,71 @@ func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateRequest) (sqlc.Organization, error) {
+func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateRequest) (Response, error) {
 	if userID == uuid.Nil {
-		return sqlc.Organization{}, apperror.NewUnauthorized("authentication required")
+		return Response{}, apperror.NewUnauthorized("authentication required")
 	}
 
 	name, err := normalizeRequiredString(req.Name, "name")
 	if err != nil {
-		return sqlc.Organization{}, err
+		return Response{}, err
 	}
 
 	org, err := s.repo.Create(ctx, name)
 	if err != nil {
-		return sqlc.Organization{}, err
+		return Response{}, err
 	}
 
 	_, err = s.repo.AddMember(ctx, sqlc.AddOrganizationMemberParams{OrganizationID: org.ID, UserID: userID, Role: ownerRole})
 	if err != nil {
-		return sqlc.Organization{}, apperror.NewInternal("create organization membership", err)
+		return Response{}, apperror.NewInternal("create organization membership", err)
 	}
 
-	return org, nil
+	return toResponse(org, ownerRole), nil
 }
 
-func (s *Service) Get(ctx context.Context, userID, orgID uuid.UUID) (sqlc.Organization, error) {
+func (s *Service) Get(ctx context.Context, userID, orgID uuid.UUID) (Response, error) {
 	if err := s.requireMember(ctx, userID, orgID); err != nil {
-		return sqlc.Organization{}, err
+		return Response{}, err
 	}
 
 	org, err := s.repo.GetByID(ctx, orgID)
 	if err != nil {
-		return sqlc.Organization{}, apperror.NewNotFound("organization not found")
+		return Response{}, apperror.NewNotFound("organization not found")
 	}
 
-	return org, nil
+	member, err := s.repo.GetMember(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: orgID, UserID: userID})
+	if err != nil {
+		return Response{}, apperror.NewNotFound("organization not found")
+	}
+
+	return toResponse(org, member.Role), nil
 }
 
-func (s *Service) Update(ctx context.Context, userID, orgID uuid.UUID, req UpdateRequest) (sqlc.Organization, error) {
+func (s *Service) Update(ctx context.Context, userID, orgID uuid.UUID, req UpdateRequest) (Response, error) {
 	if err := s.requireMember(ctx, userID, orgID); err != nil {
-		return sqlc.Organization{}, err
+		return Response{}, err
 	}
 
 	if req.Name != nil {
 		name, err := normalizeRequiredString(*req.Name, "name")
 		if err != nil {
-			return sqlc.Organization{}, err
+			return Response{}, err
 		}
 		req.Name = &name
 	}
 
 	org, err := s.repo.Update(ctx, sqlc.UpdateOrganizationParams{ID: orgID, Name: req.Name})
 	if err != nil {
-		return sqlc.Organization{}, apperror.NewNotFound("organization not found")
+		return Response{}, apperror.NewNotFound("organization not found")
 	}
 
-	return org, nil
+	member, err := s.repo.GetMember(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: orgID, UserID: userID})
+	if err != nil {
+		return Response{}, apperror.NewNotFound("organization not found")
+	}
+
+	return toResponse(org, member.Role), nil
 }
 
 func (s *Service) Delete(ctx context.Context, userID, orgID uuid.UUID) error {
@@ -84,12 +94,29 @@ func (s *Service) Delete(ctx context.Context, userID, orgID uuid.UUID) error {
 	return s.repo.Delete(ctx, orgID)
 }
 
-func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]sqlc.Organization, error) {
+func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Response, error) {
 	if userID == uuid.Nil {
 		return nil, apperror.NewUnauthorized("authentication required")
 	}
 
-	return s.repo.ListByUserID(ctx, userID)
+	orgs, err := s.repo.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := make([]Response, 0, len(orgs))
+	for _, org := range orgs {
+		responses = append(responses, Response{
+			ID:        org.ID,
+			Name:      org.Name,
+			Status:    org.Status,
+			Role:      org.MemberRole,
+			CreatedAt: pgconv.TimestamptzToTime(org.CreatedAt),
+			UpdatedAt: pgconv.TimestamptzToTime(org.UpdatedAt),
+		})
+	}
+
+	return responses, nil
 }
 
 func (s *Service) requireMember(ctx context.Context, userID, orgID uuid.UUID) error {
@@ -107,14 +134,13 @@ func (s *Service) requireMember(ctx context.Context, userID, orgID uuid.UUID) er
 	return nil
 }
 
-func toResponse(org sqlc.Organization) Response {
-	return Response{ID: org.ID, Name: org.Name, Status: org.Status, CreatedAt: pgconv.TimestamptzToTime(org.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(org.UpdatedAt)}
-}
-
-func toResponses(orgs []sqlc.Organization) []Response {
-	responses := make([]Response, 0, len(orgs))
-	for _, org := range orgs {
-		responses = append(responses, toResponse(org))
+func toResponse(org sqlc.Organization, role string) Response {
+	return Response{
+		ID:        org.ID,
+		Name:      org.Name,
+		Status:    org.Status,
+		Role:      role,
+		CreatedAt: pgconv.TimestamptzToTime(org.CreatedAt),
+		UpdatedAt: pgconv.TimestamptzToTime(org.UpdatedAt),
 	}
-	return responses
 }
