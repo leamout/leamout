@@ -2,11 +2,13 @@ package credentials
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/netip"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -19,33 +21,24 @@ type Service struct {
 	repository *Repository
 }
 
-func NewService(repository *Repository) *Service {
-	return &Service{repository: repository}
-}
+func NewService(repository *Repository) *Service { return &Service{repository: repository} }
 
-// Create creates an organization credential and returns the plaintext token.
-// The token is intentionally returned only from this operation and must not be
-// persisted or logged by callers.
 func (s *Service) Create(ctx context.Context, input CreateInput) (CreatedCredential, error) {
 	if err := ValidateCreate(input); err != nil {
 		return CreatedCredential{}, fmt.Errorf("%w: %v", ErrInvalidInput, err)
 	}
-
 	token, prefix, hash, err := GenerateToken()
 	if err != nil {
 		return CreatedCredential{}, err
 	}
-
 	row, err := s.repository.Create(ctx, input, hash, prefix)
 	if err != nil {
 		return CreatedCredential{}, err
 	}
-
 	credential, err := organizationTokenToCredential(row)
 	if err != nil {
 		return CreatedCredential{}, err
 	}
-
 	return CreatedCredential{Credential: credential, Token: token}, nil
 }
 
@@ -53,7 +46,6 @@ func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (Creden
 	if organizationID == uuid.Nil || id == uuid.Nil {
 		return Credential{}, fmt.Errorf("%w: organization and credential ids are required", ErrInvalidInput)
 	}
-
 	row, err := s.repository.GetByID(ctx, organizationID, id)
 	if err != nil {
 		return Credential{}, err
@@ -61,25 +53,41 @@ func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (Creden
 	return organizationTokenToCredential(row)
 }
 
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Credential, error) {
+	if organizationID == uuid.Nil {
+		return nil, fmt.Errorf("%w: organization id is required", ErrInvalidInput)
+	}
+	rows, err := s.repository.List(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	credentials := make([]Credential, 0, len(rows))
+	for _, row := range rows {
+		credential, err := listRowToCredential(row)
+		if err != nil {
+			return nil, err
+		}
+		credentials = append(credentials, credential)
+	}
+	return credentials, nil
+}
+
 func (s *Service) Authenticate(ctx context.Context, token string) (Credential, error) {
 	if token == "" {
 		return Credential{}, ErrInvalidToken
 	}
-
-	prefix, err := ParseTokenPrefix(token)
-	if err != nil {
+	if _, err := ParseTokenPrefix(token); err != nil {
 		return Credential{}, ErrInvalidToken
 	}
-
-	// Prefix parsing provides a cheap format check. The database lookup is by
-	// hash because the prefix is not secret and is not a credential verifier.
-	_ = prefix
 	row, err := s.repository.GetByTokenHash(ctx, HashToken(token))
 	if err != nil {
 		return Credential{}, ErrInvalidToken
 	}
-
-	return organizationTokenToCredential(row)
+	credential, err := organizationTokenToCredential(row)
+	if err != nil {
+		return Credential{}, ErrInvalidToken
+	}
+	return credential, nil
 }
 
 func (s *Service) Update(ctx context.Context, input UpdateInput, actorID uuid.UUID) (Credential, error) {
@@ -89,7 +97,6 @@ func (s *Service) Update(ctx context.Context, input UpdateInput, actorID uuid.UU
 	if actorID == uuid.Nil {
 		return Credential{}, fmt.Errorf("%w: actor id is required", ErrInvalidInput)
 	}
-
 	row, err := s.repository.Update(ctx, input, actorID)
 	if err != nil {
 		return Credential{}, err
@@ -113,22 +120,41 @@ func (s *Service) Touch(ctx context.Context, id uuid.UUID, ip netip.Addr) error 
 
 func organizationTokenToCredential(row sqlc.OrganizationToken) (Credential, error) {
 	var scopes []string
-	if len(row.Scopes) > 0 {
-		if err := unmarshalScopes(row.Scopes, &scopes); err != nil {
-			return Credential{}, err
-		}
+	if err := json.Unmarshal(row.Scopes, &scopes); err != nil {
+		return Credential{}, fmt.Errorf("decode credential scopes: %w", err)
 	}
-
+	if err := ValidateScopes(scopes); err != nil {
+		return Credential{}, fmt.Errorf("invalid credential scopes: %w", err)
+	}
 	return Credential{
-		ID:             row.ID,
-		OrganizationID: row.OrganizationID,
-		CreatedBy:      row.CreatedBy,
-		Name:           row.Name,
-		Description:    row.Description,
-		TokenPrefix:    row.TokenPrefix,
-		Scopes:         scopes,
-		LastUsedAt:     nil,
-		ExpiresAt:      nil,
-		DisabledAt:     nil,
+		ID: row.ID, OrganizationID: row.OrganizationID, CreatedBy: row.CreatedBy,
+		Name: row.Name, Description: row.Description, TokenPrefix: row.TokenPrefix,
+		Scopes: scopes, LastUsedAt: pgconv.TimestamptzToTimePtr(row.LastUsedAt),
+		ExpiresAt: pgconv.TimestamptzToTimePtr(row.ExpiresAt), DisabledAt: pgconv.TimestamptzToTimePtr(row.DisabledAt),
+		CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt),
+		LastUsedIP: pgconv.String(row.LastUsedIp),
+	}, nil
+}
+
+func listRowToCredential(row sqlc.ListOrganizationTokensByOrganizationIDRow) (Credential, error) {
+	var scopes []string
+	if err := json.Unmarshal(row.Scopes, &scopes); err != nil {
+		return Credential{}, fmt.Errorf("decode credential scopes: %w", err)
+	}
+	if err := ValidateScopes(scopes); err != nil {
+		return Credential{}, fmt.Errorf("invalid credential scopes: %w", err)
+	}
+	var createdBy *uuid.UUID
+	if row.CreatedBy != nil {
+		id, err := uuid.Parse(*row.CreatedBy)
+		if err != nil {
+			return Credential{}, fmt.Errorf("parse credential creator: %w", err)
+		}
+		createdBy = &id
+	}
+	return Credential{
+		ID: row.ID, Name: row.Name, Description: row.Description, TokenPrefix: row.TokenPrefix,
+		Scopes: scopes, CreatedBy: createdBy, LastUsedAt: pgconv.TimestamptzToTimePtr(row.LastUsedAt),
+		ExpiresAt: pgconv.TimestamptzToTimePtr(row.ExpiresAt), CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt),
 	}, nil
 }
