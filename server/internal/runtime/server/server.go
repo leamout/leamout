@@ -16,6 +16,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
@@ -98,12 +99,16 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 	credentialsRepository := credentials.NewRepository(queries)
 	credentialsService := credentials.NewService(credentialsRepository)
 
+	voiceRepository := voice.NewRepository(queries)
+	voiceService := voice.NewService(voiceRepository)
+
 	resolver := authn.NewResolver(
 		sessionService,
 		credentialsService,
 	)
 
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)
+	organizationMiddleware := middleware.NewOrganizationMiddleware()
 
 	return Modules{
 		Auth: AuthModule{
@@ -136,7 +141,13 @@ func NewModules(db *pgxpool.Pool) (Modules, error) {
 			Service:    credentialsService,
 			Handler:    credentials.NewHandler(credentialsService),
 		},
-		Authn: authMiddleware,
+		Voice: VoiceModule{
+			Repository: voiceRepository,
+			Service:    voiceService,
+			Handler:    voice.NewHandler(voiceService),
+		},
+		Authn:                authMiddleware,
+		OrganizationsContext: organizationMiddleware,
 	}, nil
 }
 
