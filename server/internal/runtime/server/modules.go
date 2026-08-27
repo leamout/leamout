@@ -5,6 +5,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/runtime/middleware"
+	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
 )
@@ -15,6 +16,7 @@ type Modules struct {
 	Users         UsersModule
 	Organizations OrganizationModule
 	Members       MembersModule
+	Credentials   CredentialsModule
 	Authn         *middleware.AuthnMiddleware
 }
 
@@ -46,4 +48,10 @@ type MembersModule struct {
 	Repository *members.Repository
 	Service    *members.Service
 	Handler    *members.Handler
+}
+
+type CredentialsModule struct {
+	Repository *credentials.Repository
+	Service    *credentials.Service
+	Handler    *credentials.Handler
 }
