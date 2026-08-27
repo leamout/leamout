@@ -5,7 +5,8 @@ import "github.com/google/uuid"
 type SubjectType string
 
 const (
-	SubjectUser SubjectType = "user"
+	SubjectUser              SubjectType = "user"
+	SubjectOrganizationToken SubjectType = "organization_token"
 )
 
 type Subject struct {
