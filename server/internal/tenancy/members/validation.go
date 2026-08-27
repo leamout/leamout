@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	roleOwner  = "owner"
 	roleAdmin  = "admin"
 	roleMember = "member"
 )
@@ -34,8 +35,8 @@ func normalizeRole(role string) (string, error) {
 		normalized = roleMember
 	}
 
-	if normalized != roleAdmin && normalized != roleMember {
-		return "", apperror.NewBadRequest("role must be admin or member")
+	if normalized != roleOwner && normalized != roleAdmin && normalized != roleMember {
+		return "", apperror.NewBadRequest("role must be owner, admin, or member")
 	}
 
 	return normalized, nil

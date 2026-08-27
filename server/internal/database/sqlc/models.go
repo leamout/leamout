@@ -98,7 +98,6 @@ type ConferenceParticipant struct {
 
 type Organization struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
-	Slug      string             `db:"slug" json:"slug"`
 	Name      string             `db:"name" json:"name"`
 	Status    string             `db:"status" json:"status"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`

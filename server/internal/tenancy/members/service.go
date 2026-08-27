@@ -130,8 +130,8 @@ func (s *Service) requireAdmin(ctx context.Context, requesterID, organizationID 
 	if err != nil {
 		return apperror.NewNotFound("organization not found")
 	}
-	if member.Role != roleAdmin {
-		return apperror.NewForbidden("organization admin role required")
+	if member.Role != roleOwner && member.Role != roleAdmin {
+		return apperror.NewForbidden("organization owner or admin role required")
 	}
 
 	return nil

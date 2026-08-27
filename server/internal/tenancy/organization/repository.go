@@ -15,8 +15,8 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 	return &Repository{queries: queries}
 }
 
-func (r *Repository) Create(ctx context.Context, arg sqlc.CreateOrganizationParams) (sqlc.Organization, error) {
-	return r.queries.CreateOrganization(ctx, arg)
+func (r *Repository) Create(ctx context.Context, name string) (sqlc.Organization, error) {
+	return r.queries.CreateOrganization(ctx, name)
 }
 
 func (r *Repository) AddMember(ctx context.Context, arg sqlc.AddOrganizationMemberParams) (sqlc.OrganizationMember, error) {

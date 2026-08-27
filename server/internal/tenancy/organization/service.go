@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-const adminRole = "admin"
+const ownerRole = "owner"
 
 type Service struct {
 	repo *Repository
@@ -25,25 +24,17 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, req CreateReques
 		return sqlc.Organization{}, apperror.NewUnauthorized("authentication required")
 	}
 
-	slug, err := normalizeSlug(req.Slug)
-	if err != nil {
-		return sqlc.Organization{}, err
-	}
-
 	name, err := normalizeRequiredString(req.Name, "name")
 	if err != nil {
 		return sqlc.Organization{}, err
 	}
 
-	org, err := s.repo.Create(ctx, sqlc.CreateOrganizationParams{Slug: slug, Name: name})
+	org, err := s.repo.Create(ctx, name)
 	if err != nil {
-		if isUniqueViolation(err) {
-			return sqlc.Organization{}, apperror.NewConflict("organization slug already exists")
-		}
 		return sqlc.Organization{}, err
 	}
 
-	_, err = s.repo.AddMember(ctx, sqlc.AddOrganizationMemberParams{OrganizationID: org.ID, UserID: userID, Role: adminRole})
+	_, err = s.repo.AddMember(ctx, sqlc.AddOrganizationMemberParams{OrganizationID: org.ID, UserID: userID, Role: ownerRole})
 	if err != nil {
 		return sqlc.Organization{}, apperror.NewInternal("create organization membership", err)
 	}
@@ -77,19 +68,8 @@ func (s *Service) Update(ctx context.Context, userID, orgID uuid.UUID, req Updat
 		req.Name = &name
 	}
 
-	if req.Slug != nil {
-		slug, err := normalizeSlug(*req.Slug)
-		if err != nil {
-			return sqlc.Organization{}, err
-		}
-		req.Slug = &slug
-	}
-
-	org, err := s.repo.Update(ctx, sqlc.UpdateOrganizationParams{ID: orgID, Name: req.Name, Slug: req.Slug})
+	org, err := s.repo.Update(ctx, sqlc.UpdateOrganizationParams{ID: orgID, Name: req.Name})
 	if err != nil {
-		if isUniqueViolation(err) {
-			return sqlc.Organization{}, apperror.NewConflict("organization slug already exists")
-		}
 		return sqlc.Organization{}, apperror.NewNotFound("organization not found")
 	}
 
@@ -128,7 +108,7 @@ func (s *Service) requireMember(ctx context.Context, userID, orgID uuid.UUID) er
 }
 
 func toResponse(org sqlc.Organization) Response {
-	return Response{ID: org.ID, Slug: org.Slug, Name: org.Name, Status: org.Status, CreatedAt: pgconv.TimestamptzToTime(org.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(org.UpdatedAt)}
+	return Response{ID: org.ID, Name: org.Name, Status: org.Status, CreatedAt: pgconv.TimestamptzToTime(org.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(org.UpdatedAt)}
 }
 
 func toResponses(orgs []sqlc.Organization) []Response {
@@ -137,9 +117,4 @@ func toResponses(orgs []sqlc.Organization) []Response {
 		responses = append(responses, toResponse(org))
 	}
 	return responses
-}
-
-func isUniqueViolation(err error) bool {
-	pgErr, ok := err.(*pgconn.PgError)
-	return ok && pgErr.Code == "23505"
 }

@@ -69,7 +69,7 @@ AND t.status = 'active'
 AND t.deleted_at IS NULL
 AND u.disabled_at IS NULL
 AND tm.status = 'active'
-AND tm.role = 'admin'  -- Only admins can invite
+AND tm.role IN ('owner', 'admin')  -- Only owners and admins can invite
 RETURNING id, organization_id, invited_by, email, role, token_hash, status, expires_at, accepted_at, declined_at, revoked_at, created_at, updated_at
 `
 
@@ -226,7 +226,7 @@ func (q *Queries) GetPendingInvitationByEmailAndOrganization(ctx context.Context
 }
 
 const listInvitationsForEmail = `-- name: ListInvitationsForEmail :many
-SELECT i.id, i.organization_id, i.invited_by, i.email, i.role, i.token_hash, i.status, i.expires_at, i.accepted_at, i.declined_at, i.revoked_at, i.created_at, i.updated_at, t.slug AS organization_slug, t.name AS organization_name
+SELECT i.id, i.organization_id, i.invited_by, i.email, i.role, i.token_hash, i.status, i.expires_at, i.accepted_at, i.declined_at, i.revoked_at, i.created_at, i.updated_at, t.name AS organization_name
 FROM organization_invitations AS i
 JOIN organizations AS t ON t.id = i.organization_id
 WHERE i.email = $1
@@ -251,7 +251,6 @@ type ListInvitationsForEmailRow struct {
 	RevokedAt        pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	OrganizationSlug string             `db:"organization_slug" json:"organization_slug"`
 	OrganizationName string             `db:"organization_name" json:"organization_name"`
 }
 
@@ -278,7 +277,6 @@ func (q *Queries) ListInvitationsForEmail(ctx context.Context, email string) ([]
 			&i.RevokedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.OrganizationSlug,
 			&i.OrganizationName,
 		); err != nil {
 			return nil, err

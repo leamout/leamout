@@ -41,7 +41,7 @@ AND t.status = 'active'
 AND t.deleted_at IS NULL
 AND u.disabled_at IS NULL
 AND tm.status = 'active'
-AND tm.role = 'admin'
+AND tm.role IN ('owner', 'admin')
 RETURNING id, organization_id, created_by, name, description, token_hash, token_prefix, scopes, last_used_at, last_used_ip, expires_at, disabled_at, created_at, updated_at
 `
 

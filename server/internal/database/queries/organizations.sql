@@ -1,9 +1,7 @@
 -- name: CreateOrganization :one
 INSERT INTO organizations (
-    slug,
     name
 ) VALUES (
-    sqlc.arg(slug),
     sqlc.arg(name)
 )
 RETURNING *;
@@ -16,19 +14,10 @@ AND status = 'active'
 AND deleted_at IS NULL
 LIMIT 1;
 
--- name: GetOrganizationBySlug :one
-SELECT *
-FROM organizations
-WHERE slug = sqlc.arg(slug)
-AND status = 'active'
-AND deleted_at IS NULL
-LIMIT 1;
-
 -- name: UpdateOrganization :one
 UPDATE organizations
 SET
     name = COALESCE(sqlc.narg(name), name),
-    slug = COALESCE(sqlc.narg(slug), slug),
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
 AND status = 'active'
