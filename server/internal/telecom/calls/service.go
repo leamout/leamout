@@ -37,10 +37,7 @@ func NewService(repo *Repository, controller Controller) *Service {
 		panic("calls: controller is required")
 	}
 
-	return &Service{
-		repo:       repo,
-		controller: controller,
-	}
+	return &Service{repo: repo, controller: controller}
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
@@ -64,8 +61,6 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		return call, nil
 	}
 
-	// Origination succeeded but persistence failed. Best-effort cleanup prevents
-	// a live media-server call from being left without a database record.
 	if hangupErr := s.controller.Hangup(ctx, sipCallID); hangupErr != nil {
 		return sqlc.Call{}, apperror.NewInternal(
 			"create call and clean up media call",
@@ -102,12 +97,10 @@ func (s *Service) Answer(ctx context.Context, organizationID, id uuid.UUID) (sql
 		return sqlc.Call{}, err
 	}
 
-	switch call.State {
-	case "answered", "active":
+	if isAnswerIdempotent(call.State) {
 		return call, nil
-	case "initiating", "ringing":
-		// These are the only states accepted by MarkAnswered as well.
-	default:
+	}
+	if !canAnswer(call.State) {
 		return sqlc.Call{}, apperror.NewConflict("call cannot be answered from state: " + call.State)
 	}
 
@@ -119,9 +112,6 @@ func (s *Service) Answer(ctx context.Context, organizationID, id uuid.UUID) (sql
 	if err == nil {
 		return updated, nil
 	}
-
-	// The media operation cannot be rolled back. If another actor won the
-	// state transition, return the now-authoritative database state.
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s.Get(ctx, organizationID, call.ID)
 	}
@@ -134,8 +124,7 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 		return sqlc.Call{}, err
 	}
 
-	switch call.State {
-	case "completed", "failed", "cancelled":
+	if isTerminal(call.State) {
 		return call, nil
 	}
 
@@ -147,13 +136,22 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 	if err == nil {
 		return updated, nil
 	}
-
-	// Hangup is irreversible at the media layer. If the DB transition lost a
-	// race with another terminal transition, return the authoritative state.
 	if errors.Is(err, pgx.ErrNoRows) {
 		return s.Get(ctx, organizationID, call.ID)
 	}
 	return sqlc.Call{}, writeError(err, "hang up call")
+}
+
+func canAnswer(state string) bool {
+	return state == "initiating" || state == "ringing"
+}
+
+func isAnswerIdempotent(state string) bool {
+	return state == "answered" || state == "active"
+}
+
+func isTerminal(state string) bool {
+	return state == "completed" || state == "failed" || state == "cancelled"
 }
 
 func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferRequest) error {
