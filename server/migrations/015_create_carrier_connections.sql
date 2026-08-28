@@ -61,6 +61,19 @@ CREATE TABLE IF NOT EXISTS carrier_connections (
     ),
     CONSTRAINT chk_carrier_connections_inbound CHECK (
         inbound_auth_method IN ('ip', 'digest', 'none')
+    ),
+    CONSTRAINT chk_carrier_connections_inbound_auth_fields CHECK (
+        (
+            inbound_auth_method IN ('ip', 'none')
+            AND inbound_username IS NULL
+            AND inbound_secret_ciphertext IS NULL
+        ) OR (
+            inbound_auth_method = 'digest'
+            AND inbound_username IS NOT NULL
+            AND length(btrim(inbound_username)) > 0
+            AND inbound_secret_ciphertext IS NOT NULL
+            AND length(inbound_secret_ciphertext) > 0
+        )
     )
 );
 
