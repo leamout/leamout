@@ -1,10 +1,11 @@
 package subscribers
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	"time"
 )
 
 type CreateRequest struct {
@@ -13,12 +14,15 @@ type CreateRequest struct {
 	Password    string    `json:"password"`
 	DisplayName *string   `json:"display_name,omitempty"`
 }
+
 type UpdateRequest struct {
 	DisplayName *string `json:"display_name,omitempty"`
 }
+
 type RotateCredentialsRequest struct {
 	Password string `json:"password"`
 }
+
 type Response struct {
 	ID             uuid.UUID `json:"id"`
 	OrganizationID uuid.UUID `json:"organization_id"`
@@ -31,6 +35,16 @@ type Response struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
-func response(v sqlc.Subscriber) Response {
-	return Response{v.ID, v.OrganizationID, v.SipDomainID, v.Username, v.Domain, v.DisplayName, v.Status, pgconv.TimestamptzToTime(v.CreatedAt), pgconv.TimestamptzToTime(v.UpdatedAt)}
+func response(subscriber sqlc.Subscriber) Response {
+	return Response{
+		ID:             subscriber.ID,
+		OrganizationID: subscriber.OrganizationID,
+		SIPDomainID:    subscriber.SipDomainID,
+		Username:       subscriber.Username,
+		Domain:         subscriber.Domain,
+		DisplayName:    subscriber.DisplayName,
+		Status:         subscriber.Status,
+		CreatedAt:      pgconv.TimestamptzToTime(subscriber.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(subscriber.UpdatedAt),
+	}
 }
