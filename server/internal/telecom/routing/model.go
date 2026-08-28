@@ -7,9 +7,9 @@ import (
 )
 
 var (
-	ErrNoRoute          = errors.New("no route available")
-	ErrCarrierMismatch  = errors.New("carrier connection does not own phone number")
-	ErrTenantMismatch   = errors.New("route organization mismatch")
+	ErrNoRoute         = errors.New("no route available")
+	ErrCarrierMismatch = errors.New("carrier connection does not own phone number")
+	ErrTenantMismatch  = errors.New("route organization mismatch")
 )
 
 type OutboundRequest struct {
