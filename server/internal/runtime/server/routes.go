@@ -15,6 +15,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
+	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -85,6 +86,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		sip_domains.RegisterRoutes(
 			r,
 			modules.SIPDomains.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
+		trunks.RegisterRoutes(
+			r,
+			modules.Trunks.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
 		webhooks.RegisterRoutes(

@@ -12,6 +12,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
+	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -33,6 +34,7 @@ type Modules struct {
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
 	Subscribers          SubscribersModule
+	Trunks               TrunksModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
@@ -119,4 +121,10 @@ type SubscribersModule struct {
 	Repository *subscribers.Repository
 	Service    *subscribers.Service
 	Handler    *subscribers.Handler
+}
+
+type TrunksModule struct {
+	Repository *trunks.Repository
+	Service    *trunks.Service
+	Handler    *trunks.Handler
 }

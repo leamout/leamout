@@ -24,6 +24,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
+	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -145,6 +146,9 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
 
+	trunksRepository := trunks.NewRepository(queries)
+	trunksService := trunks.NewService(trunksRepository)
+
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
 
@@ -216,6 +220,11 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 			Repository: sipDomainsRepository,
 			Service:    sipDomainsService,
 			Handler:    sip_domains.NewHandler(sipDomainsService),
+		},
+		Trunks: TrunksModule{
+			Repository: trunksRepository,
+			Service:    trunksService,
+			Handler:    trunks.NewHandler(trunksService),
 		},
 		Webhooks: WebhooksModule{
 			Repository: webhooksRepository,
