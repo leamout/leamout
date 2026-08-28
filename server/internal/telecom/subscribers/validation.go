@@ -1,10 +1,11 @@
 package subscribers
 
 import (
-	"github.com/google/uuid"
-	"github.com/leamout/leamout/pkg/apperror"
 	"strings"
 	"unicode"
+
+	"github.com/google/uuid"
+	"github.com/leamout/leamout/pkg/apperror"
 )
 
 func validOrg(id uuid.UUID) error {
@@ -25,7 +26,7 @@ func normalizeUsername(v string) (string, error) {
 		return "", apperror.NewBadRequest("username must be between 1 and 64 characters")
 	}
 	for _, r := range v {
-		if !(unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune("._-", r)) {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && !strings.ContainsRune("._-", r) {
 			return "", apperror.NewBadRequest("username contains invalid characters")
 		}
 	}

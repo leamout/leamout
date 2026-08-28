@@ -30,7 +30,7 @@ func normalizeDomain(value string) (string, error) {
 			return "", apperror.NewBadRequest("domain must be a valid fully qualified domain name")
 		}
 		for _, char := range label {
-			if !(char >= 'a' && char <= 'z' || char >= '0' && char <= '9' || char == '-') {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 				return "", apperror.NewBadRequest("domain must be a valid fully qualified domain name")
 			}
 		}

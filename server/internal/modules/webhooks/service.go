@@ -3,12 +3,13 @@ package webhooks
 import (
 	"context"
 	"errors"
+	"net/url"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/pkg/apperror"
-	"net/url"
-	"strings"
 )
 
 type Service struct{ repo *Repository }
