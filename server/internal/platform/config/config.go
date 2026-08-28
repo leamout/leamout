@@ -11,13 +11,13 @@ import (
 )
 
 type Config struct {
-	AppEnv                 string   `env:"APP_ENV" envDefault:"development"`
-	DatabaseURL            string   `env:"DATABASE_URL,required"`
-	RedisURL               string   `env:"REDIS_URL,required"`
-	NATSURL                string   `env:"NATS_URL,required"`
-	FreeSWITCHESLAddress   string   `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
-	FreeSWITCHESLPassword  string   `env:"FREESWITCH_ESL_PASSWORD,required"`
-	CORSOrigins            []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+	AppEnv                string   `env:"APP_ENV" envDefault:"development"`
+	DatabaseURL           string   `env:"DATABASE_URL,required"`
+	RedisURL              string   `env:"REDIS_URL,required"`
+	NATSURL               string   `env:"NATS_URL,required"`
+	FreeSWITCHESLAddress  string   `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
+	FreeSWITCHESLPassword string   `env:"FREESWITCH_ESL_PASSWORD,required"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
 }
 
 func Load() (Config, error) {
