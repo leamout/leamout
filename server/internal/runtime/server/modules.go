@@ -4,10 +4,14 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
+	"github.com/leamout/leamout/internal/telecom/sip_domains"
+	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -25,6 +29,10 @@ type Modules struct {
 	Calls                CallsModule
 	Recordings           RecordingsModule
 	Conferences          ConferencesModule
+	Webhooks             WebhooksModule
+	SIPDomains           SIPDomainsModule
+	Numbers              NumbersModule
+	Subscribers          SubscribersModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
@@ -87,4 +95,28 @@ type ConferencesModule struct {
 	Repository *conferences.Repository
 	Service    *conferences.Service
 	Handler    *conferences.Handler
+}
+
+type WebhooksModule struct {
+	Repository *webhooks.Repository
+	Service    *webhooks.Service
+	Handler    *webhooks.Handler
+}
+
+type SIPDomainsModule struct {
+	Repository *sip_domains.Repository
+	Service    *sip_domains.Service
+	Handler    *sip_domains.Handler
+}
+
+type NumbersModule struct {
+	Repository *numbers.Repository
+	Service    *numbers.Service
+	Handler    *numbers.Handler
+}
+
+type SubscribersModule struct {
+	Repository *subscribers.Repository
+	Service    *subscribers.Service
+	Handler    *subscribers.Handler
 }

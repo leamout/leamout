@@ -251,3 +251,15 @@ WHERE webhook_deliveries.id = sqlc.arg(id)
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_deliveries.status IN ('succeeded', 'failed', 'canceled')
 RETURNING webhook_deliveries.*;
+
+-- name: ListWebhookDeliveriesForEndpoint :many
+SELECT webhook_deliveries.*
+FROM webhook_deliveries
+JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id
+JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_deliveries.endpoint_id = sqlc.arg(endpoint_id)
+  AND webhook_events.organization_id = sqlc.arg(organization_id)
+  AND organizations.status = 'active'
+ORDER BY webhook_deliveries.created_at DESC
+LIMIT sqlc.arg(limit_count)
+OFFSET sqlc.arg(offset_count);

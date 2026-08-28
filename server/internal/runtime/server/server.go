@@ -12,6 +12,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
+	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
@@ -19,7 +20,10 @@ import (
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
+	"github.com/leamout/leamout/internal/telecom/sip_domains"
+	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -132,6 +136,18 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	conferencesRepository := conferences.NewRepository(queries)
 	conferencesService := conferences.NewService(conferencesRepository)
 
+	subscribersRepository := subscribers.NewRepository(queries)
+	subscribersService := subscribers.NewService(subscribersRepository)
+
+	numbersRepository := numbers.NewRepository(queries)
+	numbersService := numbers.NewService(numbersRepository)
+
+	sipDomainsRepository := sip_domains.NewRepository(queries)
+	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
+
+	webhooksRepository := webhooks.NewRepository(queries)
+	webhooksService := webhooks.NewService(webhooksRepository)
+
 	resolver := authn.NewResolver(
 		sessionService,
 		credentialsService,
@@ -185,6 +201,26 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 			Repository: recordingsRepository,
 			Service:    recordingsService,
 			Handler:    recordings.NewHandler(recordingsService),
+		},
+		Subscribers: SubscribersModule{
+			Repository: subscribersRepository,
+			Service:    subscribersService,
+			Handler:    subscribers.NewHandler(subscribersService),
+		},
+		Numbers: NumbersModule{
+			Repository: numbersRepository,
+			Service:    numbersService,
+			Handler:    numbers.NewHandler(numbersService),
+		},
+		SIPDomains: SIPDomainsModule{
+			Repository: sipDomainsRepository,
+			Service:    sipDomainsService,
+			Handler:    sip_domains.NewHandler(sipDomainsService),
+		},
+		Webhooks: WebhooksModule{
+			Repository: webhooksRepository,
+			Service:    webhooksService,
+			Handler:    webhooks.NewHandler(webhooksService),
 		},
 		Conferences: ConferencesModule{
 			Repository: conferencesRepository,

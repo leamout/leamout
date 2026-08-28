@@ -39,8 +39,8 @@ SET
     signing_secret = COALESCE(sqlc.narg(signing_secret), signing_secret),
     subscribed_events = COALESCE(sqlc.narg(subscribed_events)::text[], subscribed_events),
     enabled = COALESCE(sqlc.narg(enabled), enabled),
-    disabled_at = CASE WHEN sqlc.narg(enabled)::boolean = false THEN NOW() ELSE disabled_at END,
-    disabled_reason = CASE WHEN sqlc.narg(enabled)::boolean = false THEN 'manual' ELSE disabled_reason END,
+    disabled_at = CASE WHEN sqlc.narg(enabled)::boolean = false THEN NOW() WHEN sqlc.narg(enabled)::boolean = true THEN NULL ELSE disabled_at END,
+    disabled_reason = CASE WHEN sqlc.narg(enabled)::boolean = false THEN 'manual' WHEN sqlc.narg(enabled)::boolean = true THEN NULL ELSE disabled_reason END,
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
@@ -87,3 +87,10 @@ SET
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id);
+
+-- name: RotateWebhookEndpointSecret :one
+UPDATE webhook_endpoints
+SET signing_secret = sqlc.arg(signing_secret), updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+RETURNING *;
