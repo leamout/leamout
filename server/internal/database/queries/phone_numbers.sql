@@ -3,6 +3,8 @@ INSERT INTO phone_numbers (
     organization_id,
     number,
     country_code,
+    carrier_connection_id,
+    provider_resource_id,
     voice_enabled,
     sms_enabled
 )
@@ -10,12 +12,24 @@ SELECT
     sqlc.arg(organization_id) as organization_id,
     sqlc.arg(number) as number,
     sqlc.arg(country_code) as country_code,
+    sqlc.narg(carrier_connection_id) as carrier_connection_id,
+    sqlc.narg(provider_resource_id) as provider_resource_id,
     COALESCE(sqlc.narg(voice_enabled), true) as voice_enabled,
     COALESCE(sqlc.narg(sms_enabled), false) as sms_enabled
 FROM organizations AS t
 WHERE t.id = sqlc.arg(organization_id)
   AND t.status = 'active'
   AND t.deleted_at IS NULL
+  AND (
+      sqlc.narg(carrier_connection_id)::UUID IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM carrier_connections AS cc
+          WHERE cc.id = sqlc.narg(carrier_connection_id)::UUID
+            AND cc.organization_id = sqlc.arg(organization_id)
+            AND cc.status = 'active'
+      )
+  )
 RETURNING *;
 
 -- name: GetPhoneNumberByID :one
@@ -40,7 +54,6 @@ WHERE pn.number = sqlc.arg(number)
   AND t.deleted_at IS NULL
 LIMIT 1;
 
-
 -- name: ListPhoneNumbersByOrganizationID :many
 SELECT pn.*
 FROM phone_numbers AS pn
@@ -60,12 +73,24 @@ ORDER BY pn.number ASC;
 UPDATE phone_numbers
 SET
     country_code = COALESCE(sqlc.narg(country_code), country_code),
+    carrier_connection_id = COALESCE(sqlc.narg(carrier_connection_id), carrier_connection_id),
+    provider_resource_id = COALESCE(sqlc.narg(provider_resource_id), provider_resource_id),
     voice_enabled = COALESCE(sqlc.narg(voice_enabled), voice_enabled),
     sms_enabled = COALESCE(sqlc.narg(sms_enabled), sms_enabled),
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
   AND status = 'active'
+  AND (
+      sqlc.narg(carrier_connection_id)::UUID IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM carrier_connections AS cc
+          WHERE cc.id = sqlc.narg(carrier_connection_id)::UUID
+            AND cc.organization_id = sqlc.arg(organization_id)
+            AND cc.status = 'active'
+      )
+  )
 RETURNING *;
 
 -- name: DisablePhoneNumber :exec
