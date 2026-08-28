@@ -1,4 +1,4 @@
-h1:HQf6bC24jskl1PCK43mnJw12WVDO1hIahP+crOjPP5s=
+h1:SM+8iliCaWtN+YXQkSgvJKQHlm94nxm0UDJn6GQKx+Y=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -19,3 +19,7 @@ h1:HQf6bC24jskl1PCK43mnJw12WVDO1hIahP+crOjPP5s=
 018_create_recordings.sql h1:PPXJfsf2QZ82DykeayrD2KAftiHg42ToBYzx6vgV8XE=
 019_create_conferences.sql h1:wyuQ/t9Cb1EVR7470cOQN4vp4eXVrlrL20c+Z/4gO9U=
 020_create_conference_participants.sql h1:jf7mW5xUoCV1OL/+cE/edvVa+YBw4noAdiqe+loGrkM=
+021_create_carrier_providers.sql h1:emtBrZEuFJpZjQWvhBVrhhHnZiUdNn8D1ApvFU51efc=
+022_create_carrier_connections.sql h1:HgV1ratQRSD+PsJk4sGO+KNXjrFQJfZoudIvmMfm708=
+023_create_trunks.sql h1:Nud40uMkO7sEOT1Vxbr/ODZKfNUo3Gn9BweIbjuzcq0=
+024_link_phone_numbers_to_carrier_connections.sql h1:2K8eXzWIZg28+xhfgwvy4kenQpnVXmYARHrFrHXo4X0=

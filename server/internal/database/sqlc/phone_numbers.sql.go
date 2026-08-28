@@ -29,7 +29,7 @@ FROM organizations AS t
 WHERE t.id = $1
   AND t.status = 'active'
   AND t.deleted_at IS NULL
-RETURNING id, organization_id, number, country_code, provider_id, voice_enabled, sms_enabled, status, created_at, updated_at
+RETURNING id, organization_id, number, country_code, voice_enabled, sms_enabled, status, created_at, updated_at, carrier_connection_id, provider_resource_id
 `
 
 type CreatePhoneNumberParams struct {
@@ -54,12 +54,13 @@ func (q *Queries) CreatePhoneNumber(ctx context.Context, arg CreatePhoneNumberPa
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 	)
 	return i, err
 }
@@ -105,7 +106,7 @@ func (q *Queries) EnablePhoneNumber(ctx context.Context, arg EnablePhoneNumberPa
 }
 
 const getPhoneNumberByID = `-- name: GetPhoneNumberByID :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at, pn.carrier_connection_id, pn.provider_resource_id
 FROM phone_numbers AS pn
 JOIN organizations AS t ON t.id = pn.organization_id
 WHERE pn.id = $1
@@ -129,18 +130,19 @@ func (q *Queries) GetPhoneNumberByID(ctx context.Context, arg GetPhoneNumberByID
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 	)
 	return i, err
 }
 
 const getPhoneNumberByNumber = `-- name: GetPhoneNumberByNumber :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at, pn.carrier_connection_id, pn.provider_resource_id
 FROM phone_numbers AS pn
 JOIN organizations AS t ON t.id = pn.organization_id
 WHERE pn.number = $1
@@ -164,12 +166,13 @@ func (q *Queries) GetPhoneNumberByNumber(ctx context.Context, arg GetPhoneNumber
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 	)
 	return i, err
 }
@@ -225,7 +228,7 @@ func (q *Queries) GetVoiceBindingByNumber(ctx context.Context, number string) (G
 }
 
 const listPhoneNumbersByCountry = `-- name: ListPhoneNumbersByCountry :many
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at, pn.carrier_connection_id, pn.provider_resource_id
 FROM phone_numbers AS pn
 WHERE pn.organization_id = $1
   AND pn.country_code = $2
@@ -252,12 +255,13 @@ func (q *Queries) ListPhoneNumbersByCountry(ctx context.Context, arg ListPhoneNu
 			&i.OrganizationID,
 			&i.Number,
 			&i.CountryCode,
-			&i.ProviderID,
 			&i.VoiceEnabled,
 			&i.SmsEnabled,
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CarrierConnectionID,
+			&i.ProviderResourceID,
 		); err != nil {
 			return nil, err
 		}
@@ -270,7 +274,7 @@ func (q *Queries) ListPhoneNumbersByCountry(ctx context.Context, arg ListPhoneNu
 }
 
 const listPhoneNumbersByOrganizationID = `-- name: ListPhoneNumbersByOrganizationID :many
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at, pn.carrier_connection_id, pn.provider_resource_id
 FROM phone_numbers AS pn
 WHERE pn.organization_id = $1
   AND pn.status = 'active'
@@ -291,12 +295,13 @@ func (q *Queries) ListPhoneNumbersByOrganizationID(ctx context.Context, organiza
 			&i.OrganizationID,
 			&i.Number,
 			&i.CountryCode,
-			&i.ProviderID,
 			&i.VoiceEnabled,
 			&i.SmsEnabled,
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CarrierConnectionID,
+			&i.ProviderResourceID,
 		); err != nil {
 			return nil, err
 		}
@@ -338,7 +343,7 @@ SET
 WHERE id = $4
   AND organization_id = $5
   AND status = 'active'
-RETURNING id, organization_id, number, country_code, provider_id, voice_enabled, sms_enabled, status, created_at, updated_at
+RETURNING id, organization_id, number, country_code, voice_enabled, sms_enabled, status, created_at, updated_at, carrier_connection_id, provider_resource_id
 `
 
 type UpdatePhoneNumberParams struct {
@@ -363,12 +368,13 @@ func (q *Queries) UpdatePhoneNumber(ctx context.Context, arg UpdatePhoneNumberPa
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 	)
 	return i, err
 }
