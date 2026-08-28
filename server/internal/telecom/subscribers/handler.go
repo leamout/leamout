@@ -1,13 +1,13 @@
 package subscribers
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/pkg/apperror"
+	"github.com/leamout/leamout/pkg/helper"
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
@@ -26,8 +26,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req CreateRequest
-	if err := decode(r, &req); err != nil {
+	req, err := helper.DecodeJSON[CreateRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -85,8 +85,8 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req UpdateRequest
-	if err := decode(r, &req); err != nil {
+	req, err := helper.DecodeJSON[UpdateRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -122,8 +122,8 @@ func (h *Handler) Rotate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req RotateCredentialsRequest
-	if err := decode(r, &req); err != nil {
+	req, err := helper.DecodeJSON[RotateCredentialsRequest](r)
+	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
@@ -158,12 +158,4 @@ func ids(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	}
 
 	return organizationID, id, nil
-}
-
-func decode(r *http.Request, target any) error {
-	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
-		return apperror.NewBadRequest("invalid request body")
-	}
-
-	return nil
 }
