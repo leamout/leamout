@@ -3,6 +3,7 @@ package numbers
 import (
 	"context"
 	"errors"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -10,87 +11,134 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type Service struct{ repo *Repository }
+type Service struct {
+	repo *Repository
+}
 
-func NewService(r *Repository) *Service { return &Service{r} }
-func (s *Service) Create(c context.Context, org uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
-	if e := validateOrganizationID(org); e != nil {
-		return sqlc.PhoneNumber{}, e
-	}
-	var e error
-	req.Number, e = normalizeNumber(req.Number)
-	if e != nil {
-		return sqlc.PhoneNumber{}, e
-	}
-	req.CountryCode, e = normalizeCountryCode(req.CountryCode)
-	if e != nil {
-		return sqlc.PhoneNumber{}, e
-	}
-	v, e := s.repo.Create(c, org, req)
-	return v, writeError(e, "create phone number")
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo}
 }
-func (s *Service) List(c context.Context, org uuid.UUID) ([]sqlc.PhoneNumber, error) {
-	if e := validateOrganizationID(org); e != nil {
-		return nil, e
+
+func (s *Service) Create(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateRequest,
+) (sqlc.PhoneNumber, error) {
+	if err := validateOrganizationID(organizationID); err != nil {
+		return sqlc.PhoneNumber{}, err
 	}
-	v, e := s.repo.List(c, org)
-	if e != nil {
-		return nil, apperror.NewInternal("list phone numbers", e)
+
+	var err error
+	req.Number, err = normalizeNumber(req.Number)
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
 	}
-	return v, nil
+
+	req.CountryCode, err = normalizeCountryCode(req.CountryCode)
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+
+	result, err := s.repo.Create(ctx, organizationID, req)
+	return result, writeError(err, "create phone number")
 }
-func (s *Service) Get(c context.Context, org, id uuid.UUID) (sqlc.PhoneNumber, error) {
-	if e := validIDs(org, id); e != nil {
-		return sqlc.PhoneNumber{}, e
+
+func (s *Service) List(
+	ctx context.Context,
+	organizationID uuid.UUID,
+) ([]sqlc.PhoneNumber, error) {
+	if err := validateOrganizationID(organizationID); err != nil {
+		return nil, err
 	}
-	v, e := s.repo.Get(c, org, id)
-	return v, readError(e, "phone number not found")
+
+	result, err := s.repo.List(ctx, organizationID)
+	if err != nil {
+		return nil, apperror.NewInternal("list phone numbers", err)
+	}
+
+	return result, nil
 }
-func (s *Service) Update(c context.Context, org, id uuid.UUID, req UpdateRequest) (sqlc.PhoneNumber, error) {
-	if e := validIDs(org, id); e != nil {
-		return sqlc.PhoneNumber{}, e
+
+func (s *Service) Get(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.PhoneNumber, error) {
+	if err := validIDs(organizationID, id); err != nil {
+		return sqlc.PhoneNumber{}, err
 	}
+
+	result, err := s.repo.Get(ctx, organizationID, id)
+	return result, readError(err, "phone number not found")
+}
+
+func (s *Service) Update(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	req UpdateRequest,
+) (sqlc.PhoneNumber, error) {
+	if err := validIDs(organizationID, id); err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+
 	if req.CountryCode == nil && req.VoiceEnabled == nil && req.SMSEnabled == nil {
 		return sqlc.PhoneNumber{}, apperror.NewBadRequest("at least one field is required")
 	}
+
 	if req.CountryCode != nil {
-		v, e := normalizeCountryCode(*req.CountryCode)
-		if e != nil {
-			return sqlc.PhoneNumber{}, e
+		countryCode, err := normalizeCountryCode(*req.CountryCode)
+		if err != nil {
+			return sqlc.PhoneNumber{}, err
 		}
-		req.CountryCode = &v
+		req.CountryCode = &countryCode
 	}
-	v, e := s.repo.Update(c, org, id, req)
-	return v, writeError(e, "phone number not found")
+
+	result, err := s.repo.Update(ctx, organizationID, id, req)
+	return result, writeError(err, "phone number not found")
 }
-func (s *Service) Delete(c context.Context, org, id uuid.UUID) error {
-	if _, e := s.Get(c, org, id); e != nil {
-		return e
+
+func (s *Service) Delete(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) error {
+	if _, err := s.Get(ctx, organizationID, id); err != nil {
+		return err
 	}
-	return writeError(s.repo.Disable(c, org, id), "disable phone number")
+
+	return writeError(s.repo.Disable(ctx, organizationID, id), "disable phone number")
 }
-func validIDs(org, id uuid.UUID) error {
-	if e := validateOrganizationID(org); e != nil {
-		return e
+
+func validIDs(organizationID, id uuid.UUID) error {
+	if err := validateOrganizationID(organizationID); err != nil {
+		return err
 	}
+
 	return validateNumberID(id)
 }
-func readError(e error, msg string) error {
-	if e == nil {
+
+func readError(err error, message string) error {
+	if err == nil {
 		return nil
 	}
-	if errors.Is(e, pgx.ErrNoRows) {
-		return apperror.NewNotFound(msg)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperror.NewNotFound(message)
 	}
-	return apperror.NewInternal(msg, e)
+
+	return apperror.NewInternal(message, err)
 }
-func writeError(e error, msg string) error {
-	if e == nil {
+
+func writeError(err error, message string) error {
+	if err == nil {
 		return nil
 	}
-	var pg *pgconn.PgError
-	if errors.As(e, &pg) && pg.Code == "23505" {
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return apperror.NewConflict("phone number already exists")
 	}
-	return readError(e, msg)
+
+	return readError(err, message)
 }
