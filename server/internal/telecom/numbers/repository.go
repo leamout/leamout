@@ -7,21 +7,68 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
-type Repository struct{ queries *sqlc.Queries }
+type Repository struct {
+	queries *sqlc.Queries
+}
 
-func NewRepository(q *sqlc.Queries) *Repository { return &Repository{q} }
-func (r *Repository) Create(c context.Context, org uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
-	return r.queries.CreatePhoneNumber(c, sqlc.CreatePhoneNumberParams{OrganizationID: org, Number: req.Number, CountryCode: req.CountryCode, VoiceEnabled: req.VoiceEnabled, SmsEnabled: req.SMSEnabled})
+func NewRepository(queries *sqlc.Queries) *Repository {
+	return &Repository{queries: queries}
 }
-func (r *Repository) List(c context.Context, org uuid.UUID) ([]sqlc.PhoneNumber, error) {
-	return r.queries.ListPhoneNumbersByOrganizationID(c, org)
+
+func (r *Repository) Create(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateRequest,
+) (sqlc.PhoneNumber, error) {
+	return r.queries.CreatePhoneNumber(ctx, sqlc.CreatePhoneNumberParams{
+		OrganizationID: organizationID,
+		Number:         req.Number,
+		CountryCode:    req.CountryCode,
+		VoiceEnabled:   req.VoiceEnabled,
+		SmsEnabled:     req.SMSEnabled,
+	})
 }
-func (r *Repository) Get(c context.Context, org, id uuid.UUID) (sqlc.PhoneNumber, error) {
-	return r.queries.GetPhoneNumberByID(c, sqlc.GetPhoneNumberByIDParams{ID: id, OrganizationID: org})
+
+func (r *Repository) List(
+	ctx context.Context,
+	organizationID uuid.UUID,
+) ([]sqlc.PhoneNumber, error) {
+	return r.queries.ListPhoneNumbersByOrganizationID(ctx, organizationID)
 }
-func (r *Repository) Update(c context.Context, org, id uuid.UUID, req UpdateRequest) (sqlc.PhoneNumber, error) {
-	return r.queries.UpdatePhoneNumber(c, sqlc.UpdatePhoneNumberParams{ID: id, OrganizationID: org, CountryCode: req.CountryCode, VoiceEnabled: req.VoiceEnabled, SmsEnabled: req.SMSEnabled})
+
+func (r *Repository) Get(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.PhoneNumber, error) {
+	return r.queries.GetPhoneNumberByID(ctx, sqlc.GetPhoneNumberByIDParams{
+		ID:             id,
+		OrganizationID: organizationID,
+	})
 }
-func (r *Repository) Disable(c context.Context, org, id uuid.UUID) error {
-	return r.queries.DisablePhoneNumber(c, sqlc.DisablePhoneNumberParams{ID: id, OrganizationID: org})
+
+func (r *Repository) Update(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	req UpdateRequest,
+) (sqlc.PhoneNumber, error) {
+	return r.queries.UpdatePhoneNumber(ctx, sqlc.UpdatePhoneNumberParams{
+		ID:             id,
+		OrganizationID: organizationID,
+		CountryCode:    req.CountryCode,
+		VoiceEnabled:   req.VoiceEnabled,
+		SmsEnabled:     req.SMSEnabled,
+	})
+}
+
+func (r *Repository) Disable(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) error {
+	return r.queries.DisablePhoneNumber(ctx, sqlc.DisablePhoneNumberParams{
+		ID:             id,
+		OrganizationID: organizationID,
+	})
 }
