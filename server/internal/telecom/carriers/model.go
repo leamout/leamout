@@ -81,49 +81,92 @@ type ProviderResponse struct {
 
 func response(connection sqlc.CarrierConnection) Response {
 	return Response{
-		ID: connection.ID, OrganizationID: connection.OrganizationID, ProviderID: connection.ProviderID,
-		Name: connection.Name, Status: connection.Status, OutboundAuthMethod: connection.OutboundAuthMethod,
-		AuthUsername: connection.AuthUsername, HasOutboundCredentials: connection.AuthSecretCiphertext != nil,
-		InboundEnabled: connection.InboundEnabled, InboundAuthMethod: connection.InboundAuthMethod,
-		InboundUsername: connection.InboundUsername, HasInboundCredentials: connection.InboundSecretCiphertext != nil,
-		MaxCPS: connection.MaxCps, MaxConcurrentCalls: connection.MaxConcurrentCalls,
-		MaxDailyMinutes: connection.MaxDailyMinutes, Codecs: connection.Codecs, SupportsVideo: connection.SupportsVideo,
-		SupportsFax: connection.SupportsFax, CreatedAt: pgconv.TimestamptzToTime(connection.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(connection.UpdatedAt),
+		ID:                     connection.ID,
+		OrganizationID:         connection.OrganizationID,
+		ProviderID:             connection.ProviderID,
+		Name:                   connection.Name,
+		Status:                 connection.Status,
+		OutboundAuthMethod:     connection.OutboundAuthMethod,
+		AuthUsername:           connection.AuthUsername,
+		HasOutboundCredentials: connection.AuthSecretCiphertext != nil,
+		InboundEnabled:         connection.InboundEnabled,
+		InboundAuthMethod:      connection.InboundAuthMethod,
+		InboundUsername:        connection.InboundUsername,
+		HasInboundCredentials:  connection.InboundSecretCiphertext != nil,
+		MaxCPS:                 connection.MaxCps,
+		MaxConcurrentCalls:     connection.MaxConcurrentCalls,
+		MaxDailyMinutes:        connection.MaxDailyMinutes,
+		Codecs:                 connection.Codecs,
+		SupportsVideo:          connection.SupportsVideo,
+		SupportsFax:            connection.SupportsFax,
+		CreatedAt:              pgconv.TimestamptzToTime(connection.CreatedAt),
+		UpdatedAt:              pgconv.TimestamptzToTime(connection.UpdatedAt),
 	}
 }
 
 func getResponse(connection sqlc.GetCarrierConnectionByIDRow) Response {
 	return Response{
-		ID: connection.ID, OrganizationID: connection.OrganizationID, ProviderID: connection.ProviderID,
-		Name: connection.Name, Status: connection.Status, OutboundAuthMethod: connection.OutboundAuthMethod,
-		AuthUsername: connection.AuthUsername, HasOutboundCredentials: boolValue(connection.HasOutboundCredentials),
-		InboundEnabled: connection.InboundEnabled, InboundAuthMethod: connection.InboundAuthMethod,
-		InboundUsername: connection.InboundUsername, HasInboundCredentials: boolValue(connection.HasInboundCredentials),
-		MaxCPS: connection.MaxCps, MaxConcurrentCalls: connection.MaxConcurrentCalls,
-		MaxDailyMinutes: connection.MaxDailyMinutes, Codecs: connection.Codecs, SupportsVideo: connection.SupportsVideo,
-		SupportsFax: connection.SupportsFax, CreatedAt: pgconv.TimestamptzToTime(connection.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(connection.UpdatedAt),
+		ID:                     connection.ID,
+		OrganizationID:         connection.OrganizationID,
+		ProviderID:             connection.ProviderID,
+		Name:                   connection.Name,
+		Status:                 connection.Status,
+		OutboundAuthMethod:     connection.OutboundAuthMethod,
+		AuthUsername:           connection.AuthUsername,
+		HasOutboundCredentials: boolValue(connection.HasOutboundCredentials),
+		InboundEnabled:         connection.InboundEnabled,
+		InboundAuthMethod:      connection.InboundAuthMethod,
+		InboundUsername:        connection.InboundUsername,
+		HasInboundCredentials:  boolValue(connection.HasInboundCredentials),
+		MaxCPS:                 connection.MaxCps,
+		MaxConcurrentCalls:     connection.MaxConcurrentCalls,
+		MaxDailyMinutes:        connection.MaxDailyMinutes,
+		Codecs:                 connection.Codecs,
+		SupportsVideo:          connection.SupportsVideo,
+		SupportsFax:            connection.SupportsFax,
+		CreatedAt:              pgconv.TimestamptzToTime(connection.CreatedAt),
+		UpdatedAt:              pgconv.TimestamptzToTime(connection.UpdatedAt),
 	}
 }
 
 func listResponse(connection sqlc.ListCarrierConnectionsByOrganizationIDRow) Response {
 	return Response{
-		ID: connection.ID, OrganizationID: connection.OrganizationID, ProviderID: connection.ProviderID,
-		Name: connection.Name, Status: connection.Status, OutboundAuthMethod: connection.OutboundAuthMethod,
-		AuthUsername: connection.AuthUsername, HasOutboundCredentials: boolValue(connection.HasOutboundCredentials),
-		InboundEnabled: connection.InboundEnabled, InboundAuthMethod: connection.InboundAuthMethod,
-		InboundUsername: connection.InboundUsername, HasInboundCredentials: boolValue(connection.HasInboundCredentials),
-		MaxCPS: connection.MaxCps, MaxConcurrentCalls: connection.MaxConcurrentCalls,
-		MaxDailyMinutes: connection.MaxDailyMinutes, Codecs: connection.Codecs, SupportsVideo: connection.SupportsVideo,
-		SupportsFax: connection.SupportsFax, CreatedAt: pgconv.TimestamptzToTime(connection.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(connection.UpdatedAt),
+		ID:                     connection.ID,
+		OrganizationID:         connection.OrganizationID,
+		ProviderID:             connection.ProviderID,
+		Name:                   connection.Name,
+		Status:                 connection.Status,
+		OutboundAuthMethod:     connection.OutboundAuthMethod,
+		AuthUsername:           connection.AuthUsername,
+		HasOutboundCredentials: boolValue(connection.HasOutboundCredentials),
+		InboundEnabled:         connection.InboundEnabled,
+		InboundAuthMethod:      connection.InboundAuthMethod,
+		InboundUsername:        connection.InboundUsername,
+		HasInboundCredentials:  boolValue(connection.HasInboundCredentials),
+		MaxCPS:                 connection.MaxCps,
+		MaxConcurrentCalls:     connection.MaxConcurrentCalls,
+		MaxDailyMinutes:        connection.MaxDailyMinutes,
+		Codecs:                 connection.Codecs,
+		SupportsVideo:          connection.SupportsVideo,
+		SupportsFax:            connection.SupportsFax,
+		CreatedAt:              pgconv.TimestamptzToTime(connection.CreatedAt),
+		UpdatedAt:              pgconv.TimestamptzToTime(connection.UpdatedAt),
 	}
 }
 
-func boolValue(value interface{}) bool { result, _ := value.(bool); return result }
+func boolValue(value interface{}) bool {
+	result, _ := value.(bool)
+	return result
+}
 
 func sourceIPResponse(sourceIP sqlc.CarrierConnectionSourceIp) SourceIPResponse {
-	return SourceIPResponse{ID: sourceIP.ID, OrganizationID: sourceIP.OrganizationID,
-		CarrierConnectionID: sourceIP.CarrierConnectionID, CIDR: sourceIP.Cidr,
-		CreatedAt: pgconv.TimestamptzToTime(sourceIP.CreatedAt)}
+	return SourceIPResponse{
+		ID:                  sourceIP.ID,
+		OrganizationID:      sourceIP.OrganizationID,
+		CarrierConnectionID: sourceIP.CarrierConnectionID,
+		CIDR:                sourceIP.Cidr,
+		CreatedAt:           pgconv.TimestamptzToTime(sourceIP.CreatedAt),
+	}
 }
 
 func providerResponse(provider sqlc.CarrierProvider) ProviderResponse {
