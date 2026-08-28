@@ -241,6 +241,40 @@ func (q *Queries) ResetWebhookEndpointFailures(ctx context.Context, arg ResetWeb
 	return err
 }
 
+const rotateWebhookEndpointSecret = `-- name: RotateWebhookEndpointSecret :one
+UPDATE webhook_endpoints
+SET signing_secret = $1, updated_at = now()
+WHERE id = $2
+  AND organization_id = $3
+RETURNING id, organization_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
+`
+
+type RotateWebhookEndpointSecretParams struct {
+	SigningSecret  []byte    `db:"signing_secret" json:"signing_secret"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) RotateWebhookEndpointSecret(ctx context.Context, arg RotateWebhookEndpointSecretParams) (WebhookEndpoint, error) {
+	row := q.db.QueryRow(ctx, rotateWebhookEndpointSecret, arg.SigningSecret, arg.ID, arg.OrganizationID)
+	var i WebhookEndpoint
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Url,
+		&i.SigningSecret,
+		&i.Enabled,
+		&i.SubscribedEvents,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DisabledAt,
+		&i.ConsecutiveFailures,
+		&i.LastFailureAt,
+		&i.DisabledReason,
+	)
+	return i, err
+}
+
 const updateWebhookEndpoint = `-- name: UpdateWebhookEndpoint :one
 UPDATE webhook_endpoints
 SET
@@ -289,26 +323,5 @@ func (q *Queries) UpdateWebhookEndpoint(ctx context.Context, arg UpdateWebhookEn
 		&i.LastFailureAt,
 		&i.DisabledReason,
 	)
-	return i, err
-}
-
-const rotateWebhookEndpointSecret = `-- name: RotateWebhookEndpointSecret :one
-UPDATE webhook_endpoints
-SET signing_secret = $1, updated_at = now()
-WHERE id = $2
-  AND organization_id = $3
-RETURNING id, organization_id, url, signing_secret, enabled, subscribed_events, created_at, updated_at, disabled_at, consecutive_failures, last_failure_at, disabled_reason
-`
-
-type RotateWebhookEndpointSecretParams struct {
-	SigningSecret  []byte    `db:"signing_secret" json:"signing_secret"`
-	ID             uuid.UUID `db:"id" json:"id"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-}
-
-func (q *Queries) RotateWebhookEndpointSecret(ctx context.Context, arg RotateWebhookEndpointSecretParams) (WebhookEndpoint, error) {
-	row := q.db.QueryRow(ctx, rotateWebhookEndpointSecret, arg.SigningSecret, arg.ID, arg.OrganizationID)
-	var i WebhookEndpoint
-	err := row.Scan(&i.ID, &i.OrganizationID, &i.Url, &i.SigningSecret, &i.Enabled, &i.SubscribedEvents, &i.CreatedAt, &i.UpdatedAt, &i.DisabledAt, &i.ConsecutiveFailures, &i.LastFailureAt, &i.DisabledReason)
 	return i, err
 }
