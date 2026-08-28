@@ -26,5 +26,12 @@ type Response struct {
 }
 
 func response(domain sqlc.SipDomain) Response {
-	return Response{ID: domain.ID, OrganizationID: domain.OrganizationID, Domain: domain.Domain, Status: domain.Status, CreatedAt: pgconv.TimestamptzToTime(domain.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(domain.UpdatedAt)}
+	return Response{
+		ID:             domain.ID,
+		OrganizationID: domain.OrganizationID,
+		Domain:         domain.Domain,
+		Status:         domain.Status,
+		CreatedAt:      pgconv.TimestamptzToTime(domain.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(domain.UpdatedAt),
+	}
 }
