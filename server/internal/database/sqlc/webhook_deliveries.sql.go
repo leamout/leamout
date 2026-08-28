@@ -696,3 +696,34 @@ func (q *Queries) ScheduleWebhookDeliveryRetry(ctx context.Context, arg Schedule
 	)
 	return i, err
 }
+
+const listWebhookDeliveriesForEndpoint = `-- name: ListWebhookDeliveriesForEndpoint :many
+SELECT webhook_deliveries.id, webhook_deliveries.event_id, webhook_deliveries.endpoint_id, webhook_deliveries.status, webhook_deliveries.attempt_count, webhook_deliveries.replay_count, webhook_deliveries.next_attempt_at, webhook_deliveries.last_attempt_at, webhook_deliveries.last_replayed_at, webhook_deliveries.response_status, webhook_deliveries.response_body, webhook_deliveries.last_error, webhook_deliveries.delivered_at, webhook_deliveries.locked_at, webhook_deliveries.locked_by, webhook_deliveries.created_at, webhook_deliveries.updated_at
+FROM webhook_deliveries JOIN webhook_events ON webhook_events.id = webhook_deliveries.event_id JOIN organizations ON organizations.id = webhook_events.organization_id
+WHERE webhook_deliveries.endpoint_id = $1 AND webhook_events.organization_id = $2 AND organizations.status = 'active'
+ORDER BY webhook_deliveries.created_at DESC LIMIT $4 OFFSET $3
+`
+
+type ListWebhookDeliveriesForEndpointParams struct {
+	EndpointID     uuid.UUID `db:"endpoint_id" json:"endpoint_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	OffsetCount    int32     `db:"offset_count" json:"offset_count"`
+	LimitCount     int32     `db:"limit_count" json:"limit_count"`
+}
+
+func (q *Queries) ListWebhookDeliveriesForEndpoint(ctx context.Context, arg ListWebhookDeliveriesForEndpointParams) ([]WebhookDelivery, error) {
+	rows, err := q.db.Query(ctx, listWebhookDeliveriesForEndpoint, arg.EndpointID, arg.OrganizationID, arg.OffsetCount, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WebhookDelivery{}
+	for rows.Next() {
+		var i WebhookDelivery
+		if err := rows.Scan(&i.ID, &i.EventID, &i.EndpointID, &i.Status, &i.AttemptCount, &i.ReplayCount, &i.NextAttemptAt, &i.LastAttemptAt, &i.LastReplayedAt, &i.ResponseStatus, &i.ResponseBody, &i.LastError, &i.DeliveredAt, &i.LockedAt, &i.LockedBy, &i.CreatedAt, &i.UpdatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	return items, rows.Err()
+}
