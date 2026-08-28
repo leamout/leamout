@@ -82,11 +82,11 @@ func (r *Repository) Rotate(
 	hashes hasher.HA1Hashes,
 ) (sqlc.Subscriber, error) {
 	return r.queries.SetSubscriberPassword(ctx, sqlc.SetSubscriberPasswordParams{
-		ID:           id,
+		ID:             id,
 		OrganizationID: organizationID,
-		Ha1Md5:       &hashes.MD5,
-		Ha1Sha256:    &hashes.SHA256,
-		Ha1Sha512256: &hashes.SHA512_256,
+		Ha1Md5:         &hashes.MD5,
+		Ha1Sha256:      &hashes.SHA256,
+		Ha1Sha512256:   &hashes.SHA512_256,
 	})
 }
 
