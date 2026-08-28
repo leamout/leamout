@@ -7,11 +7,11 @@ INSERT INTO trunks (
     status
 )
 SELECT
-    sqlc.arg(organization_id),
-    sqlc.arg(carrier_connection_id),
-    sqlc.arg(name),
-    COALESCE(sqlc.narg(direction), 'bidirectional'),
-    COALESCE(sqlc.narg(status), 'active')
+    sqlc.arg(organization_id) AS organization_id,
+    sqlc.arg(carrier_connection_id) AS carrier_connection_id,
+    sqlc.arg(name) AS name,
+    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
+    COALESCE(sqlc.narg(status), 'active') AS status
 FROM carrier_connections AS cc
 WHERE cc.id = sqlc.arg(carrier_connection_id)
   AND cc.organization_id = sqlc.arg(organization_id)
@@ -80,15 +80,15 @@ INSERT INTO trunk_endpoints (
     enabled
 )
 SELECT
-    sqlc.arg(organization_id),
-    sqlc.arg(trunk_id),
-    sqlc.arg(host),
-    COALESCE(sqlc.narg(port), 5060),
-    COALESCE(sqlc.narg(transport), 'udp'),
-    COALESCE(sqlc.narg(direction), 'bidirectional'),
-    COALESCE(sqlc.narg(priority), 10),
-    COALESCE(sqlc.narg(weight), 100),
-    COALESCE(sqlc.narg(enabled), true)
+    sqlc.arg(organization_id) AS organization_id,
+    sqlc.arg(trunk_id) AS trunk_id,
+    sqlc.arg(host) AS host,
+    COALESCE(sqlc.narg(port), 5060) AS port,
+    COALESCE(sqlc.narg(transport), 'udp') AS transport,
+    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
+    COALESCE(sqlc.narg(priority), 10) AS priority,
+    COALESCE(sqlc.narg(weight), 100) AS weight,
+    COALESCE(sqlc.narg(enabled), true) AS enabled
 FROM trunks AS t
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
