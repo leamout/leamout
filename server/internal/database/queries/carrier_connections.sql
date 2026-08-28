@@ -19,23 +19,23 @@ INSERT INTO carrier_connections (
     supports_fax
 )
 SELECT
-    sqlc.arg(organization_id),
-    sqlc.arg(provider_id),
-    sqlc.arg(name),
-    COALESCE(sqlc.narg(status), 'active'),
-    COALESCE(sqlc.narg(outbound_auth_method), 'none'),
-    sqlc.narg(auth_username),
-    sqlc.narg(auth_secret_ciphertext),
-    COALESCE(sqlc.narg(inbound_enabled), false),
-    COALESCE(sqlc.narg(inbound_auth_method), 'ip'),
-    sqlc.narg(inbound_username),
-    sqlc.narg(inbound_secret_ciphertext),
-    COALESCE(sqlc.narg(max_cps), 10),
-    COALESCE(sqlc.narg(max_concurrent_calls), 100),
-    sqlc.narg(max_daily_minutes),
-    COALESCE(sqlc.narg(codecs), ARRAY['PCMU','PCMA']::TEXT[]),
-    COALESCE(sqlc.narg(supports_video), false),
-    COALESCE(sqlc.narg(supports_fax), false)
+    sqlc.arg(organization_id) AS organization_id,
+    sqlc.arg(provider_id) AS provider_id,
+    sqlc.arg(name) AS name,
+    COALESCE(sqlc.narg(status), 'active') AS status,
+    COALESCE(sqlc.narg(outbound_auth_method), 'none') AS outbound_auth_method,
+    sqlc.narg(auth_username) AS auth_username,
+    sqlc.narg(auth_secret_ciphertext) AS auth_secret_ciphertext,
+    COALESCE(sqlc.narg(inbound_enabled), false) AS inbound_enabled,
+    COALESCE(sqlc.narg(inbound_auth_method), 'ip') AS inbound_auth_method,
+    sqlc.narg(inbound_username) AS inbound_username,
+    sqlc.narg(inbound_secret_ciphertext) AS inbound_secret_ciphertext,
+    COALESCE(sqlc.narg(max_cps), 10) AS max_cps,
+    COALESCE(sqlc.narg(max_concurrent_calls), 100) AS max_concurrent_calls,
+    sqlc.narg(max_daily_minutes) AS max_daily_minutes,
+    COALESCE(sqlc.narg(codecs), ARRAY['PCMU','PCMA']::TEXT[]) AS codecs,
+    COALESCE(sqlc.narg(supports_video), false) AS supports_video,
+    COALESCE(sqlc.narg(supports_fax), false) AS supports_fax
 FROM organizations AS o
 JOIN carrier_providers AS cp ON cp.id = sqlc.arg(provider_id)
 WHERE o.id = sqlc.arg(organization_id)
@@ -230,9 +230,9 @@ INSERT INTO carrier_connection_source_ips (
     cidr
 )
 SELECT
-    sqlc.arg(organization_id),
-    sqlc.arg(carrier_connection_id),
-    sqlc.arg(cidr)
+    sqlc.arg(organization_id) AS organization_id,
+    sqlc.arg(carrier_connection_id) AS carrier_connection_id,
+    sqlc.arg(cidr) AS cidr
 FROM carrier_connections AS cc
 WHERE cc.id = sqlc.arg(carrier_connection_id)
   AND cc.organization_id = sqlc.arg(organization_id)
