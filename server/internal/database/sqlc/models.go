@@ -200,13 +200,13 @@ type PhoneNumber struct {
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Number              string             `db:"number" json:"number"`
 	CountryCode         string             `db:"country_code" json:"country_code"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
 	VoiceEnabled        bool               `db:"voice_enabled" json:"voice_enabled"`
 	SmsEnabled          bool               `db:"sms_enabled" json:"sms_enabled"`
 	Status              string             `db:"status" json:"status"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
-	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
 }
 
 type ProcessedEvent struct {
