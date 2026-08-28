@@ -10,6 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -93,6 +94,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			modules.Trunks.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
+		carriers.RegisterRoutes(r, modules.Carriers.Handler, modules.OrganizationsContext.RequireAuthenticated(modules.Authn))
 		webhooks.RegisterRoutes(
 			r,
 			modules.Webhooks.Handler,
