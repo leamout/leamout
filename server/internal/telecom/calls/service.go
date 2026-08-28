@@ -37,10 +37,7 @@ func NewService(repo *Repository, controller Controller) *Service {
 		panic("calls: controller is required")
 	}
 
-	return &Service{
-		repo:       repo,
-		controller: controller,
-	}
+	return &Service{repo: repo, controller: controller}
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
@@ -64,8 +61,6 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		return call, nil
 	}
 
-	// Origination succeeded but persistence failed. Best-effort cleanup prevents
-	// a live media-server call from being left without a database record.
 	if hangupErr := s.controller.Hangup(ctx, sipCallID); hangupErr != nil {
 		return sqlc.Call{}, apperror.NewInternal(
 			"create call and clean up media call",
@@ -96,28 +91,67 @@ func (s *Service) List(ctx context.Context, organizationID uuid.UUID, state *str
 	return s.repo.List(ctx, organizationID, state, offset, limit)
 }
 
-func (s *Service) Answer(ctx context.Context, org, id uuid.UUID) (sqlc.Call, error) {
-	call, externalID, err := s.controlCall(ctx, org, id)
+func (s *Service) Answer(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	call, externalID, err := s.controlCall(ctx, organizationID, id)
 	if err != nil {
 		return sqlc.Call{}, err
 	}
+
+	if isAnswerIdempotent(call.State) {
+		return call, nil
+	}
+	if !canAnswer(call.State) {
+		return sqlc.Call{}, apperror.NewConflict("call cannot be answered from state: " + call.State)
+	}
+
 	if err := s.controller.Answer(ctx, externalID); err != nil {
 		return sqlc.Call{}, mediaError("answer call", err)
 	}
-	updated, err := s.repo.MarkAnswered(ctx, org, call.ID)
-	return updated, writeError(err, "answer call")
+
+	updated, err := s.repo.MarkAnswered(ctx, organizationID, call.ID)
+	if err == nil {
+		return updated, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s.Get(ctx, organizationID, call.ID)
+	}
+	return sqlc.Call{}, writeError(err, "answer call")
 }
 
-func (s *Service) Hangup(ctx context.Context, org, id uuid.UUID) (sqlc.Call, error) {
-	call, externalID, err := s.controlCall(ctx, org, id)
+func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	call, externalID, err := s.controlCall(ctx, organizationID, id)
 	if err != nil {
 		return sqlc.Call{}, err
 	}
+
+	if isTerminal(call.State) {
+		return call, nil
+	}
+
 	if err := s.controller.Hangup(ctx, externalID); err != nil {
 		return sqlc.Call{}, mediaError("hang up call", err)
 	}
-	updated, err := s.repo.MarkCompleted(ctx, org, call.ID)
-	return updated, writeError(err, "hang up call")
+
+	updated, err := s.repo.MarkCompleted(ctx, organizationID, call.ID, nil)
+	if err == nil {
+		return updated, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return s.Get(ctx, organizationID, call.ID)
+	}
+	return sqlc.Call{}, writeError(err, "hang up call")
+}
+
+func canAnswer(state string) bool {
+	return state == "initiating" || state == "ringing"
+}
+
+func isAnswerIdempotent(state string) bool {
+	return state == "answered" || state == "active"
+}
+
+func isTerminal(state string) bool {
+	return state == "completed" || state == "failed" || state == "cancelled"
 }
 
 func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferRequest) error {
