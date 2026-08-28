@@ -6,7 +6,11 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func RegisterRoutes(router chi.Router, handler *Handler, auth func(http.Handler) http.Handler) {
+func RegisterRoutes(
+	router chi.Router,
+	handler *Handler,
+	auth func(http.Handler) http.Handler,
+) {
 	router.Route("/carrier-connections", func(r chi.Router) {
 		r.Use(auth)
 		r.Post("/", handler.Create)

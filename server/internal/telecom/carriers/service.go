@@ -11,11 +11,19 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type Service struct{ repo *Repository }
+type Service struct {
+	repo *Repository
+}
 
-func NewService(repo *Repository) *Service { return &Service{repo: repo} }
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo}
+}
 
-func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (Response, error) {
+func (s *Service) Create(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateRequest,
+) (Response, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return Response{}, err
 	}
@@ -40,14 +48,29 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return Response{}, err
 	}
-	item, err := s.repo.Create(ctx, sqlc.CreateCarrierConnectionParams{OrganizationID: organizationID, ProviderID: req.ProviderID, Name: name, Status: req.Status, InboundEnabled: req.InboundEnabled, MaxCps: req.MaxCPS, MaxConcurrentCalls: req.MaxConcurrentCalls, MaxDailyMinutes: req.MaxDailyMinutes, Codecs: codecs, SupportsVideo: req.SupportsVideo, SupportsFax: req.SupportsFax})
+	item, err := s.repo.Create(ctx, sqlc.CreateCarrierConnectionParams{
+		OrganizationID:     organizationID,
+		ProviderID:         req.ProviderID,
+		Name:               name,
+		Status:             req.Status,
+		InboundEnabled:     req.InboundEnabled,
+		MaxCps:             req.MaxCPS,
+		MaxConcurrentCalls: req.MaxConcurrentCalls,
+		MaxDailyMinutes:    req.MaxDailyMinutes,
+		Codecs:             codecs,
+		SupportsVideo:      req.SupportsVideo,
+		SupportsFax:        req.SupportsFax,
+	})
 	if err != nil {
 		return Response{}, writeError(err, "carrier connection", "provider not found")
 	}
 	return response(item), nil
 }
 
-func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Response, error) {
+func (s *Service) List(
+	ctx context.Context,
+	organizationID uuid.UUID,
+) ([]Response, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return nil, err
 	}
@@ -62,7 +85,11 @@ func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Respons
 	return result, nil
 }
 
-func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (Response, error) {
+func (s *Service) Get(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (Response, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return Response{}, err
 	}
@@ -76,11 +103,24 @@ func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (Respon
 	return getResponse(item), nil
 }
 
-func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req UpdateRequest) (Response, error) {
+func (s *Service) Update(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	req UpdateRequest,
+) (Response, error) {
 	if _, err := s.Get(ctx, organizationID, id); err != nil {
 		return Response{}, err
 	}
-	if req.Name == nil && req.Status == nil && req.InboundEnabled == nil && req.MaxCPS == nil && req.MaxConcurrentCalls == nil && req.MaxDailyMinutes == nil && req.Codecs == nil && req.SupportsVideo == nil && req.SupportsFax == nil {
+	if req.Name == nil &&
+		req.Status == nil &&
+		req.InboundEnabled == nil &&
+		req.MaxCPS == nil &&
+		req.MaxConcurrentCalls == nil &&
+		req.MaxDailyMinutes == nil &&
+		req.Codecs == nil &&
+		req.SupportsVideo == nil &&
+		req.SupportsFax == nil {
 		return Response{}, apperror.NewBadRequest("at least one field is required")
 	}
 	if req.Name != nil {
@@ -104,14 +144,30 @@ func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req 
 	if err != nil {
 		return Response{}, err
 	}
-	item, err := s.repo.Update(ctx, sqlc.UpdateCarrierConnectionParams{Name: req.Name, Status: req.Status, InboundEnabled: req.InboundEnabled, MaxCps: req.MaxCPS, MaxConcurrentCalls: req.MaxConcurrentCalls, MaxDailyMinutes: req.MaxDailyMinutes, Codecs: codecs, SupportsVideo: req.SupportsVideo, SupportsFax: req.SupportsFax, ID: id, OrganizationID: organizationID})
+	item, err := s.repo.Update(ctx, sqlc.UpdateCarrierConnectionParams{
+		Name:               req.Name,
+		Status:             req.Status,
+		InboundEnabled:     req.InboundEnabled,
+		MaxCps:             req.MaxCPS,
+		MaxConcurrentCalls: req.MaxConcurrentCalls,
+		MaxDailyMinutes:    req.MaxDailyMinutes,
+		Codecs:             codecs,
+		SupportsVideo:      req.SupportsVideo,
+		SupportsFax:        req.SupportsFax,
+		ID:                 id,
+		OrganizationID:     organizationID,
+	})
 	if err != nil {
 		return Response{}, writeError(err, "carrier connection", "carrier connection not found")
 	}
 	return response(item), nil
 }
 
-func (s *Service) Delete(ctx context.Context, organizationID, id uuid.UUID) error {
+func (s *Service) Delete(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) error {
 	if _, err := s.Get(ctx, organizationID, id); err != nil {
 		return err
 	}
@@ -121,7 +177,12 @@ func (s *Service) Delete(ctx context.Context, organizationID, id uuid.UUID) erro
 	return nil
 }
 
-func (s *Service) CreateSourceIP(ctx context.Context, organizationID, connectionID uuid.UUID, req SourceIPCreateRequest) (SourceIPResponse, error) {
+func (s *Service) CreateSourceIP(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	connectionID uuid.UUID,
+	req SourceIPCreateRequest,
+) (SourceIPResponse, error) {
 	if _, err := s.Get(ctx, organizationID, connectionID); err != nil {
 		return SourceIPResponse{}, err
 	}
@@ -136,7 +197,11 @@ func (s *Service) CreateSourceIP(ctx context.Context, organizationID, connection
 	return sourceIPResponse(item), nil
 }
 
-func (s *Service) ListSourceIPs(ctx context.Context, organizationID, connectionID uuid.UUID) ([]SourceIPResponse, error) {
+func (s *Service) ListSourceIPs(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	connectionID uuid.UUID,
+) ([]SourceIPResponse, error) {
 	if _, err := s.Get(ctx, organizationID, connectionID); err != nil {
 		return nil, err
 	}
@@ -151,7 +216,12 @@ func (s *Service) ListSourceIPs(ctx context.Context, organizationID, connectionI
 	return result, nil
 }
 
-func (s *Service) DeleteSourceIP(ctx context.Context, organizationID, connectionID, id uuid.UUID) error {
+func (s *Service) DeleteSourceIP(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	connectionID uuid.UUID,
+	id uuid.UUID,
+) error {
 	if err := validateID(id, "source IP id"); err != nil {
 		return err
 	}
