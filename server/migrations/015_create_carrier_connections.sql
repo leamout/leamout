@@ -5,9 +5,23 @@ CREATE TABLE IF NOT EXISTS carrier_connections (
 
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
+
     outbound_auth_method TEXT NOT NULL DEFAULT 'none',
     auth_username TEXT,
     auth_secret_ciphertext TEXT,
+
+    inbound_enabled BOOLEAN NOT NULL DEFAULT false,
+    inbound_auth_method TEXT NOT NULL DEFAULT 'ip',
+    inbound_username TEXT,
+    inbound_secret_ciphertext TEXT,
+
+    max_cps INTEGER NOT NULL DEFAULT 10,
+    max_concurrent_calls INTEGER NOT NULL DEFAULT 100,
+    max_daily_minutes BIGINT,
+
+    codecs TEXT[] NOT NULL DEFAULT '{PCMU,PCMA}',
+    supports_video BOOLEAN NOT NULL DEFAULT false,
+    supports_fax BOOLEAN NOT NULL DEFAULT false,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -35,6 +49,18 @@ CREATE TABLE IF NOT EXISTS carrier_connections (
             AND auth_secret_ciphertext IS NOT NULL
             AND length(auth_secret_ciphertext) > 0
         )
+    ),
+    CONSTRAINT chk_carrier_connections_cps CHECK (
+        max_cps > 0
+    ),
+    CONSTRAINT chk_carrier_connections_concurrent CHECK (
+        max_concurrent_calls > 0
+    ),
+    CONSTRAINT chk_carrier_connections_daily CHECK (
+        max_daily_minutes IS NULL OR max_daily_minutes > 0
+    ),
+    CONSTRAINT chk_carrier_connections_inbound CHECK (
+        inbound_auth_method IN ('ip', 'digest', 'none')
     )
 );
 
