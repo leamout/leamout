@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     number TEXT NOT NULL,
     country_code CHAR(2) NOT NULL,
     provider_id UUID,
+    carrier_connection_id UUID,
+    provider_resource_id TEXT,
     voice_enabled BOOLEAN NOT NULL DEFAULT true,
     sms_enabled BOOLEAN NOT NULL DEFAULT false,
     status TEXT NOT NULL DEFAULT 'active',
