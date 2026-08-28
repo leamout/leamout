@@ -1,61 +1,46 @@
+// Package hasher provides password and SIP digest credential hashing helpers.
 package hasher
 
 import (
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 -- MD5 is required by the SIP Digest protocol.
 	"crypto/sha256"
 	"crypto/sha512"
+	"crypto/subtle"
 	"encoding/hex"
-	"fmt"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
-// HA1Hashes contains the pre-computed HA1 hashes required by OpenSIPS
-// for SIP Digest Authentication.
-// HA1 = HASH("username:domain:password")
+// HA1Hashes contains the HA1 digests used by SIP Digest authentication.
 type HA1Hashes struct {
 	MD5        string
 	SHA256     string
 	SHA512_256 string
 }
 
-// ComputeHA1 generates all three HA1 hash variants that OpenSIPS supports.
-// The raw input is: "username:domain:password"
 func ComputeHA1(username, domain, password string) HA1Hashes {
-	raw := fmt.Sprintf("%s:%s:%s", username, domain, password)
-
-	md5Hash := md5.Sum([]byte(raw))
-	sha256Hash := sha256.Sum256([]byte(raw))
-	sha512Hash := sha512.Sum512_256([]byte(raw))
-
-	return HA1Hashes{
-		MD5:        hex.EncodeToString(md5Hash[:]),
-		SHA256:     hex.EncodeToString(sha256Hash[:]),
-		SHA512_256: hex.EncodeToString(sha512Hash[:]),
-	}
+	value := []byte(strings.Join([]string{username, domain, password}, ":"))
+	md5Sum := md5.Sum(value)
+	sha256Sum := sha256.Sum256(value)
+	sha512Sum := sha512.Sum512_256(value)
+	return HA1Hashes{MD5: hex.EncodeToString(md5Sum[:]), SHA256: hex.EncodeToString(sha256Sum[:]), SHA512_256: hex.EncodeToString(sha512Sum[:])}
 }
-
-// ComputeHA1MD5 generates only the MD5 HA1 hash (most common for SIP).
 func ComputeHA1MD5(username, domain, password string) string {
-	raw := fmt.Sprintf("%s:%s:%s", username, domain, password)
-	hash := md5.Sum([]byte(raw))
-	return hex.EncodeToString(hash[:])
+	return ComputeHA1(username, domain, password).MD5
 }
-
-// HashPassword hashes a plaintext password using bcrypt.
-// Returns the hashed password string suitable for storage in the users.password_hash column.
 func HashPassword(password string) (string, error) {
-	// Use bcrypt with default cost (10) - good balance of security and performance
-	hashedBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashed, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", fmt.Errorf("failed to hash password: %w", err)
+		return "", err
 	}
-	return string(hashedBytes), nil
+	return string(hashed), nil
+}
+func VerifyPassword(hashedPassword, password string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password)) == nil
 }
 
-// VerifyPassword compares a plaintext password against a bcrypt hash.
-// Returns true if they match, false otherwise.
-func VerifyPassword(hashedPassword, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-	return err == nil
+// VerifyHA1 compares an expected digest without leaking mismatch position.
+func VerifyHA1(expected, actual string) bool {
+	return subtle.ConstantTimeCompare([]byte(expected), []byte(actual)) == 1
 }
