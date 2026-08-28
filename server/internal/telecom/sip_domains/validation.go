@@ -21,7 +21,7 @@ func validateDomainID(id uuid.UUID) error {
 	return nil
 }
 func normalizeDomain(value string) (string, error) {
-	value = strings.ToLower(strings.TrimSpace(strings.TrimSuffix(value, ".")))
+	value = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(value), "."))
 	if value == "" || len(value) > 253 || net.ParseIP(value) != nil || !strings.Contains(value, ".") {
 		return "", apperror.NewBadRequest("domain must be a valid fully qualified domain name")
 	}
@@ -30,7 +30,7 @@ func normalizeDomain(value string) (string, error) {
 			return "", apperror.NewBadRequest("domain must be a valid fully qualified domain name")
 		}
 		for _, char := range label {
-			if !(char >= 'a' && char <= 'z' || char >= '0' && char <= '9' || char == '-') {
+			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 				return "", apperror.NewBadRequest("domain must be a valid fully qualified domain name")
 			}
 		}

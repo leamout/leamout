@@ -2,13 +2,14 @@ package webhooks
 
 import (
 	"encoding/json"
+	"net/http"
+	"strconv"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/httputil"
-	"net/http"
-	"strconv"
 )
 
 type Handler struct{ service *Service }

@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/leamout/leamout/internal/database/sqlc"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 const maxResponseBody = 4096
@@ -33,7 +34,9 @@ func sendTest(c context.Context, endpoint sqlc.WebhookEndpoint) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxResponseBody))
 	return resp.StatusCode, nil
 }
