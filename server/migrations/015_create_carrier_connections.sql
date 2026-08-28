@@ -66,16 +66,6 @@ CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_organization_id
 CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_cidr
     ON carrier_connection_source_ips USING gist (cidr inet_ops);
 
-ALTER TABLE phone_numbers
-    ADD CONSTRAINT fk_phone_numbers_carrier_connection
-        FOREIGN KEY (carrier_connection_id)
-        REFERENCES carrier_connections(id)
-        ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_phone_numbers_carrier_connection_id
-    ON phone_numbers (carrier_connection_id)
-    WHERE carrier_connection_id IS NOT NULL;
-
 CREATE TRIGGER set_carrier_connections_updated_at
 BEFORE UPDATE ON carrier_connections
 FOR EACH ROW
