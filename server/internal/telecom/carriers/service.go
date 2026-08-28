@@ -175,6 +175,33 @@ func (s *Service) DeleteSourceIP(ctx context.Context, organizationID, connection
 	return nil
 }
 
+func (s *Service) ListProviders(ctx context.Context) ([]ProviderResponse, error) {
+	providers, err := s.repo.ListProviders(ctx)
+	if err != nil {
+		return nil, apperror.NewInternal("list carrier providers", err)
+	}
+
+	result := make([]ProviderResponse, 0, len(providers))
+	for _, provider := range providers {
+		result = append(result, providerResponse(provider))
+	}
+
+	return result, nil
+}
+
+func (s *Service) GetProvider(ctx context.Context, id uuid.UUID) (ProviderResponse, error) {
+	if err := validateID(id, "carrier provider id"); err != nil {
+		return ProviderResponse{}, err
+	}
+
+	provider, err := s.repo.GetProvider(ctx, id)
+	if err != nil {
+		return ProviderResponse{}, readError(err, "carrier provider not found")
+	}
+
+	return providerResponse(provider), nil
+}
+
 func readError(err error, message string) error {
 	if err == nil {
 		return nil

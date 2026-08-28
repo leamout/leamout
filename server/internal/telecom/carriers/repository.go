@@ -36,3 +36,11 @@ func (r *Repository) ListSourceIPs(ctx context.Context, organizationID, connecti
 func (r *Repository) DeleteSourceIP(ctx context.Context, organizationID, connectionID, id uuid.UUID) error {
 	return r.queries.DeleteCarrierConnectionSourceIP(ctx, sqlc.DeleteCarrierConnectionSourceIPParams{ID: id, CarrierConnectionID: connectionID, OrganizationID: organizationID})
 }
+
+func (r *Repository) ListProviders(ctx context.Context) ([]sqlc.CarrierProvider, error) {
+	return r.queries.ListCarrierProviders(ctx)
+}
+
+func (r *Repository) GetProvider(ctx context.Context, id uuid.UUID) (sqlc.CarrierProvider, error) {
+	return r.queries.GetCarrierProviderByID(ctx, id)
+}

@@ -69,6 +69,16 @@ type SourceIPResponse struct {
 	CreatedAt           time.Time    `json:"created_at"`
 }
 
+type ProviderResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Slug      string    `json:"slug"`
+	Name      string    `json:"name"`
+	Adapter   string    `json:"adapter"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 func response(connection sqlc.CarrierConnection) Response {
 	return Response{
 		ID: connection.ID, OrganizationID: connection.OrganizationID, ProviderID: connection.ProviderID,
@@ -114,4 +124,16 @@ func sourceIPResponse(sourceIP sqlc.CarrierConnectionSourceIp) SourceIPResponse 
 	return SourceIPResponse{ID: sourceIP.ID, OrganizationID: sourceIP.OrganizationID,
 		CarrierConnectionID: sourceIP.CarrierConnectionID, CIDR: sourceIP.Cidr,
 		CreatedAt: pgconv.TimestamptzToTime(sourceIP.CreatedAt)}
+}
+
+func providerResponse(provider sqlc.CarrierProvider) ProviderResponse {
+	return ProviderResponse{
+		ID:        provider.ID,
+		Slug:      provider.Slug,
+		Name:      provider.Name,
+		Adapter:   provider.Adapter,
+		Status:    provider.Status,
+		CreatedAt: pgconv.TimestamptzToTime(provider.CreatedAt),
+		UpdatedAt: pgconv.TimestamptzToTime(provider.UpdatedAt),
+	}
 }

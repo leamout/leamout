@@ -18,4 +18,10 @@ func RegisterRoutes(router chi.Router, handler *Handler, auth func(http.Handler)
 		r.Get("/{carrier_connection_id}/source-ips", handler.ListSourceIPs)
 		r.Delete("/{carrier_connection_id}/source-ips/{source_ip_id}", handler.DeleteSourceIP)
 	})
+
+	router.Route("/carrier-providers", func(r chi.Router) {
+		r.Use(auth)
+		r.Get("/", handler.ListProviders)
+		r.Get("/{carrier_provider_id}", handler.GetProvider)
+	})
 }

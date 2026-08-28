@@ -145,6 +145,32 @@ func (h *Handler) DeleteSourceIP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) ListProviders(w http.ResponseWriter, r *http.Request) {
+	providers, err := h.service.ListProviders(r.Context())
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	httputil.OK(w, map[string]any{"carrier_providers": providers})
+}
+
+func (h *Handler) GetProvider(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "carrier_provider_id"))
+	if err != nil {
+		httputil.Error(w, apperror.NewBadRequest("invalid carrier_provider_id"))
+		return
+	}
+
+	provider, err := h.service.GetProvider(r.Context(), id)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	httputil.OK(w, provider)
+}
+
 func organizationID(r *http.Request) (uuid.UUID, error) {
 	id, ok := middleware.OrganizationIDFromContext(r.Context())
 	if !ok {
