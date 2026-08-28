@@ -19,11 +19,13 @@ import (
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
+	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -56,7 +58,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	}
 
 	freeSwitch, err := freeswitch.New(
-		freeswitch.DefaultConfig("127.0.0.1:8021", cfg.FreeSWITCHESLPassword),
+		freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword),
 	)
 	if err != nil {
 		db.Close()
@@ -144,6 +146,11 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
+	carriersRepository := carriers.NewRepository(queries)
+	carriersService := carriers.NewService(carriersRepository)
+
+	trunksRepository := trunks.NewRepository(queries)
+	trunksService := trunks.NewService(trunksRepository)
 
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
@@ -216,6 +223,16 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 			Repository: sipDomainsRepository,
 			Service:    sipDomainsService,
 			Handler:    sip_domains.NewHandler(sipDomainsService),
+		},
+		Carriers: CarriersModule{
+			Repository: carriersRepository,
+			Service:    carriersService,
+			Handler:    carriers.NewHandler(carriersService),
+		},
+		Trunks: TrunksModule{
+			Repository: trunksRepository,
+			Service:    trunksService,
+			Handler:    trunks.NewHandler(trunksService),
 		},
 		Webhooks: WebhooksModule{
 			Repository: webhooksRepository,

@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
 
     number TEXT NOT NULL,
     country_code CHAR(2) NOT NULL,
-    provider_id UUID,
+    carrier_connection_id UUID REFERENCES carrier_connections(id) ON DELETE SET NULL,
+    provider_resource_id TEXT,
     voice_enabled BOOLEAN NOT NULL DEFAULT true,
     sms_enabled BOOLEAN NOT NULL DEFAULT false,
     status TEXT NOT NULL DEFAULT 'active',
@@ -32,6 +33,10 @@ CREATE INDEX IF NOT EXISTS idx_phone_numbers_organization_country
 
 CREATE INDEX IF NOT EXISTS idx_phone_numbers_number_prefix
     ON phone_numbers (number text_pattern_ops);
+
+CREATE INDEX IF NOT EXISTS idx_phone_numbers_carrier_connection_id
+    ON phone_numbers (carrier_connection_id)
+    WHERE carrier_connection_id IS NOT NULL;
 
 CREATE TRIGGER set_phone_numbers_updated_at
 BEFORE UPDATE ON phone_numbers

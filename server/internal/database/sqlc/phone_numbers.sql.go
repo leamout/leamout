@@ -16,28 +16,42 @@ INSERT INTO phone_numbers (
     organization_id,
     number,
     country_code,
+    carrier_connection_id,
+    provider_resource_id,
     voice_enabled,
     sms_enabled
 )
 SELECT
-    $1 as organization_id,
-    $2 as number,
-    $3 as country_code,
-    COALESCE($4, true) as voice_enabled,
-    COALESCE($5, false) as sms_enabled
-FROM organizations AS t
-WHERE t.id = $1
-  AND t.status = 'active'
-  AND t.deleted_at IS NULL
-RETURNING id, organization_id, number, country_code, provider_id, voice_enabled, sms_enabled, status, created_at, updated_at
+    $1 AS organization_id,
+    $2 AS number,
+    $3 AS country_code,
+    $4 AS carrier_connection_id,
+    $5 AS provider_resource_id,
+    COALESCE($6, true) AS voice_enabled,
+    COALESCE($7, false) AS sms_enabled
+FROM organizations AS o
+LEFT JOIN carrier_connections AS cc
+  ON cc.id = $4::UUID
+ AND cc.organization_id = $1
+ AND cc.status = 'active'
+WHERE o.id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      $4::UUID IS NULL
+      OR cc.id IS NOT NULL
+  )
+RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_resource_id, voice_enabled, sms_enabled, status, created_at, updated_at
 `
 
 type CreatePhoneNumberParams struct {
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	Number         string    `db:"number" json:"number"`
-	CountryCode    string    `db:"country_code" json:"country_code"`
-	VoiceEnabled   *bool     `db:"voice_enabled" json:"voice_enabled"`
-	SmsEnabled     *bool     `db:"sms_enabled" json:"sms_enabled"`
+	OrganizationID      uuid.UUID  `db:"organization_id" json:"organization_id"`
+	Number              string     `db:"number" json:"number"`
+	CountryCode         string     `db:"country_code" json:"country_code"`
+	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderResourceID  *string    `db:"provider_resource_id" json:"provider_resource_id"`
+	VoiceEnabled        *bool      `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled          *bool      `db:"sms_enabled" json:"sms_enabled"`
 }
 
 func (q *Queries) CreatePhoneNumber(ctx context.Context, arg CreatePhoneNumberParams) (PhoneNumber, error) {
@@ -45,6 +59,8 @@ func (q *Queries) CreatePhoneNumber(ctx context.Context, arg CreatePhoneNumberPa
 		arg.OrganizationID,
 		arg.Number,
 		arg.CountryCode,
+		arg.CarrierConnectionID,
+		arg.ProviderResourceID,
 		arg.VoiceEnabled,
 		arg.SmsEnabled,
 	)
@@ -54,7 +70,8 @@ func (q *Queries) CreatePhoneNumber(ctx context.Context, arg CreatePhoneNumberPa
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
@@ -105,14 +122,14 @@ func (q *Queries) EnablePhoneNumber(ctx context.Context, arg EnablePhoneNumberPa
 }
 
 const getPhoneNumberByID = `-- name: GetPhoneNumberByID :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
-JOIN organizations AS t ON t.id = pn.organization_id
+JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.id = $1
   AND pn.organization_id = $2
   AND pn.status = 'active'
-  AND t.status = 'active'
-  AND t.deleted_at IS NULL
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -129,7 +146,8 @@ func (q *Queries) GetPhoneNumberByID(ctx context.Context, arg GetPhoneNumberByID
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
@@ -140,14 +158,14 @@ func (q *Queries) GetPhoneNumberByID(ctx context.Context, arg GetPhoneNumberByID
 }
 
 const getPhoneNumberByNumber = `-- name: GetPhoneNumberByNumber :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
-JOIN organizations AS t ON t.id = pn.organization_id
+JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.number = $1
   AND pn.organization_id = $2
   AND pn.status = 'active'
-  AND t.status = 'active'
-  AND t.deleted_at IS NULL
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -164,7 +182,8 @@ func (q *Queries) GetPhoneNumberByNumber(ctx context.Context, arg GetPhoneNumber
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,
@@ -187,13 +206,13 @@ SELECT
 FROM phone_numbers AS pn
 JOIN voice_bindings AS vb ON vb.phone_number_id = pn.id
 JOIN voice_applications AS va ON va.id = vb.voice_application_id
-JOIN organizations AS t ON t.id = pn.organization_id
+JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.number = $1
   AND pn.status = 'active'
   AND pn.voice_enabled = true
   AND va.status = 'active'
-  AND t.status = 'active'
-  AND t.deleted_at IS NULL
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -225,7 +244,7 @@ func (q *Queries) GetVoiceBindingByNumber(ctx context.Context, number string) (G
 }
 
 const listPhoneNumbersByCountry = `-- name: ListPhoneNumbersByCountry :many
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 WHERE pn.organization_id = $1
   AND pn.country_code = $2
@@ -252,7 +271,8 @@ func (q *Queries) ListPhoneNumbersByCountry(ctx context.Context, arg ListPhoneNu
 			&i.OrganizationID,
 			&i.Number,
 			&i.CountryCode,
-			&i.ProviderID,
+			&i.CarrierConnectionID,
+			&i.ProviderResourceID,
 			&i.VoiceEnabled,
 			&i.SmsEnabled,
 			&i.Status,
@@ -270,7 +290,7 @@ func (q *Queries) ListPhoneNumbersByCountry(ctx context.Context, arg ListPhoneNu
 }
 
 const listPhoneNumbersByOrganizationID = `-- name: ListPhoneNumbersByOrganizationID :many
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provider_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 WHERE pn.organization_id = $1
   AND pn.status = 'active'
@@ -291,7 +311,8 @@ func (q *Queries) ListPhoneNumbersByOrganizationID(ctx context.Context, organiza
 			&i.OrganizationID,
 			&i.Number,
 			&i.CountryCode,
-			&i.ProviderID,
+			&i.CarrierConnectionID,
+			&i.ProviderResourceID,
 			&i.VoiceEnabled,
 			&i.SmsEnabled,
 			&i.Status,
@@ -329,29 +350,45 @@ func (q *Queries) ReleasePhoneNumber(ctx context.Context, arg ReleasePhoneNumber
 }
 
 const updatePhoneNumber = `-- name: UpdatePhoneNumber :one
-UPDATE phone_numbers
+UPDATE phone_numbers AS pn
 SET
-    country_code = COALESCE($1, country_code),
-    voice_enabled = COALESCE($2, voice_enabled),
-    sms_enabled = COALESCE($3, sms_enabled),
+    country_code = COALESCE($1, pn.country_code),
+    carrier_connection_id = COALESCE($2, pn.carrier_connection_id),
+    provider_resource_id = COALESCE($3, pn.provider_resource_id),
+    voice_enabled = COALESCE($4, pn.voice_enabled),
+    sms_enabled = COALESCE($5, pn.sms_enabled),
     updated_at = NOW()
-WHERE id = $4
-  AND organization_id = $5
-  AND status = 'active'
-RETURNING id, organization_id, number, country_code, provider_id, voice_enabled, sms_enabled, status, created_at, updated_at
+WHERE pn.id = $6
+  AND pn.organization_id = $7
+  AND pn.status = 'active'
+  AND (
+      $2::UUID IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM carrier_connections AS cc
+          WHERE cc.id = $2::UUID
+            AND cc.organization_id = pn.organization_id
+            AND cc.status = 'active'
+      )
+  )
+RETURNING pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
 `
 
 type UpdatePhoneNumberParams struct {
-	CountryCode    *string   `db:"country_code" json:"country_code"`
-	VoiceEnabled   *bool     `db:"voice_enabled" json:"voice_enabled"`
-	SmsEnabled     *bool     `db:"sms_enabled" json:"sms_enabled"`
-	ID             uuid.UUID `db:"id" json:"id"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	CountryCode         *string    `db:"country_code" json:"country_code"`
+	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderResourceID  *string    `db:"provider_resource_id" json:"provider_resource_id"`
+	VoiceEnabled        *bool      `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled          *bool      `db:"sms_enabled" json:"sms_enabled"`
+	ID                  uuid.UUID  `db:"id" json:"id"`
+	OrganizationID      uuid.UUID  `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) UpdatePhoneNumber(ctx context.Context, arg UpdatePhoneNumberParams) (PhoneNumber, error) {
 	row := q.db.QueryRow(ctx, updatePhoneNumber,
 		arg.CountryCode,
+		arg.CarrierConnectionID,
+		arg.ProviderResourceID,
 		arg.VoiceEnabled,
 		arg.SmsEnabled,
 		arg.ID,
@@ -363,7 +400,8 @@ func (q *Queries) UpdatePhoneNumber(ctx context.Context, arg UpdatePhoneNumberPa
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProviderID,
+		&i.CarrierConnectionID,
+		&i.ProviderResourceID,
 		&i.VoiceEnabled,
 		&i.SmsEnabled,
 		&i.Status,

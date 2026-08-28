@@ -69,6 +69,47 @@ type CallParticipant struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type CarrierConnection struct {
+	ID                      uuid.UUID          `db:"id" json:"id"`
+	OrganizationID          uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ProviderID              uuid.UUID          `db:"provider_id" json:"provider_id"`
+	Name                    string             `db:"name" json:"name"`
+	Status                  string             `db:"status" json:"status"`
+	OutboundAuthMethod      string             `db:"outbound_auth_method" json:"outbound_auth_method"`
+	AuthUsername            *string            `db:"auth_username" json:"auth_username"`
+	AuthSecretCiphertext    *string            `db:"auth_secret_ciphertext" json:"auth_secret_ciphertext"`
+	InboundEnabled          bool               `db:"inbound_enabled" json:"inbound_enabled"`
+	InboundAuthMethod       string             `db:"inbound_auth_method" json:"inbound_auth_method"`
+	InboundUsername         *string            `db:"inbound_username" json:"inbound_username"`
+	InboundSecretCiphertext *string            `db:"inbound_secret_ciphertext" json:"inbound_secret_ciphertext"`
+	MaxCps                  int32              `db:"max_cps" json:"max_cps"`
+	MaxConcurrentCalls      int32              `db:"max_concurrent_calls" json:"max_concurrent_calls"`
+	MaxDailyMinutes         *int64             `db:"max_daily_minutes" json:"max_daily_minutes"`
+	Codecs                  []string           `db:"codecs" json:"codecs"`
+	SupportsVideo           bool               `db:"supports_video" json:"supports_video"`
+	SupportsFax             bool               `db:"supports_fax" json:"supports_fax"`
+	CreatedAt               pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type CarrierConnectionSourceIp struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	Cidr                netip.Prefix       `db:"cidr" json:"cidr"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type CarrierProvider struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Slug      string             `db:"slug" json:"slug"`
+	Name      string             `db:"name" json:"name"`
+	Adapter   string             `db:"adapter" json:"adapter"`
+	Status    string             `db:"status" json:"status"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Conference struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -165,16 +206,17 @@ type OutboxEvent struct {
 }
 
 type PhoneNumber struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Number         string             `db:"number" json:"number"`
-	CountryCode    string             `db:"country_code" json:"country_code"`
-	ProviderID     *uuid.UUID         `db:"provider_id" json:"provider_id"`
-	VoiceEnabled   bool               `db:"voice_enabled" json:"voice_enabled"`
-	SmsEnabled     bool               `db:"sms_enabled" json:"sms_enabled"`
-	Status         string             `db:"status" json:"status"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Number              string             `db:"number" json:"number"`
+	CountryCode         string             `db:"country_code" json:"country_code"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
+	VoiceEnabled        bool               `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled          bool               `db:"sms_enabled" json:"sms_enabled"`
+	Status              string             `db:"status" json:"status"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type ProcessedEvent struct {
@@ -234,6 +276,32 @@ type Subscriber struct {
 	Ha1Sha512256   *string            `db:"ha1_sha512_256" json:"ha1_sha512_256"`
 	DisplayName    *string            `db:"display_name" json:"display_name"`
 	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Trunk struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	Name                string             `db:"name" json:"name"`
+	Direction           string             `db:"direction" json:"direction"`
+	Status              string             `db:"status" json:"status"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type TrunkEndpoint struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	TrunkID        uuid.UUID          `db:"trunk_id" json:"trunk_id"`
+	Host           string             `db:"host" json:"host"`
+	Port           int32              `db:"port" json:"port"`
+	Transport      string             `db:"transport" json:"transport"`
+	Direction      string             `db:"direction" json:"direction"`
+	Priority       int32              `db:"priority" json:"priority"`
+	Weight         int32              `db:"weight" json:"weight"`
+	Enabled        bool               `db:"enabled" json:"enabled"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }

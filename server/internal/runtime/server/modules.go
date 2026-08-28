@@ -7,11 +7,13 @@ import (
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
+	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
@@ -33,6 +35,8 @@ type Modules struct {
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
 	Subscribers          SubscribersModule
+	Trunks               TrunksModule
+	Carriers             CarriersModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
@@ -119,4 +123,16 @@ type SubscribersModule struct {
 	Repository *subscribers.Repository
 	Service    *subscribers.Service
 	Handler    *subscribers.Handler
+}
+
+type TrunksModule struct {
+	Repository *trunks.Repository
+	Service    *trunks.Service
+	Handler    *trunks.Handler
+}
+
+type CarriersModule struct {
+	Repository *carriers.Repository
+	Service    *carriers.Service
+	Handler    *carriers.Handler
 }
