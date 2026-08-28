@@ -45,37 +45,105 @@ WHERE o.id = sqlc.arg(organization_id)
 RETURNING *;
 
 -- name: GetCarrierConnectionByID :one
-SELECT *
+SELECT
+    id,
+    organization_id,
+    provider_id,
+    name,
+    status,
+    outbound_auth_method,
+    auth_username,
+    auth_secret_ciphertext IS NOT NULL AS has_outbound_credentials,
+    inbound_enabled,
+    inbound_auth_method,
+    inbound_username,
+    inbound_secret_ciphertext IS NOT NULL AS has_inbound_credentials,
+    max_cps,
+    max_concurrent_calls,
+    max_daily_minutes,
+    codecs,
+    supports_video,
+    supports_fax,
+    created_at,
+    updated_at
 FROM carrier_connections
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
 LIMIT 1;
 
 -- name: ListCarrierConnectionsByOrganizationID :many
-SELECT *
+SELECT
+    id,
+    organization_id,
+    provider_id,
+    name,
+    status,
+    outbound_auth_method,
+    auth_username,
+    auth_secret_ciphertext IS NOT NULL AS has_outbound_credentials,
+    inbound_enabled,
+    inbound_auth_method,
+    inbound_username,
+    inbound_secret_ciphertext IS NOT NULL AS has_inbound_credentials,
+    max_cps,
+    max_concurrent_calls,
+    max_daily_minutes,
+    codecs,
+    supports_video,
+    supports_fax,
+    created_at,
+    updated_at
 FROM carrier_connections
 WHERE organization_id = sqlc.arg(organization_id)
 ORDER BY created_at DESC;
 
 -- name: ListActiveCarrierConnectionsByOrganizationID :many
-SELECT *
+SELECT
+    id,
+    organization_id,
+    provider_id,
+    name,
+    status,
+    outbound_auth_method,
+    auth_username,
+    auth_secret_ciphertext IS NOT NULL AS has_outbound_credentials,
+    inbound_enabled,
+    inbound_auth_method,
+    inbound_username,
+    inbound_secret_ciphertext IS NOT NULL AS has_inbound_credentials,
+    max_cps,
+    max_concurrent_calls,
+    max_daily_minutes,
+    codecs,
+    supports_video,
+    supports_fax,
+    created_at,
+    updated_at
 FROM carrier_connections
 WHERE organization_id = sqlc.arg(organization_id)
   AND status = 'active'
 ORDER BY created_at DESC;
+
+-- name: GetCarrierConnectionCredentials :one
+SELECT
+    outbound_auth_method,
+    auth_username,
+    auth_secret_ciphertext,
+    inbound_auth_method,
+    inbound_username,
+    inbound_secret_ciphertext
+FROM carrier_connections
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND status = 'active'
+LIMIT 1;
 
 -- name: UpdateCarrierConnection :one
 UPDATE carrier_connections
 SET
     name = COALESCE(sqlc.narg(name), name),
     status = COALESCE(sqlc.narg(status), status),
-    outbound_auth_method = COALESCE(sqlc.narg(outbound_auth_method), outbound_auth_method),
-    auth_username = COALESCE(sqlc.narg(auth_username), auth_username),
-    auth_secret_ciphertext = COALESCE(sqlc.narg(auth_secret_ciphertext), auth_secret_ciphertext),
     inbound_enabled = COALESCE(sqlc.narg(inbound_enabled), inbound_enabled),
-    inbound_auth_method = COALESCE(sqlc.narg(inbound_auth_method), inbound_auth_method),
-    inbound_username = COALESCE(sqlc.narg(inbound_username), inbound_username),
-    inbound_secret_ciphertext = COALESCE(sqlc.narg(inbound_secret_ciphertext), inbound_secret_ciphertext),
     max_cps = COALESCE(sqlc.narg(max_cps), max_cps),
     max_concurrent_calls = COALESCE(sqlc.narg(max_concurrent_calls), max_concurrent_calls),
     max_daily_minutes = COALESCE(sqlc.narg(max_daily_minutes), max_daily_minutes),
@@ -86,6 +154,56 @@ SET
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
 RETURNING *;
+
+-- name: SetCarrierConnectionOutboundDigestAuth :exec
+UPDATE carrier_connections
+SET
+    outbound_auth_method = 'digest',
+    auth_username = sqlc.arg(auth_username),
+    auth_secret_ciphertext = sqlc.arg(auth_secret_ciphertext),
+    updated_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id);
+
+-- name: ClearCarrierConnectionOutboundAuth :exec
+UPDATE carrier_connections
+SET
+    outbound_auth_method = 'none',
+    auth_username = NULL,
+    auth_secret_ciphertext = NULL,
+    updated_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id);
+
+-- name: SetCarrierConnectionInboundDigestAuth :exec
+UPDATE carrier_connections
+SET
+    inbound_auth_method = 'digest',
+    inbound_username = sqlc.arg(inbound_username),
+    inbound_secret_ciphertext = sqlc.arg(inbound_secret_ciphertext),
+    updated_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id);
+
+-- name: SetCarrierConnectionInboundIPAuth :exec
+UPDATE carrier_connections
+SET
+    inbound_auth_method = 'ip',
+    inbound_username = NULL,
+    inbound_secret_ciphertext = NULL,
+    updated_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id);
+
+-- name: SetCarrierConnectionInboundNoAuth :exec
+UPDATE carrier_connections
+SET
+    inbound_auth_method = 'none',
+    inbound_username = NULL,
+    inbound_secret_ciphertext = NULL,
+    updated_at = NOW()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id);
 
 -- name: DisableCarrierConnection :exec
 UPDATE carrier_connections
