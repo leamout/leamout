@@ -2,16 +2,18 @@ package webhooks
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/database/sqlc"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 type Repository struct{ queries *sqlc.Queries }
 
 func NewRepository(q *sqlc.Queries) *Repository { return &Repository{q} }
 func (r *Repository) Create(c context.Context, org uuid.UUID, req CreateRequest, secret []byte) (sqlc.WebhookEndpoint, error) {
-	return r.queries.CreateWebhookEndpoint(c, sqlc.CreateWebhookEndpointParams{OrganizationID: org, URL: req.URL, SigningSecret: secret, SubscribedEvents: req.SubscribedEvents, Enabled: req.Enabled})
+	return r.queries.CreateWebhookEndpoint(c, sqlc.CreateWebhookEndpointParams{OrganizationID: org, Url: req.URL, SigningSecret: secret, SubscribedEvents: req.SubscribedEvents, Enabled: req.Enabled})
 }
 func (r *Repository) List(c context.Context, org uuid.UUID) ([]sqlc.WebhookEndpoint, error) {
 	return r.queries.ListWebhookEndpointsByOrganizationID(c, org)
@@ -20,7 +22,7 @@ func (r *Repository) Get(c context.Context, org, id uuid.UUID) (sqlc.WebhookEndp
 	return r.queries.GetWebhookEndpointByID(c, sqlc.GetWebhookEndpointByIDParams{ID: id, OrganizationID: org})
 }
 func (r *Repository) Update(c context.Context, org, id uuid.UUID, req UpdateRequest) (sqlc.WebhookEndpoint, error) {
-	return r.queries.UpdateWebhookEndpoint(c, sqlc.UpdateWebhookEndpointParams{ID: id, OrganizationID: org, URL: req.URL, SubscribedEvents: req.SubscribedEvents, Enabled: req.Enabled})
+	return r.queries.UpdateWebhookEndpoint(c, sqlc.UpdateWebhookEndpointParams{ID: id, OrganizationID: org, Url: req.URL, SubscribedEvents: optionalSubscribedEvents(req.SubscribedEvents), Enabled: req.Enabled})
 }
 func (r *Repository) Disable(c context.Context, org, id uuid.UUID) error {
 	return r.queries.DisableWebhookEndpoint(c, sqlc.DisableWebhookEndpointParams{ID: id, OrganizationID: org})
@@ -42,5 +44,12 @@ func (r *Repository) Cancel(c context.Context, org, id uuid.UUID) error {
 	return err
 }
 func (r *Repository) CreateTestDelivery(c context.Context, org, id uuid.UUID, eventID uuid.UUID, at time.Time) (sqlc.WebhookDelivery, error) {
-	return r.queries.CreateWebhookDelivery(c, sqlc.CreateWebhookDeliveryParams{EndpointID: id, EventID: eventID, NextAttemptAt: at})
+	return r.queries.CreateWebhookDelivery(c, sqlc.CreateWebhookDeliveryParams{EndpointID: id, EventID: eventID, NextAttemptAt: pgtype.Timestamptz{Time: at, Valid: true}})
+}
+
+func optionalSubscribedEvents(events *[]string) []string {
+	if events == nil {
+		return nil
+	}
+	return *events
 }
