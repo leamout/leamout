@@ -3,6 +3,7 @@ package subscribers
 import (
 	"context"
 	"errors"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -11,104 +12,165 @@ import (
 	"github.com/leamout/leamout/pkg/hasher"
 )
 
-type Service struct{ repo *Repository }
+type Service struct {
+	repo *Repository
+}
 
-func NewService(r *Repository) *Service { return &Service{r} }
-func (s *Service) Create(c context.Context, org uuid.UUID, req CreateRequest) (sqlc.Subscriber, error) {
-	if e := validOrg(org); e != nil {
-		return sqlc.Subscriber{}, e
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo}
+}
+
+func (s *Service) Create(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateRequest,
+) (sqlc.Subscriber, error) {
+	if err := validOrg(organizationID); err != nil {
+		return sqlc.Subscriber{}, err
 	}
+
 	if req.SIPDomainID == uuid.Nil {
 		return sqlc.Subscriber{}, apperror.NewBadRequest("sip_domain_id is required")
 	}
-	var e error
-	req.Username, e = normalizeUsername(req.Username)
-	if e != nil {
-		return sqlc.Subscriber{}, e
+
+	var err error
+	req.Username, err = normalizeUsername(req.Username)
+	if err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	if e = validatePassword(req.Password); e != nil {
-		return sqlc.Subscriber{}, e
+
+	if err := validatePassword(req.Password); err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	req.DisplayName, e = normalizeDisplayName(req.DisplayName)
-	if e != nil {
-		return sqlc.Subscriber{}, e
+
+	req.DisplayName, err = normalizeDisplayName(req.DisplayName)
+	if err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	domain, e := s.repo.Domain(c, org, req.SIPDomainID)
-	if e != nil {
-		return sqlc.Subscriber{}, readError(e, "SIP domain not found")
+
+	domain, err := s.repo.Domain(ctx, organizationID, req.SIPDomainID)
+	if err != nil {
+		return sqlc.Subscriber{}, readError(err, "SIP domain not found")
 	}
-	return s.repo.Create(c, org, req, hasher.ComputeHA1(req.Username, domain.Domain, req.Password))
+
+	hashes := hasher.ComputeHA1(req.Username, domain.Domain, req.Password)
+	result, err := s.repo.Create(ctx, organizationID, req, hashes)
+	return result, writeError(err, "create subscriber")
 }
-func (s *Service) List(c context.Context, org uuid.UUID) ([]sqlc.Subscriber, error) {
-	if e := validOrg(org); e != nil {
-		return nil, e
+
+func (s *Service) List(
+	ctx context.Context,
+	organizationID uuid.UUID,
+) ([]sqlc.Subscriber, error) {
+	if err := validOrg(organizationID); err != nil {
+		return nil, err
 	}
-	v, e := s.repo.List(c, org)
-	if e != nil {
-		return nil, apperror.NewInternal("list subscribers", e)
+
+	result, err := s.repo.List(ctx, organizationID)
+	if err != nil {
+		return nil, apperror.NewInternal("list subscribers", err)
 	}
-	return v, nil
+
+	return result, nil
 }
-func (s *Service) Get(c context.Context, org, id uuid.UUID) (sqlc.Subscriber, error) {
-	if e := validIDs(org, id); e != nil {
-		return sqlc.Subscriber{}, e
+
+func (s *Service) Get(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.Subscriber, error) {
+	if err := validIDs(organizationID, id); err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	v, e := s.repo.Get(c, org, id)
-	return v, readError(e, "subscriber not found")
+
+	result, err := s.repo.Get(ctx, organizationID, id)
+	return result, readError(err, "subscriber not found")
 }
-func (s *Service) Update(c context.Context, org, id uuid.UUID, req UpdateRequest) (sqlc.Subscriber, error) {
-	if e := validIDs(org, id); e != nil {
-		return sqlc.Subscriber{}, e
+
+func (s *Service) Update(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	req UpdateRequest,
+) (sqlc.Subscriber, error) {
+	if err := validIDs(organizationID, id); err != nil {
+		return sqlc.Subscriber{}, err
 	}
+
 	if req.DisplayName == nil {
 		return sqlc.Subscriber{}, apperror.NewBadRequest("at least one field is required")
 	}
-	name, e := normalizeDisplayName(req.DisplayName)
-	if e != nil {
-		return sqlc.Subscriber{}, e
+
+	name, err := normalizeDisplayName(req.DisplayName)
+	if err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	v, e := s.repo.Update(c, org, id, name)
-	return v, writeError(e, "subscriber not found")
+
+	result, err := s.repo.Update(ctx, organizationID, id, name)
+	return result, writeError(err, "subscriber not found")
 }
-func (s *Service) Rotate(c context.Context, org, id uuid.UUID, req RotateCredentialsRequest) (sqlc.Subscriber, error) {
-	v, e := s.Get(c, org, id)
-	if e != nil {
-		return sqlc.Subscriber{}, e
+
+func (s *Service) Rotate(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	req RotateCredentialsRequest,
+) (sqlc.Subscriber, error) {
+	subscriber, err := s.Get(ctx, organizationID, id)
+	if err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	if e = validatePassword(req.Password); e != nil {
-		return sqlc.Subscriber{}, e
+
+	if err := validatePassword(req.Password); err != nil {
+		return sqlc.Subscriber{}, err
 	}
-	result, e := s.repo.Rotate(c, org, id, hasher.ComputeHA1(v.Username, v.Domain, req.Password))
-	return result, writeError(e, "subscriber not found")
+
+	hashes := hasher.ComputeHA1(subscriber.Username, subscriber.Domain, req.Password)
+	result, err := s.repo.Rotate(ctx, organizationID, id, hashes)
+	return result, writeError(err, "subscriber not found")
 }
-func (s *Service) Delete(c context.Context, org, id uuid.UUID) error {
-	if _, e := s.Get(c, org, id); e != nil {
-		return e
+
+func (s *Service) Delete(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) error {
+	if _, err := s.Get(ctx, organizationID, id); err != nil {
+		return err
 	}
-	return writeError(s.repo.Disable(c, org, id), "disable subscriber")
+
+	return writeError(s.repo.Disable(ctx, organizationID, id), "disable subscriber")
 }
-func validIDs(org, id uuid.UUID) error {
-	if e := validOrg(org); e != nil {
-		return e
+
+func validIDs(organizationID, id uuid.UUID) error {
+	if err := validOrg(organizationID); err != nil {
+		return err
 	}
+
 	return validID(id)
 }
-func readError(e error, msg string) error {
-	if e == nil {
+
+func readError(err error, message string) error {
+	if err == nil {
 		return nil
 	}
-	if errors.Is(e, pgx.ErrNoRows) {
-		return apperror.NewNotFound(msg)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperror.NewNotFound(message)
 	}
-	return apperror.NewInternal(msg, e)
+
+	return apperror.NewInternal(message, err)
 }
-func writeError(e error, msg string) error {
-	if e == nil {
+
+func writeError(err error, message string) error {
+	if err == nil {
 		return nil
 	}
-	var pg *pgconn.PgError
-	if errors.As(e, &pg) && pg.Code == "23505" {
+
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return apperror.NewConflict("subscriber already exists")
 	}
-	return readError(e, msg)
+
+	return readError(err, message)
 }
