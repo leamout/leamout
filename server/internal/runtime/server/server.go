@@ -56,7 +56,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	}
 
 	freeSwitch, err := freeswitch.New(
-		freeswitch.DefaultConfig("127.0.0.1:8021", cfg.FreeSWITCHESLPassword),
+		freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword),
 	)
 	if err != nil {
 		db.Close()
