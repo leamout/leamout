@@ -103,14 +103,16 @@ services:
       - leamout-core
 
   opensips:
-    image: opensips/opensips:3.4
+    image: leamout/opensips:4.0.1
+    build:
+      context: ./opensips
+      dockerfile: Dockerfile
+      args:
+        OPENSIPS_VERSION: 4.0.1
     restart: unless-stopped
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
-    volumes:
-      - ./opensips/opensips.cfg:/etc/opensips/opensips.cfg:ro
-      - ./opensips/tls.cfg:/etc/opensips/tls.cfg:ro
     depends_on:
       postgres:
         condition: service_healthy
