@@ -88,6 +88,15 @@ func validateControl(call sqlc.Call, action controlAction) error {
 	return invalidControlState(action, call.State)
 }
 
+func validateMediaState(call sqlc.Call) error {
+	switch CallMediaState(call.MediaState) {
+	case MediaStateActive, MediaStateHeld:
+		return nil
+	default:
+		return apperror.NewConflict("call has invalid media state: " + call.MediaState)
+	}
+}
+
 func invalidControlState(action controlAction, state string) error {
 	return apperror.NewConflict(fmt.Sprintf("cannot %s call from state: %s", action, state))
 }
@@ -110,4 +119,12 @@ func isPreAnswer(state string) bool {
 
 func isTerminal(state string) bool {
 	return state == string(StateCompleted) || state == string(StateFailed) || state == string(StateCancelled)
+}
+
+func isHeld(call sqlc.Call) bool {
+	return CallMediaState(call.MediaState) == MediaStateHeld
+}
+
+func isMediaActive(call sqlc.Call) bool {
+	return CallMediaState(call.MediaState) == MediaStateActive
 }
