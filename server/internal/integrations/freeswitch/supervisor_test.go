@@ -215,7 +215,8 @@ type fakeESLServer struct {
 func newFakeESLServer(t *testing.T, password string) *fakeESLServer {
 	t.Helper()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	var listenConfig net.ListenConfig
+	listener, err := listenConfig.Listen(context.Background(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen fake ESL server: %v", err)
 	}
