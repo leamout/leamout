@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const completeRecording = `-- name: CompleteRecording :one
@@ -406,6 +407,58 @@ type ListRecordingsParams struct {
 
 func (q *Queries) ListRecordings(ctx context.Context, arg ListRecordingsParams) ([]Recording, error) {
 	rows, err := q.db.Query(ctx, listRecordings, arg.OrganizationID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Recording{}
+	for rows.Next() {
+		var i Recording
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.CallID,
+			&i.Status,
+			&i.StorageKey,
+			&i.StorageProvider,
+			&i.StorageBucket,
+			&i.StorageUrl,
+			&i.FileSizeBytes,
+			&i.Format,
+			&i.DurationSeconds,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listRecordingsForReconciliation = `-- name: ListRecordingsForReconciliation :many
+SELECT r.id, r.organization_id, r.call_id, r.status, r.storage_key, r.storage_provider, r.storage_bucket, r.storage_url, r.file_size_bytes, r.format, r.duration_seconds, r.started_at, r.completed_at, r.created_at, r.updated_at
+FROM recordings r
+JOIN calls c ON c.id = r.call_id
+WHERE r.status = 'recording'
+  AND c.state IN ('completed', 'failed', 'cancelled')
+  AND r.updated_at <= $1
+ORDER BY r.updated_at ASC
+LIMIT $2
+`
+
+type ListRecordingsForReconciliationParams struct {
+	UpdatedBefore pgtype.Timestamptz `db:"updated_before" json:"updated_before"`
+	BatchSize     int32              `db:"batch_size" json:"batch_size"`
+}
+
+func (q *Queries) ListRecordingsForReconciliation(ctx context.Context, arg ListRecordingsForReconciliationParams) ([]Recording, error) {
+	rows, err := q.db.Query(ctx, listRecordingsForReconciliation, arg.UpdatedBefore, arg.BatchSize)
 	if err != nil {
 		return nil, err
 	}
