@@ -44,6 +44,11 @@ func (c *Client) connectAuthenticated(ctx context.Context) (net.Conn, *bufio.Rea
 		return nil, nil, fmt.Errorf("connect to FreeSWITCH: %w", err)
 	}
 
+	stopCancel := context.AfterFunc(ctx, func() {
+		_ = conn.Close()
+	})
+	defer stopCancel()
+
 	deadline := time.Now().Add(c.connectTimeout)
 	if ctxDeadline, ok := ctx.Deadline(); ok && ctxDeadline.Before(deadline) {
 		deadline = ctxDeadline
