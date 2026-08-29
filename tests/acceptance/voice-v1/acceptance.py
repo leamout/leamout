@@ -475,17 +475,31 @@ def conference():
     if item["state"] != "active":
         raise AcceptanceError("conference API did not create active state")
 
-    media = fs_cli("freeswitch", "conference list")
-    if name not in media:
-        raise AcceptanceError(
-            "conference exists only in control-plane state; no matching FreeSWITCH conference exists"
-        )
+    # FreeSWITCH conference rooms are dynamic media objects: the conference
+    # application creates the room when its first member enters and destroys it
+    # when the last member leaves. Use a background loopback call as the live
+    # synthetic participant before asserting media-plane conference controls.
+    fs_cli(
+        "freeswitch",
+        "bgapi originate "
+        f"{{origination_caller_id_number={CALLER}}}"
+        f"loopback/9196/leamout &conference({name}@default)",
+    )
+    wait_for(
+        "conference media room",
+        lambda: name if name in fs_cli("freeswitch", "conference list") else False,
+        timeout=15,
+    )
 
-    api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
-    if "locked" not in fs_cli("freeswitch", f"conference {name} list").lower():
-        raise AcceptanceError("conference lock is not observable in FreeSWITCH")
-    api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
-    api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
+    try:
+        api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
+        if "locked" not in fs_cli("freeswitch", f"conference {name} list").lower():
+            raise AcceptanceError("conference lock is not observable in FreeSWITCH")
+        api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
+        api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
+    finally:
+        fs_cli("freeswitch", f"conference {name} kick all")
+
     return "conference lifecycle and controls are observable in FreeSWITCH"
 
 
