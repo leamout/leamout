@@ -1,6 +1,7 @@
 package webhooks
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,29 @@ type UpdateRequest struct {
 	URL              *string   `json:"url,omitempty"`
 	SubscribedEvents *[]string `json:"subscribed_events,omitempty"`
 	Enabled          *bool     `json:"enabled,omitempty"`
+}
+
+type InboundEvent struct {
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	EventType      string
+	ObjectType     string
+	ObjectID       *uuid.UUID
+	Payload        json.RawMessage
+	OccurredAt     time.Time
+}
+
+type DeliveryEnvelope struct {
+	ID         uuid.UUID       `json:"id"`
+	Type       string          `json:"type"`
+	OccurredAt time.Time       `json:"occurred_at"`
+	Data       json.RawMessage `json:"data"`
+}
+
+type DeliveryAttempt struct {
+	StatusCode *int32
+	Body       *string
+	Err        error
 }
 
 type EndpointResponse struct {
