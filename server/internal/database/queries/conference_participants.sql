@@ -12,11 +12,11 @@ INSERT INTO conference_participants (
     sqlc.arg(organization_id),
     sqlc.arg(conference_id),
     sqlc.narg(call_participant_id),
-    COALESCE(sqlc.narg(state), 'joining'),
+    COALESCE(sqlc.narg(state), 'joined'),
     COALESCE(sqlc.narg(muted), false),
     COALESCE(sqlc.narg(deaf), false),
     COALESCE(sqlc.narg(speaking), false),
-    sqlc.narg(joined_at)
+    COALESCE(sqlc.narg(joined_at), NOW())
 )
 RETURNING *;
 
@@ -34,22 +34,52 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND conference_id = sqlc.arg(conference_id)
 ORDER BY created_at ASC;
 
--- name: UpdateConferenceParticipantState :one
+-- name: LeaveConferenceParticipant :one
 UPDATE conference_participants
 SET
-    state = sqlc.arg(state),
-    muted = COALESCE(sqlc.narg(muted), muted),
-    deaf = COALESCE(sqlc.narg(deaf), deaf),
-    speaking = COALESCE(sqlc.narg(speaking), speaking),
-    joined_at = CASE
-        WHEN sqlc.arg(state)::text = 'joined' THEN COALESCE(joined_at, NOW())
-        ELSE joined_at
-    END,
-    left_at = CASE
-        WHEN sqlc.arg(state)::text IN ('left', 'failed') THEN COALESCE(left_at, NOW())
-        ELSE left_at
-    END,
+    state = 'left',
+    left_at = COALESCE(left_at, NOW()),
+    muted = false,
+    deaf = false,
+    speaking = false,
     updated_at = NOW()
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
+  AND state IN ('joining', 'joined')
+RETURNING *;
+
+-- name: FailConferenceParticipant :one
+UPDATE conference_participants
+SET
+    state = 'failed',
+    left_at = COALESCE(left_at, NOW()),
+    muted = false,
+    deaf = false,
+    speaking = false,
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND state IN ('joining', 'joined')
+RETURNING *;
+
+-- name: SetConferenceParticipantMuted :one
+UPDATE conference_participants
+SET
+    muted = sqlc.arg(muted),
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND state = 'joined'
+  AND muted <> sqlc.arg(muted)
+RETURNING *;
+
+-- name: SetConferenceParticipantDeaf :one
+UPDATE conference_participants
+SET
+    deaf = sqlc.arg(deaf),
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND state = 'joined'
+  AND deaf <> sqlc.arg(deaf)
 RETURNING *;

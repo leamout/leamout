@@ -15,7 +15,13 @@ type Service struct {
 }
 
 func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+	if repo == nil {
+		panic("conferences: repository is required")
+	}
+
+	return &Service{
+		repo: repo,
+	}
 }
 
 func (s *Service) Create(
@@ -76,12 +82,34 @@ func (s *Service) End(
 	org uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.Conference, error) {
-	if _, err := s.Get(ctx, org, id); err != nil {
+	conference, err := s.Get(ctx, org, id)
+	if err != nil {
 		return sqlc.Conference{}, err
 	}
+	if conference.State == string(StateEnded) {
+		return conference, nil
+	}
+	if conference.State != string(StateActive) {
+		return sqlc.Conference{}, apperror.NewConflict(
+			"conference cannot be ended from state: " + conference.State,
+		)
+	}
 
-	value, err := s.repo.SetState(ctx, org, id, "ended")
-	return value, conferenceWriteError(err, "end conference")
+	value, err := s.repo.End(ctx, org, id)
+	if err == nil {
+		return value, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		current, readErr := s.Get(ctx, org, id)
+		if readErr != nil {
+			return sqlc.Conference{}, readErr
+		}
+		if current.State == string(StateEnded) {
+			return current, nil
+		}
+	}
+
+	return sqlc.Conference{}, conferenceWriteError(err, "end conference")
 }
 
 func (s *Service) AddParticipant(
@@ -94,7 +122,7 @@ func (s *Service) AddParticipant(
 	if err != nil {
 		return sqlc.ConferenceParticipant{}, err
 	}
-	if conference.State != "active" {
+	if conference.State != string(StateActive) {
 		return sqlc.ConferenceParticipant{}, apperror.NewConflict("conference has ended")
 	}
 	if err := validateParticipantRequest(&req); err != nil {
@@ -152,12 +180,126 @@ func (s *Service) SetParticipant(
 	muted *bool,
 	deaf *bool,
 ) (sqlc.ConferenceParticipant, error) {
-	if _, err := s.participant(ctx, org, conferenceID, id); err != nil {
+	participant, err := s.participant(ctx, org, conferenceID, id)
+	if err != nil {
 		return sqlc.ConferenceParticipant{}, err
 	}
 
-	value, err := s.repo.SetParticipant(ctx, org, id, state, muted, deaf)
-	return value, conferenceWriteError(err, "update conference participant")
+	if state == string(ParticipantLeft) {
+		if participant.State == string(ParticipantLeft) {
+			return participant, nil
+		}
+		if participant.State == string(ParticipantFailed) {
+			return sqlc.ConferenceParticipant{}, apperror.NewConflict(
+				"failed conference participant cannot leave",
+			)
+		}
+
+		value, err := s.repo.LeaveParticipant(ctx, org, id)
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantLeft),
+			"remove conference participant",
+		)
+	}
+
+	if state == string(ParticipantFailed) {
+		if participant.State == string(ParticipantFailed) {
+			return participant, nil
+		}
+		if participant.State == string(ParticipantLeft) {
+			return sqlc.ConferenceParticipant{}, apperror.NewConflict(
+				"left conference participant cannot fail",
+			)
+		}
+
+		value, err := s.repo.FailParticipant(ctx, org, id)
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantFailed),
+			"fail conference participant",
+		)
+	}
+
+	if participant.State != string(ParticipantJoined) {
+		return sqlc.ConferenceParticipant{}, apperror.NewConflict(
+			"conference participant is not joined",
+		)
+	}
+
+	if muted != nil {
+		if participant.Muted == *muted {
+			return participant, nil
+		}
+
+		value, err := s.repo.SetParticipantMuted(ctx, org, id, *muted)
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantJoined),
+			"update conference participant mute state",
+		)
+	}
+
+	if deaf != nil {
+		if participant.Deaf == *deaf {
+			return participant, nil
+		}
+
+		value, err := s.repo.SetParticipantDeaf(ctx, org, id, *deaf)
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantJoined),
+			"update conference participant deaf state",
+		)
+	}
+
+	return participant, nil
+}
+
+func (s *Service) resolveParticipantMutation(
+	ctx context.Context,
+	org uuid.UUID,
+	conferenceID uuid.UUID,
+	id uuid.UUID,
+	value sqlc.ConferenceParticipant,
+	err error,
+	desiredState string,
+	message string,
+) (sqlc.ConferenceParticipant, error) {
+	if err == nil {
+		return value, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		current, readErr := s.participant(ctx, org, conferenceID, id)
+		if readErr != nil {
+			return sqlc.ConferenceParticipant{}, readErr
+		}
+		if current.State == desiredState {
+			return current, nil
+		}
+	}
+
+	return sqlc.ConferenceParticipant{}, conferenceWriteError(err, message)
 }
 
 func conferenceReadError(err error, message string) error {
@@ -173,7 +315,9 @@ func conferenceReadError(err error, message string) error {
 
 func conferenceWriteError(err error, message string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
-		return apperror.NewNotFound("conference not found")
+		return apperror.NewConflict(
+			message + " is not valid in the current lifecycle state",
+		)
 	}
 	if err != nil {
 		return apperror.NewInternal(message, err)

@@ -10,7 +10,7 @@ INSERT INTO conferences (
     sqlc.narg(application_id),
     sqlc.arg(name),
     COALESCE(sqlc.narg(state), 'active'),
-    sqlc.narg(started_at)
+    COALESCE(sqlc.narg(started_at), NOW())
 )
 RETURNING *;
 
@@ -36,15 +36,27 @@ ORDER BY created_at DESC
 LIMIT sqlc.arg(page_limit)
 OFFSET sqlc.arg(page_offset);
 
--- name: UpdateConferenceState :one
+-- name: EndConference :one
 UPDATE conferences
 SET
-    state = sqlc.arg(state),
-    ended_at = CASE
-        WHEN sqlc.arg(state)::text = 'ended' THEN COALESCE(ended_at, NOW())
-        ELSE ended_at
-    END,
+    state = 'ended',
+    ended_at = COALESCE(ended_at, NOW()),
     updated_at = NOW()
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
+  AND state = 'active'
+RETURNING *;
+
+-- name: EndConferenceParticipants :many
+UPDATE conference_participants
+SET
+    state = 'left',
+    left_at = COALESCE(left_at, NOW()),
+    muted = false,
+    deaf = false,
+    speaking = false,
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND conference_id = sqlc.arg(conference_id)
+  AND state IN ('joining', 'joined')
 RETURNING *;

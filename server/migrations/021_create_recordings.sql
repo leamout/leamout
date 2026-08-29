@@ -38,6 +38,10 @@ CREATE INDEX IF NOT EXISTS idx_recordings_call_created
 CREATE INDEX IF NOT EXISTS idx_recordings_status
     ON recordings (organization_id, status, created_at DESC);
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_recordings_call_storage_key
+    ON recordings (call_id, storage_key)
+    WHERE storage_key IS NOT NULL;
+
 CREATE TRIGGER set_recordings_updated_at
 BEFORE UPDATE ON recordings
 FOR EACH ROW

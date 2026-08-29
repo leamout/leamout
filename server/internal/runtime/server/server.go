@@ -137,10 +137,10 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	callsRepository := calls.NewRepository(db)
 	callsService := calls.NewService(callsRepository, controller, routingService)
 
-	recordingsRepository := recordings.NewRepository(queries)
+	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
 
-	conferencesRepository := conferences.NewRepository(queries)
+	conferencesRepository := conferences.NewRepository(db)
 	conferencesService := conferences.NewService(conferencesRepository)
 
 	subscribersRepository := subscribers.NewRepository(queries)
