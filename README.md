@@ -89,13 +89,13 @@ RTPengine   FreeSWITCH
 ```text
 0. Control-plane primitives
         ↓
-1. Self-hosted programmable voice
+1. Self-hosted programmable voice + BYOC
         ↓
 2. Managed programmable voice
         ↓
-3. BYOC + multi-carrier orchestration
+3. Multi-carrier orchestration
         ↓
-4. Number abstraction + provisioning
+4. Number provisioning + lifecycle
         ↓
 5. Direct carrier connectivity
         ↓
