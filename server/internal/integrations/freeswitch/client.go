@@ -152,8 +152,16 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 }
 
 func freeSWITCHStatusUp(reply Reply) bool {
-	status := strings.ToUpper(reply.Text + "\n" + reply.Body)
-	return strings.Contains(status, "UP")
+	for _, value := range []string{reply.Body, reply.Text} {
+		status := strings.ToUpper(strings.TrimSpace(value))
+		if status == "UP" ||
+			strings.HasPrefix(status, "UP ") ||
+			strings.HasPrefix(status, "+OK UP") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *Client) command(ctx context.Context, command string) (Frame, error) {
