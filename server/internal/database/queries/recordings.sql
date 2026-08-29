@@ -54,6 +54,16 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND status <> 'deleted'
 ORDER BY created_at DESC;
 
+-- name: ListRecordingsForReconciliation :many
+SELECT r.*
+FROM recordings r
+JOIN calls c ON c.id = r.call_id
+WHERE r.status = 'recording'
+  AND c.state IN ('completed', 'failed', 'cancelled')
+  AND r.updated_at <= sqlc.arg(updated_before)
+ORDER BY r.updated_at ASC
+LIMIT sqlc.arg(batch_size);
+
 -- name: CompleteRecording :one
 UPDATE recordings
 SET

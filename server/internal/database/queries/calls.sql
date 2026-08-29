@@ -47,6 +47,15 @@ ORDER BY created_at DESC
 LIMIT sqlc.arg(page_limit)
 OFFSET sqlc.arg(page_offset);
 
+-- name: ListCallsForReconciliation :many
+SELECT *
+FROM calls
+WHERE state IN ('initiating', 'ringing', 'answered', 'active')
+  AND sip_call_id IS NOT NULL
+  AND updated_at <= sqlc.arg(updated_before)
+ORDER BY updated_at ASC
+LIMIT sqlc.arg(batch_size);
+
 -- name: UpdateCallState :one
 UPDATE calls
 SET

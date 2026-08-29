@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/modules/outbox"
@@ -102,6 +103,20 @@ func (r *Repository) List(
 		State:          state,
 		PageOffset:     offset,
 		PageLimit:      limit,
+	})
+}
+
+func (r *Repository) ListForReconciliation(
+	ctx context.Context,
+	updatedBefore time.Time,
+	batchSize int32,
+) ([]sqlc.Call, error) {
+	return r.queries.ListCallsForReconciliation(ctx, sqlc.ListCallsForReconciliationParams{
+		UpdatedBefore: pgtype.Timestamptz{
+			Time:  updatedBefore,
+			Valid: true,
+		},
+		BatchSize: batchSize,
 	})
 }
 

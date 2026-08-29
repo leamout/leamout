@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createCall = `-- name: CreateCall :one
@@ -203,6 +204,58 @@ func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]Call, e
 		arg.PageOffset,
 		arg.PageLimit,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Call{}
+	for rows.Next() {
+		var i Call
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.ApplicationID,
+			&i.Direction,
+			&i.State,
+			&i.MediaState,
+			&i.FromUri,
+			&i.ToUri,
+			&i.SipCallID,
+			&i.ProviderID,
+			&i.StartedAt,
+			&i.AnsweredAt,
+			&i.EndedAt,
+			&i.HangupReason,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCallsForReconciliation = `-- name: ListCallsForReconciliation :many
+SELECT id, organization_id, application_id, direction, state, media_state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+FROM calls
+WHERE state IN ('initiating', 'ringing', 'answered', 'active')
+  AND sip_call_id IS NOT NULL
+  AND updated_at <= $1
+ORDER BY updated_at ASC
+LIMIT $2
+`
+
+type ListCallsForReconciliationParams struct {
+	UpdatedBefore pgtype.Timestamptz `db:"updated_before" json:"updated_before"`
+	BatchSize     int32              `db:"batch_size" json:"batch_size"`
+}
+
+func (q *Queries) ListCallsForReconciliation(ctx context.Context, arg ListCallsForReconciliationParams) ([]Call, error) {
+	rows, err := q.db.Query(ctx, listCallsForReconciliation, arg.UpdatedBefore, arg.BatchSize)
 	if err != nil {
 		return nil, err
 	}

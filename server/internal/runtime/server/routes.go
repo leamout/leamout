@@ -1,8 +1,6 @@
 package server
 
 import (
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leamout/leamout/internal/identity/auth"
@@ -24,10 +22,6 @@ import (
 )
 
 func RegisterRoutes(r *chi.Mux, modules Modules) {
-	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	})
-
 	r.Route("/v1", func(r chi.Router) {
 		auth.RegisterRoutes(
 			r,
@@ -94,7 +88,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			modules.Trunks.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
-		carriers.RegisterRoutes(r, modules.Carriers.Handler, modules.OrganizationsContext.RequireAuthenticated(modules.Authn))
+		carriers.RegisterRoutes(
+			r,
+			modules.Carriers.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
 		webhooks.RegisterRoutes(
 			r,
 			modules.Webhooks.Handler,

@@ -94,6 +94,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		middleware.CORS(cfg.CORSOrigins, cfg.IsDevelopment()),
 	)
 
+	RegisterHealthRoutes(router, db, freeSwitch)
 	RegisterRoutes(router, modules)
 
 	return &Server{
