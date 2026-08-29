@@ -227,6 +227,7 @@ func (c *Client) readLoop(
 			select {
 			case replyCh <- frame:
 			case <-c.lifecycleCtx.Done():
+				c.disconnect(conn, context.Canceled)
 				return
 			}
 		case ContentTypeEventPlain:
