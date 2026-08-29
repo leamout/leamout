@@ -2,10 +2,12 @@ package calls
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -36,7 +38,7 @@ func (r *Repository) Create(
 	req CreateCallRequest,
 	sipCallID string,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallInitiated, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.createWithEvent(ctx, organizationID, sipCallID, DirectionOutbound, EventCallInitiated, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.CreateCall(ctx, sqlc.CreateCallParams{
 			OrganizationID: organizationID,
 			ApplicationID:  req.ApplicationID,
@@ -52,7 +54,7 @@ func (r *Repository) Create(
 func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) (sqlc.Call, error) {
 	applicationID := event.ApplicationID
 	channelID := event.ChannelID
-	return r.mutateWithEvent(ctx, EventCallRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.createWithEvent(ctx, event.OrganizationID, channelID, DirectionInbound, EventCallRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.CreateCall(ctx, sqlc.CreateCallParams{
 			OrganizationID: event.OrganizationID,
 			ApplicationID:  &applicationID,
@@ -232,6 +234,58 @@ func (r *Repository) MarkCancelled(
 
 type callMutation func(*sqlc.Queries) (sqlc.Call, error)
 
+func (r *Repository) createWithEvent(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	sipCallID string,
+	direction CallDirection,
+	eventType CallEventType,
+	mutation callMutation,
+) (sqlc.Call, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return sqlc.Call{}, fmt.Errorf("begin call transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	queries := r.queries.WithTx(tx)
+	call, err := mutation(queries)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "uq_calls_sip_call_id" {
+			return sqlc.Call{}, err
+		}
+
+		// A unique violation aborts this transaction. Roll it back before
+		// reading the canonical row created by the concurrent/replayed event.
+		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
+			return sqlc.Call{}, fmt.Errorf("rollback duplicate call transaction: %w", rollbackErr)
+		}
+		existing, getErr := r.GetBySIPCallID(ctx, organizationID, sipCallID)
+		if getErr != nil {
+			return sqlc.Call{}, fmt.Errorf("get existing call after SIP identity conflict: %w", getErr)
+		}
+		if existing.Direction != string(direction) {
+			return sqlc.Call{}, fmt.Errorf(
+				"SIP call identity %q belongs to %s call %s, not %s",
+				sipCallID,
+				existing.Direction,
+				existing.ID,
+				direction,
+			)
+		}
+		return existing, nil
+	}
+
+	if err := r.insertEvent(ctx, tx, call, eventType); err != nil {
+		return sqlc.Call{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.Call{}, fmt.Errorf("commit call transaction: %w", err)
+	}
+	return call, nil
+}
+
 func (r *Repository) mutateWithEvent(
 	ctx context.Context,
 	eventType CallEventType,
@@ -249,6 +303,21 @@ func (r *Repository) mutateWithEvent(
 		return sqlc.Call{}, err
 	}
 
+	if err := r.insertEvent(ctx, tx, call, eventType); err != nil {
+		return sqlc.Call{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.Call{}, fmt.Errorf("commit call transaction: %w", err)
+	}
+	return call, nil
+}
+
+func (r *Repository) insertEvent(
+	ctx context.Context,
+	tx pgx.Tx,
+	call sqlc.Call,
+	eventType CallEventType,
+) error {
 	occurredAt := time.Now().UTC()
 	event := callDomainEvent(call, eventType, occurredAt)
 	if _, err := r.outbox.WithTx(tx).Insert(ctx, outbox.Event{
@@ -262,13 +331,9 @@ func (r *Repository) mutateWithEvent(
 			"schema_version":  "1",
 		},
 	}); err != nil {
-		return sqlc.Call{}, fmt.Errorf("insert call outbox event: %w", err)
+		return fmt.Errorf("insert call outbox event: %w", err)
 	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return sqlc.Call{}, fmt.Errorf("commit call transaction: %w", err)
-	}
-	return call, nil
+	return nil
 }
 
 func callDomainEvent(call sqlc.Call, eventType CallEventType, occurredAt time.Time) CallEvent {
