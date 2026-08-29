@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT uq_subscriptions_id_organization UNIQUE (id, organization_id),
     CONSTRAINT chk_subscriptions_status CHECK (
         status IN ('pending', 'active', 'past_due', 'cancelled', 'expired')
     ),
