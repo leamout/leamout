@@ -104,7 +104,14 @@ def api(method, path, payload=None, auth=True, expected=None):
     if not raw:
         return status, None
     try:
-        return status, json.loads(raw)
+        parsed = json.loads(raw)
+        if (
+            isinstance(parsed, dict)
+            and parsed.get("success") is True
+            and "data" in parsed
+        ):
+            parsed = parsed["data"]
+        return status, parsed
     except json.JSONDecodeError:
         return status, raw.decode(errors="replace")
 
