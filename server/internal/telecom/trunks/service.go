@@ -30,41 +30,56 @@ func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
 	return service
 }
 
-func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Trunk, error) {
+func (s *Service) Create(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateRequest,
+) (sqlc.Trunk, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return sqlc.Trunk{}, err
 	}
 	if err := validateID(req.CarrierConnectionID, "carrier_connection_id"); err != nil {
 		return sqlc.Trunk{}, err
 	}
+
 	name, err := normalizeName(req.Name)
 	if err != nil {
 		return sqlc.Trunk{}, err
 	}
+
 	if req.Direction != nil {
-		value, e := normalizeChoice(*req.Direction, directions, "direction")
-		if e != nil {
-			return sqlc.Trunk{}, e
+		value, err := normalizeChoice(*req.Direction, directions, "direction")
+		if err != nil {
+			return sqlc.Trunk{}, err
 		}
 		req.Direction = &value
 	}
+
 	if req.Status != nil {
-		value, e := normalizeChoice(*req.Status, statuses, "status")
-		if e != nil {
-			return sqlc.Trunk{}, e
+		value, err := normalizeChoice(*req.Status, statuses, "status")
+		if err != nil {
+			return sqlc.Trunk{}, err
 		}
 		req.Status = &value
 	}
-	result, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
-		return repo.Create(ctx, sqlc.CreateTrunkParams{OrganizationID: organizationID, CarrierConnectionID: req.CarrierConnectionID, Name: name, Direction: req.Direction, Status: req.Status})
+
+	item, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
+		return repo.Create(ctx, sqlc.CreateTrunkParams{
+			OrganizationID:      organizationID,
+			CarrierConnectionID: req.CarrierConnectionID,
+			Name:                name,
+			Direction:           req.Direction,
+			Status:              req.Status,
+		})
 	})
-	return result, writeError(err, "trunk", "carrier connection not found")
+	return item, writeError(err, "trunk", "carrier connection not found")
 }
 
 func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.Trunk, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return nil, err
 	}
+
 	items, err := s.repo.List(ctx, organizationID)
 	if err != nil {
 		return nil, apperror.NewInternal("list trunks", err)
@@ -79,17 +94,24 @@ func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.T
 	if err := validateID(id, "trunk id"); err != nil {
 		return sqlc.Trunk{}, err
 	}
+
 	item, err := s.repo.Get(ctx, organizationID, id)
 	return item, readError(err, "trunk not found")
 }
 
-func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req UpdateRequest) (sqlc.Trunk, error) {
+func (s *Service) Update(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+	req UpdateRequest,
+) (sqlc.Trunk, error) {
 	if _, err := s.Get(ctx, organizationID, id); err != nil {
 		return sqlc.Trunk{}, err
 	}
 	if req.Name == nil && req.Direction == nil && req.Status == nil {
 		return sqlc.Trunk{}, apperror.NewBadRequest("at least one field is required")
 	}
+
 	if req.Name != nil {
 		value, err := normalizeName(*req.Name)
 		if err != nil {
@@ -97,6 +119,7 @@ func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req 
 		}
 		req.Name = &value
 	}
+
 	if req.Direction != nil {
 		value, err := normalizeChoice(*req.Direction, directions, "direction")
 		if err != nil {
@@ -104,6 +127,7 @@ func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req 
 		}
 		req.Direction = &value
 	}
+
 	if req.Status != nil {
 		value, err := normalizeChoice(*req.Status, statuses, "status")
 		if err != nil {
@@ -111,8 +135,15 @@ func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req 
 		}
 		req.Status = &value
 	}
+
 	item, err := s.mutateTrunk(ctx, EventTrunkUpdated, func(repo *Repository) (sqlc.Trunk, error) {
-		return repo.Update(ctx, sqlc.UpdateTrunkParams{Name: req.Name, Direction: req.Direction, Status: req.Status, ID: id, OrganizationID: organizationID})
+		return repo.Update(ctx, sqlc.UpdateTrunkParams{
+			Name:           req.Name,
+			Direction:      req.Direction,
+			Status:         req.Status,
+			ID:             id,
+			OrganizationID: organizationID,
+		})
 	})
 	return item, writeError(err, "trunk", "trunk not found")
 }
@@ -125,96 +156,34 @@ func (s *Service) Delete(ctx context.Context, organizationID, id uuid.UUID) erro
 	if item.Status == "disabled" {
 		return nil
 	}
+
 	_, err = s.mutateTrunk(ctx, EventTrunkDisabled, func(repo *Repository) (sqlc.Trunk, error) {
 		return repo.Disable(ctx, organizationID, id)
 	})
 	return writeError(err, "trunk", "trunk not found")
 }
 
-func (s *Service) CreateEndpoint(ctx context.Context, organizationID, trunkID uuid.UUID, req EndpointCreateRequest) (sqlc.TrunkEndpoint, error) {
+func (s *Service) CreateEndpoint(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	trunkID uuid.UUID,
+	req EndpointCreateRequest,
+) (sqlc.TrunkEndpoint, error) {
 	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
+
 	host, err := normalizeHost(req.Host)
 	if err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
+
 	if req.Port != nil {
 		if err := validatePort(*req.Port); err != nil {
 			return sqlc.TrunkEndpoint{}, err
 		}
 	}
-	if req.Transport != nil {
-		value, e := normalizeChoice(*req.Transport, transports, "transport")
-		if e != nil {
-			return sqlc.TrunkEndpoint{}, e
-		}
-		req.Transport = &value
-	}
-	if req.Direction != nil {
-		value, e := normalizeChoice(*req.Direction, directions, "direction")
-		if e != nil {
-			return sqlc.TrunkEndpoint{}, e
-		}
-		req.Direction = &value
-	}
-	if req.Priority != nil {
-		if err := validatePriority(*req.Priority); err != nil {
-			return sqlc.TrunkEndpoint{}, err
-		}
-	}
-	if req.Weight != nil {
-		if err := validateWeight(*req.Weight); err != nil {
-			return sqlc.TrunkEndpoint{}, err
-		}
-	}
-	item, err := s.mutateEndpoint(ctx, EventTrunkEndpointCreated, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
-		return repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{OrganizationID: organizationID, TrunkID: trunkID, Host: host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled})
-	})
-	return item, writeError(err, "trunk endpoint", "trunk not found")
-}
 
-func (s *Service) ListEndpoints(ctx context.Context, organizationID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
-	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
-		return nil, err
-	}
-	items, err := s.repo.ListEndpoints(ctx, organizationID, trunkID)
-	if err != nil {
-		return nil, apperror.NewInternal("list trunk endpoints", err)
-	}
-	return items, nil
-}
-
-func (s *Service) GetEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
-	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
-		return sqlc.TrunkEndpoint{}, err
-	}
-	if err := validateID(id, "endpoint id"); err != nil {
-		return sqlc.TrunkEndpoint{}, err
-	}
-	item, err := s.repo.GetEndpoint(ctx, organizationID, trunkID, id)
-	return item, readError(err, "trunk endpoint not found")
-}
-
-func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID, req EndpointUpdateRequest) (sqlc.TrunkEndpoint, error) {
-	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
-		return sqlc.TrunkEndpoint{}, err
-	}
-	if req.Host == nil && req.Port == nil && req.Transport == nil && req.Direction == nil && req.Priority == nil && req.Weight == nil && req.Enabled == nil {
-		return sqlc.TrunkEndpoint{}, apperror.NewBadRequest("at least one field is required")
-	}
-	if req.Host != nil {
-		value, err := normalizeHost(*req.Host)
-		if err != nil {
-			return sqlc.TrunkEndpoint{}, err
-		}
-		req.Host = &value
-	}
-	if req.Port != nil {
-		if err := validatePort(*req.Port); err != nil {
-			return sqlc.TrunkEndpoint{}, err
-		}
-	}
 	if req.Transport != nil {
 		value, err := normalizeChoice(*req.Transport, transports, "transport")
 		if err != nil {
@@ -222,6 +191,7 @@ func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, i
 		}
 		req.Transport = &value
 	}
+
 	if req.Direction != nil {
 		value, err := normalizeChoice(*req.Direction, directions, "direction")
 		if err != nil {
@@ -229,6 +199,7 @@ func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, i
 		}
 		req.Direction = &value
 	}
+
 	if req.Priority != nil {
 		if err := validatePriority(*req.Priority); err != nil {
 			return sqlc.TrunkEndpoint{}, err
@@ -239,26 +210,171 @@ func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, i
 			return sqlc.TrunkEndpoint{}, err
 		}
 	}
-	item, err := s.mutateEndpoint(ctx, EventTrunkEndpointUpdated, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
-		return repo.UpdateEndpoint(ctx, sqlc.UpdateTrunkEndpointParams{Host: req.Host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled, ID: id, TrunkID: trunkID, OrganizationID: organizationID})
-	})
+
+	item, err := s.mutateEndpoint(
+		ctx,
+		EventTrunkEndpointCreated,
+		func(repo *Repository) (sqlc.TrunkEndpoint, error) {
+			return repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{
+				OrganizationID: organizationID,
+				TrunkID:        trunkID,
+				Host:           host,
+				Port:           req.Port,
+				Transport:      req.Transport,
+				Direction:      req.Direction,
+				Priority:       req.Priority,
+				Weight:         req.Weight,
+				Enabled:        req.Enabled,
+			})
+		},
+	)
+	return item, writeError(err, "trunk endpoint", "trunk not found")
+}
+
+func (s *Service) ListEndpoints(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	trunkID uuid.UUID,
+) ([]sqlc.TrunkEndpoint, error) {
+	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
+		return nil, err
+	}
+
+	items, err := s.repo.ListEndpoints(ctx, organizationID, trunkID)
+	if err != nil {
+		return nil, apperror.NewInternal("list trunk endpoints", err)
+	}
+	return items, nil
+}
+
+func (s *Service) GetEndpoint(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	trunkID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.TrunkEndpoint, error) {
+	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
+		return sqlc.TrunkEndpoint{}, err
+	}
+	if err := validateID(id, "endpoint id"); err != nil {
+		return sqlc.TrunkEndpoint{}, err
+	}
+
+	item, err := s.repo.GetEndpoint(ctx, organizationID, trunkID, id)
+	return item, readError(err, "trunk endpoint not found")
+}
+
+func (s *Service) UpdateEndpoint(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	trunkID uuid.UUID,
+	id uuid.UUID,
+	req EndpointUpdateRequest,
+) (sqlc.TrunkEndpoint, error) {
+	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
+		return sqlc.TrunkEndpoint{}, err
+	}
+	if req.Host == nil &&
+		req.Port == nil &&
+		req.Transport == nil &&
+		req.Direction == nil &&
+		req.Priority == nil &&
+		req.Weight == nil &&
+		req.Enabled == nil {
+		return sqlc.TrunkEndpoint{}, apperror.NewBadRequest("at least one field is required")
+	}
+
+	if req.Host != nil {
+		value, err := normalizeHost(*req.Host)
+		if err != nil {
+			return sqlc.TrunkEndpoint{}, err
+		}
+		req.Host = &value
+	}
+
+	if req.Port != nil {
+		if err := validatePort(*req.Port); err != nil {
+			return sqlc.TrunkEndpoint{}, err
+		}
+	}
+
+	if req.Transport != nil {
+		value, err := normalizeChoice(*req.Transport, transports, "transport")
+		if err != nil {
+			return sqlc.TrunkEndpoint{}, err
+		}
+		req.Transport = &value
+	}
+
+	if req.Direction != nil {
+		value, err := normalizeChoice(*req.Direction, directions, "direction")
+		if err != nil {
+			return sqlc.TrunkEndpoint{}, err
+		}
+		req.Direction = &value
+	}
+
+	if req.Priority != nil {
+		if err := validatePriority(*req.Priority); err != nil {
+			return sqlc.TrunkEndpoint{}, err
+		}
+	}
+	if req.Weight != nil {
+		if err := validateWeight(*req.Weight); err != nil {
+			return sqlc.TrunkEndpoint{}, err
+		}
+	}
+
+	item, err := s.mutateEndpoint(
+		ctx,
+		EventTrunkEndpointUpdated,
+		func(repo *Repository) (sqlc.TrunkEndpoint, error) {
+			return repo.UpdateEndpoint(ctx, sqlc.UpdateTrunkEndpointParams{
+				Host:           req.Host,
+				Port:           req.Port,
+				Transport:      req.Transport,
+				Direction:      req.Direction,
+				Priority:       req.Priority,
+				Weight:         req.Weight,
+				Enabled:        req.Enabled,
+				ID:             id,
+				TrunkID:        trunkID,
+				OrganizationID: organizationID,
+			})
+		},
+	)
 	return item, writeError(err, "trunk endpoint", "trunk endpoint not found")
 }
 
-func (s *Service) DeleteEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) error {
+func (s *Service) DeleteEndpoint(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	trunkID uuid.UUID,
+	id uuid.UUID,
+) error {
 	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
 		return err
 	}
-	_, err := s.mutateEndpoint(ctx, EventTrunkEndpointDeleted, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
-		return repo.DeleteEndpoint(ctx, organizationID, trunkID, id)
-	})
+
+	_, err := s.mutateEndpoint(
+		ctx,
+		EventTrunkEndpointDeleted,
+		func(repo *Repository) (sqlc.TrunkEndpoint, error) {
+			return repo.DeleteEndpoint(ctx, organizationID, trunkID, id)
+		},
+	)
 	return writeError(err, "trunk endpoint", "trunk endpoint not found")
 }
 
-func (s *Service) mutateTrunk(ctx context.Context, eventType EventType, mutation func(*Repository) (sqlc.Trunk, error)) (sqlc.Trunk, error) {
+func (s *Service) mutateTrunk(
+	ctx context.Context,
+	eventType EventType,
+	mutation func(*Repository) (sqlc.Trunk, error),
+) (sqlc.Trunk, error) {
 	if s.db == nil || s.outbox == nil {
 		return sqlc.Trunk{}, fmt.Errorf("trunk database is required for domain events")
 	}
+
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return sqlc.Trunk{}, fmt.Errorf("begin trunk transaction: %w", err)
@@ -269,6 +385,7 @@ func (s *Service) mutateTrunk(ctx context.Context, eventType EventType, mutation
 	if err != nil {
 		return sqlc.Trunk{}, err
 	}
+
 	occurredAt := time.Now().UTC()
 	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
 		Subject:       string(eventType),
@@ -285,16 +402,22 @@ func (s *Service) mutateTrunk(ctx context.Context, eventType EventType, mutation
 	}); err != nil {
 		return sqlc.Trunk{}, fmt.Errorf("insert trunk outbox event: %w", err)
 	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return sqlc.Trunk{}, fmt.Errorf("commit trunk transaction: %w", err)
 	}
 	return item, nil
 }
 
-func (s *Service) mutateEndpoint(ctx context.Context, eventType EventType, mutation func(*Repository) (sqlc.TrunkEndpoint, error)) (sqlc.TrunkEndpoint, error) {
+func (s *Service) mutateEndpoint(
+	ctx context.Context,
+	eventType EventType,
+	mutation func(*Repository) (sqlc.TrunkEndpoint, error),
+) (sqlc.TrunkEndpoint, error) {
 	if s.db == nil || s.outbox == nil {
 		return sqlc.TrunkEndpoint{}, fmt.Errorf("trunk database is required for domain events")
 	}
+
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return sqlc.TrunkEndpoint{}, fmt.Errorf("begin trunk endpoint transaction: %w", err)
@@ -305,6 +428,7 @@ func (s *Service) mutateEndpoint(ctx context.Context, eventType EventType, mutat
 	if err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
+
 	occurredAt := time.Now().UTC()
 	endpointID := item.ID
 	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
@@ -323,6 +447,7 @@ func (s *Service) mutateEndpoint(ctx context.Context, eventType EventType, mutat
 	}); err != nil {
 		return sqlc.TrunkEndpoint{}, fmt.Errorf("insert trunk endpoint outbox event: %w", err)
 	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return sqlc.TrunkEndpoint{}, fmt.Errorf("commit trunk endpoint transaction: %w", err)
 	}
@@ -351,6 +476,7 @@ func writeError(err error, resource, notFound string) error {
 	if err == nil {
 		return nil
 	}
+
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return apperror.NewConflict(resource + " already exists")
