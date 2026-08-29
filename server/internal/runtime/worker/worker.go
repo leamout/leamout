@@ -15,6 +15,7 @@ import (
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
 )
 
@@ -23,6 +24,7 @@ type Worker struct {
 	freeSwitch      *freeswitch.Client
 	nats            *natsintegration.Client
 	calls           *calls.Consumer
+	recordings      *recordings.Consumer
 	outbox          *outbox.PublisherJob
 	webhookConsumer *webhooks.Consumer
 	webhookDelivery *webhooks.DeliveryJob
@@ -76,6 +78,9 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	controller := calls.NewFreeSWITCHController(freeSwitch)
 	callsService := calls.NewService(callsRepository, controller, routingService)
 
+	recordingsRepository := recordings.NewRepository(db)
+	recordingsService := recordings.NewService(recordingsRepository, nil)
+
 	outboxRepository := outbox.NewRepository(queries)
 	outboxPublisher := outbox.NewPublisher(natsClient)
 	outboxJob, err := outbox.NewPublisherJob(
@@ -110,6 +115,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		freeSwitch:      freeSwitch,
 		nats:            natsClient,
 		calls:           calls.NewConsumer(callsService),
+		recordings:      recordings.NewConsumer(recordingsService),
 		outbox:          outboxJob,
 		webhookConsumer: webhookConsumer,
 		webhookDelivery: webhookDelivery,
@@ -123,6 +129,8 @@ func (w *Worker) Run(ctx context.Context) error {
 		"CHANNEL_HOLD",
 		"CHANNEL_UNHOLD",
 		"CHANNEL_HANGUP_COMPLETE",
+		"RECORD_START",
+		"RECORD_STOP",
 	}
 
 	if err := w.freeSwitch.Subscribe(ctx, freeswitch.EventFormatPlain, events, func(eventCtx context.Context, event freeswitch.Event) error {
@@ -130,12 +138,16 @@ func (w *Worker) Run(ctx context.Context) error {
 			log.Printf("FreeSWITCH call event %s failed: %v", event.Name, err)
 			return err
 		}
+		if err := w.recordings.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
+			log.Printf("FreeSWITCH recording event %s failed: %v", event.Name, err)
+			return err
+		}
 		return nil
 	}); err != nil {
-		return fmt.Errorf("subscribe to FreeSWITCH call events: %w", err)
+		return fmt.Errorf("subscribe to FreeSWITCH lifecycle events: %w", err)
 	}
 
-	log.Print("worker subscribed to FreeSWITCH call lifecycle events")
+	log.Print("worker subscribed to FreeSWITCH call and recording lifecycle events")
 	log.Print("worker started outbox NATS publisher")
 	log.Print("worker started webhook NATS consumer")
 	log.Print("worker started webhook delivery job")
