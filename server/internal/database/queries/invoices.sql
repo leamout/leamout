@@ -12,9 +12,10 @@ INSERT INTO invoices (
     due_at,
     paid_at,
     metadata
-) VALUES (
-    sqlc.arg(organization_id),
-    sqlc.narg(subscription_id),
+)
+SELECT
+    o.id,
+    sqlc.narg(subscription_id)::uuid,
     sqlc.arg(invoice_number),
     sqlc.arg(currency),
     sqlc.arg(subtotal),
@@ -25,35 +26,60 @@ INSERT INTO invoices (
     sqlc.narg(due_at),
     sqlc.narg(paid_at),
     COALESCE(sqlc.narg(metadata), '{}'::jsonb)
-)
+FROM organizations AS o
+WHERE o.id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      sqlc.narg(subscription_id)::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM subscriptions AS s
+          WHERE s.id = sqlc.narg(subscription_id)::uuid
+            AND s.organization_id = o.id
+      )
+  )
 RETURNING *;
 
 -- name: GetInvoice :one
-SELECT *
-FROM invoices
-WHERE organization_id = sqlc.arg(organization_id)
-  AND id = sqlc.arg(id)
+SELECT i.*
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.organization_id = sqlc.arg(organization_id)
+  AND i.id = sqlc.arg(id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1;
 
 -- name: GetInvoiceByNumber :one
-SELECT *
-FROM invoices
-WHERE organization_id = sqlc.arg(organization_id)
-  AND invoice_number = sqlc.arg(invoice_number)
+SELECT i.*
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.organization_id = sqlc.arg(organization_id)
+  AND i.invoice_number = sqlc.arg(invoice_number)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1;
 
 -- name: ListInvoicesByOrganization :many
-SELECT *
-FROM invoices
-WHERE organization_id = sqlc.arg(organization_id)
-ORDER BY created_at DESC;
+SELECT i.*
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY i.created_at DESC;
 
 -- name: UpdateInvoiceStatus :one
-UPDATE invoices
+UPDATE invoices AS i
 SET
     status = sqlc.arg(status),
-    paid_at = COALESCE(sqlc.narg(paid_at), paid_at),
+    paid_at = COALESCE(sqlc.narg(paid_at), i.paid_at),
     updated_at = NOW()
-WHERE organization_id = sqlc.arg(organization_id)
-  AND id = sqlc.arg(id)
-RETURNING *;
+FROM organizations AS o
+WHERE i.organization_id = sqlc.arg(organization_id)
+  AND i.id = sqlc.arg(id)
+  AND o.id = i.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING i.*;

@@ -3,49 +3,82 @@ INSERT INTO deployments (
     license_id,
     deployment_id,
     name
-) VALUES (
-    sqlc.arg(license_id),
+)
+SELECT
+    l.id,
     sqlc.arg(deployment_id),
     sqlc.narg(name)
-)
+FROM licenses AS l
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE l.id = sqlc.arg(license_id)
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 RETURNING *;
 
 -- name: GetDeployment :one
-SELECT *
-FROM deployments
-WHERE license_id = sqlc.arg(license_id)
-  AND deployment_id = sqlc.arg(deployment_id)
+SELECT d.*
+FROM deployments AS d
+JOIN licenses AS l ON l.id = d.license_id
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE d.license_id = sqlc.arg(license_id)
+  AND d.deployment_id = sqlc.arg(deployment_id)
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1;
 
 -- name: ListDeploymentsByLicense :many
-SELECT *
-FROM deployments
-WHERE license_id = sqlc.arg(license_id)
-ORDER BY created_at DESC;
+SELECT d.*
+FROM deployments AS d
+JOIN licenses AS l ON l.id = d.license_id
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE d.license_id = sqlc.arg(license_id)
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY d.created_at DESC;
 
 -- name: CountActiveDeploymentsByLicense :one
 SELECT COUNT(*)
-FROM deployments
-WHERE license_id = sqlc.arg(license_id)
-  AND status = 'active';
+FROM deployments AS d
+JOIN licenses AS l ON l.id = d.license_id
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE d.license_id = sqlc.arg(license_id)
+  AND d.status = 'active'
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL;
 
 -- name: TouchDeployment :one
-UPDATE deployments
+UPDATE deployments AS d
 SET
     last_seen_at = COALESCE(sqlc.narg(last_seen_at), NOW()),
     updated_at = NOW()
-WHERE license_id = sqlc.arg(license_id)
-  AND deployment_id = sqlc.arg(deployment_id)
-  AND status = 'active'
-RETURNING *;
+FROM licenses AS l
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE d.license_id = l.id
+  AND d.license_id = sqlc.arg(license_id)
+  AND d.deployment_id = sqlc.arg(deployment_id)
+  AND d.status = 'active'
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING d.*;
 
 -- name: DeactivateDeployment :one
-UPDATE deployments
+UPDATE deployments AS d
 SET
     status = 'deactivated',
-    deactivated_at = COALESCE(deactivated_at, NOW()),
+    deactivated_at = COALESCE(d.deactivated_at, NOW()),
     updated_at = NOW()
-WHERE license_id = sqlc.arg(license_id)
-  AND deployment_id = sqlc.arg(deployment_id)
-  AND status = 'active'
-RETURNING *;
+FROM licenses AS l
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE d.license_id = l.id
+  AND d.license_id = sqlc.arg(license_id)
+  AND d.deployment_id = sqlc.arg(deployment_id)
+  AND d.status = 'active'
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING d.*;

@@ -8,64 +8,103 @@ INSERT INTO subscriptions (
     ends_at,
     billing_provider,
     provider_subscription_id
-) VALUES (
-    sqlc.arg(organization_id),
-    sqlc.arg(plan_id),
+)
+SELECT
+    o.id,
+    pl.id,
     COALESCE(sqlc.narg(status), 'pending'),
     COALESCE(sqlc.narg(starts_at), NOW()),
     sqlc.narg(renews_at),
     sqlc.narg(ends_at),
     sqlc.narg(billing_provider),
     sqlc.narg(provider_subscription_id)
-)
+FROM organizations AS o
+JOIN plans AS pl ON pl.id = sqlc.arg(plan_id)
+JOIN products AS p ON p.id = pl.product_id
+WHERE o.id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND pl.active = true
+  AND p.active = true
 RETURNING *;
 
 -- name: GetSubscription :one
-SELECT *
-FROM subscriptions
-WHERE organization_id = sqlc.arg(organization_id)
-  AND id = sqlc.arg(id)
+SELECT s.*
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND s.id = sqlc.arg(id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1;
 
 -- name: GetCurrentSubscription :one
-SELECT *
-FROM subscriptions
-WHERE organization_id = sqlc.arg(organization_id)
-  AND status IN ('active', 'past_due')
-ORDER BY starts_at DESC, created_at DESC
+SELECT s.*
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND s.status IN ('active', 'past_due')
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY s.starts_at DESC, s.created_at DESC
 LIMIT 1;
 
 -- name: GetSubscriptionByProviderID :one
-SELECT *
-FROM subscriptions
-WHERE billing_provider = sqlc.arg(billing_provider)
-  AND provider_subscription_id = sqlc.arg(provider_subscription_id)
+SELECT s.*
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.billing_provider = sqlc.arg(billing_provider)
+  AND s.provider_subscription_id = sqlc.arg(provider_subscription_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1;
 
 -- name: ListSubscriptionsByOrganization :many
-SELECT *
-FROM subscriptions
-WHERE organization_id = sqlc.arg(organization_id)
-ORDER BY created_at DESC;
+SELECT s.*
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY s.created_at DESC;
 
 -- name: UpdateSubscription :one
-UPDATE subscriptions
+UPDATE subscriptions AS s
 SET
-    plan_id = COALESCE(sqlc.narg(plan_id), plan_id),
-    status = COALESCE(sqlc.narg(status), status),
-    renews_at = COALESCE(sqlc.narg(renews_at), renews_at),
-    ends_at = COALESCE(sqlc.narg(ends_at), ends_at),
+    plan_id = COALESCE(sqlc.narg(plan_id)::uuid, s.plan_id),
+    status = COALESCE(sqlc.narg(status), s.status),
+    renews_at = COALESCE(sqlc.narg(renews_at), s.renews_at),
+    ends_at = COALESCE(sqlc.narg(ends_at), s.ends_at),
     updated_at = NOW()
-WHERE organization_id = sqlc.arg(organization_id)
-  AND id = sqlc.arg(id)
-RETURNING *;
+FROM organizations AS o
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND s.id = sqlc.arg(id)
+  AND o.id = s.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      sqlc.narg(plan_id)::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM plans AS pl
+          JOIN products AS p ON p.id = pl.product_id
+          WHERE pl.id = sqlc.narg(plan_id)::uuid
+            AND pl.active = true
+            AND p.active = true
+      )
+  )
+RETURNING s.*;
 
 -- name: SetSubscriptionProvider :one
-UPDATE subscriptions
+UPDATE subscriptions AS s
 SET
     billing_provider = sqlc.arg(billing_provider),
     provider_subscription_id = sqlc.arg(provider_subscription_id),
     updated_at = NOW()
-WHERE organization_id = sqlc.arg(organization_id)
-  AND id = sqlc.arg(id)
-RETURNING *;
+FROM organizations AS o
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND s.id = sqlc.arg(id)
+  AND o.id = s.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING s.*;
