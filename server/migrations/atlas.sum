@@ -1,4 +1,4 @@
-h1:SKLlYaT2Ts2bAmeqO7ojoRcAk/0mHh/GOAw8X6LApd4=
+h1:seYv3zeYKX6n90xNgXppRGJ5RQmYfSp4k5b6XxK+Dpg=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -22,3 +22,4 @@ h1:SKLlYaT2Ts2bAmeqO7ojoRcAk/0mHh/GOAw8X6LApd4=
 021_create_recordings.sql h1:gTKHXD/vG0etW3wxaINywMa1//p9Tkf5Z1/5lSX0hlw=
 022_create_conferences.sql h1:EctWohRebmBL2OOOmzV2aVWB/+tIBmfy6BaKlJQHxbI=
 023_create_conference_participants.sql h1:dMZYeVD9zYWzLDxYq5LETPgTUTEepcGis+wZfZT1Whg=
+024_create_call_events.sql h1:85ORlXv6zGbIfnDyEi9y0O66huzf10YeJbv3madsbwY=
