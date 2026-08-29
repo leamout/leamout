@@ -121,6 +121,20 @@ const (
 	DirectionOutbound CallDirection = "outbound"
 )
 
+// CallState is the persisted lifecycle state stored in calls.state.
+type CallState string
+
+const (
+	StateInitiating CallState = "initiating"
+	StateRinging    CallState = "ringing"
+	StateAnswered   CallState = "answered"
+	StateActive     CallState = "active"
+	StateCompleted  CallState = "completed"
+	StateFailed     CallState = "failed"
+	StateCancelled  CallState = "cancelled"
+)
+
+// CallStatus is the public status vocabulary used in emitted call events.
 type CallStatus string
 
 const (
