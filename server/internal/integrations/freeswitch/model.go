@@ -14,18 +14,22 @@ const (
 )
 
 type Config struct {
-	Address        string
-	Password       string
-	ConnectTimeout time.Duration
-	CommandTimeout time.Duration
+	Address           string
+	Password          string
+	ConnectTimeout    time.Duration
+	CommandTimeout    time.Duration
+	ReconnectMinDelay time.Duration
+	ReconnectMaxDelay time.Duration
 }
 
 func DefaultConfig(address, password string) Config {
 	return Config{
-		Address:        strings.TrimSpace(address),
-		Password:       password,
-		ConnectTimeout: 5 * time.Second,
-		CommandTimeout: 5 * time.Second,
+		Address:           strings.TrimSpace(address),
+		Password:          password,
+		ConnectTimeout:    5 * time.Second,
+		CommandTimeout:    5 * time.Second,
+		ReconnectMinDelay: 250 * time.Millisecond,
+		ReconnectMaxDelay: 5 * time.Second,
 	}
 }
 
@@ -41,6 +45,12 @@ func (c Config) Validate() error {
 	}
 	if c.CommandTimeout <= 0 {
 		return fmt.Errorf("FreeSWITCH command timeout must be positive")
+	}
+	if c.ReconnectMinDelay <= 0 {
+		return fmt.Errorf("FreeSWITCH reconnect minimum delay must be positive")
+	}
+	if c.ReconnectMaxDelay < c.ReconnectMinDelay {
+		return fmt.Errorf("FreeSWITCH reconnect maximum delay must be greater than or equal to minimum delay")
 	}
 	return nil
 }

@@ -24,24 +24,33 @@ type MediaController interface {
 }
 
 type Client struct {
-	address        string
-	password       string
-	connectTimeout time.Duration
-	commandTimeout time.Duration
-	dialer         *net.Dialer
+	address           string
+	password          string
+	connectTimeout    time.Duration
+	commandTimeout    time.Duration
+	reconnectMinDelay time.Duration
+	reconnectMaxDelay time.Duration
+	dialer            *net.Dialer
 
-	mu      sync.Mutex
-	conn    net.Conn
-	reader  *bufio.Reader
-	done    chan struct{}
-	readErr chan error
-	replyCh chan Frame
+	mu           sync.Mutex
+	conn         net.Conn
+	reader       *bufio.Reader
+	done         chan struct{}
+	readErr      chan error
+	replyCh      chan Frame
+	ready        bool
+	closed       bool
+	reconnecting bool
 
 	writeMu   sync.Mutex
 	commandMu sync.Mutex
 
-	handlersMu sync.RWMutex
-	handlers   []EventHandler
+	subscriptionsMu sync.RWMutex
+	subscriptions   []subscription
+
+	lifecycleCtx    context.Context
+	lifecycleCancel context.CancelFunc
+	wg              sync.WaitGroup
 }
 
 func New(cfg Config) (*Client, error) {
@@ -49,12 +58,18 @@ func New(cfg Config) (*Client, error) {
 		return nil, err
 	}
 
+	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
+
 	return &Client{
-		address:        cfg.Address,
-		password:       cfg.Password,
-		connectTimeout: cfg.ConnectTimeout,
-		commandTimeout: cfg.CommandTimeout,
-		dialer:         &net.Dialer{Timeout: cfg.ConnectTimeout},
+		address:           cfg.Address,
+		password:          cfg.Password,
+		connectTimeout:    cfg.ConnectTimeout,
+		commandTimeout:    cfg.CommandTimeout,
+		reconnectMinDelay: cfg.ReconnectMinDelay,
+		reconnectMaxDelay: cfg.ReconnectMaxDelay,
+		dialer:            &net.Dialer{Timeout: cfg.ConnectTimeout},
+		lifecycleCtx:      lifecycleCtx,
+		lifecycleCancel:   lifecycleCancel,
 	}, nil
 }
 
@@ -64,80 +79,60 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return fmt.Errorf("FreeSWITCH client is closed")
+	}
 	if c.conn != nil {
 		c.mu.Unlock()
 		return nil
 	}
 	c.mu.Unlock()
 
-	conn, err := c.dialer.DialContext(ctx, "tcp", c.address)
-	if err != nil {
-		return fmt.Errorf("connect to FreeSWITCH: %w", err)
+	if err := c.connectAndRestore(ctx); err != nil {
+		return err
 	}
-
-	reader := bufio.NewReader(conn)
-	frame, err := readFrame(reader)
-	if err != nil {
-		_ = conn.Close()
-		return fmt.Errorf("read FreeSWITCH authentication request: %w", err)
-	}
-	if frame.ContentType != ContentTypeAuthRequest {
-		_ = conn.Close()
-		return fmt.Errorf("unexpected FreeSWITCH greeting: %q", frame.ContentType)
-	}
-
-	if _, err := writeCommand(conn, "auth "+c.password); err != nil {
-		_ = conn.Close()
-		return fmt.Errorf("write FreeSWITCH authentication command: %w", err)
-	}
-	frame, err = readFrame(reader)
-	if err != nil {
-		_ = conn.Close()
-		return fmt.Errorf("read FreeSWITCH authentication response: %w", err)
-	}
-	if frame.ContentType != ContentTypeCommandReply || !frame.OK() {
-		_ = conn.Close()
-		return fmt.Errorf("FreeSWITCH authentication failed: %s", frame.ReplyText())
-	}
-
-	c.mu.Lock()
-	if c.conn != nil {
-		c.mu.Unlock()
-		_ = conn.Close()
-		return nil
-	}
-	c.conn = conn
-	c.reader = reader
-	c.done = make(chan struct{})
-	c.readErr = make(chan error, 1)
-	c.replyCh = make(chan Frame)
-	c.mu.Unlock()
-
-	go c.readLoop(conn, reader)
 	return nil
 }
 
 func (c *Client) Close() error {
 	c.mu.Lock()
-	if c.conn == nil {
+	if c.closed {
 		c.mu.Unlock()
 		return nil
 	}
+	c.closed = true
+	c.ready = false
 	conn := c.conn
-	c.conn = nil
-	c.reader = nil
 	done := c.done
-	c.done = nil
 	c.mu.Unlock()
 
-	err := conn.Close()
+	c.lifecycleCancel()
+
+	var closeErr error
+	if conn != nil {
+		closeErr = conn.Close()
+	}
 	if done != nil {
 		<-done
 	}
-	return err
+
+	c.wg.Wait()
+	return closeErr
+}
+
+func (c *Client) Ready() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	return !c.closed && c.conn != nil && c.ready
 }
 
 func (c *Client) HealthCheck(ctx context.Context) error {
+	if !c.Ready() {
+		return fmt.Errorf("FreeSWITCH client is not ready")
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -213,45 +208,67 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 	}
 }
 
-func (c *Client) readLoop(conn net.Conn, reader *bufio.Reader) {
-	defer func() {
-		c.mu.Lock()
-		if c.conn == conn {
-			c.conn = nil
-			c.reader = nil
-			if c.readErr != nil {
-				select {
-				case c.readErr <- io.EOF:
-				default:
-				}
-			}
-			if c.done != nil {
-				close(c.done)
-			}
-		}
-		c.mu.Unlock()
-	}()
+func (c *Client) readLoop(
+	conn net.Conn,
+	reader *bufio.Reader,
+	replyCh chan<- Frame,
+) {
+	defer c.wg.Done()
 
 	for {
 		frame, err := readFrame(reader)
 		if err != nil {
-			c.mu.Lock()
-			if c.readErr != nil {
-				select {
-				case c.readErr <- err:
-				default:
-				}
-			}
-			c.mu.Unlock()
+			c.disconnect(conn, err)
 			return
 		}
 
 		switch frame.ContentType {
 		case ContentTypeCommandReply, ContentTypeAPIResponse:
-			c.replyCh <- frame
+			select {
+			case replyCh <- frame:
+			case <-c.lifecycleCtx.Done():
+				c.disconnect(conn, context.Canceled)
+				return
+			}
 		case ContentTypeEventPlain:
 			c.dispatchEvent(frame)
 		}
+	}
+}
+
+func (c *Client) disconnect(conn net.Conn, readErr error) {
+	c.mu.Lock()
+	if c.conn != conn {
+		c.mu.Unlock()
+		return
+	}
+
+	done := c.done
+	errCh := c.readErr
+	c.conn = nil
+	c.reader = nil
+	c.done = nil
+	c.readErr = nil
+	c.replyCh = nil
+	c.ready = false
+	shouldReconnect := !c.closed
+	c.mu.Unlock()
+
+	if readErr == nil {
+		readErr = io.EOF
+	}
+	if errCh != nil {
+		select {
+		case errCh <- readErr:
+		default:
+		}
+	}
+	if done != nil {
+		close(done)
+	}
+
+	if shouldReconnect {
+		c.startReconnect()
 	}
 }
 
@@ -262,16 +279,16 @@ func (c *Client) dispatchEvent(frame Frame) {
 		Name:    frame.Header("Event-Name"),
 	}
 
-	c.handlersMu.RLock()
-	handlers := append([]EventHandler(nil), c.handlers...)
-	c.handlersMu.RUnlock()
+	for _, subscription := range c.subscriptionSnapshot() {
+		if !subscription.matches(event.Name) {
+			continue
+		}
 
-	for _, handler := range handlers {
-		go func(h EventHandler) {
+		go func(handler EventHandler) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = h(ctx, event)
-		}(handler)
+			_ = handler(ctx, event)
+		}(subscription.handler)
 	}
 }
 
