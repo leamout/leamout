@@ -11,7 +11,7 @@ import (
 type Repository struct{ queries *sqlc.Queries }
 
 func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }
-func (r *Repository) WithTx(tx pgx.Tx) *Repository    { return NewRepository(r.queries.WithTx(tx)) }
+func (r *Repository) WithTx(tx pgx.Tx) *Repository { return NewRepository(r.queries.WithTx(tx)) }
 
 func (r *Repository) Create(ctx context.Context, arg sqlc.CreateTrunkParams) (sqlc.Trunk, error) {
 	return r.queries.CreateTrunk(ctx, arg)
