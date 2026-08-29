@@ -23,6 +23,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
+	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/trunks"
@@ -129,8 +130,12 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	voiceRepository := voice.NewRepository(queries)
 	voiceService := voice.NewService(voiceRepository)
 
+	routingRepository := routing.NewRepository(queries)
+	routeResolver := routing.NewResolver(routingRepository)
+	routingService := routing.NewService(routeResolver)
+
 	callsRepository := calls.NewRepository(queries)
-	callsService := calls.NewService(callsRepository, controller)
+	callsService := calls.NewService(callsRepository, controller, routingService)
 
 	recordingsRepository := recordings.NewRepository(queries)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
