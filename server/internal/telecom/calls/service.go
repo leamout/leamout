@@ -196,7 +196,32 @@ func (s *Service) Hold(ctx context.Context, org, id uuid.UUID) error {
 	if err := validateControl(call, controlHold); err != nil {
 		return err
 	}
-	return mediaError("hold call", s.controller.Hold(ctx, externalID))
+	if err := validateMediaState(call); err != nil {
+		return err
+	}
+	if isHeld(call) {
+		return nil
+	}
+
+	if err := s.controller.Hold(ctx, externalID); err != nil {
+		return mediaError("hold call", err)
+	}
+
+	_, err = s.repo.MarkHeld(ctx, org, call.ID)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		latest, getErr := s.Get(ctx, org, call.ID)
+		if getErr == nil && isHeld(latest) {
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+		return invalidControlState(controlHold, latest.State)
+	}
+	return writeError(err, "hold call")
 }
 
 func (s *Service) Unhold(ctx context.Context, org, id uuid.UUID) error {
@@ -207,7 +232,32 @@ func (s *Service) Unhold(ctx context.Context, org, id uuid.UUID) error {
 	if err := validateControl(call, controlUnhold); err != nil {
 		return err
 	}
-	return mediaError("resume call", s.controller.Unhold(ctx, externalID))
+	if err := validateMediaState(call); err != nil {
+		return err
+	}
+	if isMediaActive(call) {
+		return nil
+	}
+
+	if err := s.controller.Unhold(ctx, externalID); err != nil {
+		return mediaError("resume call", err)
+	}
+
+	_, err = s.repo.MarkResumed(ctx, org, call.ID)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		latest, getErr := s.Get(ctx, org, call.ID)
+		if getErr == nil && isMediaActive(latest) {
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+		return invalidControlState(controlUnhold, latest.State)
+	}
+	return writeError(err, "resume call")
 }
 
 func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) error {
