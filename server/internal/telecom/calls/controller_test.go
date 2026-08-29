@@ -2,14 +2,15 @@ package calls
 
 import "testing"
 
-func TestFreeSWITCHEndpoint(t *testing.T) {
+func TestFreeSWITCHEgress(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		req     OriginateRequest
-		want    string
-		wantErr bool
+		name          string
+		req           OriginateRequest
+		wantEndpoint  string
+		wantRouteURI  string
+		wantErr       bool
 	}{
 		{
 			name: "udp route",
@@ -19,7 +20,8 @@ func TestFreeSWITCHEndpoint(t *testing.T) {
 				Transport:   "udp",
 				Destination: "+14155550100",
 			},
-			want: "sofia/external/+14155550100@sip.carrier.example:5060;transport=udp",
+			wantEndpoint: "sofia/internal/+14155550100@opensips:5060;transport=udp",
+			wantRouteURI: "sip:sip.carrier.example:5060;transport=udp",
 		},
 		{
 			name: "ipv6 route",
@@ -29,7 +31,8 @@ func TestFreeSWITCHEndpoint(t *testing.T) {
 				Transport:   "TLS",
 				Destination: "+233200000000",
 			},
-			want: "sofia/external/+233200000000@[2001:db8::10]:5061;transport=tls",
+			wantEndpoint: "sofia/internal/+233200000000@opensips:5060;transport=udp",
+			wantRouteURI: "sip:[2001:db8::10]:5061;transport=tls",
 		},
 		{
 			name: "invalid transport",
@@ -47,12 +50,15 @@ func TestFreeSWITCHEndpoint(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := freeSWITCHEndpoint(tt.req)
+			endpoint, routeURI, err := freeSWITCHEgress(tt.req)
 			if (err != nil) != tt.wantErr {
-				t.Fatalf("freeSWITCHEndpoint() error = %v, wantErr %t", err, tt.wantErr)
+				t.Fatalf("freeSWITCHEgress() error = %v, wantErr %t", err, tt.wantErr)
 			}
-			if got != tt.want {
-				t.Fatalf("freeSWITCHEndpoint() = %q, want %q", got, tt.want)
+			if endpoint != tt.wantEndpoint {
+				t.Fatalf("freeSWITCHEgress() endpoint = %q, want %q", endpoint, tt.wantEndpoint)
+			}
+			if routeURI != tt.wantRouteURI {
+				t.Fatalf("freeSWITCHEgress() route URI = %q, want %q", routeURI, tt.wantRouteURI)
 			}
 		})
 	}
