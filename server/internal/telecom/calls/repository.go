@@ -32,6 +32,20 @@ func (r *Repository) Create(
 	})
 }
 
+func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) (sqlc.Call, error) {
+	applicationID := event.ApplicationID
+	channelID := event.ChannelID
+	return r.queries.CreateCall(ctx, sqlc.CreateCallParams{
+		OrganizationID: event.OrganizationID,
+		ApplicationID:  &applicationID,
+		Direction:      string(DirectionInbound),
+		State:          "ringing",
+		FromUri:        event.From,
+		ToUri:          event.To,
+		SipCallID:      &channelID,
+	})
+}
+
 func (r *Repository) Get(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -40,6 +54,13 @@ func (r *Repository) Get(
 	return r.queries.GetCall(ctx, sqlc.GetCallParams{
 		OrganizationID: organizationID,
 		ID:             id,
+	})
+}
+
+func (r *Repository) GetBySIPCallID(ctx context.Context, organizationID uuid.UUID, sipCallID string) (sqlc.Call, error) {
+	return r.queries.GetCallBySIPCallID(ctx, sqlc.GetCallBySIPCallIDParams{
+		OrganizationID: organizationID,
+		SipCallID:      &sipCallID,
 	})
 }
 

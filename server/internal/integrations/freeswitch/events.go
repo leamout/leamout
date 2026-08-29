@@ -3,6 +3,7 @@ package freeswitch
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -42,4 +43,20 @@ func (c *Client) Subscribe(ctx context.Context, format EventFormat, events []str
 	c.handlersMu.Unlock()
 
 	return nil
+}
+
+func plainEventHeader(body, name string) string {
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimRight(line, "\r")
+		key, value, ok := strings.Cut(line, ": ")
+		if !ok || key != name {
+			continue
+		}
+		decoded, err := url.PathUnescape(value)
+		if err == nil {
+			return decoded
+		}
+		return value
+	}
+	return ""
 }
