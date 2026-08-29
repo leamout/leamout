@@ -43,25 +43,21 @@ revoked
 
 The database validates state names and basic temporal/deployment limits. Service logic owns valid transitions and issuance policy.
 
-## Package boundary
+## Licensing authority
 
-License verification and license authority must remain separate.
+License issuance is a commercial-domain responsibility. Private signing material must remain inside the trusted licensing authority and must not be exposed to self-hosted deployments.
 
 ```text
-server/internal/commercial/licensing
-        │
-        │ private signing authority
-        ▼
-     signed license
-        │
-        │ public verification
-        ▼
-server/pkg/license
+commercial state
+      ↓
+entitlement resolution
+      ↓
+licensing authority
+      ↓
+signed license
+      ↓
+self-hosted deployment
 ```
-
-`server/pkg/license` may contain a public-safe format, verifier, and verification errors. It must not contain private signing keys or functionality that allows a public/self-hosted binary to generate valid commercial licenses.
-
-Private signing behavior belongs under `server/internal/commercial/licensing`.
 
 ## Intended operations
 
@@ -98,10 +94,10 @@ The exact signed format should be versioned before it becomes a compatibility co
 
 ## Key security
 
-- Private signing keys remain in the private commercial authority.
-- Self-hosted binaries receive only verification material.
+- Private signing keys remain in the trusted commercial licensing authority.
+- Self-hosted deployments receive only what is required to validate issued licenses.
 - `signing_key_id` allows key rotation and verification-key selection.
-- License verification must fail closed for invalid signatures or malformed claims.
+- License validation must fail closed for invalid signatures or malformed claims.
 
 Ed25519 is suitable for this asymmetric signing boundary.
 

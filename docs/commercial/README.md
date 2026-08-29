@@ -1,4 +1,4 @@
-# Commercial Domain Overview
+# Commercial Domain
 
 The commercial domain turns Leamout usage and self-hosted deployments into durable commercial state without making an external billing provider the source of truth.
 
