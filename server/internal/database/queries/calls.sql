@@ -16,6 +16,7 @@ INSERT INTO calls (
     sqlc.arg(to_uri),
     sqlc.narg(sip_call_id)
 )
+ON CONFLICT DO NOTHING
 RETURNING *;
 
 -- name: GetCall :one
