@@ -1,6 +1,10 @@
 package calls
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/leamout/leamout/internal/database/sqlc"
+)
 
 func TestCanAnswer(t *testing.T) {
 	tests := []struct {
@@ -68,5 +72,79 @@ func TestIsTerminal(t *testing.T) {
 				t.Fatalf("isTerminal(%q) = %v, want %v", tt.state, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestValidateControl(t *testing.T) {
+	connectedActions := []controlAction{
+		controlTransfer,
+		controlHold,
+		controlUnhold,
+		controlPlay,
+		controlStop,
+		controlRecord,
+		controlDTMF,
+	}
+
+	for _, action := range connectedActions {
+		for _, state := range []string{"answered", "active"} {
+			t.Run(string(action)+"/allows-"+state, func(t *testing.T) {
+				call := sqlc.Call{Direction: "outbound", State: state}
+				if err := validateControl(call, action); err != nil {
+					t.Fatalf("validateControl(%q, %q) returned error: %v", state, action, err)
+				}
+			})
+		}
+
+		for _, state := range []string{"initiating", "ringing", "completed", "failed", "cancelled"} {
+			t.Run(string(action)+"/rejects-"+state, func(t *testing.T) {
+				call := sqlc.Call{Direction: "outbound", State: state}
+				if err := validateControl(call, action); err == nil {
+					t.Fatalf("validateControl(%q, %q) expected conflict", state, action)
+				}
+			})
+		}
+	}
+}
+
+func TestValidateAnswerControl(t *testing.T) {
+	for _, state := range []string{"initiating", "ringing", "answered", "active"} {
+		t.Run("inbound/"+state, func(t *testing.T) {
+			call := sqlc.Call{Direction: "inbound", State: state}
+			if err := validateControl(call, controlAnswer); err != nil {
+				t.Fatalf("validateControl(%q, answer) returned error: %v", state, err)
+			}
+		})
+	}
+
+	for _, state := range []string{"completed", "failed", "cancelled"} {
+		t.Run("inbound/rejects-"+state, func(t *testing.T) {
+			call := sqlc.Call{Direction: "inbound", State: state}
+			if err := validateControl(call, controlAnswer); err == nil {
+				t.Fatalf("validateControl(%q, answer) expected conflict", state)
+			}
+		})
+	}
+
+	for _, state := range []string{"initiating", "ringing", "answered", "active"} {
+		t.Run("outbound/rejects-"+state, func(t *testing.T) {
+			call := sqlc.Call{Direction: "outbound", State: state}
+			if err := validateControl(call, controlAnswer); err == nil {
+				t.Fatalf("outbound answer in %q expected conflict", state)
+			}
+		})
+	}
+}
+
+func TestHangupStateClassification(t *testing.T) {
+	for _, state := range []string{"initiating", "ringing"} {
+		if !isPreAnswer(state) {
+			t.Fatalf("isPreAnswer(%q) = false, want true", state)
+		}
+	}
+	for _, state := range []string{"answered", "active"} {
+		if !isConnected(state) {
+			t.Fatalf("isConnected(%q) = false, want true", state)
+		}
 	}
 }
