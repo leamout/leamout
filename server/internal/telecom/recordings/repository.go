@@ -71,12 +71,12 @@ func (r *Repository) Start(
 	return r.mutate(ctx, EventRecordingStarted, func(repo *Repository) (sqlc.Recording, error) {
 		provider := "freeswitch-local"
 		return repo.queries.CreateRecording(ctx, sqlc.CreateRecordingParams{
-			OrganizationID: call.OrganizationID,
-			CallID:         call.ID,
-			Status:         string(StatusRecording),
-			StorageKey:     &path,
+			OrganizationID:  call.OrganizationID,
+			CallID:          call.ID,
+			Status:          string(StatusRecording),
+			StorageKey:      &path,
 			StorageProvider: &provider,
-			StartedAt: pgtype.Timestamptz{Time: occurredAt, Valid: true},
+			StartedAt:       pgtype.Timestamptz{Time: occurredAt, Valid: true},
 		})
 	})
 }
