@@ -93,21 +93,21 @@ func invalidControlState(action controlAction, state string) error {
 }
 
 func canAnswer(state string) bool {
-	return state == string(StatusInitiated) || state == string(StatusRinging)
+	return state == string(StateInitiating) || state == string(StateRinging)
 }
 
 func isAnswerIdempotent(state string) bool {
-	return state == string(StatusAnswered) || state == string(StatusActive)
+	return state == string(StateAnswered) || state == string(StateActive)
 }
 
 func isConnected(state string) bool {
-	return state == string(StatusAnswered) || state == string(StatusActive)
+	return state == string(StateAnswered) || state == string(StateActive)
 }
 
 func isPreAnswer(state string) bool {
-	return state == string(StatusInitiated) || state == string(StatusRinging)
+	return state == string(StateInitiating) || state == string(StateRinging)
 }
 
 func isTerminal(state string) bool {
-	return state == string(StatusCompleted) || state == string(StatusFailed) || state == string(StatusCancelled)
+	return state == string(StateCompleted) || state == string(StateFailed) || state == string(StateCancelled)
 }
