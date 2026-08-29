@@ -70,12 +70,13 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("connect FreeSWITCH: %w", err)
 	}
 
-	controller := calls.NewFreeSWITCHController(freeSwitch)
+	callsController := calls.NewFreeSWITCHController(freeSwitch)
+	conferenceController := conferences.NewFreeSWITCHController(freeSwitch)
 
 	logger := logging.New()
 	metricsRegistry := metrics.New()
 
-	modules, err := NewModules(db, controller)
+	modules, err := NewModules(db, callsController, conferenceController)
 	if err != nil {
 		_ = freeSwitch.Close()
 		db.Close()
@@ -107,7 +108,11 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	}, nil
 }
 
-func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) {
+func NewModules(
+	db *pgxpool.Pool,
+	callsController calls.Controller,
+	conferenceController conferences.Controller,
+) (Modules, error) {
 	queries := sqlc.New(db)
 
 	sessionRepository := session.NewRepository(queries)
@@ -136,13 +141,13 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	routingService := routing.NewService(routeResolver)
 
 	callsRepository := calls.NewRepository(db)
-	callsService := calls.NewService(callsRepository, controller, routingService)
+	callsService := calls.NewService(callsRepository, callsController, routingService)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
 
 	conferencesRepository := conferences.NewRepository(db)
-	conferencesService := conferences.NewService(conferencesRepository)
+	conferencesService := conferences.NewService(conferencesRepository, conferenceController)
 
 	subscribersRepository := subscribers.NewRepository(queries)
 	subscribersService := subscribers.NewService(subscribersRepository)
