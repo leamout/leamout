@@ -205,6 +205,7 @@ func (r *Repository) mutateWithEvent(
 		"event_id":        eventID.String(),
 		"event_type":      string(eventType),
 		"organization_id": call.OrganizationID.String(),
+		"schema_version":  "1",
 	})
 	if err != nil {
 		return sqlc.Call{}, fmt.Errorf("marshal call event headers: %w", err)
@@ -239,6 +240,10 @@ func callDomainEvent(call sqlc.Call, eventType CallEventType, status CallStatus,
 	if call.SipCallID != nil {
 		sipCallID = *call.SipCallID
 	}
+	hangupReason := ""
+	if call.HangupReason != nil {
+		hangupReason = *call.HangupReason
+	}
 
 	return CallEvent{
 		EventType:      eventType,
@@ -250,6 +255,7 @@ func callDomainEvent(call sqlc.Call, eventType CallEventType, status CallStatus,
 		To:             call.ToUri,
 		Direction:      CallDirection(call.Direction),
 		Status:         status,
+		HangupReason:   hangupReason,
 		OccurredAt:     occurredAt,
 	}
 }
