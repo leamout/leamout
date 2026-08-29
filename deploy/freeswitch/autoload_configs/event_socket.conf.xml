@@ -4,11 +4,11 @@
 
   <!--
     Read the ESL password from the container environment.
+    X-PRE-PROCESS directives must keep cmd/data on the same line because
+    FreeSWITCH preprocesses configuration one line at a time.
     Do not commit the actual password to Git.
   -->
-  <X-PRE-PROCESS
-      cmd="env-set"
-      data="event_socket_password=$FREESWITCH_ESL_PASSWORD"/>
+  <X-PRE-PROCESS cmd="env-set" data="event_socket_password=$FREESWITCH_ESL_PASSWORD"/>
 
   <settings>
 
