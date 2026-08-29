@@ -18,6 +18,28 @@ COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/voice-v1/comp
 cleanup() {
     status=$?
     trap - EXIT INT TERM
+
+    if [ "$status" -ne 0 ]; then
+        printf '\n%s\n' "=== Voice v1 diagnostics: compose ps ==="
+        (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
+
+        printf '\n%s\n' "=== Voice v1 diagnostics: service logs ==="
+        (
+            cd "$REPO_ROOT" &&
+                $COMPOSE logs --no-color --tail=200 \
+                    api \
+                    worker \
+                    freeswitch \
+                    opensips \
+                    rtpengine \
+                    postgres \
+                    nats \
+                    redis \
+                    voice-v1-carrier \
+                    voice-v1-webhook
+        ) || true
+    fi
+
     if [ "${VOICE_V1_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
         rm -rf "$CERT_DIR"
