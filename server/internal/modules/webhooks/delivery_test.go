@@ -47,7 +47,7 @@ func TestHTTPSenderSendsSignedEnvelope(t *testing.T) {
 	attempt := sender.Send(context.Background(), sqlc.ClaimWebhookDeliveriesRow{
 		EventID:       eventID,
 		EventType:     "call.answered",
-		Payload:       []byte(`{"call_id":"call-1"}`),
+		Payload:       []byte("{\"call_id\":\"call-1\"}"),
 		OccurredAt:    pgtype.Timestamptz{Time: occurredAt, Valid: true},
 		Url:           server.URL,
 		SigningSecret: secret,
