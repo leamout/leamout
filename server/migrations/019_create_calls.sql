@@ -40,8 +40,8 @@ CREATE INDEX IF NOT EXISTS idx_calls_organization_state
 CREATE INDEX IF NOT EXISTS idx_calls_application_created
     ON calls (application_id, created_at DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_calls_organization_sip_call_id
-    ON calls (organization_id, sip_call_id)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_calls_sip_call_id
+    ON calls (sip_call_id)
     WHERE sip_call_id IS NOT NULL;
 
 CREATE TRIGGER set_calls_updated_at
