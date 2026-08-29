@@ -18,7 +18,10 @@ func NewService(repo *Repository) *Service {
 	if repo == nil {
 		panic("conferences: repository is required")
 	}
-	return &Service{repo: repo}
+
+	return &Service{
+		repo: repo,
+	}
 }
 
 func (s *Service) Create(
@@ -87,7 +90,9 @@ func (s *Service) End(
 		return conference, nil
 	}
 	if conference.State != string(StateActive) {
-		return sqlc.Conference{}, apperror.NewConflict("conference cannot be ended from state: " + conference.State)
+		return sqlc.Conference{}, apperror.NewConflict(
+			"conference cannot be ended from state: " + conference.State,
+		)
 	}
 
 	value, err := s.repo.End(ctx, org, id)
@@ -103,6 +108,7 @@ func (s *Service) End(
 			return current, nil
 		}
 	}
+
 	return sqlc.Conference{}, conferenceWriteError(err, "end conference")
 }
 
@@ -184,10 +190,22 @@ func (s *Service) SetParticipant(
 			return participant, nil
 		}
 		if participant.State == string(ParticipantFailed) {
-			return sqlc.ConferenceParticipant{}, apperror.NewConflict("failed conference participant cannot leave")
+			return sqlc.ConferenceParticipant{}, apperror.NewConflict(
+				"failed conference participant cannot leave",
+			)
 		}
+
 		value, err := s.repo.LeaveParticipant(ctx, org, id)
-		return s.resolveParticipantMutation(ctx, org, conferenceID, id, value, err, string(ParticipantLeft), "remove conference participant")
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantLeft),
+			"remove conference participant",
+		)
 	}
 
 	if state == string(ParticipantFailed) {
@@ -195,29 +213,64 @@ func (s *Service) SetParticipant(
 			return participant, nil
 		}
 		if participant.State == string(ParticipantLeft) {
-			return sqlc.ConferenceParticipant{}, apperror.NewConflict("left conference participant cannot fail")
+			return sqlc.ConferenceParticipant{}, apperror.NewConflict(
+				"left conference participant cannot fail",
+			)
 		}
+
 		value, err := s.repo.FailParticipant(ctx, org, id)
-		return s.resolveParticipantMutation(ctx, org, conferenceID, id, value, err, string(ParticipantFailed), "fail conference participant")
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantFailed),
+			"fail conference participant",
+		)
 	}
 
 	if participant.State != string(ParticipantJoined) {
-		return sqlc.ConferenceParticipant{}, apperror.NewConflict("conference participant is not joined")
+		return sqlc.ConferenceParticipant{}, apperror.NewConflict(
+			"conference participant is not joined",
+		)
 	}
 
 	if muted != nil {
 		if participant.Muted == *muted {
 			return participant, nil
 		}
+
 		value, err := s.repo.SetParticipantMuted(ctx, org, id, *muted)
-		return s.resolveParticipantMutation(ctx, org, conferenceID, id, value, err, string(ParticipantJoined), "update conference participant mute state")
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantJoined),
+			"update conference participant mute state",
+		)
 	}
+
 	if deaf != nil {
 		if participant.Deaf == *deaf {
 			return participant, nil
 		}
+
 		value, err := s.repo.SetParticipantDeaf(ctx, org, id, *deaf)
-		return s.resolveParticipantMutation(ctx, org, conferenceID, id, value, err, string(ParticipantJoined), "update conference participant deaf state")
+		return s.resolveParticipantMutation(
+			ctx,
+			org,
+			conferenceID,
+			id,
+			value,
+			err,
+			string(ParticipantJoined),
+			"update conference participant deaf state",
+		)
 	}
 
 	return participant, nil
@@ -245,6 +298,7 @@ func (s *Service) resolveParticipantMutation(
 			return current, nil
 		}
 	}
+
 	return sqlc.ConferenceParticipant{}, conferenceWriteError(err, message)
 }
 
@@ -261,7 +315,9 @@ func conferenceReadError(err error, message string) error {
 
 func conferenceWriteError(err error, message string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
-		return apperror.NewConflict(message + " is not valid in the current lifecycle state")
+		return apperror.NewConflict(
+			message + " is not valid in the current lifecycle state",
+		)
 	}
 	if err != nil {
 		return apperror.NewInternal(message, err)
