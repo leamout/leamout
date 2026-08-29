@@ -52,7 +52,13 @@ type Frame struct {
 }
 
 func (f Frame) Header(name string) string {
-	return f.Headers[name]
+	if value := f.Headers[name]; value != "" {
+		return value
+	}
+	if f.ContentType == ContentTypeEventPlain {
+		return plainEventHeader(f.Body, name)
+	}
+	return ""
 }
 
 func (f Frame) ReplyText() string {
@@ -79,7 +85,10 @@ type Event struct {
 }
 
 func (e Event) Header(name string) string {
-	return e.Headers[name]
+	if value := e.Headers[name]; value != "" {
+		return value
+	}
+	return plainEventHeader(e.Body, name)
 }
 
 type EventFormat string
