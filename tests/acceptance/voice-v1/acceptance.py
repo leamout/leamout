@@ -342,13 +342,25 @@ def inbound_call():
 
     inbound = wait_for("inbound call persistence", probe, timeout=15)
     STATE["inbound_call_id"] = inbound["id"]
-    fs_cli("voice-v1-carrier", f"uuid_kill {carrier_uuid}")
-    wait_call(
-        inbound["id"],
-        lambda call: call["state"] in {"completed", "failed", "cancelled"},
-        "inbound terminal state",
-    )
-    return f"carrier ingress created inbound call {inbound['id']}"
+    STATE["inbound_carrier_uuid"] = carrier_uuid
+    return f"carrier ingress created live inbound call {inbound['id']}"
+
+
+def answer_inbound():
+    call_id = STATE["inbound_call_id"]
+    try:
+        _, call = api("POST", f"/v1/calls/{call_id}/answer", expected={200})
+        if call["state"] not in {"answered", "active"}:
+            raise AcceptanceError(f"answer state is {call['state']}")
+
+        _, ended = api("POST", f"/v1/calls/{call_id}/hangup", expected={200})
+        if ended["state"] not in {"completed", "cancelled"}:
+            raise AcceptanceError(f"inbound hangup state is {ended['state']}")
+        return f"inbound answer and hangup persisted {ended['state']}"
+    finally:
+        carrier_uuid = STATE.get("inbound_carrier_uuid")
+        if carrier_uuid:
+            fs_cli("voice-v1-carrier", f"uuid_kill {carrier_uuid}")
 
 
 def outbound_call():
@@ -364,16 +376,11 @@ def outbound_call():
     )
     if call["direction"] != "outbound" or not call.get("sip_call_id"):
         raise AcceptanceError("outbound call has no media identity")
+    if call["state"] not in {"answered", "active"}:
+        raise AcceptanceError(f"answered outbound call persisted as {call['state']}")
     STATE["call_id"] = call["id"]
     STATE["sip_call_id"] = call["sip_call_id"]
-    return f"outbound call {call['id']} reached the synthetic carrier"
-
-
-def answer():
-    _, call = api("POST", f"/v1/calls/{STATE['call_id']}/answer", expected={200})
-    if call["state"] not in {"answered", "active"}:
-        raise AcceptanceError(f"answer state is {call['state']}")
-    return "connected state persisted"
+    return f"outbound call {call['id']} reached an answered carrier leg"
 
 
 def hold_resume():
@@ -450,12 +457,12 @@ def transfer():
     return "live call transferred to the local 9196 dialplan"
 
 
-def hangup():
+def hangup_outbound():
     _, call = api("POST", f"/v1/calls/{STATE['call_id']}/hangup", expected={200})
     if call["state"] not in {"completed", "cancelled"}:
         raise AcceptanceError(f"hangup state is {call['state']}")
     STATE["terminal_state"] = call["state"]
-    return f"hangup persisted {call['state']}"
+    return f"outbound cleanup persisted {call['state']}"
 
 
 def conference():
@@ -598,21 +605,22 @@ def main():
         RESULTS[14] = ("FAIL", "Receive webhooks", f"webhook setup failed: {error}")
         print(f"FAIL 14 Receive webhooks: webhook setup failed: {error}")
 
-    record(4, "Receive an inbound call", inbound_call)
+    inbound_ok = record(4, "Receive an inbound call", inbound_call)
+    if inbound_ok:
+        record(6, "Answer/hang up", answer_inbound)
 
     if record(5, "Originate an outbound call", outbound_call):
-        if record(6, "Answer/hang up", answer):
-            record(8, "Hold/resume", hold_resume)
-            record(9, "Play audio", play_audio)
-            record(10, "Record", record_audio)
-            record(7, "Transfer", transfer)
-            try:
-                detail = hangup()
-                RESULTS[6] = ("PASS", "Answer/hang up", detail)
-                print(f"PASS 06 Answer/hang up: {detail}")
-            except Exception as error:
-                RESULTS[6] = ("FAIL", "Answer/hang up", f"hangup failed: {error}")
-                print(f"FAIL 06 Answer/hang up: hangup failed: {error}")
+        record(8, "Hold/resume", hold_resume)
+        record(9, "Play audio", play_audio)
+        record(10, "Record", record_audio)
+        record(7, "Transfer", transfer)
+        try:
+            detail = hangup_outbound()
+            print(f"PASS outbound cleanup: {detail}")
+        except Exception as error:
+            print(f"FAIL outbound cleanup: {error}")
+            if RESULTS.get(6, ("FAIL",))[0] == "PASS":
+                RESULTS[6] = ("FAIL", "Answer/hang up", f"outbound hangup failed: {error}")
 
     record(11, "Create/manage conferences", conference)
     record(12, "Receive normalized call events", normalized_events)
