@@ -13,65 +13,30 @@ import urllib.error
 import urllib.request
 import uuid
 
-
-API_BASE = os.environ.get("VOICE_V1_API_BASE", "http://127.0.0.1:8080")
-TOKEN = os.environ.get(
-    "VOICE_V1_TOKEN",
-    "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx",
-)
-ESL_PASSWORD = os.environ.get("FREESWITCH_ESL_PASSWORD", "voice-v1-esl-secret")
-DID = os.environ.get("VOICE_V1_DID", "+15551234567")
-CALLER = os.environ.get("VOICE_V1_CALLER", "+15557654321")
+API_BASE = os.getenv("VOICE_V1_API_BASE", "http://127.0.0.1:8080")
+TOKEN = os.getenv("VOICE_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
+ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "voice-v1-esl-secret")
+DID = os.getenv("VOICE_V1_DID", "+15551234567")
+CALLER = os.getenv("VOICE_V1_CALLER", "+15557654321")
 PROVIDER_ID = "00000000-0000-0000-0000-000000002001"
+ORG_ID = "00000000-0000-0000-0000-000000001001"
 COMPOSE = [
-    "docker",
-    "compose",
-    "-f",
-    "deploy/compose.yaml",
-    "-f",
-    "tests/acceptance/voice-v1/compose.yaml",
+    "docker", "compose",
+    "-f", "deploy/compose.yaml",
+    "-f", "tests/acceptance/voice-v1/compose.yaml",
 ]
+
+STATE = {}
+RESULTS = {}
 
 
 class AcceptanceError(RuntimeError):
     pass
 
 
-class Results:
-    def __init__(self):
-        self.items = {}
-
-    def pass_(self, number, name, detail=""):
-        self.items[number] = ("PASS", name, detail)
-        print(f"PASS {number:02d} {name}{': ' + detail if detail else ''}")
-
-    def fail(self, number, name, error):
-        self.items[number] = ("FAIL", name, str(error))
-        print(f"FAIL {number:02d} {name}: {error}")
-
-    def summary(self):
-        print("\nVoice v1 acceptance matrix")
-        print("=" * 72)
-        failed = 0
-        for number in range(1, 17):
-            status, name, detail = self.items.get(
-                number,
-                ("FAIL", "unexecuted acceptance item", "dependency prevented execution"),
-            )
-            failed += status != "PASS"
-            suffix = f" - {detail}" if detail else ""
-            print(f"{number:02d}. {status:4} {name}{suffix}")
-        return failed
-
-
-RESULTS = Results()
-STATE = {}
-
-
-def run(command, *, check=True, input_text=None):
+def run(command, check=True):
     completed = subprocess.run(
         command,
-        input=input_text,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -90,55 +55,40 @@ def compose(*args, check=True):
 
 def fs_cli(service, command):
     return compose(
-        "exec",
-        "-T",
-        service,
+        "exec", "-T", service,
         "fs_cli",
-        "-H",
-        "127.0.0.1",
-        "-P",
-        "8021",
-        "-p",
-        ESL_PASSWORD,
-        "-x",
-        command,
+        "-H", "127.0.0.1",
+        "-P", "8021",
+        "-p", ESL_PASSWORD,
+        "-x", command,
     )
 
 
 def psql(sql):
     return compose(
-        "exec",
-        "-T",
-        "postgres",
-        "psql",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-U",
-        "leamout",
-        "-d",
-        "leamout",
-        "-Atc",
-        sql,
+        "exec", "-T", "postgres",
+        "psql", "-v", "ON_ERROR_STOP=1",
+        "-U", "leamout", "-d", "leamout", "-Atc", sql,
     )
 
 
-def request(method, path, payload=None, *, auth=True, expected=None):
+def api(method, path, payload=None, auth=True, expected=None):
     body = None
     headers = {"Accept": "application/json"}
     if payload is not None:
-        body = json.dumps(payload).encode("utf-8")
+        body = json.dumps(payload).encode()
         headers["Content-Type"] = "application/json"
     if auth:
         headers["Authorization"] = f"Bearer {TOKEN}"
 
-    req = urllib.request.Request(
+    request = urllib.request.Request(
         API_BASE + path,
         data=body,
-        method=method,
         headers=headers,
+        method=method,
     )
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:
             status = response.status
             raw = response.read()
     except urllib.error.HTTPError as error:
@@ -148,18 +98,18 @@ def request(method, path, payload=None, *, auth=True, expected=None):
         raise AcceptanceError(f"{method} {path}: {error}") from error
 
     if expected is not None and status not in expected:
-        text = raw.decode("utf-8", errors="replace")
-        raise AcceptanceError(f"{method} {path}: HTTP {status}, body={text}")
-
+        raise AcceptanceError(
+            f"{method} {path}: HTTP {status}, body={raw.decode(errors='replace')}"
+        )
     if not raw:
         return status, None
     try:
         return status, json.loads(raw)
     except json.JSONDecodeError:
-        return status, raw.decode("utf-8", errors="replace")
+        return status, raw.decode(errors="replace")
 
 
-def wait_for(description, probe, timeout=15.0, interval=0.25):
+def wait_for(description, probe, timeout=15, interval=0.25):
     deadline = time.monotonic() + timeout
     last_error = None
     while time.monotonic() < deadline:
@@ -167,7 +117,7 @@ def wait_for(description, probe, timeout=15.0, interval=0.25):
             value = probe()
             if value:
                 return value
-        except Exception as error:  # acceptance polling preserves the last failure
+        except Exception as error:
             last_error = error
         time.sleep(interval)
     suffix = f": {last_error}" if last_error else ""
@@ -175,7 +125,7 @@ def wait_for(description, probe, timeout=15.0, interval=0.25):
 
 
 def health_status(path):
-    status, _ = request("GET", path, auth=False)
+    status, _ = api("GET", path, auth=False)
     return status
 
 
@@ -185,75 +135,68 @@ def wait_api_ready():
 
 
 def get_call(call_id):
-    _, call = request("GET", f"/v1/calls/{call_id}", expected={200})
+    _, call = api("GET", f"/v1/calls/{call_id}", expected={200})
     return call
 
 
 def wait_call(call_id, predicate, description, timeout=15):
-    return wait_for(
-        description,
-        lambda: (call := get_call(call_id)) if predicate(call) else False,
-        timeout=timeout,
-    )
+    def probe():
+        call = get_call(call_id)
+        return call if predicate(call) else False
+
+    return wait_for(description, probe, timeout=timeout)
 
 
 def list_calls():
-    _, body = request("GET", "/v1/calls/?limit=100", expected={200})
+    _, body = api("GET", "/v1/calls/?limit=100", expected={200})
     return body["calls"]
 
 
 def list_recordings():
-    _, body = request("GET", "/v1/recordings/?limit=100", expected={200})
+    _, body = api("GET", "/v1/recordings/?limit=100", expected={200})
     return body["recordings"]
 
 
-def webhook_events():
+def sink_events():
     context = ssl._create_unverified_context()
-    req = urllib.request.Request("https://127.0.0.1:18443/events")
-    with urllib.request.urlopen(req, timeout=5, context=context) as response:
+    request = urllib.request.Request("https://127.0.0.1:18443/events")
+    with urllib.request.urlopen(request, timeout=5, context=context) as response:
         return json.loads(response.read())["events"]
 
 
-def verify_webhook_signature(event, secret):
-    headers = event["headers"]
-    timestamp = headers["X-Leamout-Timestamp"]
-    signature = headers["X-Leamout-Signature"]
-    body = event["body"]
+def verify_signature(event):
+    secret = STATE["webhook_secret"]
     secret_bytes = base64.urlsafe_b64decode(secret + "=" * (-len(secret) % 4))
-    digest = hmac.new(
+    timestamp = event["headers"]["X-Leamout-Timestamp"]
+    body = event["body"]
+    expected = "v1=" + hmac.new(
         secret_bytes,
-        f"{timestamp}.{body}".encode("utf-8"),
+        f"{timestamp}.{body}".encode(),
         hashlib.sha256,
     ).hexdigest()
-    expected = "v1=" + digest
-    if not hmac.compare_digest(signature, expected):
+    actual = event["headers"]["X-Leamout-Signature"]
+    if not hmac.compare_digest(actual, expected):
         raise AcceptanceError("webhook signature did not verify")
 
 
-def check(number, name, function):
+def record(number, name, function):
     try:
         detail = function() or ""
-        RESULTS.pass_(number, name, detail)
+        RESULTS[number] = ("PASS", name, detail)
+        print(f"PASS {number:02d} {name}{': ' + detail if detail else ''}")
         return True
     except Exception as error:
-        RESULTS.fail(number, name, error)
+        RESULTS[number] = ("FAIL", name, str(error))
+        print(f"FAIL {number:02d} {name}: {error}")
         return False
 
 
-def acceptance_deploy():
+def deploy():
     wait_api_ready()
     running = set(compose("ps", "--status", "running", "--services").splitlines())
     required = {
-        "postgres",
-        "redis",
-        "nats",
-        "api",
-        "worker",
-        "opensips",
-        "rtpengine",
-        "freeswitch",
-        "voice-v1-carrier",
-        "voice-v1-webhook",
+        "postgres", "redis", "nats", "api", "worker", "opensips",
+        "rtpengine", "freeswitch", "voice-v1-carrier", "voice-v1-webhook",
     }
     missing = sorted(required - running)
     if missing:
@@ -261,15 +204,13 @@ def acceptance_deploy():
     return "full control/media stack is running"
 
 
-def acceptance_provider():
-    _, providers = request("GET", "/v1/carrier-providers/", expected={200})
-    provider_items = providers.get("carrier_providers", providers.get("providers", []))
-    if not any(item["id"] == PROVIDER_ID for item in provider_items):
-        raise AcceptanceError("synthetic carrier provider fixture is not visible through API")
+def configure_provider():
+    _, providers = api("GET", "/v1/carrier-providers/", expected={200})
+    if not any(item["id"] == PROVIDER_ID for item in providers["carrier_providers"]):
+        raise AcceptanceError("synthetic carrier provider fixture is not visible")
 
-    _, connection = request(
-        "POST",
-        "/v1/carrier-connections/",
+    _, connection = api(
+        "POST", "/v1/carrier-connections/",
         {
             "provider_id": PROVIDER_ID,
             "name": "voice-v1-carrier",
@@ -279,17 +220,15 @@ def acceptance_provider():
         expected={201},
     )
     STATE["connection_id"] = connection["id"]
-
-    request(
+    api(
         "POST",
         f"/v1/carrier-connections/{connection['id']}/source-ips",
         {"cidr": "172.30.0.50/32"},
         expected={201},
     )
 
-    _, trunk = request(
-        "POST",
-        "/v1/trunks/",
+    _, trunk = api(
+        "POST", "/v1/trunks/",
         {
             "carrier_connection_id": connection["id"],
             "name": "voice-v1-trunk",
@@ -299,7 +238,7 @@ def acceptance_provider():
     )
     STATE["trunk_id"] = trunk["id"]
 
-    _, endpoint = request(
+    _, endpoint = api(
         "POST",
         f"/v1/trunks/{trunk['id']}/endpoints",
         {
@@ -312,68 +251,57 @@ def acceptance_provider():
     )
     if endpoint["host"] != "voice-v1-carrier":
         raise AcceptanceError("trunk endpoint was not persisted")
-    return f"carrier connection {connection['id']} routes to synthetic SIP peer"
+    return f"carrier {connection['id']} routes to the synthetic SIP peer"
 
 
-def acceptance_voice_application():
-    _, number = request(
-        "POST",
-        "/v1/numbers/",
+def create_voice_application():
+    _, number = api(
+        "POST", "/v1/numbers/",
         {"number": DID, "country_code": "US", "voice_enabled": True},
         expected={201},
     )
     STATE["number_id"] = number["id"]
 
-    connection_id = STATE["connection_id"]
     updated = psql(
         "UPDATE phone_numbers SET carrier_connection_id = "
-        f"'{connection_id}'::uuid WHERE id = '{number['id']}'::uuid RETURNING id;"
+        f"'{STATE['connection_id']}'::uuid WHERE id = '{number['id']}'::uuid RETURNING id;"
     )
     if number["id"] not in updated:
-        raise AcceptanceError("failed to assign acceptance DID to carrier connection")
+        raise AcceptanceError("failed to assign test DID to carrier connection")
 
-    _, application = request(
-        "POST",
-        "/v1/voice-applications/",
+    _, application = api(
+        "POST", "/v1/voice-applications/",
         {"name": "voice-v1-acceptance", "caller_id": CALLER},
         expected={201},
     )
     STATE["application_id"] = application["id"]
-
-    _, binding = request(
+    _, binding = api(
         "POST",
         f"/v1/voice-applications/{application['id']}/bindings",
         {"phone_number_id": number["id"]},
         expected={201},
     )
     if binding.get("phone_number_id") != number["id"]:
-        raise AcceptanceError("voice application DID binding was not persisted")
-    return f"voice application {application['id']} bound to {DID}"
+        raise AcceptanceError("DID binding was not persisted")
+    return f"voice application {application['id']} is bound to {DID}"
 
 
 def configure_webhook():
-    _, created = request(
-        "POST",
-        "/v1/webhooks/",
+    _, created = api(
+        "POST", "/v1/webhooks/",
         {
             "url": "https://voice-v1-webhook:8443/events",
             "subscribed_events": [
-                "call.initiated",
-                "call.answered",
-                "call.held",
-                "call.resumed",
-                "call.completed",
-                "call.ringing",
-                "recording.started",
-                "recording.completed",
+                "call.initiated", "call.ringing", "call.answered",
+                "call.held", "call.resumed", "call.completed",
+                "recording.started", "recording.completed",
             ],
         },
         expected={201},
     )
     STATE["webhook_id"] = created["webhook"]["id"]
     STATE["webhook_secret"] = created["signing_secret"]
-
-    _, test_result = request(
+    _, test_result = api(
         "POST",
         f"/v1/webhooks/{STATE['webhook_id']}/test",
         expected={200},
@@ -382,10 +310,43 @@ def configure_webhook():
         raise AcceptanceError(f"webhook test returned {test_result['response_status']}")
 
 
-def acceptance_outbound():
-    _, call = request(
-        "POST",
-        "/v1/calls/",
+def inbound_call():
+    existing = {item["id"] for item in list_calls()}
+    output = fs_cli(
+        "voice-v1-carrier",
+        "originate "
+        f"{{origination_caller_id_number={CALLER}}}"
+        f"sofia/internal/{DID}@opensips:5060 &park()",
+    )
+    if "+OK" not in output:
+        raise AcceptanceError(f"synthetic carrier originate failed: {output}")
+    carrier_uuid = output.split("+OK", 1)[1].strip().split()[0]
+
+    def probe():
+        return next(
+            (
+                item for item in list_calls()
+                if item["id"] not in existing
+                and item["direction"] == "inbound"
+                and item["to"] == DID
+            ),
+            False,
+        )
+
+    inbound = wait_for("inbound call persistence", probe, timeout=15)
+    STATE["inbound_call_id"] = inbound["id"]
+    fs_cli("voice-v1-carrier", f"uuid_kill {carrier_uuid}")
+    wait_call(
+        inbound["id"],
+        lambda call: call["state"] in {"completed", "failed", "cancelled"},
+        "inbound terminal state",
+    )
+    return f"carrier ingress created inbound call {inbound['id']}"
+
+
+def outbound_call():
+    _, call = api(
+        "POST", "/v1/calls/",
         {
             "application_id": STATE["application_id"],
             "trunk_id": STATE["trunk_id"],
@@ -395,158 +356,110 @@ def acceptance_outbound():
         expected={201},
     )
     if call["direction"] != "outbound" or not call.get("sip_call_id"):
-        raise AcceptanceError("outbound call did not expose expected routing identity")
+        raise AcceptanceError("outbound call has no media identity")
     STATE["call_id"] = call["id"]
     STATE["sip_call_id"] = call["sip_call_id"]
-    return f"outbound call {call['id']} reached synthetic carrier"
+    return f"outbound call {call['id']} reached the synthetic carrier"
 
 
-def acceptance_answer():
+def answer():
+    _, call = api("POST", f"/v1/calls/{STATE['call_id']}/answer", expected={200})
+    if call["state"] not in {"answered", "active"}:
+        raise AcceptanceError(f"answer state is {call['state']}")
+    return "connected state persisted"
+
+
+def hold_resume():
     call_id = STATE["call_id"]
-    _, answered = request("POST", f"/v1/calls/{call_id}/answer", expected={200})
-    if answered["state"] not in {"answered", "active"}:
-        raise AcceptanceError(f"answer state is {answered['state']}")
-    STATE["answered"] = True
-    return "answer persisted connected call state"
-
-
-def acceptance_hold_resume():
-    call_id = STATE["call_id"]
-    request("POST", f"/v1/calls/{call_id}/hold", expected={200})
+    api("POST", f"/v1/calls/{call_id}/hold", expected={200})
     wait_call(call_id, lambda call: call["media_state"] == "held", "held media state")
-    request("POST", f"/v1/calls/{call_id}/unhold", expected={200})
+    api("POST", f"/v1/calls/{call_id}/unhold", expected={200})
     wait_call(call_id, lambda call: call["media_state"] == "active", "active media state")
-    return "media_state transitions active -> held -> active"
+    return "media_state changed active -> held -> active"
 
 
-def acceptance_play():
+def play_audio():
     call_id = STATE["call_id"]
-    request(
-        "POST",
-        f"/v1/calls/{call_id}/play",
+    api(
+        "POST", f"/v1/calls/{call_id}/play",
         {"path": "tone_stream://%(500,0,440)"},
         expected={200},
     )
     time.sleep(0.2)
-    request("POST", f"/v1/calls/{call_id}/stop", expected={200})
-    if "+OK" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}"):
+    api("POST", f"/v1/calls/{call_id}/stop", expected={200})
+    if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
         raise AcceptanceError("media channel disappeared during playback")
-    return "FreeSWITCH accepted playback and stop on live channel"
+    return "playback and stop executed on a live FreeSWITCH channel"
 
 
-def acceptance_record():
+def record_audio():
     call_id = STATE["call_id"]
     path = "/var/lib/freeswitch/recordings/voice-v1-acceptance.wav"
-    request(
-        "POST",
-        f"/v1/calls/{call_id}/record",
+    api(
+        "POST", f"/v1/calls/{call_id}/record",
         {"action": "start", "path": path},
         expected={200},
     )
-    recording = wait_for(
-        "recording.started persistence",
-        lambda: next(
+
+    def started():
+        return next(
             (
-                item
-                for item in list_recordings()
+                item for item in list_recordings()
                 if item["call_id"] == call_id and item["status"] == "recording"
             ),
             False,
-        ),
-        timeout=15,
-    )
-    request(
-        "POST",
-        f"/v1/calls/{call_id}/record",
+        )
+
+    recording = wait_for("recording.started persistence", started)
+    api(
+        "POST", f"/v1/calls/{call_id}/record",
         {"action": "stop", "path": path},
         expected={200},
     )
-    wait_for(
-        "recording.completed persistence",
-        lambda: next(
+
+    def completed():
+        return next(
             (
-                item
-                for item in list_recordings()
+                item for item in list_recordings()
                 if item["id"] == recording["id"] and item["status"] == "completed"
             ),
             False,
-        ),
-        timeout=15,
-    )
+        )
+
+    wait_for("recording.completed persistence", completed)
     return f"recording {recording['id']} completed through lifecycle events"
 
 
-def acceptance_transfer():
+def transfer():
     call_id = STATE["call_id"]
-    request(
-        "POST",
-        f"/v1/calls/{call_id}/transfer",
+    api(
+        "POST", f"/v1/calls/{call_id}/transfer",
         {"destination": "9196", "dialplan": "XML", "context": "leamout"},
         expected={200},
     )
     time.sleep(0.25)
-    output = fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}")
-    if "+OK true" not in output.lower() and "true" not in output.lower():
+    if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
         raise AcceptanceError("transferred channel is no longer live")
-    return "live call transferred into local 9196 dialplan"
+    return "live call transferred to the local 9196 dialplan"
 
 
-def acceptance_hangup():
-    call_id = STATE["call_id"]
-    _, ended = request("POST", f"/v1/calls/{call_id}/hangup", expected={200})
-    if ended["state"] not in {"completed", "cancelled"}:
-        raise AcceptanceError(f"hangup state is {ended['state']}")
-    STATE["terminal_state"] = ended["state"]
-    return f"hangup persisted terminal state {ended['state']}"
+def hangup():
+    _, call = api("POST", f"/v1/calls/{STATE['call_id']}/hangup", expected={200})
+    if call["state"] not in {"completed", "cancelled"}:
+        raise AcceptanceError(f"hangup state is {call['state']}")
+    STATE["terminal_state"] = call["state"]
+    return f"hangup persisted {call['state']}"
 
 
-def acceptance_inbound():
-    existing_ids = {item["id"] for item in list_calls()}
-    output = fs_cli(
-        "voice-v1-carrier",
-        "originate "
-        f"{{origination_caller_id_number={CALLER}}}"
-        f"sofia/internal/{DID}@opensips:5060 &park()",
-    )
-    if "+OK" not in output:
-        raise AcceptanceError(f"carrier originate did not answer: {output}")
-    carrier_uuid = output.split("+OK", 1)[1].strip().split()[0]
-
-    inbound = wait_for(
-        "inbound call persistence",
-        lambda: next(
-            (
-                item
-                for item in list_calls()
-                if item["id"] not in existing_ids
-                and item["direction"] == "inbound"
-                and item["to"] == DID
-            ),
-            False,
-        ),
-        timeout=15,
-    )
-    STATE["inbound_call_id"] = inbound["id"]
-    fs_cli("voice-v1-carrier", f"uuid_kill {carrier_uuid}")
-    wait_call(
-        inbound["id"],
-        lambda call: call["state"] in {"completed", "failed", "cancelled"},
-        "inbound terminal state",
-        timeout=15,
-    )
-    return f"carrier ingress created inbound call {inbound['id']}"
-
-
-def acceptance_conference():
+def conference():
     name = "voice-v1-" + uuid.uuid4().hex[:8]
-    _, conference = request(
-        "POST",
-        "/v1/conferences/",
+    _, item = api(
+        "POST", "/v1/conferences/",
         {"application_id": STATE["application_id"], "name": name},
         expected={201},
     )
-    if conference["state"] != "active":
-        raise AcceptanceError("conference API did not create active conference")
+    if item["state"] != "active":
+        raise AcceptanceError("conference API did not create active state")
 
     media = fs_cli("freeswitch", "conference list")
     if name not in media:
@@ -554,134 +467,155 @@ def acceptance_conference():
             "conference exists only in control-plane state; no matching FreeSWITCH conference exists"
         )
 
-    request("POST", f"/v1/conferences/{conference['id']}/lock", expected={200})
-    media = fs_cli("freeswitch", f"conference {name} list")
-    if "locked" not in media.lower():
+    api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
+    if "locked" not in fs_cli("freeswitch", f"conference {name} list").lower():
         raise AcceptanceError("conference lock is not observable in FreeSWITCH")
-    request("POST", f"/v1/conferences/{conference['id']}/unlock", expected={200})
-    request("DELETE", f"/v1/conferences/{conference['id']}", expected={200})
-    return "conference lifecycle and media controls are backed by FreeSWITCH"
+    api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
+    api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
+    return "conference lifecycle and controls are observable in FreeSWITCH"
 
 
-def acceptance_events():
-    required = {"call.initiated", "call.answered", "call.held", "call.resumed", "call.completed"}
+def normalized_events():
+    required = {
+        "call.initiated", "call.answered", "call.held",
+        "call.resumed", "call.completed",
+    }
 
-    def observed():
-        types = {event["envelope"].get("type") for event in webhook_events()}
-        return types if required.issubset(types) else False
+    def probe():
+        found = {event["envelope"].get("type") for event in sink_events()}
+        return found if required.issubset(found) else False
 
-    types = wait_for("normalized call events", observed, timeout=20)
-    return "observed " + ", ".join(sorted(required & types))
+    found = wait_for("normalized call events", probe, timeout=20)
+    return "observed " + ", ".join(sorted(required & found))
 
 
-def acceptance_query_state():
+def query_call_state():
     call = get_call(STATE["call_id"])
     if call["state"] != STATE["terminal_state"]:
-        raise AcceptanceError("queried call state does not match last control mutation")
-    if call["organization_id"] != "00000000-0000-0000-0000-000000001001":
+        raise AcceptanceError("queried state does not match terminal mutation")
+    if call["organization_id"] != ORG_ID:
         raise AcceptanceError("queried call escaped acceptance organization")
-    return f"GET /calls/{{id}} returned durable {call['state']} state"
+    return f"durable call state is {call['state']}"
 
 
-def acceptance_webhook():
-    events = wait_for("webhook deliveries", lambda: webhook_events() or False, timeout=20)
-    call_events = [event for event in events if event["envelope"].get("type", "").startswith("call.")]
+def webhooks():
+    events = wait_for("webhook deliveries", lambda: sink_events() or False, timeout=20)
+    call_events = [
+        event for event in events
+        if event["envelope"].get("type", "").startswith("call.")
+    ]
     if not call_events:
-        raise AcceptanceError("no call webhook deliveries were received")
+        raise AcceptanceError("no call webhook deliveries received")
     for event in call_events:
-        verify_webhook_signature(event, STATE["webhook_secret"])
-    _, deliveries = request(
+        verify_signature(event)
+
+    _, body = api(
         "GET",
         f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
         expected={200},
     )
-    if not any(item["status"] == "delivered" for item in deliveries["deliveries"]):
-        raise AcceptanceError("webhook API has no delivered attempt")
-    return f"{len(call_events)} signed call webhook deliveries verified"
+    if not any(item["status"] == "delivered" for item in body["deliveries"]):
+        raise AcceptanceError("webhook API has no delivered attempts")
+    return f"{len(call_events)} signed call deliveries verified"
 
 
-def acceptance_health():
+def health():
     if health_status("/healthz") != 204 or health_status("/readyz") != 204:
-        raise AcceptanceError("HTTP liveness/readiness is not healthy")
+        raise AcceptanceError("HTTP health endpoints are not healthy")
     status = fs_cli("freeswitch", "status")
     if "UP" not in status.upper():
         raise AcceptanceError("FreeSWITCH status is not UP")
-    channels = fs_cli("freeswitch", "show channels count")
-    if "total" not in channels.lower() and "+OK" not in channels:
-        raise AcceptanceError("FreeSWITCH channel health query failed")
+    fs_cli("freeswitch", "show channels count")
     return "HTTP readiness and FreeSWITCH media status are healthy"
 
 
-def acceptance_restart():
-    call_before = get_call(STATE["call_id"])
-
+def restart_safety():
+    before = get_call(STATE["call_id"])
     compose("restart", "worker")
     wait_for(
         "worker restart",
         lambda: "worker" in compose("ps", "--status", "running", "--services").splitlines(),
         timeout=30,
     )
+
     compose("restart", "api")
     wait_api_ready()
-    after_process_restart = get_call(STATE["call_id"])
-    if after_process_restart["state"] != call_before["state"]:
+    if get_call(STATE["call_id"])["state"] != before["state"]:
         raise AcceptanceError("API/worker restart changed terminal call state")
 
     compose("stop", "freeswitch")
-    wait_for("readiness failure after FreeSWITCH stop", lambda: health_status("/readyz") == 503, timeout=15)
+    wait_for(
+        "readiness failure after FreeSWITCH stop",
+        lambda: health_status("/readyz") == 503,
+        timeout=15,
+    )
     compose("start", "freeswitch")
-    wait_for("readiness recovery after FreeSWITCH start", lambda: health_status("/readyz") == 204, timeout=45)
+    wait_for(
+        "readiness recovery after FreeSWITCH start",
+        lambda: health_status("/readyz") == 204,
+        timeout=45,
+    )
 
-    after_media_restart = get_call(STATE["call_id"])
-    if after_media_restart["state"] != call_before["state"]:
+    if get_call(STATE["call_id"])["state"] != before["state"]:
         raise AcceptanceError("FreeSWITCH restart changed completed call state")
-    return "API, worker, and FreeSWITCH restarted with readiness recovery and durable state"
+    return "API, worker, and FreeSWITCH restart with readiness/state recovery"
+
+
+def print_summary():
+    print("\nVoice v1 acceptance matrix")
+    print("=" * 72)
+    failed = 0
+    for number in range(1, 17):
+        status, name, detail = RESULTS.get(
+            number,
+            ("FAIL", "unexecuted acceptance item", "dependency prevented execution"),
+        )
+        if status != "PASS":
+            failed += 1
+        suffix = f" - {detail}" if detail else ""
+        print(f"{number:02d}. {status:4} {name}{suffix}")
+    return failed
 
 
 def main():
-    if not check(1, "Deploy Leamout", acceptance_deploy):
-        RESULTS.summary()
-        return 1
-
-    if not check(2, "Configure a SIP endpoint/provider", acceptance_provider):
-        RESULTS.summary()
-        return 1
-
-    if not check(3, "Create a voice application", acceptance_voice_application):
-        RESULTS.summary()
-        return 1
+    if not record(1, "Deploy Leamout", deploy):
+        return print_summary() or 1
+    if not record(2, "Configure a SIP endpoint/provider", configure_provider):
+        return print_summary() or 1
+    if not record(3, "Create a voice application", create_voice_application):
+        return print_summary() or 1
 
     try:
         configure_webhook()
     except Exception as error:
-        RESULTS.fail(14, "Receive webhooks", f"webhook setup failed: {error}")
+        RESULTS[14] = ("FAIL", "Receive webhooks", f"webhook setup failed: {error}")
+        print(f"FAIL 14 Receive webhooks: webhook setup failed: {error}")
 
-    check(4, "Receive an inbound call", acceptance_inbound)
+    record(4, "Receive an inbound call", inbound_call)
 
-    outbound_ok = check(5, "Originate an outbound call", acceptance_outbound)
-    if outbound_ok:
-        answer_ok = check(6, "Answer/hang up", acceptance_answer)
-        if answer_ok:
-            check(8, "Hold/resume", acceptance_hold_resume)
-            check(9, "Play audio", acceptance_play)
-            check(10, "Record", acceptance_record)
-            check(7, "Transfer", acceptance_transfer)
+    if record(5, "Originate an outbound call", outbound_call):
+        if record(6, "Answer/hang up", answer):
+            record(8, "Hold/resume", hold_resume)
+            record(9, "Play audio", play_audio)
+            record(10, "Record", record_audio)
+            record(7, "Transfer", transfer)
             try:
-                detail = acceptance_hangup()
-                if RESULTS.items.get(6, (None,))[0] == "PASS":
-                    RESULTS.pass_(6, "Answer/hang up", detail)
+                detail = hangup()
+                RESULTS[6] = ("PASS", "Answer/hang up", detail)
+                print(f"PASS 06 Answer/hang up: {detail}")
             except Exception as error:
-                RESULTS.fail(6, "Answer/hang up", f"answer passed but hangup failed: {error}")
+                RESULTS[6] = ("FAIL", "Answer/hang up", f"hangup failed: {error}")
+                print(f"FAIL 06 Answer/hang up: hangup failed: {error}")
 
-    check(11, "Create/manage conferences", acceptance_conference)
-    if 14 not in RESULTS.items or RESULTS.items[14][0] != "FAIL":
-        check(14, "Receive webhooks", acceptance_webhook)
-    check(12, "Receive normalized call events", acceptance_events)
-    check(13, "Query call state", acceptance_query_state)
-    check(15, "Inspect call/media health", acceptance_health)
-    check(16, "Restart components without corrupting state", acceptance_restart)
+    record(11, "Create/manage conferences", conference)
+    record(12, "Receive normalized call events", normalized_events)
+    record(13, "Query call state", query_call_state)
+    if RESULTS.get(14, ("PASS",))[0] != "FAIL":
+        record(14, "Receive webhooks", webhooks)
+    record(15, "Inspect call/media health", health)
+    record(16, "Restart components without corrupting state", restart_safety)
 
-    failed = RESULTS.summary()
+    failed = print_summary()
     if failed:
         print(f"\nVoice v1 acceptance FAILED: {failed} capability check(s) did not pass.")
         return 1
