@@ -20,14 +20,16 @@ import (
 )
 
 type Worker struct {
-	db              *pgxpool.Pool
-	freeSwitch      *freeswitch.Client
-	nats            *natsintegration.Client
-	calls           *calls.Consumer
-	recordings      *recordings.Consumer
-	outbox          *outbox.PublisherJob
-	webhookConsumer *webhooks.Consumer
-	webhookDelivery *webhooks.DeliveryJob
+	db                      *pgxpool.Pool
+	freeSwitch              *freeswitch.Client
+	nats                    *natsintegration.Client
+	calls                   *calls.Consumer
+	recordings              *recordings.Consumer
+	callReconciliation      *calls.ReconciliationJob
+	recordingReconciliation *recordings.ReconciliationJob
+	outbox                  *outbox.PublisherJob
+	webhookConsumer         *webhooks.Consumer
+	webhookDelivery         *webhooks.DeliveryJob
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
@@ -81,6 +83,29 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
 
+	callReconciliation, err := calls.NewReconciliationJob(
+		callsRepository,
+		freeSwitch,
+		calls.DefaultReconciliationJobConfig(),
+	)
+	if err != nil {
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
+	}
+
+	recordingReconciliation, err := recordings.NewReconciliationJob(
+		recordingsRepository,
+		recordings.DefaultReconciliationJobConfig(),
+	)
+	if err != nil {
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize recording reconciliation job: %w", err)
+	}
+
 	outboxRepository := outbox.NewRepository(queries)
 	outboxPublisher := outbox.NewPublisher(natsClient)
 	outboxJob, err := outbox.NewPublisherJob(
@@ -111,14 +136,16 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 
 	return &Worker{
-		db:              db,
-		freeSwitch:      freeSwitch,
-		nats:            natsClient,
-		calls:           calls.NewConsumer(callsService),
-		recordings:      recordings.NewConsumer(recordingsService),
-		outbox:          outboxJob,
-		webhookConsumer: webhookConsumer,
-		webhookDelivery: webhookDelivery,
+		db:                      db,
+		freeSwitch:              freeSwitch,
+		nats:                    natsClient,
+		calls:                   calls.NewConsumer(callsService),
+		recordings:              recordings.NewConsumer(recordingsService),
+		callReconciliation:      callReconciliation,
+		recordingReconciliation: recordingReconciliation,
+		outbox:                  outboxJob,
+		webhookConsumer:         webhookConsumer,
+		webhookDelivery:         webhookDelivery,
 	}, nil
 }
 
@@ -133,26 +160,35 @@ func (w *Worker) Run(ctx context.Context) error {
 		"RECORD_STOP",
 	}
 
-	if err := w.freeSwitch.Subscribe(ctx, freeswitch.EventFormatPlain, events, func(eventCtx context.Context, event freeswitch.Event) error {
-		if err := w.calls.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
-			log.Printf("FreeSWITCH call event %s failed: %v", event.Name, err)
-			return err
-		}
-		if err := w.recordings.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
-			log.Printf("FreeSWITCH recording event %s failed: %v", event.Name, err)
-			return err
-		}
-		return nil
-	}); err != nil {
+	if err := w.freeSwitch.Subscribe(
+		ctx,
+		freeswitch.EventFormatPlain,
+		events,
+		func(eventCtx context.Context, event freeswitch.Event) error {
+			if err := w.calls.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
+				log.Printf("FreeSWITCH call event %s failed: %v", event.Name, err)
+				return err
+			}
+			if err := w.recordings.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
+				log.Printf("FreeSWITCH recording event %s failed: %v", event.Name, err)
+				return err
+			}
+			return nil
+		},
+	); err != nil {
 		return fmt.Errorf("subscribe to FreeSWITCH lifecycle events: %w", err)
 	}
 
 	log.Print("worker subscribed to FreeSWITCH call and recording lifecycle events")
+	log.Print("worker started call reconciliation job")
+	log.Print("worker started recording reconciliation job")
 	log.Print("worker started outbox NATS publisher")
 	log.Print("worker started webhook NATS consumer")
 	log.Print("worker started webhook delivery job")
 
-	errCh := make(chan error, 3)
+	errCh := make(chan error, 5)
+	go runComponent(ctx, errCh, "call reconciliation", w.callReconciliation.Run)
+	go runComponent(ctx, errCh, "recording reconciliation", w.recordingReconciliation.Run)
 	go runComponent(ctx, errCh, "outbox publisher", w.outbox.Run)
 	go runComponent(ctx, errCh, "webhook consumer", w.webhookConsumer.Run)
 	go runComponent(ctx, errCh, "webhook delivery", w.webhookDelivery.Run)
