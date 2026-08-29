@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
+    invoice_id UUID,
     provider TEXT NOT NULL,
     provider_payment_id TEXT,
     amount BIGINT NOT NULL,
@@ -12,6 +12,10 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT fk_payments_invoice_organization
+        FOREIGN KEY (invoice_id, organization_id)
+        REFERENCES invoices (id, organization_id)
+        ON DELETE SET NULL (invoice_id),
     CONSTRAINT chk_payments_provider CHECK (
         length(trim(provider)) > 0 AND provider !~ '[[:space:]]'
     ),
