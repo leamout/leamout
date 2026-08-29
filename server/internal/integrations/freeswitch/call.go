@@ -11,21 +11,26 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 		return Call{}, err
 	}
 
-	command := "originate"
-	if prefix := formatVariables(req.Variables); prefix != "" {
-		command += " " + prefix
+	endpoint := req.Endpoint
+	variables := req.Variables
+	if req.CallerID != "" {
+		variables = append(append(map[string]string{}, variables...), "")
 	}
+
 	if req.CallerID != "" {
 		callerIDVar := "origination_caller_id_number=" + commandWord(req.CallerID)
-		if strings.HasSuffix(command, "}") {
-			command = strings.TrimSuffix(command, "}") + "," + callerIDVar + "}"
+		if prefix := formatVariables(req.Variables); prefix != "" {
+			endpoint = strings.TrimSuffix(prefix, "}") + "," + callerIDVar + "}" + endpoint
 		} else {
-			command += " {" + callerIDVar + "}"
+			endpoint = "{" + callerIDVar + "}" + endpoint
 		}
+	} else if prefix := formatVariables(req.Variables); prefix != "" {
+		endpoint = prefix + endpoint
 	}
+
 	// Once the B-leg answers, keep the channel parked under ESL control instead
 	// of sending it through a user-facing dialplan destination.
-	command += " " + commandWords(req.Endpoint, "&park()")
+	command := "originate " + commandWords(endpoint, "&park()")
 
 	reply, err := c.Command(ctx, command)
 	if err != nil {
