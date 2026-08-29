@@ -8,6 +8,39 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
+type Status string
+
+const (
+	StatusRecording Status = "recording"
+	StatusCompleted Status = "completed"
+	StatusFailed    Status = "failed"
+	StatusDeleted   Status = "deleted"
+)
+
+type EventType string
+
+const (
+	EventRecordingStarted   EventType = "recording.started"
+	EventRecordingCompleted EventType = "recording.completed"
+	EventRecordingFailed    EventType = "recording.failed"
+	EventRecordingDeleted   EventType = "recording.deleted"
+)
+
+type LifecycleEvent struct {
+	ChannelID  string
+	Path       string
+	OccurredAt time.Time
+}
+
+type Event struct {
+	EventType      EventType         `json:"event_type"`
+	OrganizationID uuid.UUID         `json:"organization_id"`
+	RecordingID    uuid.UUID         `json:"recording_id"`
+	CallID         uuid.UUID         `json:"call_id"`
+	Resource       RecordingResponse `json:"resource"`
+	OccurredAt     time.Time         `json:"occurred_at"`
+}
+
 type RecordingResponse struct {
 	ID              uuid.UUID  `json:"id"`
 	OrganizationID  uuid.UUID  `json:"organization_id"`
