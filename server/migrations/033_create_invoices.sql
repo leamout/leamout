@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+    subscription_id UUID,
     invoice_number TEXT NOT NULL UNIQUE,
     currency TEXT NOT NULL,
     subtotal BIGINT NOT NULL,
@@ -15,6 +15,11 @@ CREATE TABLE IF NOT EXISTS invoices (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT uq_invoices_id_organization UNIQUE (id, organization_id),
+    CONSTRAINT fk_invoices_subscription_organization
+        FOREIGN KEY (subscription_id, organization_id)
+        REFERENCES subscriptions (id, organization_id)
+        ON DELETE SET NULL (subscription_id),
     CONSTRAINT chk_invoices_invoice_number CHECK (length(trim(invoice_number)) > 0),
     CONSTRAINT chk_invoices_currency CHECK (currency ~ '^[A-Z]{3}$'),
     CONSTRAINT chk_invoices_amounts CHECK (subtotal >= 0 AND tax >= 0 AND total >= 0),
