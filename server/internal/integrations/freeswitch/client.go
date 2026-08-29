@@ -145,10 +145,15 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("FreeSWITCH health check failed: %w", err)
 	}
-	if !strings.Contains(strings.ToUpper(reply.Text), "UP") {
+	if !freeSWITCHStatusUp(reply) {
 		return fmt.Errorf("FreeSWITCH is not running properly")
 	}
 	return nil
+}
+
+func freeSWITCHStatusUp(reply Reply) bool {
+	status := strings.ToUpper(reply.Text + "\n" + reply.Body)
+	return strings.Contains(status, "UP")
 }
 
 func (c *Client) command(ctx context.Context, command string) (Frame, error) {
