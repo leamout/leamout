@@ -3,6 +3,7 @@ x-leamout-environment: &leamout-environment
   DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
   REDIS_URL: redis://redis:6379
   NATS_URL: nats://nats:4222
+  NATS_STREAM_REPLICAS: ${NATS_STREAM_REPLICAS:-1}
   FREESWITCH_ESL_ADDRESS: freeswitch:8021
   FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}

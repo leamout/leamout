@@ -5,7 +5,11 @@ const (
 	EventsStreamName = "LEAMOUT_EVENTS"
 	DLQStreamName    = "LEAMOUT_DLQ"
 
-	JobsSubject   = "leamout.job.>"
-	EventsSubject = "leamout.event.>"
-	DLQSubject    = "leamout.dlq.>"
+	JobsSubjectPrefix   = "leamout.job."
+	EventsSubjectPrefix = "leamout.event."
+	DLQSubjectPrefix    = "leamout.dlq."
+
+	JobsSubject   = JobsSubjectPrefix + ">"
+	EventsSubject = EventsSubjectPrefix + ">"
+	DLQSubject    = DLQSubjectPrefix + ">"
 )

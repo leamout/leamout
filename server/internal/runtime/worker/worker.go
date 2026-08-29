@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
+	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
+	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/routing"
@@ -17,7 +20,9 @@ import (
 type Worker struct {
 	db         *pgxpool.Pool
 	freeSwitch *freeswitch.Client
+	nats       *natsintegration.Client
 	calls      *calls.Consumer
+	outbox     *outbox.PublisherJob
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
@@ -30,14 +35,32 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("ping worker database: %w", err)
 	}
 
+	natsClient, err := natsintegration.New(ctx, natsintegration.DefaultConfig(cfg.NATSURL))
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connect worker NATS: %w", err)
+	}
+	streamLimits := natsintegration.DefaultStreamLimits()
+	streamLimits.Replicas = cfg.NATSStreamReplicas
+	if streamLimits.Replicas <= 0 {
+		streamLimits.Replicas = 1
+	}
+	if err := natsClient.Provision(ctx, streamLimits); err != nil {
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("provision worker NATS streams: %w", err)
+	}
+
 	freeSwitch, err := freeswitch.New(
 		freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword),
 	)
 	if err != nil {
+		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize worker FreeSWITCH client: %w", err)
 	}
 	if err := freeSwitch.Connect(ctx); err != nil {
+		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("connect worker FreeSWITCH: %w", err)
 	}
@@ -50,10 +73,26 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	controller := calls.NewFreeSWITCHController(freeSwitch)
 	callsService := calls.NewService(callsRepository, controller, routingService)
 
+	outboxRepository := outbox.NewRepository(queries)
+	outboxPublisher := outbox.NewPublisher(natsClient)
+	outboxJob, err := outbox.NewPublisherJob(
+		outboxRepository,
+		outboxPublisher,
+		outbox.DefaultPublisherJobConfig("worker-"+uuid.NewString()),
+	)
+	if err != nil {
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize outbox publisher job: %w", err)
+	}
+
 	return &Worker{
 		db:         db,
 		freeSwitch: freeSwitch,
+		nats:       natsClient,
 		calls:      calls.NewConsumer(callsService),
+		outbox:     outboxJob,
 	}, nil
 }
 
@@ -75,13 +114,29 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 
 	log.Print("worker subscribed to FreeSWITCH call lifecycle events")
-	<-ctx.Done()
-	return nil
+	log.Print("worker started outbox NATS publisher")
+
+	errCh := make(chan error, 1)
+	go func() {
+		if err := w.outbox.Run(ctx); err != nil {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return nil
+	case err := <-errCh:
+		return fmt.Errorf("run outbox publisher: %w", err)
+	}
 }
 
 func (w *Worker) Close() {
 	if w.freeSwitch != nil {
 		_ = w.freeSwitch.Close()
+	}
+	if w.nats != nil {
+		_ = w.nats.Close()
 	}
 	if w.db != nil {
 		w.db.Close()
