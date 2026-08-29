@@ -13,7 +13,7 @@ import (
 
 type Repository struct{ queries *sqlc.Queries }
 
-func NewRepository(q *sqlc.Queries) *Repository { return &Repository{q} }
+func NewRepository(q *sqlc.Queries) *Repository    { return &Repository{q} }
 func (r *Repository) WithTx(tx pgx.Tx) *Repository { return NewRepository(r.queries.WithTx(tx)) }
 func (r *Repository) Create(c context.Context, org uuid.UUID, req CreateRequest, secret []byte) (sqlc.WebhookEndpoint, error) {
 	return r.queries.CreateWebhookEndpoint(c, sqlc.CreateWebhookEndpointParams{OrganizationID: org, Url: req.URL, SigningSecret: secret, SubscribedEvents: req.SubscribedEvents, Enabled: req.Enabled})
