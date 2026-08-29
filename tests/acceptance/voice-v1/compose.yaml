@@ -11,10 +11,6 @@ services:
     volumes:
       - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/ca.crt:/voice-v1-certs/ca.crt:ro
 
-  freeswitch:
-    environment:
-      PATH: /usr/local/freeswitch/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-
   rtpengine:
     # The acceptance carrier and FreeSWITCH instances are on leamout-core, so
     # publishing the production RTP range to the GitHub runner is unnecessary
@@ -29,7 +25,6 @@ services:
     restart: unless-stopped
     environment:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
-      PATH: /usr/local/freeswitch/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
       - ${VOICE_V1_SUITE_DIR:?VOICE_V1_SUITE_DIR is required}/carrier-dialplan.xml:/leamout-config/dialplan/leamout.xml:ro
     expose:
