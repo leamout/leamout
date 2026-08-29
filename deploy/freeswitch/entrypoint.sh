@@ -6,4 +6,4 @@ for script in /docker-entrypoint.d/*.sh; do
   "$script"
 done
 
-exec /usr/local/freeswitch/bin/freeswitch -nonat -nf
+exec "$@"

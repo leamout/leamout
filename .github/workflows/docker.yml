@@ -16,6 +16,22 @@ permissions:
   contents: read
 
 jobs:
+  opensips:
+    name: Build OpenSIPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build OpenSIPS image
+        run: |
+          docker build \
+            --file deploy/opensips/Dockerfile \
+            --build-arg OPENSIPS_VERSION=4.0.1 \
+            --tag leamout/opensips:test \
+            deploy/opensips
+
   freeswitch:
     name: Build FreeSWITCH
     runs-on: ubuntu-latest
