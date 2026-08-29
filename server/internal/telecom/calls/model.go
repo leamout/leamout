@@ -88,6 +88,7 @@ func callResponse(call sqlc.Call) CallResponse {
 type CallEvent struct {
 	EventType      CallEventType `json:"event_type"`
 	CallID         string        `json:"call_id"`
+	SIPCallID      string        `json:"sip_call_id,omitempty"`
 	ApplicationID  string        `json:"application_id"`
 	OrganizationID string        `json:"organization_id"`
 	From           string        `json:"from"`
