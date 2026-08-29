@@ -88,12 +88,14 @@ func callResponse(call sqlc.Call) CallResponse {
 type CallEvent struct {
 	EventType      CallEventType `json:"event_type"`
 	CallID         string        `json:"call_id"`
+	SIPCallID      string        `json:"sip_call_id,omitempty"`
 	ApplicationID  string        `json:"application_id"`
 	OrganizationID string        `json:"organization_id"`
 	From           string        `json:"from"`
 	To             string        `json:"to"`
 	Direction      CallDirection `json:"direction"`
 	Status         CallStatus    `json:"status"`
+	HangupReason   string        `json:"hangup_reason,omitempty"`
 	DurationSec    int           `json:"duration_seconds,omitempty"`
 	OccurredAt     time.Time     `json:"occurred_at"`
 	RecordingURL   string        `json:"recording_url,omitempty"`
@@ -105,8 +107,10 @@ const (
 	EventCallInitiated CallEventType = "call.initiated"
 	EventCallRinging   CallEventType = "call.ringing"
 	EventCallAnswered  CallEventType = "call.answered"
+	EventCallActive    CallEventType = "call.active"
 	EventCallCompleted CallEventType = "call.completed"
 	EventCallFailed    CallEventType = "call.failed"
+	EventCallCancelled CallEventType = "call.cancelled"
 	EventCallRecording CallEventType = "call.recording.available"
 )
 
@@ -123,8 +127,10 @@ const (
 	StatusInitiated CallStatus = "initiated"
 	StatusRinging   CallStatus = "ringing"
 	StatusAnswered  CallStatus = "answered"
+	StatusActive    CallStatus = "active"
 	StatusCompleted CallStatus = "completed"
 	StatusFailed    CallStatus = "failed"
+	StatusCancelled CallStatus = "cancelled"
 	StatusBusy      CallStatus = "busy"
 	StatusNoAnswer  CallStatus = "no-answer"
 )

@@ -46,7 +46,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
 	routingService := routing.NewService(routeResolver)
-	callsRepository := calls.NewRepository(queries)
+	callsRepository := calls.NewRepository(db)
 	controller := calls.NewFreeSWITCHController(freeSwitch)
 	callsService := calls.NewService(callsRepository, controller, routingService)
 
