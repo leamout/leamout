@@ -32,6 +32,12 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND sip_call_id = sqlc.arg(sip_call_id)
 LIMIT 1;
 
+-- name: GetCallBySIPCallIDGlobal :one
+SELECT *
+FROM calls
+WHERE sip_call_id = sqlc.arg(sip_call_id)
+LIMIT 1;
+
 -- name: ListCalls :many
 SELECT *
 FROM calls
@@ -75,6 +81,28 @@ SET state = 'active', updated_at = NOW()
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state IN ('answered', 'ringing')
+RETURNING *;
+
+-- name: MarkCallHeld :one
+UPDATE calls
+SET
+    media_state = 'held',
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND state IN ('answered', 'active')
+  AND media_state = 'active'
+RETURNING *;
+
+-- name: MarkCallResumed :one
+UPDATE calls
+SET
+    media_state = 'active',
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND state IN ('answered', 'active')
+  AND media_state = 'held'
 RETURNING *;
 
 -- name: MarkCallCompleted :one

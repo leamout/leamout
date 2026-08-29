@@ -20,11 +20,12 @@ func TestCallDomainEventUsesLeamoutAndMediaIDs(t *testing.T) {
 		OrganizationID: organizationID,
 		ApplicationID:  &applicationID,
 		Direction:      string(DirectionInbound),
-		State:          "answered",
+		State:          string(StateAnswered),
+		MediaState:     string(MediaStateHeld),
 		FromUri:        "+233201234567",
 		ToUri:          "+233301234567",
 		SipCallID:      &sipCallID,
-	}, EventCallAnswered, StatusAnswered, occurredAt)
+	}, EventCallHeld, occurredAt)
 
 	if event.CallID != callID.String() {
 		t.Fatalf("call id = %q, want %q", event.CallID, callID.String())
@@ -38,8 +39,11 @@ func TestCallDomainEventUsesLeamoutAndMediaIDs(t *testing.T) {
 	if event.ApplicationID != applicationID.String() {
 		t.Fatalf("application id = %q, want %q", event.ApplicationID, applicationID.String())
 	}
-	if event.EventType != EventCallAnswered || event.Status != StatusAnswered {
-		t.Fatalf("event = %q/%q, want %q/%q", event.EventType, event.Status, EventCallAnswered, StatusAnswered)
+	if event.EventType != EventCallHeld || event.Status != StatusAnswered {
+		t.Fatalf("event = %q/%q, want %q/%q", event.EventType, event.Status, EventCallHeld, StatusAnswered)
+	}
+	if event.MediaState != MediaStateHeld {
+		t.Fatalf("media state = %q, want %q", event.MediaState, MediaStateHeld)
 	}
 	if !event.OccurredAt.Equal(occurredAt) {
 		t.Fatalf("occurred at = %s, want %s", event.OccurredAt, occurredAt)

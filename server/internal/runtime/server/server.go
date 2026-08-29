@@ -155,7 +155,7 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	carriersService := carriers.NewService(carriersRepository)
 
 	trunksRepository := trunks.NewRepository(queries)
-	trunksService := trunks.NewService(trunksRepository)
+	trunksService := trunks.NewService(trunksRepository, db)
 
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)

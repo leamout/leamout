@@ -12,17 +12,20 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
 	"github.com/leamout/leamout/internal/modules/outbox"
+	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/routing"
 )
 
 type Worker struct {
-	db         *pgxpool.Pool
-	freeSwitch *freeswitch.Client
-	nats       *natsintegration.Client
-	calls      *calls.Consumer
-	outbox     *outbox.PublisherJob
+	db              *pgxpool.Pool
+	freeSwitch      *freeswitch.Client
+	nats            *natsintegration.Client
+	calls           *calls.Consumer
+	outbox          *outbox.PublisherJob
+	webhookConsumer *webhooks.Consumer
+	webhookDelivery *webhooks.DeliveryJob
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
@@ -87,12 +90,29 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize outbox publisher job: %w", err)
 	}
 
+	webhookRepository := webhooks.NewRepository(queries)
+	webhookService := webhooks.NewService(webhookRepository, db)
+	webhookConsumer := webhooks.NewConsumer(natsClient, webhookService)
+	webhookDelivery, err := webhooks.NewDeliveryJob(
+		webhookRepository,
+		webhooks.NewHTTPSender(),
+		webhooks.DefaultDeliveryJobConfig("worker-"+uuid.NewString()),
+	)
+	if err != nil {
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize webhook delivery job: %w", err)
+	}
+
 	return &Worker{
-		db:         db,
-		freeSwitch: freeSwitch,
-		nats:       natsClient,
-		calls:      calls.NewConsumer(callsService),
-		outbox:     outboxJob,
+		db:              db,
+		freeSwitch:      freeSwitch,
+		nats:            natsClient,
+		calls:           calls.NewConsumer(callsService),
+		outbox:          outboxJob,
+		webhookConsumer: webhookConsumer,
+		webhookDelivery: webhookDelivery,
 	}, nil
 }
 
@@ -100,6 +120,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	events := []string{
 		"CHANNEL_CREATE",
 		"CHANNEL_ANSWER",
+		"CHANNEL_HOLD",
+		"CHANNEL_UNHOLD",
 		"CHANNEL_HANGUP_COMPLETE",
 	}
 
@@ -115,19 +137,25 @@ func (w *Worker) Run(ctx context.Context) error {
 
 	log.Print("worker subscribed to FreeSWITCH call lifecycle events")
 	log.Print("worker started outbox NATS publisher")
+	log.Print("worker started webhook NATS consumer")
+	log.Print("worker started webhook delivery job")
 
-	errCh := make(chan error, 1)
-	go func() {
-		if err := w.outbox.Run(ctx); err != nil {
-			errCh <- err
-		}
-	}()
+	errCh := make(chan error, 3)
+	go runComponent(ctx, errCh, "outbox publisher", w.outbox.Run)
+	go runComponent(ctx, errCh, "webhook consumer", w.webhookConsumer.Run)
+	go runComponent(ctx, errCh, "webhook delivery", w.webhookDelivery.Run)
 
 	select {
 	case <-ctx.Done():
 		return nil
 	case err := <-errCh:
-		return fmt.Errorf("run outbox publisher: %w", err)
+		return err
+	}
+}
+
+func runComponent(ctx context.Context, errCh chan<- error, name string, run func(context.Context) error) {
+	if err := run(ctx); err != nil {
+		errCh <- fmt.Errorf("run %s: %w", name, err)
 	}
 }
 

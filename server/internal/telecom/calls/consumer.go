@@ -12,6 +12,8 @@ import (
 const (
 	freeSWITCHEventChannelCreate         = "CHANNEL_CREATE"
 	freeSWITCHEventChannelAnswer         = "CHANNEL_ANSWER"
+	freeSWITCHEventChannelHold           = "CHANNEL_HOLD"
+	freeSWITCHEventChannelUnhold         = "CHANNEL_UNHOLD"
 	freeSWITCHEventChannelHangupComplete = "CHANNEL_HANGUP_COMPLETE"
 )
 
@@ -19,6 +21,8 @@ type callLifecycleService interface {
 	EnsureInbound(context.Context, InboundCallEvent) error
 	MarkInboundAnswered(context.Context, InboundCallEvent) error
 	FinishInbound(context.Context, InboundCallEvent) error
+	MarkMediaHeld(context.Context, string) error
+	MarkMediaResumed(context.Context, string) error
 }
 
 type Consumer struct {
@@ -34,6 +38,10 @@ func NewConsumer(service *Service) *Consumer {
 
 func (c *Consumer) HandleFreeSWITCHEvent(ctx context.Context, event freeswitch.Event) error {
 	switch event.Name {
+	case freeSWITCHEventChannelHold:
+		return c.service.MarkMediaHeld(ctx, mediaChannelID(event))
+	case freeSWITCHEventChannelUnhold:
+		return c.service.MarkMediaResumed(ctx, mediaChannelID(event))
 	case freeSWITCHEventChannelCreate, freeSWITCHEventChannelAnswer, freeSWITCHEventChannelHangupComplete:
 	default:
 		return nil
@@ -57,6 +65,10 @@ func (c *Consumer) HandleFreeSWITCHEvent(ctx context.Context, event freeswitch.E
 	default:
 		return nil
 	}
+}
+
+func mediaChannelID(event freeswitch.Event) string {
+	return strings.TrimSpace(event.Header("Unique-ID"))
 }
 
 func inboundCallEvent(event freeswitch.Event) (InboundCallEvent, bool, error) {

@@ -12,6 +12,9 @@ type fakeLifecycleService struct {
 	ensure   int
 	answered int
 	finished int
+	held     int
+	resumed  int
+	channel  string
 	last     InboundCallEvent
 }
 
@@ -30,6 +33,18 @@ func (f *fakeLifecycleService) MarkInboundAnswered(_ context.Context, event Inbo
 func (f *fakeLifecycleService) FinishInbound(_ context.Context, event InboundCallEvent) error {
 	f.finished++
 	f.last = event
+	return nil
+}
+
+func (f *fakeLifecycleService) MarkMediaHeld(_ context.Context, channelID string) error {
+	f.held++
+	f.channel = channelID
+	return nil
+}
+
+func (f *fakeLifecycleService) MarkMediaResumed(_ context.Context, channelID string) error {
+	f.resumed++
+	f.channel = channelID
 	return nil
 }
 
@@ -86,5 +101,34 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 	}
 	if !service.last.WasAnswered {
 		t.Fatal("WasAnswered = false, want true")
+	}
+}
+
+func TestConsumerReconcilesMediaStateWithoutInboundHeaders(t *testing.T) {
+	service := &fakeLifecycleService{}
+	consumer := &Consumer{service: service}
+
+	if err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
+		Name: "CHANNEL_HOLD",
+		Headers: map[string]string{
+			"Unique-ID": "channel-3",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if service.held != 1 || service.channel != "channel-3" {
+		t.Fatalf("hold reconciliation = %+v, want channel-3", service)
+	}
+
+	if err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
+		Name: "CHANNEL_UNHOLD",
+		Headers: map[string]string{
+			"Unique-ID": "channel-3",
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if service.resumed != 1 || service.channel != "channel-3" {
+		t.Fatalf("resume reconciliation = %+v, want channel-3", service)
 	}
 }

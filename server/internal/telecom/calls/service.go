@@ -123,12 +123,11 @@ func (s *Service) Answer(ctx context.Context, organizationID, id uuid.UUID) (sql
 	if err != nil {
 		return sqlc.Call{}, err
 	}
-
+	if err := validateControl(call, controlAnswer); err != nil {
+		return sqlc.Call{}, err
+	}
 	if isAnswerIdempotent(call.State) {
 		return call, nil
-	}
-	if !canAnswer(call.State) {
-		return sqlc.Call{}, apperror.NewConflict("call cannot be answered from state: " + call.State)
 	}
 
 	if err := s.controller.Answer(ctx, externalID); err != nil {
@@ -150,7 +149,6 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 	if err != nil {
 		return sqlc.Call{}, err
 	}
-
 	if isTerminal(call.State) {
 		return call, nil
 	}
@@ -159,7 +157,14 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 		return sqlc.Call{}, mediaError("hang up call", err)
 	}
 
-	updated, err := s.repo.MarkCompleted(ctx, organizationID, call.ID, nil)
+	var updated sqlc.Call
+	if isPreAnswer(call.State) {
+		updated, err = s.repo.MarkCancelled(ctx, organizationID, call.ID, nil)
+	} else if isConnected(call.State) {
+		updated, err = s.repo.MarkCompleted(ctx, organizationID, call.ID, nil)
+	} else {
+		return sqlc.Call{}, invalidControlState(controlHangup, call.State)
+	}
 	if err == nil {
 		return updated, nil
 	}
@@ -169,21 +174,12 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 	return sqlc.Call{}, writeError(err, "hang up call")
 }
 
-func canAnswer(state string) bool {
-	return state == "initiating" || state == "ringing"
-}
-
-func isAnswerIdempotent(state string) bool {
-	return state == "answered" || state == "active"
-}
-
-func isTerminal(state string) bool {
-	return state == "completed" || state == "failed" || state == "cancelled"
-}
-
 func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferRequest) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
+		return err
+	}
+	if err := validateControl(call, controlTransfer); err != nil {
 		return err
 	}
 	if req.Destination, err = require(req.Destination, "destination"); err != nil {
@@ -193,24 +189,83 @@ func (s *Service) Transfer(ctx context.Context, org, id uuid.UUID, req TransferR
 }
 
 func (s *Service) Hold(ctx context.Context, org, id uuid.UUID) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
 		return err
 	}
-	return mediaError("hold call", s.controller.Hold(ctx, externalID))
+	if err := validateControl(call, controlHold); err != nil {
+		return err
+	}
+	if err := validateMediaState(call); err != nil {
+		return err
+	}
+	if isHeld(call) {
+		return nil
+	}
+
+	if err := s.controller.Hold(ctx, externalID); err != nil {
+		return mediaError("hold call", err)
+	}
+
+	_, err = s.repo.MarkHeld(ctx, org, call.ID)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		latest, getErr := s.Get(ctx, org, call.ID)
+		if getErr == nil && isHeld(latest) {
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+		return invalidControlState(controlHold, latest.State)
+	}
+	return writeError(err, "hold call")
 }
 
 func (s *Service) Unhold(ctx context.Context, org, id uuid.UUID) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
 		return err
 	}
-	return mediaError("resume call", s.controller.Unhold(ctx, externalID))
+	if err := validateControl(call, controlUnhold); err != nil {
+		return err
+	}
+	if err := validateMediaState(call); err != nil {
+		return err
+	}
+	if isMediaActive(call) {
+		return nil
+	}
+
+	if err := s.controller.Unhold(ctx, externalID); err != nil {
+		return mediaError("resume call", err)
+	}
+
+	_, err = s.repo.MarkResumed(ctx, org, call.ID)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		latest, getErr := s.Get(ctx, org, call.ID)
+		if getErr == nil && isMediaActive(latest) {
+			return nil
+		}
+		if getErr != nil {
+			return getErr
+		}
+		return invalidControlState(controlUnhold, latest.State)
+	}
+	return writeError(err, "resume call")
 }
 
 func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
+		return err
+	}
+	if err := validateControl(call, controlPlay); err != nil {
 		return err
 	}
 	if req.Path, err = require(req.Path, "path"); err != nil {
@@ -220,16 +275,22 @@ func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) 
 }
 
 func (s *Service) Stop(ctx context.Context, org, id uuid.UUID) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
+		return err
+	}
+	if err := validateControl(call, controlStop); err != nil {
 		return err
 	}
 	return mediaError("stop audio", s.controller.Stop(ctx, externalID))
 }
 
 func (s *Service) Record(ctx context.Context, org, id uuid.UUID, req RecordRequest) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
+		return err
+	}
+	if err := validateControl(call, controlRecord); err != nil {
 		return err
 	}
 	if err := validateRecordRequest(&req); err != nil {
@@ -239,8 +300,11 @@ func (s *Service) Record(ctx context.Context, org, id uuid.UUID, req RecordReque
 }
 
 func (s *Service) DTMF(ctx context.Context, org, id uuid.UUID, req DTMFRequest) error {
-	_, externalID, err := s.controlCall(ctx, org, id)
+	call, externalID, err := s.controlCall(ctx, org, id)
 	if err != nil {
+		return err
+	}
+	if err := validateControl(call, controlDTMF); err != nil {
 		return err
 	}
 	if req.Digits, err = require(req.Digits, "digits"); err != nil {
