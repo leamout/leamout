@@ -132,11 +132,12 @@ func (q *Queries) CreateTrunkEndpoint(ctx context.Context, arg CreateTrunkEndpoi
 	return i, err
 }
 
-const deleteTrunkEndpoint = `-- name: DeleteTrunkEndpoint :exec
+const deleteTrunkEndpoint = `-- name: DeleteTrunkEndpoint :one
 DELETE FROM trunk_endpoints
 WHERE id = $1
   AND trunk_id = $2
   AND organization_id = $3
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at
 `
 
 type DeleteTrunkEndpointParams struct {
@@ -145,12 +146,27 @@ type DeleteTrunkEndpointParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
-func (q *Queries) DeleteTrunkEndpoint(ctx context.Context, arg DeleteTrunkEndpointParams) error {
-	_, err := q.db.Exec(ctx, deleteTrunkEndpoint, arg.ID, arg.TrunkID, arg.OrganizationID)
-	return err
+func (q *Queries) DeleteTrunkEndpoint(ctx context.Context, arg DeleteTrunkEndpointParams) (TrunkEndpoint, error) {
+	row := q.db.QueryRow(ctx, deleteTrunkEndpoint, arg.ID, arg.TrunkID, arg.OrganizationID)
+	var i TrunkEndpoint
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.TrunkID,
+		&i.Host,
+		&i.Port,
+		&i.Transport,
+		&i.Direction,
+		&i.Priority,
+		&i.Weight,
+		&i.Enabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
-const disableTrunk = `-- name: DisableTrunk :exec
+const disableTrunk = `-- name: DisableTrunk :one
 UPDATE trunks
 SET
     status = 'disabled',
@@ -158,6 +174,7 @@ SET
 WHERE id = $1
   AND organization_id = $2
   AND status = 'active'
+RETURNING id, organization_id, carrier_connection_id, name, direction, status, created_at, updated_at
 `
 
 type DisableTrunkParams struct {
@@ -165,9 +182,20 @@ type DisableTrunkParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
-func (q *Queries) DisableTrunk(ctx context.Context, arg DisableTrunkParams) error {
-	_, err := q.db.Exec(ctx, disableTrunk, arg.ID, arg.OrganizationID)
-	return err
+func (q *Queries) DisableTrunk(ctx context.Context, arg DisableTrunkParams) (Trunk, error) {
+	row := q.db.QueryRow(ctx, disableTrunk, arg.ID, arg.OrganizationID)
+	var i Trunk
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CarrierConnectionID,
+		&i.Name,
+		&i.Direction,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const enableTrunk = `-- name: EnableTrunk :exec

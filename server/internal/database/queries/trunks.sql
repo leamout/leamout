@@ -49,14 +49,15 @@ WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
 RETURNING *;
 
--- name: DisableTrunk :exec
+-- name: DisableTrunk :one
 UPDATE trunks
 SET
     status = 'disabled',
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND status = 'active';
+  AND status = 'active'
+RETURNING *;
 
 -- name: EnableTrunk :exec
 UPDATE trunks
@@ -125,11 +126,12 @@ WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
 RETURNING *;
 
--- name: DeleteTrunkEndpoint :exec
+-- name: DeleteTrunkEndpoint :one
 DELETE FROM trunk_endpoints
 WHERE id = sqlc.arg(id)
   AND trunk_id = sqlc.arg(trunk_id)
-  AND organization_id = sqlc.arg(organization_id);
+  AND organization_id = sqlc.arg(organization_id)
+RETURNING *;
 
 -- name: ListActiveOutboundTrunkEndpoints :many
 SELECT te.*
