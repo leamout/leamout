@@ -198,11 +198,11 @@ func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 }
 
 type fakeESLServer struct {
-	t            *testing.T
-	password     string
-	listener     net.Listener
-	available    atomic.Bool
-	accepts      atomic.Int32
+	t             *testing.T
+	password      string
+	listener      net.Listener
+	available     atomic.Bool
+	accepts       atomic.Int32
 	subscriptions atomic.Int32
 
 	mu          sync.Mutex
