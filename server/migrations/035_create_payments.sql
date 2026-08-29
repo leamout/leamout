@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID NOT NULL REFERENCES customers(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL,
     provider TEXT NOT NULL,
     provider_payment_id TEXT,
@@ -33,8 +33,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_payments_provider_payment_id
     ON payments (provider, provider_payment_id)
     WHERE provider_payment_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_payments_customer_created
-    ON payments (customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_payments_organization_created
+    ON payments (organization_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_payments_invoice_created
     ON payments (invoice_id, created_at DESC)

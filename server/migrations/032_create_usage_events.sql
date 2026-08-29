@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS usage_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID NOT NULL REFERENCES customers(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
     meter_id UUID NOT NULL REFERENCES meters(id),
     quantity BIGINT NOT NULL,
@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS usage_events (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_usage_events_customer_meter_occurred
-    ON usage_events (customer_id, meter_id, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_usage_events_organization_meter_occurred
+    ON usage_events (organization_id, meter_id, occurred_at);
 
 CREATE INDEX IF NOT EXISTS idx_usage_events_subscription_meter_occurred
     ON usage_events (subscription_id, meter_id, occurred_at)

@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS invoices (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID NOT NULL REFERENCES customers(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
     invoice_number TEXT NOT NULL UNIQUE,
     currency TEXT NOT NULL,
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     CONSTRAINT chk_invoices_metadata_object CHECK (jsonb_typeof(metadata) = 'object')
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoices_customer_created
-    ON invoices (customer_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_invoices_organization_created
+    ON invoices (organization_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_invoices_subscription_created
     ON invoices (subscription_id, created_at DESC)

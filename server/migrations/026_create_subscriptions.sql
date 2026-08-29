@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID NOT NULL REFERENCES customers(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     plan_id UUID NOT NULL REFERENCES plans(id),
     status TEXT NOT NULL DEFAULT 'pending',
     starts_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -39,8 +39,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_provider_subscription
     ON subscriptions (billing_provider, provider_subscription_id)
     WHERE billing_provider IS NOT NULL AND provider_subscription_id IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_subscriptions_customer_status
-    ON subscriptions (customer_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_organization_status
+    ON subscriptions (organization_id, status, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_plan_status
     ON subscriptions (plan_id, status, created_at DESC);

@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS entitlements (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     plan_id UUID REFERENCES plans(id) ON DELETE CASCADE,
-    customer_id UUID REFERENCES customers(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     license_id UUID REFERENCES licenses(id) ON DELETE CASCADE,
     entitlement_key TEXT NOT NULL,
     kind TEXT NOT NULL,
@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS entitlements (
 
     CONSTRAINT chk_entitlements_owner CHECK (
         (plan_id IS NOT NULL)::int
-        + (customer_id IS NOT NULL)::int
+        + (organization_id IS NOT NULL)::int
         + (license_id IS NOT NULL)::int = 1
     ),
     CONSTRAINT chk_entitlements_key CHECK (
@@ -35,9 +35,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_plan_key
     ON entitlements (plan_id, entitlement_key)
     WHERE plan_id IS NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_customer_key
-    ON entitlements (customer_id, entitlement_key)
-    WHERE customer_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_organization_key
+    ON entitlements (organization_id, entitlement_key)
+    WHERE organization_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_entitlements_license_key
     ON entitlements (license_id, entitlement_key)

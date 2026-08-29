@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS licenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    customer_id UUID NOT NULL REFERENCES customers(id),
+    organization_id UUID NOT NULL REFERENCES organizations(id),
     subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     max_deployments INTEGER NOT NULL DEFAULT 1,
@@ -22,8 +22,8 @@ CREATE TABLE IF NOT EXISTS licenses (
     )
 );
 
-CREATE INDEX IF NOT EXISTS idx_licenses_customer_status
-    ON licenses (customer_id, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_licenses_organization_status
+    ON licenses (organization_id, status, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_licenses_subscription_id
     ON licenses (subscription_id, created_at DESC)
