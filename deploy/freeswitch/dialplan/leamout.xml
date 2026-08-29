@@ -7,12 +7,16 @@
       </condition>
     </extension>
 
-    <!-- Carrier ingress has already been authenticated and resolved by OpenSIPS.
-         Keep the channel alive without answering it so the call consumer/control
-         plane can decide how the bound voice application should handle it. -->
-    <extension name="inbound-voice-application">
+    <!-- Temporary inbound PSTN smoke path. OpenSIPS has already authenticated
+         the carrier source and resolved the DID to a trusted voice application.
+         Answer and echo to prove two-way media through RTPengine end to end.
+         Replace this with parked-channel control once the calls consumer owns
+         inbound FreeSWITCH events. -->
+    <extension name="inbound-voice-application-smoke">
       <condition field="${sip_h_X-Leamout-Voice-Application-ID}" expression="^.+$">
-        <action application="park"/>
+        <action application="log" data="NOTICE Leamout inbound PSTN smoke call application=${sip_h_X-Leamout-Voice-Application-ID} did=${destination_number}"/>
+        <action application="answer"/>
+        <action application="echo"/>
       </condition>
     </extension>
   </context>
