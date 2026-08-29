@@ -1,7 +1,5 @@
 package calls
 
-// Define calls number models here
-
 import (
 	"time"
 
@@ -10,13 +8,24 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
-// CreateCallRequest contains the routing details for an outbound call.
+// CreateCallRequest contains the public routing intent for an outbound call.
 type CreateCallRequest struct {
 	ApplicationID *uuid.UUID        `json:"application_id,omitempty"`
+	TrunkID       uuid.UUID         `json:"trunk_id"`
 	From          string            `json:"from"`
 	To            string            `json:"to"`
-	Endpoint      string            `json:"endpoint"`
 	Variables     map[string]string `json:"variables,omitempty"`
+}
+
+// OriginateRequest is the internal media-controller command produced after
+// Leamout resolves a public call request to a concrete telecom route.
+type OriginateRequest struct {
+	Host        string
+	Port        int32
+	Transport   string
+	Destination string
+	CallerID    string
+	Variables   map[string]string
 }
 
 type TransferRequest struct {

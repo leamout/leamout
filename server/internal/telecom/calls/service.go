@@ -7,12 +7,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
 // Controller is the media-server contract used by the call API.
 type Controller interface {
-	Originate(context.Context, CreateCallRequest) (string, error)
+	Originate(context.Context, OriginateRequest) (string, error)
 	Answer(context.Context, string) error
 	Hangup(context.Context, string) error
 	Transfer(context.Context, string, TransferRequest) error
@@ -24,20 +25,28 @@ type Controller interface {
 	DTMF(context.Context, string, string) error
 }
 
+type RouteResolver interface {
+	ResolveOutbound(context.Context, routing.OutboundRequest) (routing.OutboundDecision, error)
+}
+
 type Service struct {
 	repo       *Repository
 	controller Controller
+	routes     RouteResolver
 }
 
-func NewService(repo *Repository, controller Controller) *Service {
+func NewService(repo *Repository, controller Controller, routes RouteResolver) *Service {
 	if repo == nil {
 		panic("calls: repository is required")
 	}
 	if controller == nil {
 		panic("calls: controller is required")
 	}
+	if routes == nil {
+		panic("calls: route resolver is required")
+	}
 
-	return &Service{repo: repo, controller: controller}
+	return &Service{repo: repo, controller: controller, routes: routes}
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
@@ -48,7 +57,25 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		return sqlc.Call{}, err
 	}
 
-	sipCallID, err := s.controller.Originate(ctx, req)
+	route, err := s.routes.ResolveOutbound(ctx, routing.OutboundRequest{
+		OrganizationID: organizationID,
+		ApplicationID:  req.ApplicationID,
+		From:           req.From,
+		To:             req.To,
+		TrunkID:        req.TrunkID,
+	})
+	if err != nil {
+		return sqlc.Call{}, routeError(err)
+	}
+
+	sipCallID, err := s.controller.Originate(ctx, OriginateRequest{
+		Host:        route.Host,
+		Port:        route.Port,
+		Transport:   route.Transport,
+		Destination: route.To,
+		CallerID:    route.From,
+		Variables:   req.Variables,
+	})
 	if err != nil {
 		return sqlc.Call{}, mediaError("originate call", err)
 	}
@@ -231,6 +258,13 @@ func (s *Service) controlCall(ctx context.Context, org, id uuid.UUID) (sqlc.Call
 		return sqlc.Call{}, "", apperror.NewConflict("call has no media-server id")
 	}
 	return call, *call.SipCallID, nil
+}
+
+func routeError(err error) error {
+	if errors.Is(err, routing.ErrNoRoute) {
+		return apperror.NewConflict("no outbound route available")
+	}
+	return apperror.NewInternal("resolve outbound route", err)
 }
 
 func readCall(call sqlc.Call, err error) (sqlc.Call, error) {
