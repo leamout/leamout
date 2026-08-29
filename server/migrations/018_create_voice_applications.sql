@@ -49,8 +49,10 @@ CREATE TABLE IF NOT EXISTS voice_bindings (
     )
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_voice_bindings_application_phone_number
-    ON voice_bindings (voice_application_id, phone_number_id)
+-- A DID may route to only one voice application. Applications may still own
+-- many DIDs through separate bindings.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_voice_bindings_phone_number
+    ON voice_bindings (phone_number_id)
     WHERE phone_number_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_voice_bindings_application_sip_domain
