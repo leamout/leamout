@@ -95,6 +95,7 @@ type CallEvent struct {
 	To             string        `json:"to"`
 	Direction      CallDirection `json:"direction"`
 	Status         CallStatus    `json:"status"`
+	HangupReason   string        `json:"hangup_reason,omitempty"`
 	DurationSec    int           `json:"duration_seconds,omitempty"`
 	OccurredAt     time.Time     `json:"occurred_at"`
 	RecordingURL   string        `json:"recording_url,omitempty"`
