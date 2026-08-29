@@ -2,25 +2,31 @@ package calls
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/outbox"
 )
 
 type Repository struct {
 	db      *pgxpool.Pool
 	queries *sqlc.Queries
+	outbox  *outbox.Repository
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
 	if db == nil {
 		panic("calls: database is required")
 	}
-	return &Repository{db: db, queries: sqlc.New(db)}
+	queries := sqlc.New(db)
+	return &Repository{
+		db:      db,
+		queries: queries,
+		outbox:  outbox.NewRepository(queries),
+	}
 }
 
 func (r *Repository) Create(
@@ -189,39 +195,25 @@ func (r *Repository) mutateWithEvent(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	call, err := mutation(r.queries.WithTx(tx))
+	queries := r.queries.WithTx(tx)
+	call, err := mutation(queries)
 	if err != nil {
 		return sqlc.Call{}, err
 	}
 
-	eventID := uuid.New()
 	occurredAt := time.Now().UTC()
 	event := callDomainEvent(call, eventType, status, occurredAt)
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return sqlc.Call{}, fmt.Errorf("marshal call event: %w", err)
-	}
-	headers, err := json.Marshal(map[string]string{
-		"event_id":        eventID.String(),
-		"event_type":      string(eventType),
-		"organization_id": call.OrganizationID.String(),
-		"schema_version":  "1",
-	})
-	if err != nil {
-		return sqlc.Call{}, fmt.Errorf("marshal call event headers: %w", err)
-	}
-
-	if _, err := tx.Exec(ctx, `
-INSERT INTO call_events (id, organization_id, call_id, event_type, payload, occurred_at)
-VALUES ($1, $2, $3, $4, $5::jsonb, $6)
-`, eventID, call.OrganizationID, call.ID, string(eventType), payload, occurredAt); err != nil {
-		return sqlc.Call{}, fmt.Errorf("insert call event: %w", err)
-	}
-
-	if _, err := tx.Exec(ctx, `
-INSERT INTO outbox_events (id, subject, aggregate_type, aggregate_id, payload, headers)
-VALUES ($1, $2, 'call', $3, $4::jsonb, $5::jsonb)
-`, eventID, string(eventType), call.ID, payload, headers); err != nil {
+	if _, err := r.outbox.WithTx(tx).Insert(ctx, outbox.Event{
+		Subject:       string(eventType),
+		AggregateType: "call",
+		AggregateID:   call.ID,
+		Payload:       event,
+		Headers: map[string]string{
+			"event_type":      string(eventType),
+			"organization_id": call.OrganizationID.String(),
+			"schema_version":  "1",
+		},
+	}); err != nil {
 		return sqlc.Call{}, fmt.Errorf("insert call outbox event: %w", err)
 	}
 
