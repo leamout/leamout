@@ -9,40 +9,113 @@ import (
 
 type EventHandler func(context.Context, Event) error
 
-func (c *Client) Subscribe(ctx context.Context, format EventFormat, events []string, handler EventHandler) error {
+type subscription struct {
+	format  EventFormat
+	events  []string
+	handler EventHandler
+}
+
+func (s subscription) command() string {
+	command := "event " + string(s.format)
+	if len(s.events) > 0 {
+		command += " " + strings.Join(s.events, " ")
+	}
+	return command
+}
+
+func (s subscription) matches(eventName string) bool {
+	if len(s.events) == 0 {
+		return true
+	}
+
+	for _, event := range s.events {
+		if event == eventName {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Client) Subscribe(
+	ctx context.Context,
+	format EventFormat,
+	events []string,
+	handler EventHandler,
+) error {
+	subscription, err := newSubscription(format, events, handler)
+	if err != nil {
+		return err
+	}
+
+	c.subscriptionsMu.Lock()
+	defer c.subscriptionsMu.Unlock()
+
+	if err := c.sendSubscription(ctx, subscription); err != nil {
+		return err
+	}
+	c.subscriptions = append(c.subscriptions, subscription)
+
+	return nil
+}
+
+func newSubscription(
+	format EventFormat,
+	events []string,
+	handler EventHandler,
+) (subscription, error) {
 	if handler == nil {
-		return fmt.Errorf("FreeSWITCH event handler is required")
+		return subscription{}, fmt.Errorf("FreeSWITCH event handler is required")
 	}
 	if format != EventFormatPlain {
-		return fmt.Errorf("unsupported FreeSWITCH event format: %q", format)
+		return subscription{}, fmt.Errorf("unsupported FreeSWITCH event format: %q", format)
 	}
 
 	clean := make([]string, 0, len(events))
+	seen := make(map[string]struct{}, len(events))
 	for _, event := range events {
 		event = strings.TrimSpace(event)
-		if event != "" {
-			clean = append(clean, event)
+		if event == "" {
+			continue
 		}
+		if _, ok := seen[event]; ok {
+			continue
+		}
+		seen[event] = struct{}{}
+		clean = append(clean, event)
 	}
 
-	command := "event " + string(format)
-	if len(clean) > 0 {
-		command += " " + strings.Join(clean, " ")
-	}
+	return subscription{
+		format:  format,
+		events:  clean,
+		handler: handler,
+	}, nil
+}
 
-	frame, err := c.command(ctx, command)
+func (c *Client) sendSubscription(ctx context.Context, subscription subscription) error {
+	frame, err := c.command(ctx, subscription.command())
 	if err != nil {
 		return err
 	}
 	if !frame.OK() {
 		return fmt.Errorf("FreeSWITCH event subscription failed: %s", frame.ReplyText())
 	}
-
-	c.handlersMu.Lock()
-	c.handlers = append(c.handlers, handler)
-	c.handlersMu.Unlock()
-
 	return nil
+}
+
+func (c *Client) restoreSubscriptions(ctx context.Context) error {
+	for _, subscription := range c.subscriptionSnapshot() {
+		if err := c.sendSubscription(ctx, subscription); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) subscriptionSnapshot() []subscription {
+	c.subscriptionsMu.RLock()
+	defer c.subscriptionsMu.RUnlock()
+
+	return append([]subscription(nil), c.subscriptions...)
 }
 
 func plainEventHeader(body, name string) string {
