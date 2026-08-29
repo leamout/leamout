@@ -41,6 +41,26 @@ type EndpointUpdateRequest struct {
 	Enabled   *bool   `json:"enabled,omitempty"`
 }
 
+type EventType string
+
+const (
+	EventTrunkCreated          EventType = "trunk.created"
+	EventTrunkUpdated          EventType = "trunk.updated"
+	EventTrunkDisabled         EventType = "trunk.disabled"
+	EventTrunkEndpointCreated  EventType = "trunk.endpoint.created"
+	EventTrunkEndpointUpdated  EventType = "trunk.endpoint.updated"
+	EventTrunkEndpointDeleted  EventType = "trunk.endpoint.deleted"
+)
+
+type Event struct {
+	EventType      EventType `json:"event_type"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+	TrunkID        uuid.UUID `json:"trunk_id"`
+	EndpointID     *uuid.UUID `json:"endpoint_id,omitempty"`
+	Resource       any       `json:"resource"`
+	OccurredAt     time.Time `json:"occurred_at"`
+}
+
 type Response struct {
 	ID                  uuid.UUID `json:"id"`
 	OrganizationID      uuid.UUID `json:"organization_id"`
