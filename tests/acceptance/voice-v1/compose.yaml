@@ -11,6 +11,10 @@ services:
     volumes:
       - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/ca.crt:/voice-v1-certs/ca.crt:ro
 
+  freeswitch:
+    environment:
+      PATH: /usr/local/freeswitch/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
   voice-v1-carrier:
     image: leamout/voice-v1-carrier:dev
     build:
@@ -19,6 +23,7 @@ services:
     restart: unless-stopped
     environment:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+      PATH: /usr/local/freeswitch/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
       - ${VOICE_V1_SUITE_DIR:?VOICE_V1_SUITE_DIR is required}/carrier-dialplan.xml:/leamout-config/dialplan/leamout.xml:ro
     expose:
