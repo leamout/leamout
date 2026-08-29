@@ -28,6 +28,16 @@ type OriginateRequest struct {
 	Variables   map[string]string
 }
 
+type InboundCallEvent struct {
+	OrganizationID uuid.UUID
+	ApplicationID  uuid.UUID
+	ChannelID      string
+	From           string
+	To             string
+	HangupCause    string
+	WasAnswered    bool
+}
+
 type TransferRequest struct {
 	Destination string `json:"destination"`
 	Dialplan    string `json:"dialplan,omitempty"`
