@@ -2,6 +2,7 @@ package webhooks
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -128,7 +129,7 @@ func attemptError(attempt DeliveryAttempt) string {
 		return attempt.Err.Error()
 	}
 	if attempt.StatusCode != nil {
-		return "webhook endpoint returned HTTP " + fmt.Sprint(*attempt.StatusCode)
+		return fmt.Sprintf("webhook endpoint returned HTTP %d", *attempt.StatusCode)
 	}
 	return "webhook delivery failed"
 }
