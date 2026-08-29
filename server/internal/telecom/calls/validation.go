@@ -13,6 +13,7 @@ type controlAction string
 
 const (
 	controlAnswer   controlAction = "answer"
+	controlHangup   controlAction = "hang up"
 	controlTransfer controlAction = "transfer"
 	controlHold     controlAction = "hold"
 	controlUnhold   controlAction = "resume"
