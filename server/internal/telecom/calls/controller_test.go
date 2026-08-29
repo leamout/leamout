@@ -6,11 +6,11 @@ func TestFreeSWITCHEgress(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name          string
-		req           OriginateRequest
-		wantEndpoint  string
-		wantRouteURI  string
-		wantErr       bool
+		name         string
+		req          OriginateRequest
+		wantEndpoint string
+		wantRouteURI string
+		wantErr      bool
 	}{
 		{
 			name: "udp route",
