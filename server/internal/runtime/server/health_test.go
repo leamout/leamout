@@ -69,7 +69,12 @@ func TestHealthRoutes(t *testing.T) {
 				fakeReadinessMedia{err: tt.media},
 			)
 
-			request := httptest.NewRequest(http.MethodGet, tt.path, nil)
+			request := httptest.NewRequestWithContext(
+				context.Background(),
+				http.MethodGet,
+				tt.path,
+				nil,
+			)
 			response := httptest.NewRecorder()
 			router.ServeHTTP(response, request)
 
