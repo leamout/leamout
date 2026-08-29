@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS calls (
     application_id UUID REFERENCES voice_applications(id) ON DELETE SET NULL,
     direction TEXT NOT NULL,
     state TEXT NOT NULL DEFAULT 'initiating',
+    media_state TEXT NOT NULL DEFAULT 'active',
     from_uri TEXT NOT NULL,
     to_uri TEXT NOT NULL,
     sip_call_id TEXT,
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS calls (
     CONSTRAINT chk_calls_state CHECK (
         state IN ('initiating', 'ringing', 'answered', 'active', 'completed', 'failed', 'cancelled')
     ),
+    CONSTRAINT chk_calls_media_state CHECK (media_state IN ('active', 'held')),
     CONSTRAINT chk_calls_from_uri CHECK (length(trim(from_uri)) > 0),
     CONSTRAINT chk_calls_to_uri CHECK (length(trim(to_uri)) > 0),
     CONSTRAINT chk_calls_timestamps CHECK (
