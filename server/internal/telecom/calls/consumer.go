@@ -101,11 +101,11 @@ func inboundCallEvent(event freeswitch.Event) (InboundCallEvent, bool, error) {
 		From:           from,
 		To:             to,
 		HangupCause:    strings.TrimSpace(event.Header("Hangup-Cause")),
-		WasAnswered:    eventAnswered(event),
+		WasAnswered:    channelWasAnswered(event),
 	}, true, nil
 }
 
-func eventAnswered(event freeswitch.Event) bool {
+func channelWasAnswered(event freeswitch.Event) bool {
 	answerEpoch := strings.TrimSpace(event.Header("variable_answer_epoch"))
 	return answerEpoch != "" && answerEpoch != "0"
 }
