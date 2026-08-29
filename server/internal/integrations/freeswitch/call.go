@@ -23,7 +23,9 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 			command += " {" + callerIDVar + "}"
 		}
 	}
-	command += " " + commandWords(req.Endpoint, req.Destination)
+	// Once the B-leg answers, keep the channel parked under ESL control instead
+	// of sending it through a user-facing dialplan destination.
+	command += " " + commandWords(req.Endpoint, "&park()")
 
 	reply, err := c.Command(ctx, command)
 	if err != nil {
