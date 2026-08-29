@@ -134,7 +134,7 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	routeResolver := routing.NewResolver(routingRepository)
 	routingService := routing.NewService(routeResolver)
 
-	callsRepository := calls.NewRepository(queries)
+	callsRepository := calls.NewRepository(db)
 	callsService := calls.NewService(callsRepository, controller, routingService)
 
 	recordingsRepository := recordings.NewRepository(queries)
