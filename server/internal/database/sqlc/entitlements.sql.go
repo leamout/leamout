@@ -12,10 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createEntitlement = `-- name: CreateEntitlement :one
+const createLicenseEntitlement = `-- name: CreateLicenseEntitlement :one
 INSERT INTO entitlements (
-    plan_id,
-    organization_id,
     license_id,
     entitlement_key,
     kind,
@@ -23,43 +21,45 @@ INSERT INTO entitlements (
     limit_value,
     starts_at,
     expires_at
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9
 )
+SELECT
+    l.id AS license_id,
+    $1 AS entitlement_key,
+    $2 AS kind,
+    $3 AS enabled,
+    $4 AS limit_value,
+    $5 AS starts_at,
+    $6 AS expires_at
+FROM licenses AS l
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE l.id = $7
+  AND l.organization_id = $8
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 RETURNING id, plan_id, organization_id, license_id, entitlement_key, kind, enabled, limit_value, starts_at, expires_at, created_at, updated_at
 `
 
-type CreateEntitlementParams struct {
-	PlanID         *uuid.UUID         `db:"plan_id" json:"plan_id"`
-	OrganizationID *uuid.UUID         `db:"organization_id" json:"organization_id"`
-	LicenseID      *uuid.UUID         `db:"license_id" json:"license_id"`
+type CreateLicenseEntitlementParams struct {
 	EntitlementKey string             `db:"entitlement_key" json:"entitlement_key"`
 	Kind           string             `db:"kind" json:"kind"`
 	Enabled        *bool              `db:"enabled" json:"enabled"`
 	LimitValue     *int64             `db:"limit_value" json:"limit_value"`
 	StartsAt       pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	LicenseID      uuid.UUID          `db:"license_id" json:"license_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
-func (q *Queries) CreateEntitlement(ctx context.Context, arg CreateEntitlementParams) (Entitlement, error) {
-	row := q.db.QueryRow(ctx, createEntitlement,
-		arg.PlanID,
-		arg.OrganizationID,
-		arg.LicenseID,
+func (q *Queries) CreateLicenseEntitlement(ctx context.Context, arg CreateLicenseEntitlementParams) (Entitlement, error) {
+	row := q.db.QueryRow(ctx, createLicenseEntitlement,
 		arg.EntitlementKey,
 		arg.Kind,
 		arg.Enabled,
 		arg.LimitValue,
 		arg.StartsAt,
 		arg.ExpiresAt,
+		arg.LicenseID,
+		arg.OrganizationID,
 	)
 	var i Entitlement
 	err := row.Scan(
@@ -79,52 +79,211 @@ func (q *Queries) CreateEntitlement(ctx context.Context, arg CreateEntitlementPa
 	return i, err
 }
 
-const deleteEntitlement = `-- name: DeleteEntitlement :exec
-DELETE FROM entitlements
-WHERE id = $1
+const createOrganizationEntitlement = `-- name: CreateOrganizationEntitlement :one
+INSERT INTO entitlements (
+    organization_id,
+    entitlement_key,
+    kind,
+    enabled,
+    limit_value,
+    starts_at,
+    expires_at
+)
+SELECT
+    o.id AS organization_id,
+    $1 AS entitlement_key,
+    $2 AS kind,
+    $3 AS enabled,
+    $4 AS limit_value,
+    $5 AS starts_at,
+    $6 AS expires_at
+FROM organizations AS o
+WHERE o.id = $7
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING id, plan_id, organization_id, license_id, entitlement_key, kind, enabled, limit_value, starts_at, expires_at, created_at, updated_at
 `
 
-func (q *Queries) DeleteEntitlement(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteEntitlement, id)
+type CreateOrganizationEntitlementParams struct {
+	EntitlementKey string             `db:"entitlement_key" json:"entitlement_key"`
+	Kind           string             `db:"kind" json:"kind"`
+	Enabled        *bool              `db:"enabled" json:"enabled"`
+	LimitValue     *int64             `db:"limit_value" json:"limit_value"`
+	StartsAt       pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) CreateOrganizationEntitlement(ctx context.Context, arg CreateOrganizationEntitlementParams) (Entitlement, error) {
+	row := q.db.QueryRow(ctx, createOrganizationEntitlement,
+		arg.EntitlementKey,
+		arg.Kind,
+		arg.Enabled,
+		arg.LimitValue,
+		arg.StartsAt,
+		arg.ExpiresAt,
+		arg.OrganizationID,
+	)
+	var i Entitlement
+	err := row.Scan(
+		&i.ID,
+		&i.PlanID,
+		&i.OrganizationID,
+		&i.LicenseID,
+		&i.EntitlementKey,
+		&i.Kind,
+		&i.Enabled,
+		&i.LimitValue,
+		&i.StartsAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createPlanEntitlement = `-- name: CreatePlanEntitlement :one
+INSERT INTO entitlements (
+    plan_id,
+    entitlement_key,
+    kind,
+    enabled,
+    limit_value,
+    starts_at,
+    expires_at
+)
+SELECT
+    pl.id AS plan_id,
+    $1 AS entitlement_key,
+    $2 AS kind,
+    $3 AS enabled,
+    $4 AS limit_value,
+    $5 AS starts_at,
+    $6 AS expires_at
+FROM plans AS pl
+JOIN products AS p ON p.id = pl.product_id
+WHERE pl.id = $7
+  AND pl.active = true
+  AND p.active = true
+RETURNING id, plan_id, organization_id, license_id, entitlement_key, kind, enabled, limit_value, starts_at, expires_at, created_at, updated_at
+`
+
+type CreatePlanEntitlementParams struct {
+	EntitlementKey string             `db:"entitlement_key" json:"entitlement_key"`
+	Kind           string             `db:"kind" json:"kind"`
+	Enabled        *bool              `db:"enabled" json:"enabled"`
+	LimitValue     *int64             `db:"limit_value" json:"limit_value"`
+	StartsAt       pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	PlanID         uuid.UUID          `db:"plan_id" json:"plan_id"`
+}
+
+func (q *Queries) CreatePlanEntitlement(ctx context.Context, arg CreatePlanEntitlementParams) (Entitlement, error) {
+	row := q.db.QueryRow(ctx, createPlanEntitlement,
+		arg.EntitlementKey,
+		arg.Kind,
+		arg.Enabled,
+		arg.LimitValue,
+		arg.StartsAt,
+		arg.ExpiresAt,
+		arg.PlanID,
+	)
+	var i Entitlement
+	err := row.Scan(
+		&i.ID,
+		&i.PlanID,
+		&i.OrganizationID,
+		&i.LicenseID,
+		&i.EntitlementKey,
+		&i.Kind,
+		&i.Enabled,
+		&i.LimitValue,
+		&i.StartsAt,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteLicenseEntitlement = `-- name: DeleteLicenseEntitlement :exec
+DELETE FROM entitlements AS e
+USING licenses AS l, organizations AS o
+WHERE e.id = $1
+  AND e.license_id = $2
+  AND l.id = e.license_id
+  AND l.organization_id = $3
+  AND o.id = l.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+`
+
+type DeleteLicenseEntitlementParams struct {
+	ID             uuid.UUID  `db:"id" json:"id"`
+	LicenseID      *uuid.UUID `db:"license_id" json:"license_id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) DeleteLicenseEntitlement(ctx context.Context, arg DeleteLicenseEntitlementParams) error {
+	_, err := q.db.Exec(ctx, deleteLicenseEntitlement, arg.ID, arg.LicenseID, arg.OrganizationID)
 	return err
 }
 
-const getEntitlement = `-- name: GetEntitlement :one
-SELECT id, plan_id, organization_id, license_id, entitlement_key, kind, enabled, limit_value, starts_at, expires_at, created_at, updated_at
-FROM entitlements
-WHERE id = $1
-LIMIT 1
+const deleteOrganizationEntitlement = `-- name: DeleteOrganizationEntitlement :exec
+DELETE FROM entitlements AS e
+USING organizations AS o
+WHERE e.id = $1
+  AND e.organization_id = $2
+  AND o.id = e.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 `
 
-func (q *Queries) GetEntitlement(ctx context.Context, id uuid.UUID) (Entitlement, error) {
-	row := q.db.QueryRow(ctx, getEntitlement, id)
-	var i Entitlement
-	err := row.Scan(
-		&i.ID,
-		&i.PlanID,
-		&i.OrganizationID,
-		&i.LicenseID,
-		&i.EntitlementKey,
-		&i.Kind,
-		&i.Enabled,
-		&i.LimitValue,
-		&i.StartsAt,
-		&i.ExpiresAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+type DeleteOrganizationEntitlementParams struct {
+	ID             uuid.UUID  `db:"id" json:"id"`
+	OrganizationID *uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) DeleteOrganizationEntitlement(ctx context.Context, arg DeleteOrganizationEntitlementParams) error {
+	_, err := q.db.Exec(ctx, deleteOrganizationEntitlement, arg.ID, arg.OrganizationID)
+	return err
+}
+
+const deletePlanEntitlement = `-- name: DeletePlanEntitlement :exec
+DELETE FROM entitlements
+WHERE id = $1
+  AND plan_id = $2
+`
+
+type DeletePlanEntitlementParams struct {
+	ID     uuid.UUID  `db:"id" json:"id"`
+	PlanID *uuid.UUID `db:"plan_id" json:"plan_id"`
+}
+
+func (q *Queries) DeletePlanEntitlement(ctx context.Context, arg DeletePlanEntitlementParams) error {
+	_, err := q.db.Exec(ctx, deletePlanEntitlement, arg.ID, arg.PlanID)
+	return err
 }
 
 const listLicenseEntitlements = `-- name: ListLicenseEntitlements :many
-SELECT id, plan_id, organization_id, license_id, entitlement_key, kind, enabled, limit_value, starts_at, expires_at, created_at, updated_at
-FROM entitlements
-WHERE license_id = $1
-ORDER BY entitlement_key
+SELECT e.id, e.plan_id, e.organization_id, e.license_id, e.entitlement_key, e.kind, e.enabled, e.limit_value, e.starts_at, e.expires_at, e.created_at, e.updated_at
+FROM entitlements AS e
+JOIN licenses AS l ON l.id = e.license_id
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE e.license_id = $1
+  AND l.organization_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY e.entitlement_key
 `
 
-func (q *Queries) ListLicenseEntitlements(ctx context.Context, licenseID *uuid.UUID) ([]Entitlement, error) {
-	rows, err := q.db.Query(ctx, listLicenseEntitlements, licenseID)
+type ListLicenseEntitlementsParams struct {
+	LicenseID      *uuid.UUID `db:"license_id" json:"license_id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) ListLicenseEntitlements(ctx context.Context, arg ListLicenseEntitlementsParams) ([]Entitlement, error) {
+	rows, err := q.db.Query(ctx, listLicenseEntitlements, arg.LicenseID, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}
@@ -157,10 +316,13 @@ func (q *Queries) ListLicenseEntitlements(ctx context.Context, licenseID *uuid.U
 }
 
 const listOrganizationEntitlements = `-- name: ListOrganizationEntitlements :many
-SELECT id, plan_id, organization_id, license_id, entitlement_key, kind, enabled, limit_value, starts_at, expires_at, created_at, updated_at
-FROM entitlements
-WHERE organization_id = $1
-ORDER BY entitlement_key
+SELECT e.id, e.plan_id, e.organization_id, e.license_id, e.entitlement_key, e.kind, e.enabled, e.limit_value, e.starts_at, e.expires_at, e.created_at, e.updated_at
+FROM entitlements AS e
+JOIN organizations AS o ON o.id = e.organization_id
+WHERE e.organization_id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY e.entitlement_key
 `
 
 func (q *Queries) ListOrganizationEntitlements(ctx context.Context, organizationID *uuid.UUID) ([]Entitlement, error) {

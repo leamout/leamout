@@ -26,42 +26,56 @@ INSERT INTO carrier_rates (
     effective_from,
     effective_until,
     active
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    COALESCE($9, 1),
-    COALESCE($10, NOW()),
-    $11,
-    COALESCE($12, true)
 )
+SELECT
+    pl.id AS plan_id,
+    m.id AS meter_id,
+    $1::uuid AS carrier_provider_id,
+    $2 AS direction,
+    $3 AS country_code,
+    $4 AS network,
+    $5 AS currency,
+    $6 AS unit_amount_micros,
+    COALESCE($7, 1) AS unit_size,
+    COALESCE($8, NOW()) AS effective_from,
+    $9 AS effective_until,
+    COALESCE($10, true) AS active
+FROM plans AS pl
+JOIN products AS p ON p.id = pl.product_id
+JOIN meters AS m ON m.id = $11
+WHERE pl.id = $12
+  AND pl.active = true
+  AND p.active = true
+  AND m.active = true
+  AND (
+      $1::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM carrier_providers AS cp
+          WHERE cp.id = $1::uuid
+            AND cp.status = 'active'
+      )
+  )
 RETURNING id, plan_id, meter_id, carrier_provider_id, direction, country_code, network, currency, unit_amount_micros, unit_size, effective_from, effective_until, active, created_at, updated_at
 `
 
 type CreateCarrierRateParams struct {
-	PlanID            uuid.UUID          `db:"plan_id" json:"plan_id"`
-	MeterID           uuid.UUID          `db:"meter_id" json:"meter_id"`
 	CarrierProviderID *uuid.UUID         `db:"carrier_provider_id" json:"carrier_provider_id"`
 	Direction         *string            `db:"direction" json:"direction"`
 	CountryCode       *string            `db:"country_code" json:"country_code"`
 	Network           *string            `db:"network" json:"network"`
 	Currency          string             `db:"currency" json:"currency"`
 	UnitAmountMicros  int64              `db:"unit_amount_micros" json:"unit_amount_micros"`
-	UnitSize          interface{}        `db:"unit_size" json:"unit_size"`
-	EffectiveFrom     interface{}        `db:"effective_from" json:"effective_from"`
+	UnitSize          *int64             `db:"unit_size" json:"unit_size"`
+	EffectiveFrom     pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
 	EffectiveUntil    pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
-	Active            interface{}        `db:"active" json:"active"`
+	Active            *bool              `db:"active" json:"active"`
+	MeterID           uuid.UUID          `db:"meter_id" json:"meter_id"`
+	PlanID            uuid.UUID          `db:"plan_id" json:"plan_id"`
 }
 
 func (q *Queries) CreateCarrierRate(ctx context.Context, arg CreateCarrierRateParams) (CarrierRate, error) {
 	row := q.db.QueryRow(ctx, createCarrierRate,
-		arg.PlanID,
-		arg.MeterID,
 		arg.CarrierProviderID,
 		arg.Direction,
 		arg.CountryCode,
@@ -72,6 +86,8 @@ func (q *Queries) CreateCarrierRate(ctx context.Context, arg CreateCarrierRatePa
 		arg.EffectiveFrom,
 		arg.EffectiveUntil,
 		arg.Active,
+		arg.MeterID,
+		arg.PlanID,
 	)
 	var i CarrierRate
 	err := row.Scan(
@@ -168,29 +184,43 @@ func (q *Queries) ListCarrierRatesByPlan(ctx context.Context, planID uuid.UUID) 
 }
 
 const resolveCarrierRate = `-- name: ResolveCarrierRate :one
-SELECT id, plan_id, meter_id, carrier_provider_id, direction, country_code, network, currency, unit_amount_micros, unit_size, effective_from, effective_until, active, created_at, updated_at
-FROM carrier_rates
-WHERE plan_id = $1
-  AND meter_id = $2
-  AND active = true
-  AND effective_from <= $3
-  AND (effective_until IS NULL OR effective_until > $3)
-  AND (carrier_provider_id IS NULL OR carrier_provider_id = $4)
-  AND (direction IS NULL OR direction = $5)
-  AND (country_code IS NULL OR country_code = $6)
-  AND (network IS NULL OR network = $7)
+SELECT cr.id, cr.plan_id, cr.meter_id, cr.carrier_provider_id, cr.direction, cr.country_code, cr.network, cr.currency, cr.unit_amount_micros, cr.unit_size, cr.effective_from, cr.effective_until, cr.active, cr.created_at, cr.updated_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+JOIN plans AS pl ON pl.id = s.plan_id
+JOIN products AS p ON p.id = pl.product_id
+JOIN meters AS m ON m.id = $1
+JOIN carrier_rates AS cr
+  ON cr.plan_id = s.plan_id
+ AND cr.meter_id = m.id
+WHERE s.id = $2
+  AND s.organization_id = $3
+  AND s.status IN ('active', 'past_due')
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND pl.active = true
+  AND p.active = true
+  AND m.active = true
+  AND cr.active = true
+  AND cr.effective_from <= $4
+  AND (cr.effective_until IS NULL OR cr.effective_until > $4)
+  AND (cr.carrier_provider_id IS NULL OR cr.carrier_provider_id = $5::uuid)
+  AND (cr.direction IS NULL OR cr.direction = $6)
+  AND (cr.country_code IS NULL OR cr.country_code = $7)
+  AND (cr.network IS NULL OR cr.network = $8)
 ORDER BY
-    (carrier_provider_id IS NOT NULL)::int
-    + (direction IS NOT NULL)::int
-    + (country_code IS NOT NULL)::int
-    + (network IS NOT NULL)::int DESC,
-    effective_from DESC
+    (cr.carrier_provider_id IS NOT NULL)::int
+    + (cr.direction IS NOT NULL)::int
+    + (cr.country_code IS NOT NULL)::int
+    + (cr.network IS NOT NULL)::int DESC,
+    cr.effective_from DESC
 LIMIT 1
 `
 
 type ResolveCarrierRateParams struct {
-	PlanID            uuid.UUID          `db:"plan_id" json:"plan_id"`
 	MeterID           uuid.UUID          `db:"meter_id" json:"meter_id"`
+	SubscriptionID    uuid.UUID          `db:"subscription_id" json:"subscription_id"`
+	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
 	AtTime            pgtype.Timestamptz `db:"at_time" json:"at_time"`
 	CarrierProviderID *uuid.UUID         `db:"carrier_provider_id" json:"carrier_provider_id"`
 	Direction         *string            `db:"direction" json:"direction"`
@@ -200,8 +230,9 @@ type ResolveCarrierRateParams struct {
 
 func (q *Queries) ResolveCarrierRate(ctx context.Context, arg ResolveCarrierRateParams) (CarrierRate, error) {
 	row := q.db.QueryRow(ctx, resolveCarrierRate,
-		arg.PlanID,
 		arg.MeterID,
+		arg.SubscriptionID,
+		arg.OrganizationID,
 		arg.AtTime,
 		arg.CarrierProviderID,
 		arg.Direction,
@@ -230,12 +261,33 @@ func (q *Queries) ResolveCarrierRate(ctx context.Context, arg ResolveCarrierRate
 }
 
 const setCarrierRateActive = `-- name: SetCarrierRateActive :one
-UPDATE carrier_rates
+UPDATE carrier_rates AS cr
 SET
     active = $1,
     updated_at = NOW()
-WHERE id = $2
-RETURNING id, plan_id, meter_id, carrier_provider_id, direction, country_code, network, currency, unit_amount_micros, unit_size, effective_from, effective_until, active, created_at, updated_at
+FROM plans AS pl, products AS p, meters AS m
+WHERE cr.id = $2
+  AND pl.id = cr.plan_id
+  AND p.id = pl.product_id
+  AND m.id = cr.meter_id
+  AND (
+      $1 = false
+      OR (
+          pl.active = true
+          AND p.active = true
+          AND m.active = true
+          AND (
+              cr.carrier_provider_id IS NULL
+              OR EXISTS (
+                  SELECT 1
+                  FROM carrier_providers AS cp
+                  WHERE cp.id = cr.carrier_provider_id
+                    AND cp.status = 'active'
+              )
+          )
+      )
+  )
+RETURNING pl.id, product_id, pl.code, pl.name, pl.description, pl.active, pl.created_at, pl.updated_at, p.id, p.code, p.name, p.description, p.active, p.created_at, p.updated_at, m.id, key, m.name, unit, m.active, m.created_at, m.updated_at, cr.id, plan_id, meter_id, carrier_provider_id, direction, country_code, network, currency, unit_amount_micros, unit_size, effective_from, effective_until, cr.active, cr.created_at, cr.updated_at
 `
 
 type SetCarrierRateActiveParams struct {
@@ -243,11 +295,73 @@ type SetCarrierRateActiveParams struct {
 	ID     uuid.UUID `db:"id" json:"id"`
 }
 
-func (q *Queries) SetCarrierRateActive(ctx context.Context, arg SetCarrierRateActiveParams) (CarrierRate, error) {
+type SetCarrierRateActiveRow struct {
+	ID                uuid.UUID          `db:"id" json:"id"`
+	ProductID         uuid.UUID          `db:"product_id" json:"product_id"`
+	Code              string             `db:"code" json:"code"`
+	Name              string             `db:"name" json:"name"`
+	Description       *string            `db:"description" json:"description"`
+	Active            bool               `db:"active" json:"active"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID_2              uuid.UUID          `db:"id_2" json:"id_2"`
+	Code_2            string             `db:"code_2" json:"code_2"`
+	Name_2            string             `db:"name_2" json:"name_2"`
+	Description_2     *string            `db:"description_2" json:"description_2"`
+	Active_2          bool               `db:"active_2" json:"active_2"`
+	CreatedAt_2       pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
+	UpdatedAt_2       pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
+	ID_3              uuid.UUID          `db:"id_3" json:"id_3"`
+	Key               string             `db:"key" json:"key"`
+	Name_3            string             `db:"name_3" json:"name_3"`
+	Unit              string             `db:"unit" json:"unit"`
+	Active_3          bool               `db:"active_3" json:"active_3"`
+	CreatedAt_3       pgtype.Timestamptz `db:"created_at_3" json:"created_at_3"`
+	UpdatedAt_3       pgtype.Timestamptz `db:"updated_at_3" json:"updated_at_3"`
+	ID_4              uuid.UUID          `db:"id_4" json:"id_4"`
+	PlanID            uuid.UUID          `db:"plan_id" json:"plan_id"`
+	MeterID           uuid.UUID          `db:"meter_id" json:"meter_id"`
+	CarrierProviderID *uuid.UUID         `db:"carrier_provider_id" json:"carrier_provider_id"`
+	Direction         *string            `db:"direction" json:"direction"`
+	CountryCode       *string            `db:"country_code" json:"country_code"`
+	Network           *string            `db:"network" json:"network"`
+	Currency          string             `db:"currency" json:"currency"`
+	UnitAmountMicros  int64              `db:"unit_amount_micros" json:"unit_amount_micros"`
+	UnitSize          int64              `db:"unit_size" json:"unit_size"`
+	EffectiveFrom     pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
+	EffectiveUntil    pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
+	Active_4          bool               `db:"active_4" json:"active_4"`
+	CreatedAt_4       pgtype.Timestamptz `db:"created_at_4" json:"created_at_4"`
+	UpdatedAt_4       pgtype.Timestamptz `db:"updated_at_4" json:"updated_at_4"`
+}
+
+func (q *Queries) SetCarrierRateActive(ctx context.Context, arg SetCarrierRateActiveParams) (SetCarrierRateActiveRow, error) {
 	row := q.db.QueryRow(ctx, setCarrierRateActive, arg.Active, arg.ID)
-	var i CarrierRate
+	var i SetCarrierRateActiveRow
 	err := row.Scan(
 		&i.ID,
+		&i.ProductID,
+		&i.Code,
+		&i.Name,
+		&i.Description,
+		&i.Active,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ID_2,
+		&i.Code_2,
+		&i.Name_2,
+		&i.Description_2,
+		&i.Active_2,
+		&i.CreatedAt_2,
+		&i.UpdatedAt_2,
+		&i.ID_3,
+		&i.Key,
+		&i.Name_3,
+		&i.Unit,
+		&i.Active_3,
+		&i.CreatedAt_3,
+		&i.UpdatedAt_3,
+		&i.ID_4,
 		&i.PlanID,
 		&i.MeterID,
 		&i.CarrierProviderID,
@@ -259,9 +373,9 @@ func (q *Queries) SetCarrierRateActive(ctx context.Context, arg SetCarrierRateAc
 		&i.UnitSize,
 		&i.EffectiveFrom,
 		&i.EffectiveUntil,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.Active_4,
+		&i.CreatedAt_4,
+		&i.UpdatedAt_4,
 	)
 	return i, err
 }

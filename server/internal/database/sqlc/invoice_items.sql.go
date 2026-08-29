@@ -25,39 +25,73 @@ INSERT INTO invoice_items (
     period_start,
     period_end,
     metadata
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    COALESCE($6, 1),
-    $7,
-    $8,
-    $9,
-    $10,
-    COALESCE($11, '{}'::jsonb)
 )
+SELECT
+    i.id AS invoice_id,
+    $1::uuid AS meter_id,
+    $2::uuid AS carrier_rate_id,
+    $3 AS type,
+    $4 AS description,
+    COALESCE($5, 1) AS quantity,
+    $6 AS unit_amount_micros,
+    $7 AS amount,
+    $8 AS period_start,
+    $9 AS period_end,
+    COALESCE($10, '{}'::jsonb) AS metadata
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.id = $11
+  AND i.organization_id = $12
+  AND i.status = 'draft'
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      $1::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM meters AS m
+          WHERE m.id = $1::uuid
+      )
+  )
+  AND (
+      $2::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM carrier_rates AS cr
+          LEFT JOIN subscriptions AS s
+            ON s.id = i.subscription_id
+           AND s.organization_id = i.organization_id
+          WHERE cr.id = $2::uuid
+            AND (
+                $1::uuid IS NULL
+                OR cr.meter_id = $1::uuid
+            )
+            AND (
+                i.subscription_id IS NULL
+                OR cr.plan_id = s.plan_id
+            )
+      )
+  )
 RETURNING id, invoice_id, meter_id, carrier_rate_id, type, description, quantity, unit_amount_micros, amount, period_start, period_end, metadata, created_at
 `
 
 type CreateInvoiceItemParams struct {
-	InvoiceID        uuid.UUID          `db:"invoice_id" json:"invoice_id"`
 	MeterID          *uuid.UUID         `db:"meter_id" json:"meter_id"`
 	CarrierRateID    *uuid.UUID         `db:"carrier_rate_id" json:"carrier_rate_id"`
 	Type             string             `db:"type" json:"type"`
 	Description      string             `db:"description" json:"description"`
-	Quantity         interface{}        `db:"quantity" json:"quantity"`
+	Quantity         *int64             `db:"quantity" json:"quantity"`
 	UnitAmountMicros *int64             `db:"unit_amount_micros" json:"unit_amount_micros"`
 	Amount           int64              `db:"amount" json:"amount"`
 	PeriodStart      pgtype.Timestamptz `db:"period_start" json:"period_start"`
 	PeriodEnd        pgtype.Timestamptz `db:"period_end" json:"period_end"`
-	Metadata         interface{}        `db:"metadata" json:"metadata"`
+	Metadata         []byte             `db:"metadata" json:"metadata"`
+	InvoiceID        uuid.UUID          `db:"invoice_id" json:"invoice_id"`
+	OrganizationID   uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemParams) (InvoiceItem, error) {
 	row := q.db.QueryRow(ctx, createInvoiceItem,
-		arg.InvoiceID,
 		arg.MeterID,
 		arg.CarrierRateID,
 		arg.Type,
@@ -68,6 +102,8 @@ func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemPa
 		arg.PeriodStart,
 		arg.PeriodEnd,
 		arg.Metadata,
+		arg.InvoiceID,
+		arg.OrganizationID,
 	)
 	var i InvoiceItem
 	err := row.Scan(
@@ -89,24 +125,46 @@ func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemPa
 }
 
 const deleteInvoiceItems = `-- name: DeleteInvoiceItems :exec
-DELETE FROM invoice_items
-WHERE invoice_id = $1
+DELETE FROM invoice_items AS ii
+USING invoices AS i, organizations AS o
+WHERE ii.invoice_id = $1
+  AND i.id = ii.invoice_id
+  AND i.organization_id = $2
+  AND i.status = 'draft'
+  AND o.id = i.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 `
 
-func (q *Queries) DeleteInvoiceItems(ctx context.Context, invoiceID uuid.UUID) error {
-	_, err := q.db.Exec(ctx, deleteInvoiceItems, invoiceID)
+type DeleteInvoiceItemsParams struct {
+	InvoiceID      uuid.UUID `db:"invoice_id" json:"invoice_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) DeleteInvoiceItems(ctx context.Context, arg DeleteInvoiceItemsParams) error {
+	_, err := q.db.Exec(ctx, deleteInvoiceItems, arg.InvoiceID, arg.OrganizationID)
 	return err
 }
 
 const listInvoiceItems = `-- name: ListInvoiceItems :many
-SELECT id, invoice_id, meter_id, carrier_rate_id, type, description, quantity, unit_amount_micros, amount, period_start, period_end, metadata, created_at
-FROM invoice_items
-WHERE invoice_id = $1
-ORDER BY created_at ASC
+SELECT ii.id, ii.invoice_id, ii.meter_id, ii.carrier_rate_id, ii.type, ii.description, ii.quantity, ii.unit_amount_micros, ii.amount, ii.period_start, ii.period_end, ii.metadata, ii.created_at
+FROM invoice_items AS ii
+JOIN invoices AS i ON i.id = ii.invoice_id
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE ii.invoice_id = $1
+  AND i.organization_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY ii.created_at ASC
 `
 
-func (q *Queries) ListInvoiceItems(ctx context.Context, invoiceID uuid.UUID) ([]InvoiceItem, error) {
-	rows, err := q.db.Query(ctx, listInvoiceItems, invoiceID)
+type ListInvoiceItemsParams struct {
+	InvoiceID      uuid.UUID `db:"invoice_id" json:"invoice_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsParams) ([]InvoiceItem, error) {
+	rows, err := q.db.Query(ctx, listInvoiceItems, arg.InvoiceID, arg.OrganizationID)
 	if err != nil {
 		return nil, err
 	}

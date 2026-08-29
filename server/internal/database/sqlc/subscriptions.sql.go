@@ -22,40 +22,48 @@ INSERT INTO subscriptions (
     ends_at,
     billing_provider,
     provider_subscription_id
-) VALUES (
-    $1,
-    $2,
-    COALESCE($3, 'pending'),
-    COALESCE($4, NOW()),
-    $5,
-    $6,
-    $7,
-    $8
 )
+SELECT
+    o.id AS organization_id,
+    pl.id AS plan_id,
+    COALESCE($1, 'pending') AS status,
+    COALESCE($2, NOW()) AS starts_at,
+    $3 AS renews_at,
+    $4 AS ends_at,
+    $5 AS billing_provider,
+    $6 AS provider_subscription_id
+FROM organizations AS o
+JOIN plans AS pl ON pl.id = $7
+JOIN products AS p ON p.id = pl.product_id
+WHERE o.id = $8
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND pl.active = true
+  AND p.active = true
 RETURNING id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
 `
 
 type CreateSubscriptionParams struct {
-	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
-	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
-	Status                 interface{}        `db:"status" json:"status"`
-	StartsAt               interface{}        `db:"starts_at" json:"starts_at"`
+	Status                 *string            `db:"status" json:"status"`
+	StartsAt               pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
 	RenewsAt               pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
 	EndsAt                 pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
 	BillingProvider        *string            `db:"billing_provider" json:"billing_provider"`
 	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error) {
 	row := q.db.QueryRow(ctx, createSubscription,
-		arg.OrganizationID,
-		arg.PlanID,
 		arg.Status,
 		arg.StartsAt,
 		arg.RenewsAt,
 		arg.EndsAt,
 		arg.BillingProvider,
 		arg.ProviderSubscriptionID,
+		arg.PlanID,
+		arg.OrganizationID,
 	)
 	var i Subscription
 	err := row.Scan(
@@ -75,11 +83,14 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 }
 
 const getCurrentSubscription = `-- name: GetCurrentSubscription :one
-SELECT id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
-FROM subscriptions
-WHERE organization_id = $1
-  AND status IN ('active', 'past_due')
-ORDER BY starts_at DESC, created_at DESC
+SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.organization_id = $1
+  AND s.status IN ('active', 'past_due')
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY s.starts_at DESC, s.created_at DESC
 LIMIT 1
 `
 
@@ -103,10 +114,13 @@ func (q *Queries) GetCurrentSubscription(ctx context.Context, organizationID uui
 }
 
 const getSubscription = `-- name: GetSubscription :one
-SELECT id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
-FROM subscriptions
-WHERE organization_id = $1
-  AND id = $2
+SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.organization_id = $1
+  AND s.id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -135,10 +149,13 @@ func (q *Queries) GetSubscription(ctx context.Context, arg GetSubscriptionParams
 }
 
 const getSubscriptionByProviderID = `-- name: GetSubscriptionByProviderID :one
-SELECT id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
-FROM subscriptions
-WHERE billing_provider = $1
-  AND provider_subscription_id = $2
+SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.billing_provider = $1
+  AND s.provider_subscription_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -167,10 +184,13 @@ func (q *Queries) GetSubscriptionByProviderID(ctx context.Context, arg GetSubscr
 }
 
 const listSubscriptionsByOrganization = `-- name: ListSubscriptionsByOrganization :many
-SELECT id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
-FROM subscriptions
-WHERE organization_id = $1
-ORDER BY created_at DESC
+SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+WHERE s.organization_id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY s.created_at DESC
 `
 
 func (q *Queries) ListSubscriptionsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Subscription, error) {
@@ -206,14 +226,18 @@ func (q *Queries) ListSubscriptionsByOrganization(ctx context.Context, organizat
 }
 
 const setSubscriptionProvider = `-- name: SetSubscriptionProvider :one
-UPDATE subscriptions
+UPDATE subscriptions AS s
 SET
     billing_provider = $1,
     provider_subscription_id = $2,
     updated_at = NOW()
-WHERE organization_id = $3
-  AND id = $4
-RETURNING id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
+FROM organizations AS o
+WHERE s.organization_id = $3
+  AND s.id = $4
+  AND o.id = s.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, s.id, organization_id, plan_id, s.status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, s.created_at, s.updated_at
 `
 
 type SetSubscriptionProviderParams struct {
@@ -223,41 +247,82 @@ type SetSubscriptionProviderParams struct {
 	ID                     uuid.UUID `db:"id" json:"id"`
 }
 
-func (q *Queries) SetSubscriptionProvider(ctx context.Context, arg SetSubscriptionProviderParams) (Subscription, error) {
+type SetSubscriptionProviderRow struct {
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	Name                   string             `db:"name" json:"name"`
+	Status                 string             `db:"status" json:"status"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt              pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	ID_2                   uuid.UUID          `db:"id_2" json:"id_2"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Status_2               string             `db:"status_2" json:"status_2"`
+	StartsAt               pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
+	RenewsAt               pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
+	EndsAt                 pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
+	BillingProvider        *string            `db:"billing_provider" json:"billing_provider"`
+	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
+	CreatedAt_2            pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
+	UpdatedAt_2            pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
+}
+
+func (q *Queries) SetSubscriptionProvider(ctx context.Context, arg SetSubscriptionProviderParams) (SetSubscriptionProviderRow, error) {
 	row := q.db.QueryRow(ctx, setSubscriptionProvider,
 		arg.BillingProvider,
 		arg.ProviderSubscriptionID,
 		arg.OrganizationID,
 		arg.ID,
 	)
-	var i Subscription
+	var i SetSubscriptionProviderRow
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ID_2,
 		&i.OrganizationID,
 		&i.PlanID,
-		&i.Status,
+		&i.Status_2,
 		&i.StartsAt,
 		&i.RenewsAt,
 		&i.EndsAt,
 		&i.BillingProvider,
 		&i.ProviderSubscriptionID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.CreatedAt_2,
+		&i.UpdatedAt_2,
 	)
 	return i, err
 }
 
 const updateSubscription = `-- name: UpdateSubscription :one
-UPDATE subscriptions
+UPDATE subscriptions AS s
 SET
-    plan_id = COALESCE($1, plan_id),
-    status = COALESCE($2, status),
-    renews_at = COALESCE($3, renews_at),
-    ends_at = COALESCE($4, ends_at),
+    plan_id = COALESCE($1::uuid, s.plan_id),
+    status = COALESCE($2, s.status),
+    renews_at = COALESCE($3, s.renews_at),
+    ends_at = COALESCE($4, s.ends_at),
     updated_at = NOW()
-WHERE organization_id = $5
-  AND id = $6
-RETURNING id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
+FROM organizations AS o
+WHERE s.organization_id = $5
+  AND s.id = $6
+  AND o.id = s.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      $1::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM plans AS pl
+          JOIN products AS p ON p.id = pl.product_id
+          WHERE pl.id = $1::uuid
+            AND pl.active = true
+            AND p.active = true
+      )
+  )
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, s.id, organization_id, plan_id, s.status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, s.created_at, s.updated_at
 `
 
 type UpdateSubscriptionParams struct {
@@ -269,7 +334,27 @@ type UpdateSubscriptionParams struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdateSubscription(ctx context.Context, arg UpdateSubscriptionParams) (Subscription, error) {
+type UpdateSubscriptionRow struct {
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	Name                   string             `db:"name" json:"name"`
+	Status                 string             `db:"status" json:"status"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt              pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	ID_2                   uuid.UUID          `db:"id_2" json:"id_2"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Status_2               string             `db:"status_2" json:"status_2"`
+	StartsAt               pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
+	RenewsAt               pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
+	EndsAt                 pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
+	BillingProvider        *string            `db:"billing_provider" json:"billing_provider"`
+	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
+	CreatedAt_2            pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
+	UpdatedAt_2            pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
+}
+
+func (q *Queries) UpdateSubscription(ctx context.Context, arg UpdateSubscriptionParams) (UpdateSubscriptionRow, error) {
 	row := q.db.QueryRow(ctx, updateSubscription,
 		arg.PlanID,
 		arg.Status,
@@ -278,19 +363,25 @@ func (q *Queries) UpdateSubscription(ctx context.Context, arg UpdateSubscription
 		arg.OrganizationID,
 		arg.ID,
 	)
-	var i Subscription
+	var i UpdateSubscriptionRow
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ID_2,
 		&i.OrganizationID,
 		&i.PlanID,
-		&i.Status,
+		&i.Status_2,
 		&i.StartsAt,
 		&i.RenewsAt,
 		&i.EndsAt,
 		&i.BillingProvider,
 		&i.ProviderSubscriptionID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.CreatedAt_2,
+		&i.UpdatedAt_2,
 	)
 	return i, err
 }

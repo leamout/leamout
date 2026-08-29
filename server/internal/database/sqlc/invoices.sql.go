@@ -26,41 +26,53 @@ INSERT INTO invoices (
     due_at,
     paid_at,
     metadata
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    COALESCE($6, 0),
-    $7,
-    COALESCE($8, 'draft'),
-    $9,
-    $10,
-    $11,
-    COALESCE($12, '{}'::jsonb)
 )
+SELECT
+    o.id AS organization_id,
+    $1::uuid AS subscription_id,
+    $2 AS invoice_number,
+    $3 AS currency,
+    $4 AS subtotal,
+    COALESCE($5, 0) AS tax,
+    $6 AS total,
+    COALESCE($7, 'draft') AS status,
+    $8 AS issued_at,
+    $9 AS due_at,
+    $10 AS paid_at,
+    COALESCE($11, '{}'::jsonb) AS metadata
+FROM organizations AS o
+WHERE o.id = $12
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      $1::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM subscriptions AS s
+          WHERE s.id = $1::uuid
+            AND s.organization_id = o.id
+      )
+  )
 RETURNING id, organization_id, subscription_id, invoice_number, currency, subtotal, tax, total, status, issued_at, due_at, paid_at, metadata, created_at, updated_at
 `
 
 type CreateInvoiceParams struct {
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	InvoiceNumber  string             `db:"invoice_number" json:"invoice_number"`
 	Currency       string             `db:"currency" json:"currency"`
 	Subtotal       int64              `db:"subtotal" json:"subtotal"`
-	Tax            interface{}        `db:"tax" json:"tax"`
+	Tax            *int64             `db:"tax" json:"tax"`
 	Total          int64              `db:"total" json:"total"`
-	Status         interface{}        `db:"status" json:"status"`
+	Status         *string            `db:"status" json:"status"`
 	IssuedAt       pgtype.Timestamptz `db:"issued_at" json:"issued_at"`
 	DueAt          pgtype.Timestamptz `db:"due_at" json:"due_at"`
 	PaidAt         pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
-	Metadata       interface{}        `db:"metadata" json:"metadata"`
+	Metadata       []byte             `db:"metadata" json:"metadata"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (Invoice, error) {
 	row := q.db.QueryRow(ctx, createInvoice,
-		arg.OrganizationID,
 		arg.SubscriptionID,
 		arg.InvoiceNumber,
 		arg.Currency,
@@ -72,6 +84,7 @@ func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (I
 		arg.DueAt,
 		arg.PaidAt,
 		arg.Metadata,
+		arg.OrganizationID,
 	)
 	var i Invoice
 	err := row.Scan(
@@ -95,10 +108,13 @@ func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (I
 }
 
 const getInvoice = `-- name: GetInvoice :one
-SELECT id, organization_id, subscription_id, invoice_number, currency, subtotal, tax, total, status, issued_at, due_at, paid_at, metadata, created_at, updated_at
-FROM invoices
-WHERE organization_id = $1
-  AND id = $2
+SELECT i.id, i.organization_id, i.subscription_id, i.invoice_number, i.currency, i.subtotal, i.tax, i.total, i.status, i.issued_at, i.due_at, i.paid_at, i.metadata, i.created_at, i.updated_at
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.organization_id = $1
+  AND i.id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -131,10 +147,13 @@ func (q *Queries) GetInvoice(ctx context.Context, arg GetInvoiceParams) (Invoice
 }
 
 const getInvoiceByNumber = `-- name: GetInvoiceByNumber :one
-SELECT id, organization_id, subscription_id, invoice_number, currency, subtotal, tax, total, status, issued_at, due_at, paid_at, metadata, created_at, updated_at
-FROM invoices
-WHERE organization_id = $1
-  AND invoice_number = $2
+SELECT i.id, i.organization_id, i.subscription_id, i.invoice_number, i.currency, i.subtotal, i.tax, i.total, i.status, i.issued_at, i.due_at, i.paid_at, i.metadata, i.created_at, i.updated_at
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.organization_id = $1
+  AND i.invoice_number = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -167,10 +186,13 @@ func (q *Queries) GetInvoiceByNumber(ctx context.Context, arg GetInvoiceByNumber
 }
 
 const listInvoicesByOrganization = `-- name: ListInvoicesByOrganization :many
-SELECT id, organization_id, subscription_id, invoice_number, currency, subtotal, tax, total, status, issued_at, due_at, paid_at, metadata, created_at, updated_at
-FROM invoices
-WHERE organization_id = $1
-ORDER BY created_at DESC
+SELECT i.id, i.organization_id, i.subscription_id, i.invoice_number, i.currency, i.subtotal, i.tax, i.total, i.status, i.issued_at, i.due_at, i.paid_at, i.metadata, i.created_at, i.updated_at
+FROM invoices AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.organization_id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY i.created_at DESC
 `
 
 func (q *Queries) ListInvoicesByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Invoice, error) {
@@ -210,14 +232,18 @@ func (q *Queries) ListInvoicesByOrganization(ctx context.Context, organizationID
 }
 
 const updateInvoiceStatus = `-- name: UpdateInvoiceStatus :one
-UPDATE invoices
+UPDATE invoices AS i
 SET
     status = $1,
-    paid_at = COALESCE($2, paid_at),
+    paid_at = COALESCE($2, i.paid_at),
     updated_at = NOW()
-WHERE organization_id = $3
-  AND id = $4
-RETURNING id, organization_id, subscription_id, invoice_number, currency, subtotal, tax, total, status, issued_at, due_at, paid_at, metadata, created_at, updated_at
+FROM organizations AS o
+WHERE i.organization_id = $3
+  AND i.id = $4
+  AND o.id = i.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, i.id, organization_id, subscription_id, invoice_number, currency, subtotal, tax, total, i.status, issued_at, due_at, paid_at, metadata, i.created_at, i.updated_at
 `
 
 type UpdateInvoiceStatusParams struct {
@@ -227,16 +253,46 @@ type UpdateInvoiceStatusParams struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdateInvoiceStatus(ctx context.Context, arg UpdateInvoiceStatusParams) (Invoice, error) {
+type UpdateInvoiceStatusRow struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	Name           string             `db:"name" json:"name"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	ID_2           uuid.UUID          `db:"id_2" json:"id_2"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
+	InvoiceNumber  string             `db:"invoice_number" json:"invoice_number"`
+	Currency       string             `db:"currency" json:"currency"`
+	Subtotal       int64              `db:"subtotal" json:"subtotal"`
+	Tax            int64              `db:"tax" json:"tax"`
+	Total          int64              `db:"total" json:"total"`
+	Status_2       string             `db:"status_2" json:"status_2"`
+	IssuedAt       pgtype.Timestamptz `db:"issued_at" json:"issued_at"`
+	DueAt          pgtype.Timestamptz `db:"due_at" json:"due_at"`
+	PaidAt         pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
+	Metadata       []byte             `db:"metadata" json:"metadata"`
+	CreatedAt_2    pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
+	UpdatedAt_2    pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
+}
+
+func (q *Queries) UpdateInvoiceStatus(ctx context.Context, arg UpdateInvoiceStatusParams) (UpdateInvoiceStatusRow, error) {
 	row := q.db.QueryRow(ctx, updateInvoiceStatus,
 		arg.Status,
 		arg.PaidAt,
 		arg.OrganizationID,
 		arg.ID,
 	)
-	var i Invoice
+	var i UpdateInvoiceStatusRow
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ID_2,
 		&i.OrganizationID,
 		&i.SubscriptionID,
 		&i.InvoiceNumber,
@@ -244,13 +300,13 @@ func (q *Queries) UpdateInvoiceStatus(ctx context.Context, arg UpdateInvoiceStat
 		&i.Subtotal,
 		&i.Tax,
 		&i.Total,
-		&i.Status,
+		&i.Status_2,
 		&i.IssuedAt,
 		&i.DueAt,
 		&i.PaidAt,
 		&i.Metadata,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.CreatedAt_2,
+		&i.UpdatedAt_2,
 	)
 	return i, err
 }

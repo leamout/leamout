@@ -23,35 +23,48 @@ INSERT INTO payments (
     status,
     paid_at,
     metadata
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    COALESCE($7, 'pending'),
-    $8,
-    COALESCE($9, '{}'::jsonb)
 )
+SELECT
+    o.id AS organization_id,
+    $1::uuid AS invoice_id,
+    $2 AS provider,
+    $3 AS provider_payment_id,
+    $4 AS amount,
+    $5 AS currency,
+    COALESCE($6, 'pending') AS status,
+    $7 AS paid_at,
+    COALESCE($8, '{}'::jsonb) AS metadata
+FROM organizations AS o
+WHERE o.id = $9
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND (
+      $1::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM invoices AS i
+          WHERE i.id = $1::uuid
+            AND i.organization_id = o.id
+            AND i.currency = $5
+      )
+  )
 RETURNING id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
 `
 
 type CreatePaymentParams struct {
-	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
 	InvoiceID         *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
 	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
 	Amount            int64              `db:"amount" json:"amount"`
 	Currency          string             `db:"currency" json:"currency"`
-	Status            interface{}        `db:"status" json:"status"`
+	Status            *string            `db:"status" json:"status"`
 	PaidAt            pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
-	Metadata          interface{}        `db:"metadata" json:"metadata"`
+	Metadata          []byte             `db:"metadata" json:"metadata"`
+	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
 	row := q.db.QueryRow(ctx, createPayment,
-		arg.OrganizationID,
 		arg.InvoiceID,
 		arg.Provider,
 		arg.ProviderPaymentID,
@@ -60,6 +73,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 		arg.Status,
 		arg.PaidAt,
 		arg.Metadata,
+		arg.OrganizationID,
 	)
 	var i Payment
 	err := row.Scan(
@@ -80,10 +94,13 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 }
 
 const getPayment = `-- name: GetPayment :one
-SELECT id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
-FROM payments
-WHERE organization_id = $1
-  AND id = $2
+SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+FROM payments AS p
+JOIN organizations AS o ON o.id = p.organization_id
+WHERE p.organization_id = $1
+  AND p.id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -113,10 +130,13 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 }
 
 const getPaymentByProviderID = `-- name: GetPaymentByProviderID :one
-SELECT id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
-FROM payments
-WHERE provider = $1
-  AND provider_payment_id = $2
+SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+FROM payments AS p
+JOIN organizations AS o ON o.id = p.organization_id
+WHERE p.provider = $1
+  AND p.provider_payment_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
@@ -146,11 +166,17 @@ func (q *Queries) GetPaymentByProviderID(ctx context.Context, arg GetPaymentByPr
 }
 
 const listPaymentsByInvoice = `-- name: ListPaymentsByInvoice :many
-SELECT id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
-FROM payments
-WHERE organization_id = $1
-  AND invoice_id = $2
-ORDER BY created_at DESC
+SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+FROM payments AS p
+JOIN invoices AS i
+  ON i.id = p.invoice_id
+ AND i.organization_id = p.organization_id
+JOIN organizations AS o ON o.id = p.organization_id
+WHERE p.organization_id = $1
+  AND p.invoice_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY p.created_at DESC
 `
 
 type ListPaymentsByInvoiceParams struct {
@@ -192,10 +218,13 @@ func (q *Queries) ListPaymentsByInvoice(ctx context.Context, arg ListPaymentsByI
 }
 
 const listPaymentsByOrganization = `-- name: ListPaymentsByOrganization :many
-SELECT id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
-FROM payments
-WHERE organization_id = $1
-ORDER BY created_at DESC
+SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+FROM payments AS p
+JOIN organizations AS o ON o.id = p.organization_id
+WHERE p.organization_id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY p.created_at DESC
 `
 
 func (q *Queries) ListPaymentsByOrganization(ctx context.Context, organizationID uuid.UUID) ([]Payment, error) {
@@ -232,15 +261,19 @@ func (q *Queries) ListPaymentsByOrganization(ctx context.Context, organizationID
 }
 
 const updatePaymentStatus = `-- name: UpdatePaymentStatus :one
-UPDATE payments
+UPDATE payments AS p
 SET
     status = $1,
-    paid_at = COALESCE($2, paid_at),
-    metadata = COALESCE($3, metadata),
+    paid_at = COALESCE($2, p.paid_at),
+    metadata = COALESCE($3, p.metadata),
     updated_at = NOW()
-WHERE organization_id = $4
-  AND id = $5
-RETURNING id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
+FROM organizations AS o
+WHERE p.organization_id = $4
+  AND p.id = $5
+  AND o.id = p.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, p.id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, p.status, paid_at, metadata, p.created_at, p.updated_at
 `
 
 type UpdatePaymentStatusParams struct {
@@ -251,7 +284,28 @@ type UpdatePaymentStatusParams struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error) {
+type UpdatePaymentStatusRow struct {
+	ID                uuid.UUID          `db:"id" json:"id"`
+	Name              string             `db:"name" json:"name"`
+	Status            string             `db:"status" json:"status"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt         pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	ID_2              uuid.UUID          `db:"id_2" json:"id_2"`
+	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
+	InvoiceID         *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
+	Provider          string             `db:"provider" json:"provider"`
+	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
+	Amount            int64              `db:"amount" json:"amount"`
+	Currency          string             `db:"currency" json:"currency"`
+	Status_2          string             `db:"status_2" json:"status_2"`
+	PaidAt            pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
+	Metadata          []byte             `db:"metadata" json:"metadata"`
+	CreatedAt_2       pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
+	UpdatedAt_2       pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
+}
+
+func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (UpdatePaymentStatusRow, error) {
 	row := q.db.QueryRow(ctx, updatePaymentStatus,
 		arg.Status,
 		arg.PaidAt,
@@ -259,20 +313,26 @@ func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStat
 		arg.OrganizationID,
 		arg.ID,
 	)
-	var i Payment
+	var i UpdatePaymentStatusRow
 	err := row.Scan(
 		&i.ID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.ID_2,
 		&i.OrganizationID,
 		&i.InvoiceID,
 		&i.Provider,
 		&i.ProviderPaymentID,
 		&i.Amount,
 		&i.Currency,
-		&i.Status,
+		&i.Status_2,
 		&i.PaidAt,
 		&i.Metadata,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+		&i.CreatedAt_2,
+		&i.UpdatedAt_2,
 	)
 	return i, err
 }

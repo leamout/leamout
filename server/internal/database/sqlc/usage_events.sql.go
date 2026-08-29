@@ -23,44 +23,59 @@ INSERT INTO usage_events (
     idempotency_key,
     dimensions,
     occurred_at
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    COALESCE($8, '{}'::jsonb),
-    $9
 )
+SELECT
+    o.id AS organization_id,
+    $1::uuid AS subscription_id,
+    m.id AS meter_id,
+    $2 AS quantity,
+    $3 AS source_type,
+    $4 AS source_id,
+    $5 AS idempotency_key,
+    COALESCE($6, '{}'::jsonb) AS dimensions,
+    $7 AS occurred_at
+FROM organizations AS o
+JOIN meters AS m ON m.id = $8
+WHERE o.id = $9
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND m.active = true
+  AND (
+      $1::uuid IS NULL
+      OR EXISTS (
+          SELECT 1
+          FROM subscriptions AS s
+          WHERE s.id = $1::uuid
+            AND s.organization_id = o.id
+      )
+  )
 ON CONFLICT (idempotency_key) DO NOTHING
 RETURNING id, organization_id, subscription_id, meter_id, quantity, source_type, source_id, idempotency_key, dimensions, occurred_at, created_at
 `
 
 type CreateUsageEventParams struct {
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
-	MeterID        uuid.UUID          `db:"meter_id" json:"meter_id"`
 	Quantity       int64              `db:"quantity" json:"quantity"`
 	SourceType     string             `db:"source_type" json:"source_type"`
 	SourceID       string             `db:"source_id" json:"source_id"`
 	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
-	Dimensions     interface{}        `db:"dimensions" json:"dimensions"`
+	Dimensions     []byte             `db:"dimensions" json:"dimensions"`
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	MeterID        uuid.UUID          `db:"meter_id" json:"meter_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
 func (q *Queries) CreateUsageEvent(ctx context.Context, arg CreateUsageEventParams) (UsageEvent, error) {
 	row := q.db.QueryRow(ctx, createUsageEvent,
-		arg.OrganizationID,
 		arg.SubscriptionID,
-		arg.MeterID,
 		arg.Quantity,
 		arg.SourceType,
 		arg.SourceID,
 		arg.IdempotencyKey,
 		arg.Dimensions,
 		arg.OccurredAt,
+		arg.MeterID,
+		arg.OrganizationID,
 	)
 	var i UsageEvent
 	err := row.Scan(
@@ -80,14 +95,23 @@ func (q *Queries) CreateUsageEvent(ctx context.Context, arg CreateUsageEventPara
 }
 
 const getUsageEventByIdempotencyKey = `-- name: GetUsageEventByIdempotencyKey :one
-SELECT id, organization_id, subscription_id, meter_id, quantity, source_type, source_id, idempotency_key, dimensions, occurred_at, created_at
-FROM usage_events
-WHERE idempotency_key = $1
+SELECT ue.id, ue.organization_id, ue.subscription_id, ue.meter_id, ue.quantity, ue.source_type, ue.source_id, ue.idempotency_key, ue.dimensions, ue.occurred_at, ue.created_at
+FROM usage_events AS ue
+JOIN organizations AS o ON o.id = ue.organization_id
+WHERE ue.organization_id = $1
+  AND ue.idempotency_key = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 LIMIT 1
 `
 
-func (q *Queries) GetUsageEventByIdempotencyKey(ctx context.Context, idempotencyKey string) (UsageEvent, error) {
-	row := q.db.QueryRow(ctx, getUsageEventByIdempotencyKey, idempotencyKey)
+type GetUsageEventByIdempotencyKeyParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	IdempotencyKey string    `db:"idempotency_key" json:"idempotency_key"`
+}
+
+func (q *Queries) GetUsageEventByIdempotencyKey(ctx context.Context, arg GetUsageEventByIdempotencyKeyParams) (UsageEvent, error) {
+	row := q.db.QueryRow(ctx, getUsageEventByIdempotencyKey, arg.OrganizationID, arg.IdempotencyKey)
 	var i UsageEvent
 	err := row.Scan(
 		&i.ID,
@@ -106,13 +130,16 @@ func (q *Queries) GetUsageEventByIdempotencyKey(ctx context.Context, idempotency
 }
 
 const listUsageEventsByMeter = `-- name: ListUsageEventsByMeter :many
-SELECT id, organization_id, subscription_id, meter_id, quantity, source_type, source_id, idempotency_key, dimensions, occurred_at, created_at
-FROM usage_events
-WHERE organization_id = $1
-  AND meter_id = $2
-  AND occurred_at >= $3
-  AND occurred_at < $4
-ORDER BY occurred_at ASC
+SELECT ue.id, ue.organization_id, ue.subscription_id, ue.meter_id, ue.quantity, ue.source_type, ue.source_id, ue.idempotency_key, ue.dimensions, ue.occurred_at, ue.created_at
+FROM usage_events AS ue
+JOIN organizations AS o ON o.id = ue.organization_id
+WHERE ue.organization_id = $1
+  AND ue.meter_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND ue.occurred_at >= $3
+  AND ue.occurred_at < $4
+ORDER BY ue.occurred_at ASC
 `
 
 type ListUsageEventsByMeterParams struct {
@@ -160,12 +187,15 @@ func (q *Queries) ListUsageEventsByMeter(ctx context.Context, arg ListUsageEvent
 }
 
 const listUsageEventsByOrganization = `-- name: ListUsageEventsByOrganization :many
-SELECT id, organization_id, subscription_id, meter_id, quantity, source_type, source_id, idempotency_key, dimensions, occurred_at, created_at
-FROM usage_events
-WHERE organization_id = $1
-  AND occurred_at >= $2
-  AND occurred_at < $3
-ORDER BY occurred_at ASC
+SELECT ue.id, ue.organization_id, ue.subscription_id, ue.meter_id, ue.quantity, ue.source_type, ue.source_id, ue.idempotency_key, ue.dimensions, ue.occurred_at, ue.created_at
+FROM usage_events AS ue
+JOIN organizations AS o ON o.id = ue.organization_id
+WHERE ue.organization_id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND ue.occurred_at >= $2
+  AND ue.occurred_at < $3
+ORDER BY ue.occurred_at ASC
 `
 
 type ListUsageEventsByOrganizationParams struct {
@@ -207,12 +237,15 @@ func (q *Queries) ListUsageEventsByOrganization(ctx context.Context, arg ListUsa
 }
 
 const sumUsageByMeter = `-- name: SumUsageByMeter :one
-SELECT COALESCE(SUM(quantity), 0)::bigint
-FROM usage_events
-WHERE organization_id = $1
-  AND meter_id = $2
-  AND occurred_at >= $3
-  AND occurred_at < $4
+SELECT COALESCE(SUM(ue.quantity), 0)::bigint
+FROM usage_events AS ue
+JOIN organizations AS o ON o.id = ue.organization_id
+WHERE ue.organization_id = $1
+  AND ue.meter_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND ue.occurred_at >= $3
+  AND ue.occurred_at < $4
 `
 
 type SumUsageByMeterParams struct {
