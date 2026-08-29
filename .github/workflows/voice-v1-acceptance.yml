@@ -1,0 +1,20 @@
+name: Voice v1 acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Self-hosted programmable voice
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Run Voice v1 acceptance suite
+        run: sh tests/acceptance/voice-v1/run.sh
