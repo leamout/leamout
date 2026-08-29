@@ -36,20 +36,20 @@ const (
 type EventType string
 
 const (
-	EventConferenceCreated    EventType = "conference.created"
-	EventConferenceEnded      EventType = "conference.ended"
-	EventParticipantJoined    EventType = "conference.participant.joined"
-	EventParticipantLeft      EventType = "conference.participant.left"
-	EventParticipantFailed    EventType = "conference.participant.failed"
+	EventConferenceCreated EventType = "conference.created"
+	EventConferenceEnded   EventType = "conference.ended"
+	EventParticipantJoined EventType = "conference.participant.joined"
+	EventParticipantLeft   EventType = "conference.participant.left"
+	EventParticipantFailed EventType = "conference.participant.failed"
 )
 
 type Event struct {
-	EventType      EventType      `json:"event_type"`
-	OrganizationID uuid.UUID      `json:"organization_id"`
-	ConferenceID   uuid.UUID      `json:"conference_id"`
-	ParticipantID  *uuid.UUID     `json:"participant_id,omitempty"`
-	Resource       any            `json:"resource"`
-	OccurredAt     time.Time      `json:"occurred_at"`
+	EventType      EventType  `json:"event_type"`
+	OrganizationID uuid.UUID  `json:"organization_id"`
+	ConferenceID   uuid.UUID  `json:"conference_id"`
+	ParticipantID  *uuid.UUID `json:"participant_id,omitempty"`
+	Resource       any        `json:"resource"`
+	OccurredAt     time.Time  `json:"occurred_at"`
 }
 
 type ConferenceResponse struct {
