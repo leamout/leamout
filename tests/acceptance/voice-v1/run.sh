@@ -11,12 +11,13 @@ export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-voice-v1-esl-secret}"
 export TURN_REALM="${TURN_REALM:-voice-v1.local}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-voice-v1-turn-secret}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
-export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-127.0.0.1}"
+export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.30.0.10}"
 
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/voice-v1/compose.yaml"
 
 cleanup() {
     status=$?
+    trap - EXIT INT TERM
     if [ "${VOICE_V1_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
         rm -rf "$CERT_DIR"
