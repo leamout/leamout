@@ -7,14 +7,14 @@ import (
 )
 
 type DeliveryJobConfig struct {
-	WorkerID          string
-	BatchSize         int32
-	PollInterval      time.Duration
-	LockTimeout       time.Duration
-	RetryBaseDelay    time.Duration
-	RetryMaxDelay     time.Duration
-	MaxAttempts       int32
-	AutoDisableAfter  int32
+	WorkerID         string
+	BatchSize        int32
+	PollInterval     time.Duration
+	LockTimeout      time.Duration
+	RetryBaseDelay   time.Duration
+	RetryMaxDelay    time.Duration
+	MaxAttempts      int32
+	AutoDisableAfter int32
 }
 
 func DefaultDeliveryJobConfig(workerID string) DeliveryJobConfig {
