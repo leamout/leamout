@@ -174,16 +174,16 @@ while :; do
     sleep 1
 done
 
-printf '%s\n' "Waiting for FreeSWITCH ESL..."
+printf '%s\n' "Waiting for FreeSWITCH ESL from the Compose network..."
 i=0
-until $COMPOSE exec -T freeswitch sh -c '
-    fs_cli -H 127.0.0.1 -P 8021 \
+until $COMPOSE exec -T voice-v1-carrier sh -c '
+    fs_cli -H freeswitch -P 8021 \
         -p "$FREESWITCH_ESL_PASSWORD" \
         -x status >/dev/null 2>&1
 '; do
     i=$((i + 1))
     if [ "$i" -ge 60 ]; then
-        echo "FreeSWITCH ESL did not become ready/authenticated" >&2
+        echo "FreeSWITCH ESL did not become ready/authenticated from the Compose network" >&2
         exit 1
     fi
     sleep 1
