@@ -135,6 +135,45 @@ $COMPOSE exec -T postgres \
     <tests/acceptance/voice-v1/bootstrap.sql \
     >/dev/null
 
+printf '%s\n' "Starting OpenSIPS after database bootstrap..."
+$COMPOSE up -d --build opensips
+
+printf '%s\n' "Waiting for OpenSIPS startup stability..."
+i=0
+stable=0
+while :; do
+    opensips_id=$($COMPOSE ps -q opensips)
+    if [ -n "$opensips_id" ]; then
+        running=$(docker inspect -f '{{.State.Running}}' "$opensips_id" 2>/dev/null || true)
+        restart_count=$(docker inspect -f '{{.RestartCount}}' "$opensips_id" 2>/dev/null || true)
+
+        if [ -n "$restart_count" ] && [ "$restart_count" -gt 0 ] 2>/dev/null; then
+            echo "OpenSIPS restarted during initialization" >&2
+            $COMPOSE logs --no-color --tail=200 opensips >&2 || true
+            exit 1
+        fi
+
+        if [ "$running" = "true" ] && [ "$restart_count" = "0" ]; then
+            stable=$((stable + 1))
+            if [ "$stable" -ge 5 ]; then
+                break
+            fi
+        else
+            stable=0
+        fi
+    else
+        stable=0
+    fi
+
+    i=$((i + 1))
+    if [ "$i" -ge 30 ]; then
+        echo "OpenSIPS did not become stable" >&2
+        $COMPOSE logs --no-color --tail=200 opensips >&2 || true
+        exit 1
+    fi
+    sleep 1
+done
+
 printf '%s\n' "Waiting for FreeSWITCH ESL..."
 i=0
 until $COMPOSE exec -T freeswitch sh -c '
@@ -150,6 +189,6 @@ until $COMPOSE exec -T freeswitch sh -c '
     sleep 1
 done
 
-$COMPOSE up -d --build opensips api worker
+$COMPOSE up -d --build api worker
 
 python3 tests/acceptance/voice-v1/acceptance.py
