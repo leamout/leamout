@@ -23,38 +23,70 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	if db == nil {
 		panic("recordings: database is required")
 	}
+
 	queries := sqlc.New(db)
-	return &Repository{db: db, queries: queries, outbox: outbox.NewRepository(queries)}
+	return &Repository{
+		db:      db,
+		queries: queries,
+		outbox:  outbox.NewRepository(queries),
+	}
 }
 
 func (r *Repository) WithTx(tx pgx.Tx) *Repository {
 	queries := r.queries.WithTx(tx)
-	return &Repository{db: r.db, queries: queries, outbox: outbox.NewRepository(queries)}
+	return &Repository{
+		db:      r.db,
+		queries: queries,
+		outbox:  outbox.NewRepository(queries),
+	}
 }
 
-func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Recording, error) {
-	return r.queries.GetRecording(ctx, sqlc.GetRecordingParams{OrganizationID: organizationID, ID: id})
+func (r *Repository) Get(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.Recording, error) {
+	return r.queries.GetRecording(ctx, sqlc.GetRecordingParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
 }
 
-func (r *Repository) GetIncludingDeleted(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Recording, error) {
+func (r *Repository) GetIncludingDeleted(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.Recording, error) {
 	return r.queries.GetRecordingIncludingDeleted(ctx, sqlc.GetRecordingIncludingDeletedParams{
 		OrganizationID: organizationID,
 		ID:             id,
 	})
 }
 
-func (r *Repository) GetByCallStorageKey(ctx context.Context, callID uuid.UUID, storageKey string) (sqlc.Recording, error) {
+func (r *Repository) GetByCallStorageKey(
+	ctx context.Context,
+	callID uuid.UUID,
+	storageKey string,
+) (sqlc.Recording, error) {
 	return r.queries.GetRecordingByCallStorageKey(ctx, sqlc.GetRecordingByCallStorageKeyParams{
 		CallID:     callID,
 		StorageKey: &storageKey,
 	})
 }
 
-func (r *Repository) GetCallByChannelID(ctx context.Context, channelID string) (sqlc.Call, error) {
+func (r *Repository) GetCallByChannelID(
+	ctx context.Context,
+	channelID string,
+) (sqlc.Call, error) {
 	return r.queries.GetCallBySIPCallIDGlobal(ctx, &channelID)
 }
 
-func (r *Repository) List(ctx context.Context, organizationID uuid.UUID, offset, limit int32) ([]sqlc.Recording, error) {
+func (r *Repository) List(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	offset int32,
+	limit int32,
+) ([]sqlc.Recording, error) {
 	return r.queries.ListRecordings(ctx, sqlc.ListRecordingsParams{
 		OrganizationID: organizationID,
 		PageOffset:     offset,
@@ -68,44 +100,72 @@ func (r *Repository) Start(
 	path string,
 	occurredAt time.Time,
 ) (sqlc.Recording, error) {
-	return r.mutate(ctx, EventRecordingStarted, func(repo *Repository) (sqlc.Recording, error) {
-		provider := "freeswitch-local"
-		return repo.queries.CreateRecording(ctx, sqlc.CreateRecordingParams{
-			OrganizationID:  call.OrganizationID,
-			CallID:          call.ID,
-			Status:          string(StatusRecording),
-			StorageKey:      &path,
-			StorageProvider: &provider,
-			StartedAt:       pgtype.Timestamptz{Time: occurredAt, Valid: true},
-		})
-	})
+	return r.mutate(
+		ctx,
+		EventRecordingStarted,
+		func(repo *Repository) (sqlc.Recording, error) {
+			provider := "freeswitch-local"
+			return repo.queries.CreateRecording(ctx, sqlc.CreateRecordingParams{
+				OrganizationID:  call.OrganizationID,
+				CallID:          call.ID,
+				Status:          string(StatusRecording),
+				StorageKey:      &path,
+				StorageProvider: &provider,
+				StartedAt: pgtype.Timestamptz{
+					Time:  occurredAt,
+					Valid: true,
+				},
+			})
+		},
+	)
 }
 
-func (r *Repository) Complete(ctx context.Context, recording sqlc.Recording) (sqlc.Recording, error) {
-	return r.mutate(ctx, EventRecordingCompleted, func(repo *Repository) (sqlc.Recording, error) {
-		return repo.queries.CompleteRecording(ctx, sqlc.CompleteRecordingParams{
-			OrganizationID: recording.OrganizationID,
-			ID:             recording.ID,
-		})
-	})
+func (r *Repository) Complete(
+	ctx context.Context,
+	recording sqlc.Recording,
+) (sqlc.Recording, error) {
+	return r.mutate(
+		ctx,
+		EventRecordingCompleted,
+		func(repo *Repository) (sqlc.Recording, error) {
+			return repo.queries.CompleteRecording(ctx, sqlc.CompleteRecordingParams{
+				OrganizationID: recording.OrganizationID,
+				ID:             recording.ID,
+			})
+		},
+	)
 }
 
-func (r *Repository) Fail(ctx context.Context, recording sqlc.Recording) (sqlc.Recording, error) {
-	return r.mutate(ctx, EventRecordingFailed, func(repo *Repository) (sqlc.Recording, error) {
-		return repo.queries.FailRecording(ctx, sqlc.FailRecordingParams{
-			OrganizationID: recording.OrganizationID,
-			ID:             recording.ID,
-		})
-	})
+func (r *Repository) Fail(
+	ctx context.Context,
+	recording sqlc.Recording,
+) (sqlc.Recording, error) {
+	return r.mutate(
+		ctx,
+		EventRecordingFailed,
+		func(repo *Repository) (sqlc.Recording, error) {
+			return repo.queries.FailRecording(ctx, sqlc.FailRecordingParams{
+				OrganizationID: recording.OrganizationID,
+				ID:             recording.ID,
+			})
+		},
+	)
 }
 
-func (r *Repository) Delete(ctx context.Context, recording sqlc.Recording) (sqlc.Recording, error) {
-	return r.mutate(ctx, EventRecordingDeleted, func(repo *Repository) (sqlc.Recording, error) {
-		return repo.queries.DeleteRecording(ctx, sqlc.DeleteRecordingParams{
-			OrganizationID: recording.OrganizationID,
-			ID:             recording.ID,
-		})
-	})
+func (r *Repository) Delete(
+	ctx context.Context,
+	recording sqlc.Recording,
+) (sqlc.Recording, error) {
+	return r.mutate(
+		ctx,
+		EventRecordingDeleted,
+		func(repo *Repository) (sqlc.Recording, error) {
+			return repo.queries.DeleteRecording(ctx, sqlc.DeleteRecordingParams{
+				OrganizationID: recording.OrganizationID,
+				ID:             recording.ID,
+			})
+		},
+	)
 }
 
 type recordingMutation func(*Repository) (sqlc.Recording, error)
@@ -152,5 +212,6 @@ func (r *Repository) mutate(
 	if err := tx.Commit(ctx); err != nil {
 		return sqlc.Recording{}, fmt.Errorf("commit recording transaction: %w", err)
 	}
+
 	return recording, nil
 }
