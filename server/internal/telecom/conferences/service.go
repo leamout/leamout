@@ -11,16 +11,21 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo       *Repository
+	controller Controller
 }
 
-func NewService(repo *Repository) *Service {
+func NewService(repo *Repository, controller Controller) *Service {
 	if repo == nil {
 		panic("conferences: repository is required")
 	}
+	if controller == nil {
+		panic("conferences: media controller is required")
+	}
 
 	return &Service{
-		repo: repo,
+		repo:       repo,
+		controller: controller,
 	}
 }
 
@@ -110,6 +115,34 @@ func (s *Service) End(
 	}
 
 	return sqlc.Conference{}, conferenceWriteError(err, "end conference")
+}
+
+func (s *Service) Lock(ctx context.Context, org uuid.UUID, id uuid.UUID) error {
+	conference, err := s.Get(ctx, org, id)
+	if err != nil {
+		return err
+	}
+	if conference.State != string(StateActive) {
+		return apperror.NewConflict("conference has ended")
+	}
+	if err := s.controller.Lock(ctx, conference.Name); err != nil {
+		return apperror.NewInternal("lock conference media", err)
+	}
+	return nil
+}
+
+func (s *Service) Unlock(ctx context.Context, org uuid.UUID, id uuid.UUID) error {
+	conference, err := s.Get(ctx, org, id)
+	if err != nil {
+		return err
+	}
+	if conference.State != string(StateActive) {
+		return apperror.NewConflict("conference has ended")
+	}
+	if err := s.controller.Unlock(ctx, conference.Name); err != nil {
+		return apperror.NewInternal("unlock conference media", err)
+	}
+	return nil
 }
 
 func (s *Service) AddParticipant(
