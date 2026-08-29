@@ -9,14 +9,16 @@ import (
 func TestValidateCreateRequest(t *testing.T) {
 	t.Parallel()
 
+	trunkID := uuid.New()
 	tests := []struct {
 		name string
 		req  CreateCallRequest
 		want bool
 	}{
-		{name: "valid request", req: CreateCallRequest{From: "1000", To: "1001", Endpoint: "sofia/gateway/main"}, want: true},
-		{name: "missing originator", req: CreateCallRequest{To: "1001", Endpoint: "sofia/gateway/main"}},
-		{name: "nil application rejected", req: CreateCallRequest{ApplicationID: ptr(uuid.Nil), From: "1000", To: "1001", Endpoint: "sofia/gateway/main"}},
+		{name: "valid request", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001"}, want: true},
+		{name: "missing originator", req: CreateCallRequest{TrunkID: trunkID, To: "1001"}},
+		{name: "missing trunk", req: CreateCallRequest{From: "1000", To: "1001"}},
+		{name: "nil application rejected", req: CreateCallRequest{ApplicationID: ptr(uuid.Nil), TrunkID: trunkID, From: "1000", To: "1001"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
