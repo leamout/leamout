@@ -15,6 +15,12 @@ services:
     environment:
       PATH: /usr/local/freeswitch/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
+  rtpengine:
+    # The acceptance carrier and FreeSWITCH instances are on leamout-core, so
+    # publishing the production RTP range to the GitHub runner is unnecessary
+    # and makes Docker create thousands of host UDP port mappings.
+    ports: !reset []
+
   voice-v1-carrier:
     image: leamout/voice-v1-carrier:dev
     build:
