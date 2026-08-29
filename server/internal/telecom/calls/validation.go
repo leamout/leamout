@@ -13,6 +13,7 @@ func validateOrganizationID(id uuid.UUID) error {
 	}
 	return nil
 }
+
 func require(value, field string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -20,10 +21,15 @@ func require(value, field string) (string, error) {
 	}
 	return value, nil
 }
+
 func validateCreateRequest(req *CreateCallRequest) error {
 	if req.ApplicationID != nil && *req.ApplicationID == uuid.Nil {
 		return apperror.NewBadRequest("application_id is invalid")
 	}
+	if req.TrunkID == uuid.Nil {
+		return apperror.NewBadRequest("trunk_id is required")
+	}
+
 	var err error
 	if req.From, err = require(req.From, "from"); err != nil {
 		return err
@@ -31,9 +37,9 @@ func validateCreateRequest(req *CreateCallRequest) error {
 	if req.To, err = require(req.To, "to"); err != nil {
 		return err
 	}
-	req.Endpoint, err = require(req.Endpoint, "endpoint")
-	return err
+	return nil
 }
+
 func validateRecordRequest(req *RecordRequest) error {
 	if req.Action == "" {
 		req.Action = "start"
