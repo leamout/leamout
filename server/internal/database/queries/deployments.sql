@@ -5,9 +5,9 @@ INSERT INTO deployments (
     name
 )
 SELECT
-    l.id,
-    sqlc.arg(deployment_id),
-    sqlc.narg(name)
+    l.id AS license_id,
+    sqlc.arg(deployment_id) AS deployment_id,
+    sqlc.narg(name) AS name
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
 WHERE l.id = sqlc.arg(license_id)
@@ -64,7 +64,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING d.*;
+RETURNING *;
 
 -- name: DeactivateDeployment :one
 UPDATE deployments AS d
@@ -81,4 +81,4 @@ WHERE d.license_id = l.id
   AND l.organization_id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING d.*;
+RETURNING *;

@@ -11,15 +11,15 @@ INSERT INTO usage_events (
     occurred_at
 )
 SELECT
-    o.id,
-    sqlc.narg(subscription_id)::uuid,
-    m.id,
-    sqlc.arg(quantity),
-    sqlc.arg(source_type),
-    sqlc.arg(source_id),
-    sqlc.arg(idempotency_key),
-    COALESCE(sqlc.narg(dimensions), '{}'::jsonb),
-    sqlc.arg(occurred_at)
+    o.id AS organization_id,
+    sqlc.narg(subscription_id)::uuid AS subscription_id,
+    m.id AS meter_id,
+    sqlc.arg(quantity) AS quantity,
+    sqlc.arg(source_type) AS source_type,
+    sqlc.arg(source_id) AS source_id,
+    sqlc.arg(idempotency_key) AS idempotency_key,
+    COALESCE(sqlc.narg(dimensions), '{}'::jsonb) AS dimensions,
+    sqlc.arg(occurred_at) AS occurred_at
 FROM organizations AS o
 JOIN meters AS m ON m.id = sqlc.arg(meter_id)
 WHERE o.id = sqlc.arg(organization_id)

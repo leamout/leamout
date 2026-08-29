@@ -7,11 +7,11 @@ INSERT INTO plans (
     active
 )
 SELECT
-    p.id,
-    sqlc.arg(code),
-    sqlc.arg(name),
-    sqlc.narg(description),
-    COALESCE(sqlc.narg(active), true)
+    p.id AS product_id,
+    sqlc.arg(code) AS code,
+    sqlc.arg(name) AS name,
+    sqlc.narg(description) AS description,
+    COALESCE(sqlc.narg(active), true) AS active
 FROM products AS p
 WHERE p.id = sqlc.arg(product_id)
   AND p.active = true
@@ -59,4 +59,4 @@ WHERE pl.id = sqlc.arg(id)
       COALESCE(sqlc.narg(active), pl.active) = false
       OR p.active = true
   )
-RETURNING pl.*;
+RETURNING *;

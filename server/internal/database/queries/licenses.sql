@@ -9,13 +9,13 @@ INSERT INTO licenses (
     expires_at
 )
 SELECT
-    o.id,
-    sqlc.narg(subscription_id)::uuid,
-    COALESCE(sqlc.narg(status), 'pending'),
-    COALESCE(sqlc.narg(max_deployments), 1),
-    sqlc.narg(signing_key_id),
-    COALESCE(sqlc.narg(issued_at), NOW()),
-    sqlc.narg(expires_at)
+    o.id AS organization_id,
+    sqlc.narg(subscription_id)::uuid AS subscription_id,
+    COALESCE(sqlc.narg(status), 'pending') AS status,
+    COALESCE(sqlc.narg(max_deployments), 1) AS max_deployments,
+    sqlc.narg(signing_key_id) AS signing_key_id,
+    COALESCE(sqlc.narg(issued_at), NOW()) AS issued_at,
+    sqlc.narg(expires_at) AS expires_at
 FROM organizations AS o
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
@@ -74,7 +74,7 @@ WHERE l.organization_id = sqlc.arg(organization_id)
   AND o.id = l.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.*;
+RETURNING *;
 
 -- name: UpdateLicenseExpiration :one
 UPDATE licenses AS l
@@ -87,4 +87,4 @@ WHERE l.organization_id = sqlc.arg(organization_id)
   AND o.id = l.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.*;
+RETURNING *;

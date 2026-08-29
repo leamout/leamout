@@ -14,18 +14,18 @@ INSERT INTO invoices (
     metadata
 )
 SELECT
-    o.id,
-    sqlc.narg(subscription_id)::uuid,
-    sqlc.arg(invoice_number),
-    sqlc.arg(currency),
-    sqlc.arg(subtotal),
-    COALESCE(sqlc.narg(tax), 0),
-    sqlc.arg(total),
-    COALESCE(sqlc.narg(status), 'draft'),
-    sqlc.narg(issued_at),
-    sqlc.narg(due_at),
-    sqlc.narg(paid_at),
-    COALESCE(sqlc.narg(metadata), '{}'::jsonb)
+    o.id AS organization_id,
+    sqlc.narg(subscription_id)::uuid AS subscription_id,
+    sqlc.arg(invoice_number) AS invoice_number,
+    sqlc.arg(currency) AS currency,
+    sqlc.arg(subtotal) AS subtotal,
+    COALESCE(sqlc.narg(tax), 0) AS tax,
+    sqlc.arg(total) AS total,
+    COALESCE(sqlc.narg(status), 'draft') AS status,
+    sqlc.narg(issued_at) AS issued_at,
+    sqlc.narg(due_at) AS due_at,
+    sqlc.narg(paid_at) AS paid_at,
+    COALESCE(sqlc.narg(metadata), '{}'::jsonb) AS metadata
 FROM organizations AS o
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
@@ -82,4 +82,4 @@ WHERE i.organization_id = sqlc.arg(organization_id)
   AND o.id = i.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING i.*;
+RETURNING *;

@@ -11,15 +11,15 @@ INSERT INTO payments (
     metadata
 )
 SELECT
-    o.id,
-    sqlc.narg(invoice_id)::uuid,
-    sqlc.arg(provider),
-    sqlc.narg(provider_payment_id),
-    sqlc.arg(amount),
-    sqlc.arg(currency),
-    COALESCE(sqlc.narg(status), 'pending'),
-    sqlc.narg(paid_at),
-    COALESCE(sqlc.narg(metadata), '{}'::jsonb)
+    o.id AS organization_id,
+    sqlc.narg(invoice_id)::uuid AS invoice_id,
+    sqlc.arg(provider) AS provider,
+    sqlc.narg(provider_payment_id) AS provider_payment_id,
+    sqlc.arg(amount) AS amount,
+    sqlc.arg(currency) AS currency,
+    COALESCE(sqlc.narg(status), 'pending') AS status,
+    sqlc.narg(paid_at) AS paid_at,
+    COALESCE(sqlc.narg(metadata), '{}'::jsonb) AS metadata
 FROM organizations AS o
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
@@ -91,4 +91,4 @@ WHERE p.organization_id = sqlc.arg(organization_id)
   AND o.id = p.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING p.*;
+RETURNING *;

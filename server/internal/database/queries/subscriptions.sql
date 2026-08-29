@@ -10,14 +10,14 @@ INSERT INTO subscriptions (
     provider_subscription_id
 )
 SELECT
-    o.id,
-    pl.id,
-    COALESCE(sqlc.narg(status), 'pending'),
-    COALESCE(sqlc.narg(starts_at), NOW()),
-    sqlc.narg(renews_at),
-    sqlc.narg(ends_at),
-    sqlc.narg(billing_provider),
-    sqlc.narg(provider_subscription_id)
+    o.id AS organization_id,
+    pl.id AS plan_id,
+    COALESCE(sqlc.narg(status), 'pending') AS status,
+    COALESCE(sqlc.narg(starts_at), NOW()) AS starts_at,
+    sqlc.narg(renews_at) AS renews_at,
+    sqlc.narg(ends_at) AS ends_at,
+    sqlc.narg(billing_provider) AS billing_provider,
+    sqlc.narg(provider_subscription_id) AS provider_subscription_id
 FROM organizations AS o
 JOIN plans AS pl ON pl.id = sqlc.arg(plan_id)
 JOIN products AS p ON p.id = pl.product_id
@@ -93,7 +93,7 @@ WHERE s.organization_id = sqlc.arg(organization_id)
             AND p.active = true
       )
   )
-RETURNING s.*;
+RETURNING *;
 
 -- name: SetSubscriptionProvider :one
 UPDATE subscriptions AS s
@@ -107,4 +107,4 @@ WHERE s.organization_id = sqlc.arg(organization_id)
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING s.*;
+RETURNING *;

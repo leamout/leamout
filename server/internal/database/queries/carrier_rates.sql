@@ -14,18 +14,18 @@ INSERT INTO carrier_rates (
     active
 )
 SELECT
-    pl.id,
-    m.id,
-    sqlc.narg(carrier_provider_id)::uuid,
-    sqlc.narg(direction),
-    sqlc.narg(country_code),
-    sqlc.narg(network),
-    sqlc.arg(currency),
-    sqlc.arg(unit_amount_micros),
-    COALESCE(sqlc.narg(unit_size), 1),
-    COALESCE(sqlc.narg(effective_from), NOW()),
-    sqlc.narg(effective_until),
-    COALESCE(sqlc.narg(active), true)
+    pl.id AS plan_id,
+    m.id AS meter_id,
+    sqlc.narg(carrier_provider_id)::uuid AS carrier_provider_id,
+    sqlc.narg(direction) AS direction,
+    sqlc.narg(country_code) AS country_code,
+    sqlc.narg(network) AS network,
+    sqlc.arg(currency) AS currency,
+    sqlc.arg(unit_amount_micros) AS unit_amount_micros,
+    COALESCE(sqlc.narg(unit_size), 1) AS unit_size,
+    COALESCE(sqlc.narg(effective_from), NOW()) AS effective_from,
+    sqlc.narg(effective_until) AS effective_until,
+    COALESCE(sqlc.narg(active), true) AS active
 FROM plans AS pl
 JOIN products AS p ON p.id = pl.product_id
 JOIN meters AS m ON m.id = sqlc.arg(meter_id)
@@ -94,11 +94,11 @@ UPDATE carrier_rates AS cr
 SET
     active = sqlc.arg(active),
     updated_at = NOW()
-FROM plans AS pl
-JOIN products AS p ON p.id = pl.product_id
-JOIN meters AS m ON m.id = cr.meter_id
+FROM plans AS pl, products AS p, meters AS m
 WHERE cr.id = sqlc.arg(id)
   AND pl.id = cr.plan_id
+  AND p.id = pl.product_id
+  AND m.id = cr.meter_id
   AND (
       sqlc.arg(active) = false
       OR (
@@ -116,4 +116,4 @@ WHERE cr.id = sqlc.arg(id)
           )
       )
   )
-RETURNING cr.*;
+RETURNING *;

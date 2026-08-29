@@ -13,17 +13,17 @@ INSERT INTO invoice_items (
     metadata
 )
 SELECT
-    i.id,
-    sqlc.narg(meter_id)::uuid,
-    sqlc.narg(carrier_rate_id)::uuid,
-    sqlc.arg(type),
-    sqlc.arg(description),
-    COALESCE(sqlc.narg(quantity), 1),
-    sqlc.narg(unit_amount_micros),
-    sqlc.arg(amount),
-    sqlc.narg(period_start),
-    sqlc.narg(period_end),
-    COALESCE(sqlc.narg(metadata), '{}'::jsonb)
+    i.id AS invoice_id,
+    sqlc.narg(meter_id)::uuid AS meter_id,
+    sqlc.narg(carrier_rate_id)::uuid AS carrier_rate_id,
+    sqlc.arg(type) AS type,
+    sqlc.arg(description) AS description,
+    COALESCE(sqlc.narg(quantity), 1) AS quantity,
+    sqlc.narg(unit_amount_micros) AS unit_amount_micros,
+    sqlc.arg(amount) AS amount,
+    sqlc.narg(period_start) AS period_start,
+    sqlc.narg(period_end) AS period_end,
+    COALESCE(sqlc.narg(metadata), '{}'::jsonb) AS metadata
 FROM invoices AS i
 JOIN organizations AS o ON o.id = i.organization_id
 WHERE i.id = sqlc.arg(invoice_id)

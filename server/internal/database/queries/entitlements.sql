@@ -9,13 +9,13 @@ INSERT INTO entitlements (
     expires_at
 )
 SELECT
-    pl.id,
-    sqlc.arg(entitlement_key),
-    sqlc.arg(kind),
-    sqlc.narg(enabled),
-    sqlc.narg(limit_value),
-    sqlc.narg(starts_at),
-    sqlc.narg(expires_at)
+    pl.id AS plan_id,
+    sqlc.arg(entitlement_key) AS entitlement_key,
+    sqlc.arg(kind) AS kind,
+    sqlc.narg(enabled) AS enabled,
+    sqlc.narg(limit_value) AS limit_value,
+    sqlc.narg(starts_at) AS starts_at,
+    sqlc.narg(expires_at) AS expires_at
 FROM plans AS pl
 JOIN products AS p ON p.id = pl.product_id
 WHERE pl.id = sqlc.arg(plan_id)
@@ -34,13 +34,13 @@ INSERT INTO entitlements (
     expires_at
 )
 SELECT
-    o.id,
-    sqlc.arg(entitlement_key),
-    sqlc.arg(kind),
-    sqlc.narg(enabled),
-    sqlc.narg(limit_value),
-    sqlc.narg(starts_at),
-    sqlc.narg(expires_at)
+    o.id AS organization_id,
+    sqlc.arg(entitlement_key) AS entitlement_key,
+    sqlc.arg(kind) AS kind,
+    sqlc.narg(enabled) AS enabled,
+    sqlc.narg(limit_value) AS limit_value,
+    sqlc.narg(starts_at) AS starts_at,
+    sqlc.narg(expires_at) AS expires_at
 FROM organizations AS o
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
@@ -58,13 +58,13 @@ INSERT INTO entitlements (
     expires_at
 )
 SELECT
-    l.id,
-    sqlc.arg(entitlement_key),
-    sqlc.arg(kind),
-    sqlc.narg(enabled),
-    sqlc.narg(limit_value),
-    sqlc.narg(starts_at),
-    sqlc.narg(expires_at)
+    l.id AS license_id,
+    sqlc.arg(entitlement_key) AS entitlement_key,
+    sqlc.arg(kind) AS kind,
+    sqlc.narg(enabled) AS enabled,
+    sqlc.narg(limit_value) AS limit_value,
+    sqlc.narg(starts_at) AS starts_at,
+    sqlc.narg(expires_at) AS expires_at
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
 WHERE l.id = sqlc.arg(license_id)
