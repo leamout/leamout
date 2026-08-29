@@ -29,6 +29,13 @@ func TestFreeSWITCHStatusUp(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "incidental up substring is not healthy",
+			reply: Reply{
+				Body: "BACKUP",
+			},
+			want: false,
+		},
 	}
 
 	for _, tt := range tests {
