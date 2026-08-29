@@ -1,70 +1,10 @@
-<profile name="internal">
-
-  <gateways>
-  </gateways>
-
-  <domains>
-    <domain name="all" alias="true" parse="false"/>
-  </domains>
-
-  <settings>
-
-    <!-- Logging / diagnostics -->
-    <param name="debug" value="0"/>
-    <param name="sip-trace" value="no"/>
-    <param name="sip-capture" value="no"/>
-
-    <!-- Leamout internal dialplan -->
-    <param name="context" value="leamout"/>
-    <param name="dialplan" value="XML"/>
-
-    <!-- SIP -->
-    <param name="sip-port" value="5060"/>
-    <param name="sip-ip" value="$${local_ip_v4}"/>
-
-    <!-- RTP -->
-    <param name="rtp-ip" value="$${local_ip_v4}"/>
-
-    <!-- Codecs -->
-    <param
-      name="inbound-codec-prefs"
-      value="OPUS,G722,PCMU,PCMA"/>
-
-    <param
-      name="outbound-codec-prefs"
-      value="OPUS,G722,PCMU,PCMA"/>
-
-    <param
-      name="inbound-codec-negotiation"
-      value="generous"/>
-
-    <param
-      name="inbound-late-negotiation"
-      value="true"/>
-
-    <!-- Authentication -->
-    <param name="auth-calls" value="false"/>
-    <param name="disable-register" value="true"/>
-    <param name="auth-subscriptions" value="false"/>
-    <param name="manage-presence" value="false"/>
-
-    <!-- Only accept traffic from the local/container network -->
-    <param
-      name="apply-inbound-acl"
-      value="localnet.auto"/>
-
-    <param
-      name="local-network-acl"
-      value="localnet.auto"/>
-
-    <!-- RTP / DTMF -->
-    <param name="rtp-timer-name" value="soft"/>
-    <param name="rfc2833-pt" value="101"/>
-    <param name="dtmf-duration" value="2000"/>
-
-    <!-- TLS is handled separately -->
-    <param name="tls" value="false"/>
-
-  </settings>
-
-</profile>
+<include>
+  <context name="leamout">
+    <extension name="echo-test">
+      <condition field="destination_number" expression="^9196$">
+        <action application="answer"/>
+        <action application="echo"/>
+      </condition>
+    </extension>
+  </context>
+</include>

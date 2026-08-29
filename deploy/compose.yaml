@@ -154,7 +154,8 @@ services:
       - "5060/tcp"
       - "8021/tcp"
     networks:
-      - leamout-core
+      leamout-core:
+        ipv4_address: 172.30.0.20
 
   rtpengine:
     image: leamout/rtpengine:dev

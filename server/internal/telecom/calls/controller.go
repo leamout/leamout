@@ -10,6 +10,12 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 )
 
+const (
+	openSIPSEgressHost = "opensips"
+	openSIPSEgressPort = 5060
+	routeURIHeaderVar  = "sip_h_X-Leamout-Route-URI"
+)
+
 // FreeSWITCHController adapts the FreeSWITCH client to the calls.Controller interface.
 // It translates resolved domain-level call operations into FreeSWITCH-specific commands.
 type FreeSWITCHController struct {
@@ -27,18 +33,27 @@ func NewFreeSWITCHController(client *freeswitch.Client) *FreeSWITCHController {
 	return &FreeSWITCHController{client: client}
 }
 
-// Originate initiates an outbound call using a route already resolved by Leamout.
+// Originate initiates an outbound call through the trusted FreeSWITCH -> OpenSIPS
+// handoff. The carrier destination is carried as internal SIP metadata and is
+// never exposed as a public FreeSWITCH dial string.
 func (c *FreeSWITCHController) Originate(ctx context.Context, req OriginateRequest) (string, error) {
-	endpoint, err := freeSWITCHEndpoint(req)
+	endpoint, routeURI, err := freeSWITCHEgress(req)
 	if err != nil {
 		return "", err
 	}
+
+	variables := make(map[string]string, len(req.Variables)+1)
+	for key, value := range req.Variables {
+		variables[key] = value
+	}
+	// Always overwrite the reserved routing variable after copying user variables.
+	variables[routeURIHeaderVar] = routeURI
 
 	call, err := c.client.Originate(ctx, freeswitch.OriginateRequest{
 		Endpoint:    endpoint,
 		Destination: req.Destination,
 		CallerID:    req.CallerID,
-		Variables:   req.Variables,
+		Variables:   variables,
 	})
 	if err != nil {
 		return "", fmt.Errorf("originate call: %w", err)
@@ -50,29 +65,33 @@ func (c *FreeSWITCHController) Originate(ctx context.Context, req OriginateReque
 	return call.UUID, nil
 }
 
-func freeSWITCHEndpoint(req OriginateRequest) (string, error) {
+func freeSWITCHEgress(req OriginateRequest) (string, string, error) {
 	host := strings.TrimSpace(req.Host)
 	if host == "" {
-		return "", fmt.Errorf("resolved route host is required")
+		return "", "", fmt.Errorf("resolved route host is required")
 	}
 	if req.Port < 1 || req.Port > 65535 {
-		return "", fmt.Errorf("resolved route port is invalid: %d", req.Port)
+		return "", "", fmt.Errorf("resolved route port is invalid: %d", req.Port)
 	}
 
 	transport := strings.ToLower(strings.TrimSpace(req.Transport))
 	switch transport {
 	case "udp", "tcp", "tls":
 	default:
-		return "", fmt.Errorf("resolved route transport is invalid: %q", req.Transport)
+		return "", "", fmt.Errorf("resolved route transport is invalid: %q", req.Transport)
 	}
 
 	destination := strings.TrimSpace(req.Destination)
 	if destination == "" {
-		return "", fmt.Errorf("resolved route destination is required")
+		return "", "", fmt.Errorf("resolved route destination is required")
 	}
 
-	target := net.JoinHostPort(host, strconv.Itoa(int(req.Port)))
-	return fmt.Sprintf("sofia/external/%s@%s;transport=%s", destination, target, transport), nil
+	carrierTarget := net.JoinHostPort(host, strconv.Itoa(int(req.Port)))
+	routeURI := fmt.Sprintf("sip:%s;transport=%s", carrierTarget, transport)
+	openSIPSTarget := net.JoinHostPort(openSIPSEgressHost, strconv.Itoa(openSIPSEgressPort))
+	endpoint := fmt.Sprintf("sofia/internal/%s@%s;transport=udp", destination, openSIPSTarget)
+
+	return endpoint, routeURI, nil
 }
 
 func (c *FreeSWITCHController) Answer(ctx context.Context, callID string) error {
