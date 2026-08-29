@@ -60,13 +60,13 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 	err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
 		Name: "CHANNEL_HANGUP_COMPLETE",
 		Headers: map[string]string{
-			"Unique-ID":                                      "channel-2",
-			"variable_sip_h_X-Leamout-Organization-ID":     organizationID.String(),
+			"Unique-ID": "channel-2",
+			"variable_sip_h_X-Leamout-Organization-ID":      organizationID.String(),
 			"variable_sip_h_X-Leamout-Voice-Application-ID": applicationID.String(),
-			"Caller-Caller-ID-Number":                      "+233201234567",
-			"Caller-Destination-Number":                    "+233301234567",
-			"Hangup-Cause":                                 "NORMAL_CLEARING",
-			"variable_answer_epoch":                        "1787976000",
+			"Caller-Caller-ID-Number":                       "+233201234567",
+			"Caller-Destination-Number":                     "+233301234567",
+			"Hangup-Cause":                                  "NORMAL_CLEARING",
+			"variable_answer_epoch":                         "1787976000",
 		},
 	})
 	if err != nil {
