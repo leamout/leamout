@@ -4,12 +4,14 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 type Repository struct{ queries *sqlc.Queries }
 
 func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }
+func (r *Repository) WithTx(tx pgx.Tx) *Repository    { return NewRepository(r.queries.WithTx(tx)) }
 
 func (r *Repository) Create(ctx context.Context, arg sqlc.CreateTrunkParams) (sqlc.Trunk, error) {
 	return r.queries.CreateTrunk(ctx, arg)
@@ -23,7 +25,7 @@ func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (sql
 func (r *Repository) Update(ctx context.Context, arg sqlc.UpdateTrunkParams) (sqlc.Trunk, error) {
 	return r.queries.UpdateTrunk(ctx, arg)
 }
-func (r *Repository) Disable(ctx context.Context, organizationID, id uuid.UUID) error {
+func (r *Repository) Disable(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Trunk, error) {
 	return r.queries.DisableTrunk(ctx, sqlc.DisableTrunkParams{ID: id, OrganizationID: organizationID})
 }
 func (r *Repository) CreateEndpoint(ctx context.Context, arg sqlc.CreateTrunkEndpointParams) (sqlc.TrunkEndpoint, error) {
@@ -38,6 +40,6 @@ func (r *Repository) GetEndpoint(ctx context.Context, organizationID, trunkID, i
 func (r *Repository) UpdateEndpoint(ctx context.Context, arg sqlc.UpdateTrunkEndpointParams) (sqlc.TrunkEndpoint, error) {
 	return r.queries.UpdateTrunkEndpoint(ctx, arg)
 }
-func (r *Repository) DeleteEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) error {
+func (r *Repository) DeleteEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
 	return r.queries.DeleteTrunkEndpoint(ctx, sqlc.DeleteTrunkEndpointParams{ID: id, TrunkID: trunkID, OrganizationID: organizationID})
 }
