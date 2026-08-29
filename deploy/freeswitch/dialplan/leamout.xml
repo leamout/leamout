@@ -6,5 +6,14 @@
         <action application="echo"/>
       </condition>
     </extension>
+
+    <!-- Carrier ingress has already been authenticated and resolved by OpenSIPS.
+         Keep the channel alive without answering it so the call consumer/control
+         plane can decide how the bound voice application should handle it. -->
+    <extension name="inbound-voice-application">
+      <condition field="${sip_h_X-Leamout-Voice-Application-ID}" expression="^.+$">
+        <action application="park"/>
+      </condition>
+    </extension>
   </context>
 </include>
