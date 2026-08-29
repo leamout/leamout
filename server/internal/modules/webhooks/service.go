@@ -3,8 +3,6 @@ package webhooks
 import (
 	"context"
 	"errors"
-	"net/url"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -106,75 +104,6 @@ func (s *Service) Retry(c context.Context, org, endpoint, id uuid.UUID) (sqlc.We
 	}
 	v, e := s.repo.Retry(c, org, id)
 	return v, readErr(e, "webhook delivery is not retryable")
-}
-func validOrg(v uuid.UUID) error {
-	if v == uuid.Nil {
-		return apperror.NewBadRequest("organization_id is required")
-	}
-	return nil
-}
-func validIDs(org, id uuid.UUID) error {
-	if e := validOrg(org); e != nil {
-		return e
-	}
-	if id == uuid.Nil {
-		return apperror.NewBadRequest("webhook id is required")
-	}
-	return nil
-}
-func normalizeURL(v string) (string, error) {
-	v = strings.TrimSpace(v)
-	u, e := url.ParseRequestURI(v)
-	if e != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-		return "", apperror.NewBadRequest("url must be an https URL")
-	}
-	return v, nil
-}
-func normalizeEvents(v []string) ([]string, error) {
-	if len(v) == 0 {
-		return nil, apperror.NewBadRequest("subscribed_events is required")
-	}
-	out := make([]string, 0, len(v))
-	seen := map[string]struct{}{}
-	for _, e := range v {
-		e = strings.TrimSpace(e)
-		if e == "" || strings.ContainsAny(e, " \t\r\n") {
-			return nil, apperror.NewBadRequest("subscribed_events must contain non-empty event names")
-		}
-		if _, ok := seen[e]; !ok {
-			seen[e] = struct{}{}
-			out = append(out, e)
-		}
-	}
-	return out, nil
-}
-func normalizeCreate(r *CreateRequest) error {
-	var e error
-	r.URL, e = normalizeURL(r.URL)
-	if e != nil {
-		return e
-	}
-	r.SubscribedEvents, e = normalizeEvents(r.SubscribedEvents)
-	return e
-}
-func normalizeUpdate(r *UpdateRequest) error {
-	var e error
-	if r.URL != nil {
-		v := *r.URL
-		v, e = normalizeURL(v)
-		if e != nil {
-			return e
-		}
-		r.URL = &v
-	}
-	if r.SubscribedEvents != nil {
-		v, e := normalizeEvents(*r.SubscribedEvents)
-		if e != nil {
-			return e
-		}
-		r.SubscribedEvents = &v
-	}
-	return nil
 }
 func readErr(e error, msg string) error {
 	if e == nil {
