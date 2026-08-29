@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS usage_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+    subscription_id UUID,
     meter_id UUID NOT NULL REFERENCES meters(id),
     quantity BIGINT NOT NULL,
     source_type TEXT NOT NULL,
@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS usage_events (
     occurred_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT fk_usage_events_subscription_organization
+        FOREIGN KEY (subscription_id, organization_id)
+        REFERENCES subscriptions (id, organization_id)
+        ON DELETE SET NULL (subscription_id),
     CONSTRAINT chk_usage_events_quantity CHECK (quantity > 0),
     CONSTRAINT chk_usage_events_source_type CHECK (
         length(trim(source_type)) > 0 AND source_type !~ '[[:space:]]'
