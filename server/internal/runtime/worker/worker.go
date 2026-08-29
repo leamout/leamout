@@ -42,6 +42,9 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 	streamLimits := natsintegration.DefaultStreamLimits()
 	streamLimits.Replicas = cfg.NATSStreamReplicas
+	if streamLimits.Replicas <= 0 {
+		streamLimits.Replicas = 1
+	}
 	if err := natsClient.Provision(ctx, streamLimits); err != nil {
 		_ = natsClient.Close()
 		db.Close()
