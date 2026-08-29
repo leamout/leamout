@@ -12,11 +12,6 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 	}
 
 	endpoint := req.Endpoint
-	variables := req.Variables
-	if req.CallerID != "" {
-		variables = append(append(map[string]string{}, variables...), "")
-	}
-
 	if req.CallerID != "" {
 		callerIDVar := "origination_caller_id_number=" + commandWord(req.CallerID)
 		if prefix := formatVariables(req.Variables); prefix != "" {
