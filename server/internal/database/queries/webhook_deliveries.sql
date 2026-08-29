@@ -14,6 +14,7 @@ FROM webhook_events
 JOIN webhook_endpoints ON webhook_endpoints.id = sqlc.arg(endpoint_id)
 JOIN organizations ON organizations.id = webhook_events.organization_id
 WHERE webhook_events.id = sqlc.arg(event_id)
+  AND webhook_endpoints.organization_id = webhook_events.organization_id
   AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND organizations.status = 'active'
@@ -31,7 +32,8 @@ SELECT
 FROM webhook_endpoints
 JOIN webhook_events ON webhook_events.id = sqlc.arg(event_id)
 JOIN organizations ON organizations.id = webhook_events.organization_id
-WHERE webhook_endpoints.enabled = true
+WHERE webhook_endpoints.organization_id = webhook_events.organization_id
+  AND webhook_endpoints.enabled = true
   AND webhook_endpoints.disabled_at IS NULL
   AND webhook_events.event_type = ANY(webhook_endpoints.subscribed_events)
   AND organizations.status = 'active'

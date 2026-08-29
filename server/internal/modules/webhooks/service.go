@@ -3,16 +3,28 @@ package webhooks
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type Service struct{ repo *Repository }
+type Service struct {
+	repo *Repository
+	db   *pgxpool.Pool
+}
 
-func NewService(r *Repository) *Service { return &Service{r} }
+func NewService(r *Repository, db ...*pgxpool.Pool) *Service {
+	service := &Service{repo: r}
+	if len(db) > 0 {
+		service.db = db[0]
+	}
+	return service
+}
 func (s *Service) Create(c context.Context, org uuid.UUID, req CreateRequest) (sqlc.WebhookEndpoint, []byte, error) {
 	if err := validOrg(org); err != nil {
 		return sqlc.WebhookEndpoint{}, nil, err
@@ -105,6 +117,44 @@ func (s *Service) Retry(c context.Context, org, endpoint, id uuid.UUID) (sqlc.We
 	v, e := s.repo.Retry(c, org, id)
 	return v, readErr(e, "webhook delivery is not retryable")
 }
+
+func (s *Service) Ingest(c context.Context, event InboundEvent) error {
+	if err := validateInboundEvent(event); err != nil {
+		return err
+	}
+	if s.db == nil {
+		return fmt.Errorf("webhook database is required for event ingestion")
+	}
+
+	tx, err := s.db.Begin(c)
+	if err != nil {
+		return fmt.Errorf("begin webhook event transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(c) }()
+
+	repo := s.repo.WithTx(tx)
+	if _, err := repo.CreateEvent(c, event); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("create webhook event: %w", err)
+		}
+		existing, getErr := repo.GetEvent(c, event.OrganizationID, event.ID)
+		if getErr != nil {
+			return fmt.Errorf("get existing webhook event: %w", getErr)
+		}
+		if existing.EventType != event.EventType || existing.ObjectType != event.ObjectType {
+			return fmt.Errorf("webhook event %s conflicts with existing event metadata", event.ID)
+		}
+	}
+
+	if _, err := repo.CreateDeliveriesForEvent(c, event.ID, time.Now().UTC()); err != nil {
+		return fmt.Errorf("create webhook deliveries: %w", err)
+	}
+	if err := tx.Commit(c); err != nil {
+		return fmt.Errorf("commit webhook event transaction: %w", err)
+	}
+	return nil
+}
+
 func readErr(e error, msg string) error {
 	if e == nil {
 		return nil

@@ -1,6 +1,9 @@
 package webhooks
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -21,6 +24,28 @@ func validIDs(org, id uuid.UUID) error {
 	}
 	if id == uuid.Nil {
 		return apperror.NewBadRequest("webhook id is required")
+	}
+	return nil
+}
+
+func validateInboundEvent(event InboundEvent) error {
+	if event.ID == uuid.Nil {
+		return fmt.Errorf("webhook event id is required")
+	}
+	if event.OrganizationID == uuid.Nil {
+		return fmt.Errorf("webhook event organization id is required")
+	}
+	if strings.TrimSpace(event.EventType) == "" {
+		return fmt.Errorf("webhook event type is required")
+	}
+	if strings.TrimSpace(event.ObjectType) == "" {
+		return fmt.Errorf("webhook event object type is required")
+	}
+	if event.OccurredAt.IsZero() {
+		return fmt.Errorf("webhook event occurred_at is required")
+	}
+	if !json.Valid(event.Payload) || len(bytes.TrimSpace(event.Payload)) == 0 || bytes.TrimSpace(event.Payload)[0] != '{' {
+		return fmt.Errorf("webhook event payload must be a JSON object")
 	}
 	return nil
 }
