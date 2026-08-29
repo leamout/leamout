@@ -105,8 +105,10 @@ const (
 	EventCallInitiated CallEventType = "call.initiated"
 	EventCallRinging   CallEventType = "call.ringing"
 	EventCallAnswered  CallEventType = "call.answered"
+	EventCallActive    CallEventType = "call.active"
 	EventCallCompleted CallEventType = "call.completed"
 	EventCallFailed    CallEventType = "call.failed"
+	EventCallCancelled CallEventType = "call.cancelled"
 	EventCallRecording CallEventType = "call.recording.available"
 )
 
@@ -123,8 +125,10 @@ const (
 	StatusInitiated CallStatus = "initiated"
 	StatusRinging   CallStatus = "ringing"
 	StatusAnswered  CallStatus = "answered"
+	StatusActive    CallStatus = "active"
 	StatusCompleted CallStatus = "completed"
 	StatusFailed    CallStatus = "failed"
+	StatusCancelled CallStatus = "cancelled"
 	StatusBusy      CallStatus = "busy"
 	StatusNoAnswer  CallStatus = "no-answer"
 )
