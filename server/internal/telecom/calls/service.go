@@ -163,7 +163,7 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 	} else if isConnected(call.State) {
 		updated, err = s.repo.MarkCompleted(ctx, organizationID, call.ID, nil)
 	} else {
-		return sqlc.Call{}, invalidControlState("hang up", call.State)
+		return sqlc.Call{}, invalidControlState(controlHangup, call.State)
 	}
 	if err == nil {
 		return updated, nil
@@ -293,7 +293,7 @@ func readCall(call sqlc.Call, err error) (sqlc.Call, error) {
 
 func writeError(err error, message string) error {
 	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlc.Call{}, apperror.NewNotFound("call not found")
+		return apperror.NewNotFound("call not found")
 	}
 	if err != nil {
 		return apperror.NewInternal(message, err)
