@@ -120,6 +120,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	events := []string{
 		"CHANNEL_CREATE",
 		"CHANNEL_ANSWER",
+		"CHANNEL_HOLD",
+		"CHANNEL_UNHOLD",
 		"CHANNEL_HANGUP_COMPLETE",
 	}
 

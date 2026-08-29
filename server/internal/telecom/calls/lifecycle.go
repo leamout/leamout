@@ -86,6 +86,40 @@ func (s *Service) FinishInbound(ctx context.Context, event InboundCallEvent) err
 	return nil
 }
 
+func (s *Service) MarkMediaHeld(ctx context.Context, channelID string) error {
+	return s.reconcileMediaState(ctx, channelID, MediaStateHeld)
+}
+
+func (s *Service) MarkMediaResumed(ctx context.Context, channelID string) error {
+	return s.reconcileMediaState(ctx, channelID, MediaStateActive)
+}
+
+func (s *Service) reconcileMediaState(ctx context.Context, channelID string, target CallMediaState) error {
+	call, err := s.repo.GetBySIPCallIDGlobal(ctx, channelID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("get call for media state reconciliation: %w", err)
+	}
+	if !isConnected(call.State) || CallMediaState(call.MediaState) == target {
+		return nil
+	}
+
+	switch target {
+	case MediaStateHeld:
+		_, err = s.repo.MarkHeld(ctx, call.OrganizationID, call.ID)
+	case MediaStateActive:
+		_, err = s.repo.MarkResumed(ctx, call.OrganizationID, call.ID)
+	default:
+		return fmt.Errorf("unsupported media state: %s", target)
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return fmt.Errorf("reconcile call media state: %w", err)
+	}
+	return nil
+}
+
 func cancelledHangupCause(cause string) bool {
 	switch strings.ToUpper(strings.TrimSpace(cause)) {
 	case "NORMAL_CLEARING", "ORIGINATOR_CANCEL":

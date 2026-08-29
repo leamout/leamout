@@ -42,6 +42,7 @@ type Call struct {
 	ApplicationID  *uuid.UUID         `db:"application_id" json:"application_id"`
 	Direction      string             `db:"direction" json:"direction"`
 	State          string             `db:"state" json:"state"`
+	MediaState     string             `db:"media_state" json:"media_state"`
 	FromUri        string             `db:"from_uri" json:"from_uri"`
 	ToUri          string             `db:"to_uri" json:"to_uri"`
 	SipCallID      *string            `db:"sip_call_id" json:"sip_call_id"`

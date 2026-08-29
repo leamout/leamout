@@ -35,7 +35,7 @@ func (r *Repository) Create(
 	req CreateCallRequest,
 	sipCallID string,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallInitiated, StatusInitiated, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallInitiated, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.CreateCall(ctx, sqlc.CreateCallParams{
 			OrganizationID: organizationID,
 			ApplicationID:  req.ApplicationID,
@@ -51,7 +51,7 @@ func (r *Repository) Create(
 func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) (sqlc.Call, error) {
 	applicationID := event.ApplicationID
 	channelID := event.ChannelID
-	return r.mutateWithEvent(ctx, EventCallRinging, StatusRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.CreateCall(ctx, sqlc.CreateCallParams{
 			OrganizationID: event.OrganizationID,
 			ApplicationID:  &applicationID,
@@ -75,11 +75,19 @@ func (r *Repository) Get(
 	})
 }
 
-func (r *Repository) GetBySIPCallID(ctx context.Context, organizationID uuid.UUID, sipCallID string) (sqlc.Call, error) {
+func (r *Repository) GetBySIPCallID(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	sipCallID string,
+) (sqlc.Call, error) {
 	return r.queries.GetCallBySIPCallID(ctx, sqlc.GetCallBySIPCallIDParams{
 		OrganizationID: organizationID,
 		SipCallID:      &sipCallID,
 	})
+}
+
+func (r *Repository) GetBySIPCallIDGlobal(ctx context.Context, sipCallID string) (sqlc.Call, error) {
+	return r.queries.GetCallBySIPCallIDGlobal(ctx, &sipCallID)
 }
 
 func (r *Repository) List(
@@ -102,7 +110,7 @@ func (r *Repository) MarkRinging(
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallRinging, StatusRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallRinging(ctx, sqlc.MarkCallRingingParams{
 			OrganizationID: organizationID,
 			ID:             id,
@@ -115,7 +123,7 @@ func (r *Repository) MarkAnswered(
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallAnswered, StatusAnswered, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallAnswered, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallAnswered(ctx, sqlc.MarkCallAnsweredParams{
 			OrganizationID: organizationID,
 			ID:             id,
@@ -128,8 +136,34 @@ func (r *Repository) MarkActive(
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallActive, StatusActive, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallActive, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallActive(ctx, sqlc.MarkCallActiveParams{
+			OrganizationID: organizationID,
+			ID:             id,
+		})
+	})
+}
+
+func (r *Repository) MarkHeld(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallHeld, func(q *sqlc.Queries) (sqlc.Call, error) {
+		return q.MarkCallHeld(ctx, sqlc.MarkCallHeldParams{
+			OrganizationID: organizationID,
+			ID:             id,
+		})
+	})
+}
+
+func (r *Repository) MarkResumed(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallResumed, func(q *sqlc.Queries) (sqlc.Call, error) {
+		return q.MarkCallResumed(ctx, sqlc.MarkCallResumedParams{
 			OrganizationID: organizationID,
 			ID:             id,
 		})
@@ -142,7 +176,7 @@ func (r *Repository) MarkCompleted(
 	id uuid.UUID,
 	hangupReason *string,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallCompleted, StatusCompleted, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallCompleted, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallCompleted(ctx, sqlc.MarkCallCompletedParams{
 			OrganizationID: organizationID,
 			ID:             id,
@@ -157,7 +191,7 @@ func (r *Repository) MarkFailed(
 	id uuid.UUID,
 	hangupReason *string,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallFailed, StatusFailed, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallFailed, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallFailed(ctx, sqlc.MarkCallFailedParams{
 			OrganizationID: organizationID,
 			ID:             id,
@@ -172,7 +206,7 @@ func (r *Repository) MarkCancelled(
 	id uuid.UUID,
 	hangupReason *string,
 ) (sqlc.Call, error) {
-	return r.mutateWithEvent(ctx, EventCallCancelled, StatusCancelled, func(q *sqlc.Queries) (sqlc.Call, error) {
+	return r.mutateWithEvent(ctx, EventCallCancelled, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallCancelled(ctx, sqlc.MarkCallCancelledParams{
 			OrganizationID: organizationID,
 			ID:             id,
@@ -186,7 +220,6 @@ type callMutation func(*sqlc.Queries) (sqlc.Call, error)
 func (r *Repository) mutateWithEvent(
 	ctx context.Context,
 	eventType CallEventType,
-	status CallStatus,
 	mutation callMutation,
 ) (sqlc.Call, error) {
 	tx, err := r.db.Begin(ctx)
@@ -202,7 +235,7 @@ func (r *Repository) mutateWithEvent(
 	}
 
 	occurredAt := time.Now().UTC()
-	event := callDomainEvent(call, eventType, status, occurredAt)
+	event := callDomainEvent(call, eventType, occurredAt)
 	if _, err := r.outbox.WithTx(tx).Insert(ctx, outbox.Event{
 		Subject:       string(eventType),
 		AggregateType: "call",
@@ -223,7 +256,7 @@ func (r *Repository) mutateWithEvent(
 	return call, nil
 }
 
-func callDomainEvent(call sqlc.Call, eventType CallEventType, status CallStatus, occurredAt time.Time) CallEvent {
+func callDomainEvent(call sqlc.Call, eventType CallEventType, occurredAt time.Time) CallEvent {
 	applicationID := ""
 	if call.ApplicationID != nil {
 		applicationID = call.ApplicationID.String()
@@ -246,7 +279,8 @@ func callDomainEvent(call sqlc.Call, eventType CallEventType, status CallStatus,
 		From:           call.FromUri,
 		To:             call.ToUri,
 		Direction:      CallDirection(call.Direction),
-		Status:         status,
+		Status:         statusForState(call.State),
+		MediaState:     CallMediaState(call.MediaState),
 		HangupReason:   hangupReason,
 		OccurredAt:     occurredAt,
 	}
