@@ -46,17 +46,21 @@ func (r *Repository) Create(
 	org uuid.UUID,
 	req CreateRequest,
 ) (sqlc.Conference, error) {
-	return r.mutateConference(ctx, EventConferenceCreated, func(repo *Repository) (sqlc.Conference, error) {
-		return repo.queries.CreateConference(ctx, sqlc.CreateConferenceParams{
-			OrganizationID: org,
-			ApplicationID:  req.ApplicationID,
-			Name:           req.Name,
-			StartedAt: pgtype.Timestamptz{
-				Time:  time.Now().UTC(),
-				Valid: true,
-			},
-		})
-	})
+	return r.mutateConference(
+		ctx,
+		EventConferenceCreated,
+		func(repo *Repository) (sqlc.Conference, error) {
+			return repo.queries.CreateConference(ctx, sqlc.CreateConferenceParams{
+				OrganizationID: org,
+				ApplicationID:  req.ApplicationID,
+				Name:           req.Name,
+				StartedAt: pgtype.Timestamptz{
+					Time:  time.Now().UTC(),
+					Valid: true,
+				},
+			})
+		},
+	)
 }
 
 func (r *Repository) Get(
@@ -103,20 +107,34 @@ func (r *Repository) End(
 		return sqlc.Conference{}, err
 	}
 
-	participants, err := repo.queries.EndConferenceParticipants(ctx, sqlc.EndConferenceParticipantsParams{
-		OrganizationID: org,
-		ConferenceID:   id,
-	})
+	participants, err := repo.queries.EndConferenceParticipants(
+		ctx,
+		sqlc.EndConferenceParticipantsParams{
+			OrganizationID: org,
+			ConferenceID:   id,
+		},
+	)
 	if err != nil {
 		return sqlc.Conference{}, err
 	}
 
 	occurredAt := time.Now().UTC()
-	if err := repo.insertConferenceEvent(ctx, EventConferenceEnded, conference, occurredAt); err != nil {
+	if err := repo.insertConferenceEvent(
+		ctx,
+		EventConferenceEnded,
+		conference,
+		occurredAt,
+	); err != nil {
 		return sqlc.Conference{}, err
 	}
+
 	for _, participant := range participants {
-		if err := repo.insertParticipantEvent(ctx, EventParticipantLeft, participant, occurredAt); err != nil {
+		if err := repo.insertParticipantEvent(
+			ctx,
+			EventParticipantLeft,
+			participant,
+			occurredAt,
+		); err != nil {
 			return sqlc.Conference{}, err
 		}
 	}
@@ -124,6 +142,7 @@ func (r *Repository) End(
 	if err := tx.Commit(ctx); err != nil {
 		return sqlc.Conference{}, fmt.Errorf("commit conference end transaction: %w", err)
 	}
+
 	return conference, nil
 }
 
@@ -133,14 +152,21 @@ func (r *Repository) CreateParticipant(
 	conferenceID uuid.UUID,
 	req AddParticipantRequest,
 ) (sqlc.ConferenceParticipant, error) {
-	return r.mutateParticipant(ctx, EventParticipantJoined, func(repo *Repository) (sqlc.ConferenceParticipant, error) {
-		return repo.queries.CreateConferenceParticipant(ctx, sqlc.CreateConferenceParticipantParams{
-			OrganizationID:    org,
-			ConferenceID:      conferenceID,
-			CallParticipantID: req.CallParticipantID,
-			State:             string(ParticipantJoined),
-		})
-	})
+	return r.mutateParticipant(
+		ctx,
+		EventParticipantJoined,
+		func(repo *Repository) (sqlc.ConferenceParticipant, error) {
+			return repo.queries.CreateConferenceParticipant(
+				ctx,
+				sqlc.CreateConferenceParticipantParams{
+					OrganizationID:    org,
+					ConferenceID:      conferenceID,
+					CallParticipantID: req.CallParticipantID,
+					State:             string(ParticipantJoined),
+				},
+			)
+		},
+	)
 }
 
 func (r *Repository) GetParticipant(
@@ -170,12 +196,19 @@ func (r *Repository) LeaveParticipant(
 	org uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.ConferenceParticipant, error) {
-	return r.mutateParticipant(ctx, EventParticipantLeft, func(repo *Repository) (sqlc.ConferenceParticipant, error) {
-		return repo.queries.LeaveConferenceParticipant(ctx, sqlc.LeaveConferenceParticipantParams{
-			OrganizationID: org,
-			ID:             id,
-		})
-	})
+	return r.mutateParticipant(
+		ctx,
+		EventParticipantLeft,
+		func(repo *Repository) (sqlc.ConferenceParticipant, error) {
+			return repo.queries.LeaveConferenceParticipant(
+				ctx,
+				sqlc.LeaveConferenceParticipantParams{
+					OrganizationID: org,
+					ID:             id,
+				},
+			)
+		},
+	)
 }
 
 func (r *Repository) FailParticipant(
@@ -183,12 +216,19 @@ func (r *Repository) FailParticipant(
 	org uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.ConferenceParticipant, error) {
-	return r.mutateParticipant(ctx, EventParticipantFailed, func(repo *Repository) (sqlc.ConferenceParticipant, error) {
-		return repo.queries.FailConferenceParticipant(ctx, sqlc.FailConferenceParticipantParams{
-			OrganizationID: org,
-			ID:             id,
-		})
-	})
+	return r.mutateParticipant(
+		ctx,
+		EventParticipantFailed,
+		func(repo *Repository) (sqlc.ConferenceParticipant, error) {
+			return repo.queries.FailConferenceParticipant(
+				ctx,
+				sqlc.FailConferenceParticipantParams{
+					OrganizationID: org,
+					ID:             id,
+				},
+			)
+		},
+	)
 }
 
 func (r *Repository) SetParticipantMuted(
@@ -218,6 +258,7 @@ func (r *Repository) SetParticipantDeaf(
 }
 
 type conferenceMutation func(*Repository) (sqlc.Conference, error)
+
 type participantMutation func(*Repository) (sqlc.ConferenceParticipant, error)
 
 func (r *Repository) mutateConference(
@@ -236,13 +277,20 @@ func (r *Repository) mutateConference(
 	if err != nil {
 		return sqlc.Conference{}, err
 	}
-	if err := repo.insertConferenceEvent(ctx, eventType, conference, time.Now().UTC()); err != nil {
+
+	if err := repo.insertConferenceEvent(
+		ctx,
+		eventType,
+		conference,
+		time.Now().UTC(),
+	); err != nil {
 		return sqlc.Conference{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return sqlc.Conference{}, fmt.Errorf("commit conference transaction: %w", err)
 	}
+
 	return conference, nil
 }
 
@@ -253,7 +301,10 @@ func (r *Repository) mutateParticipant(
 ) (sqlc.ConferenceParticipant, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return sqlc.ConferenceParticipant{}, fmt.Errorf("begin conference participant transaction: %w", err)
+		return sqlc.ConferenceParticipant{}, fmt.Errorf(
+			"begin conference participant transaction: %w",
+			err,
+		)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
@@ -262,13 +313,23 @@ func (r *Repository) mutateParticipant(
 	if err != nil {
 		return sqlc.ConferenceParticipant{}, err
 	}
-	if err := repo.insertParticipantEvent(ctx, eventType, participant, time.Now().UTC()); err != nil {
+
+	if err := repo.insertParticipantEvent(
+		ctx,
+		eventType,
+		participant,
+		time.Now().UTC(),
+	); err != nil {
 		return sqlc.ConferenceParticipant{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return sqlc.ConferenceParticipant{}, fmt.Errorf("commit conference participant transaction: %w", err)
+		return sqlc.ConferenceParticipant{}, fmt.Errorf(
+			"commit conference participant transaction: %w",
+			err,
+		)
 	}
+
 	return participant, nil
 }
 
@@ -294,6 +355,7 @@ func (r *Repository) insertConferenceEvent(
 	if err != nil {
 		return fmt.Errorf("insert conference outbox event: %w", err)
 	}
+
 	return nil
 }
 
@@ -321,6 +383,7 @@ func (r *Repository) insertParticipantEvent(
 	if err != nil {
 		return fmt.Errorf("insert conference participant outbox event: %w", err)
 	}
+
 	return nil
 }
 
