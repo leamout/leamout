@@ -11,6 +11,11 @@ FROM signalwire/freeswitch-public-base:bookworm@sha256:790ee70a1ae2725297ff00f51
 
 USER root
 
+# FreeSWITCH is installed under /usr/local/freeswitch in the maintained base
+# image. Keep its CLI/runtime binaries on PATH so generic exec-style entrypoints
+# and acceptance tooling can invoke freeswitch and fs_cli consistently.
+ENV PATH="/usr/local/freeswitch/bin:${PATH}"
+
 # Keep Leamout configuration in the image rather than mounting it as a
 # mutable production volume. The existing configuration files themselves are
 # intentionally unchanged.
