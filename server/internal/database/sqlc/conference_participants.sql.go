@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createConferenceParticipant = `-- name: CreateConferenceParticipant :one
@@ -26,24 +25,24 @@ INSERT INTO conference_participants (
     $1,
     $2,
     $3,
-    COALESCE($4, 'joining'),
+    COALESCE($4, 'joined'),
     COALESCE($5, false),
     COALESCE($6, false),
     COALESCE($7, false),
-    $8
+    COALESCE($8, NOW())
 )
 RETURNING id, organization_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
 `
 
 type CreateConferenceParticipantParams struct {
-	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ConferenceID      uuid.UUID          `db:"conference_id" json:"conference_id"`
-	CallParticipantID *uuid.UUID         `db:"call_participant_id" json:"call_participant_id"`
-	State             interface{}        `db:"state" json:"state"`
-	Muted             interface{}        `db:"muted" json:"muted"`
-	Deaf              interface{}        `db:"deaf" json:"deaf"`
-	Speaking          interface{}        `db:"speaking" json:"speaking"`
-	JoinedAt          pgtype.Timestamptz `db:"joined_at" json:"joined_at"`
+	OrganizationID    uuid.UUID   `db:"organization_id" json:"organization_id"`
+	ConferenceID      uuid.UUID   `db:"conference_id" json:"conference_id"`
+	CallParticipantID *uuid.UUID  `db:"call_participant_id" json:"call_participant_id"`
+	State             interface{} `db:"state" json:"state"`
+	Muted             interface{} `db:"muted" json:"muted"`
+	Deaf              interface{} `db:"deaf" json:"deaf"`
+	Speaking          interface{} `db:"speaking" json:"speaking"`
+	JoinedAt          interface{} `db:"joined_at" json:"joined_at"`
 }
 
 func (q *Queries) CreateConferenceParticipant(ctx context.Context, arg CreateConferenceParticipantParams) (ConferenceParticipant, error) {
@@ -57,6 +56,46 @@ func (q *Queries) CreateConferenceParticipant(ctx context.Context, arg CreateCon
 		arg.Speaking,
 		arg.JoinedAt,
 	)
+	var i ConferenceParticipant
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ConferenceID,
+		&i.CallParticipantID,
+		&i.State,
+		&i.Muted,
+		&i.Deaf,
+		&i.Speaking,
+		&i.JoinedAt,
+		&i.LeftAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const failConferenceParticipant = `-- name: FailConferenceParticipant :one
+UPDATE conference_participants
+SET
+    state = 'failed',
+    left_at = COALESCE(left_at, NOW()),
+    muted = false,
+    deaf = false,
+    speaking = false,
+    updated_at = NOW()
+WHERE organization_id = $1
+  AND id = $2
+  AND state IN ('joining', 'joined')
+RETURNING id, organization_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
+`
+
+type FailConferenceParticipantParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) FailConferenceParticipant(ctx context.Context, arg FailConferenceParticipantParams) (ConferenceParticipant, error) {
+	row := q.db.QueryRow(ctx, failConferenceParticipant, arg.OrganizationID, arg.ID)
 	var i ConferenceParticipant
 	err := row.Scan(
 		&i.ID,
@@ -90,6 +129,46 @@ type GetConferenceParticipantParams struct {
 
 func (q *Queries) GetConferenceParticipant(ctx context.Context, arg GetConferenceParticipantParams) (ConferenceParticipant, error) {
 	row := q.db.QueryRow(ctx, getConferenceParticipant, arg.OrganizationID, arg.ID)
+	var i ConferenceParticipant
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ConferenceID,
+		&i.CallParticipantID,
+		&i.State,
+		&i.Muted,
+		&i.Deaf,
+		&i.Speaking,
+		&i.JoinedAt,
+		&i.LeftAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const leaveConferenceParticipant = `-- name: LeaveConferenceParticipant :one
+UPDATE conference_participants
+SET
+    state = 'left',
+    left_at = COALESCE(left_at, NOW()),
+    muted = false,
+    deaf = false,
+    speaking = false,
+    updated_at = NOW()
+WHERE organization_id = $1
+  AND id = $2
+  AND state IN ('joining', 'joined')
+RETURNING id, organization_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
+`
+
+type LeaveConferenceParticipantParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) LeaveConferenceParticipant(ctx context.Context, arg LeaveConferenceParticipantParams) (ConferenceParticipant, error) {
+	row := q.db.QueryRow(ctx, leaveConferenceParticipant, arg.OrganizationID, arg.ID)
 	var i ConferenceParticipant
 	err := row.Scan(
 		&i.ID,
@@ -154,45 +233,64 @@ func (q *Queries) ListConferenceParticipants(ctx context.Context, arg ListConfer
 	return items, nil
 }
 
-const updateConferenceParticipantState = `-- name: UpdateConferenceParticipantState :one
+const setConferenceParticipantDeaf = `-- name: SetConferenceParticipantDeaf :one
 UPDATE conference_participants
 SET
-    state = $1,
-    muted = COALESCE($2, muted),
-    deaf = COALESCE($3, deaf),
-    speaking = COALESCE($4, speaking),
-    joined_at = CASE
-        WHEN $1::text = 'joined' THEN COALESCE(joined_at, NOW())
-        ELSE joined_at
-    END,
-    left_at = CASE
-        WHEN $1::text IN ('left', 'failed') THEN COALESCE(left_at, NOW())
-        ELSE left_at
-    END,
+    deaf = $1,
     updated_at = NOW()
-WHERE organization_id = $5
-  AND id = $6
+WHERE organization_id = $2
+  AND id = $3
+  AND state = 'joined'
+  AND deaf <> $1
 RETURNING id, organization_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
 `
 
-type UpdateConferenceParticipantStateParams struct {
-	State          string    `db:"state" json:"state"`
-	Muted          *bool     `db:"muted" json:"muted"`
-	Deaf           *bool     `db:"deaf" json:"deaf"`
-	Speaking       *bool     `db:"speaking" json:"speaking"`
+type SetConferenceParticipantDeafParams struct {
+	Deaf           bool      `db:"deaf" json:"deaf"`
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	ID             uuid.UUID `db:"id" json:"id"`
 }
 
-func (q *Queries) UpdateConferenceParticipantState(ctx context.Context, arg UpdateConferenceParticipantStateParams) (ConferenceParticipant, error) {
-	row := q.db.QueryRow(ctx, updateConferenceParticipantState,
-		arg.State,
-		arg.Muted,
-		arg.Deaf,
-		arg.Speaking,
-		arg.OrganizationID,
-		arg.ID,
+func (q *Queries) SetConferenceParticipantDeaf(ctx context.Context, arg SetConferenceParticipantDeafParams) (ConferenceParticipant, error) {
+	row := q.db.QueryRow(ctx, setConferenceParticipantDeaf, arg.Deaf, arg.OrganizationID, arg.ID)
+	var i ConferenceParticipant
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ConferenceID,
+		&i.CallParticipantID,
+		&i.State,
+		&i.Muted,
+		&i.Deaf,
+		&i.Speaking,
+		&i.JoinedAt,
+		&i.LeftAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
+	return i, err
+}
+
+const setConferenceParticipantMuted = `-- name: SetConferenceParticipantMuted :one
+UPDATE conference_participants
+SET
+    muted = $1,
+    updated_at = NOW()
+WHERE organization_id = $2
+  AND id = $3
+  AND state = 'joined'
+  AND muted <> $1
+RETURNING id, organization_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
+`
+
+type SetConferenceParticipantMutedParams struct {
+	Muted          bool      `db:"muted" json:"muted"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) SetConferenceParticipantMuted(ctx context.Context, arg SetConferenceParticipantMutedParams) (ConferenceParticipant, error) {
+	row := q.db.QueryRow(ctx, setConferenceParticipantMuted, arg.Muted, arg.OrganizationID, arg.ID)
 	var i ConferenceParticipant
 	err := row.Scan(
 		&i.ID,

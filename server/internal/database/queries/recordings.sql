@@ -20,7 +20,7 @@ INSERT INTO recordings (
     sqlc.narg(storage_url),
     sqlc.narg(file_size_bytes),
     sqlc.narg(format),
-    sqlc.narg(started_at)
+    COALESCE(sqlc.narg(started_at), NOW())
 )
 RETURNING *;
 
@@ -29,6 +29,21 @@ SELECT *
 FROM recordings
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
+  AND status <> 'deleted'
+LIMIT 1;
+
+-- name: GetRecordingIncludingDeleted :one
+SELECT *
+FROM recordings
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+LIMIT 1;
+
+-- name: GetRecordingByCallStorageKey :one
+SELECT *
+FROM recordings
+WHERE call_id = sqlc.arg(call_id)
+  AND storage_key = sqlc.arg(storage_key)
 LIMIT 1;
 
 -- name: ListCallRecordings :many
@@ -36,6 +51,7 @@ SELECT *
 FROM recordings
 WHERE organization_id = sqlc.arg(organization_id)
   AND call_id = sqlc.arg(call_id)
+  AND status <> 'deleted'
 ORDER BY created_at DESC;
 
 -- name: CompleteRecording :one
