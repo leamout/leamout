@@ -70,7 +70,7 @@ func (s *Service) ObserveStarted(ctx context.Context, event LifecycleEvent) erro
 		return apperror.NewInternal("resolve recording call", err)
 	}
 
-	existing, err := s.repo.GetByCallStorageKey(ctx, call.ID, path)
+	_, err = s.repo.GetByCallStorageKey(ctx, call.ID, path)
 	if err == nil {
 		return nil
 	}
@@ -82,8 +82,7 @@ func (s *Service) ObserveStarted(ctx context.Context, event LifecycleEvent) erro
 	if err != nil {
 		// A duplicated FreeSWITCH event may race another worker event. Re-read the
 		// stable (call_id, storage_key) identity before surfacing an error.
-		if current, readErr := s.repo.GetByCallStorageKey(ctx, call.ID, path); readErr == nil {
-			_ = current
+		if _, readErr := s.repo.GetByCallStorageKey(ctx, call.ID, path); readErr == nil {
 			return nil
 		}
 		return apperror.NewInternal("start recording lifecycle", err)
