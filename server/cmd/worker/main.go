@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/leamout/leamout/internal/platform/config"
+	runtimeworker "github.com/leamout/leamout/internal/runtime/worker"
 )
 
 func main() {
@@ -18,11 +19,20 @@ func main() {
 	)
 	defer stop()
 
-	if _, err := config.Load(); err != nil {
+	cfg, err := config.Load()
+	if err != nil {
 		log.Fatal(err)
 	}
 
+	worker, err := runtimeworker.New(ctx, cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer worker.Close()
+
 	log.Print("worker started")
-	<-ctx.Done()
+	if err := worker.Run(ctx); err != nil {
+		log.Fatal(err)
+	}
 	log.Print("worker stopped")
 }
