@@ -108,7 +108,6 @@ $COMPOSE up -d --build \
     nats \
     rtpengine \
     freeswitch \
-    opensips \
     voice-v1-carrier \
     voice-v1-webhook
 
@@ -136,6 +135,21 @@ $COMPOSE exec -T postgres \
     <tests/acceptance/voice-v1/bootstrap.sql \
     >/dev/null
 
-$COMPOSE up -d --build api worker
+printf '%s\n' "Waiting for FreeSWITCH ESL..."
+i=0
+until $COMPOSE exec -T freeswitch sh -c '
+    fs_cli -H 127.0.0.1 -P 8021 \
+        -p "$FREESWITCH_ESL_PASSWORD" \
+        -x status >/dev/null 2>&1
+'; do
+    i=$((i + 1))
+    if [ "$i" -ge 60 ]; then
+        echo "FreeSWITCH ESL did not become ready/authenticated" >&2
+        exit 1
+    fi
+    sleep 1
+done
+
+$COMPOSE up -d --build opensips api worker
 
 python3 tests/acceptance/voice-v1/acceptance.py
