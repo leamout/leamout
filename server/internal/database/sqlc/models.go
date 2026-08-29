@@ -110,6 +110,24 @@ type CarrierProvider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type CarrierRate struct {
+	ID                uuid.UUID          `db:"id" json:"id"`
+	PlanID            uuid.UUID          `db:"plan_id" json:"plan_id"`
+	MeterID           uuid.UUID          `db:"meter_id" json:"meter_id"`
+	CarrierProviderID *uuid.UUID         `db:"carrier_provider_id" json:"carrier_provider_id"`
+	Direction         *string            `db:"direction" json:"direction"`
+	CountryCode       *string            `db:"country_code" json:"country_code"`
+	Network           *string            `db:"network" json:"network"`
+	Currency          string             `db:"currency" json:"currency"`
+	UnitAmountMicros  int64              `db:"unit_amount_micros" json:"unit_amount_micros"`
+	UnitSize          int64              `db:"unit_size" json:"unit_size"`
+	EffectiveFrom     pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
+	EffectiveUntil    pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
+	Active            bool               `db:"active" json:"active"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Conference struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -195,6 +213,22 @@ type Invoice struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type InvoiceItem struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	InvoiceID        uuid.UUID          `db:"invoice_id" json:"invoice_id"`
+	MeterID          *uuid.UUID         `db:"meter_id" json:"meter_id"`
+	CarrierRateID    *uuid.UUID         `db:"carrier_rate_id" json:"carrier_rate_id"`
+	Type             string             `db:"type" json:"type"`
+	Description      string             `db:"description" json:"description"`
+	Quantity         int64              `db:"quantity" json:"quantity"`
+	UnitAmountMicros *int64             `db:"unit_amount_micros" json:"unit_amount_micros"`
+	Amount           int64              `db:"amount" json:"amount"`
+	PeriodStart      pgtype.Timestamptz `db:"period_start" json:"period_start"`
+	PeriodEnd        pgtype.Timestamptz `db:"period_end" json:"period_end"`
+	Metadata         []byte             `db:"metadata" json:"metadata"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type License struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	CustomerID     uuid.UUID          `db:"customer_id" json:"customer_id"`
@@ -206,6 +240,16 @@ type License struct {
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Meter struct {
+	ID        uuid.UUID          `db:"id" json:"id"`
+	Key       string             `db:"key" json:"key"`
+	Name      string             `db:"name" json:"name"`
+	Unit      string             `db:"unit" json:"unit"`
+	Active    bool               `db:"active" json:"active"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Organization struct {
@@ -425,6 +469,20 @@ type TrunkEndpoint struct {
 	Enabled        bool               `db:"enabled" json:"enabled"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type UsageEvent struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	CustomerID     uuid.UUID          `db:"customer_id" json:"customer_id"`
+	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
+	MeterID        uuid.UUID          `db:"meter_id" json:"meter_id"`
+	Quantity       int64              `db:"quantity" json:"quantity"`
+	SourceType     string             `db:"source_type" json:"source_type"`
+	SourceID       string             `db:"source_id" json:"source_id"`
+	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
+	Dimensions     []byte             `db:"dimensions" json:"dimensions"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type User struct {

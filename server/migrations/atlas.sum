@@ -1,4 +1,4 @@
-h1:66VDp/MY3LdN83fJw6/4bNH5lY3Z7ZB1A9FmkfFqN8o=
+h1:SV4iIEOTziGJQ92VKqnjL/ceqfc+XKg/wLuoaz7gkTQ=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -29,5 +29,9 @@ h1:66VDp/MY3LdN83fJw6/4bNH5lY3Z7ZB1A9FmkfFqN8o=
 028_create_licenses.sql h1:uBkYQsZx3BqzRCN88OOjwGtnSBI7jn1OryWM1/pnDt4=
 029_create_entitlements.sql h1:jg26ETNtBSajMdtgGs+pVCsl6GnGaNBdFvFr89N/TcQ=
 030_create_deployments.sql h1:XP+Sfl8g8IwqX2RSLjxW9oeN9yd917xKn8m3pNkE6x4=
-031_create_invoices.sql h1:w7IXTF84caONDuo6IRyj7fwOfk0ianbQxJRZ1oFu6Kk=
-032_create_payments.sql h1:Yt9BAB8aEDrZQnjXR7oNXpt/XhGASVHrzupIsejbxjQ=
+031_create_meters.sql h1:qSBtG7vcxbgmocDV7Y8iEj9qDHT+OLkgNsMRM0vtt5s=
+032_create_carrier_rates.sql h1:dk9n4/zsq5dngXQU9IeEX6j6PC2Ie87InkmAx9oZt34=
+033_create_usage_events.sql h1:+AE7dClvDzd9r5xO1GAs40u464TGC8YGbBfN8EqmPA4=
+034_create_invoices.sql h1:E4P5uJ52sj6NIh9LpiUpD9mftgop4bPuEBeIw0W6tW8=
+035_create_invoice_items.sql h1:2cCZzY5dMdm6sBcWkSMWq92/2DiqzxsZjnFeK9u/KH4=
+036_create_payments.sql h1:jouTHOFSEo38GoChB9bt+z83AhHjLCsvqrUnFXu6fMw=
