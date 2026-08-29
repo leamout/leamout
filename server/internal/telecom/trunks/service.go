@@ -3,17 +3,32 @@ package trunks
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type Service struct{ repo *Repository }
+type Service struct {
+	repo   *Repository
+	db     *pgxpool.Pool
+	outbox *outbox.Repository
+}
 
-func NewService(repo *Repository) *Service { return &Service{repo: repo} }
+func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
+	service := &Service{repo: repo}
+	if len(db) > 0 && db[0] != nil {
+		service.db = db[0]
+		service.outbox = outbox.NewRepository(sqlc.New(db[0]))
+	}
+	return service
+}
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Trunk, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
@@ -40,9 +55,12 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		}
 		req.Status = &value
 	}
-	result, err := s.repo.Create(ctx, sqlc.CreateTrunkParams{OrganizationID: organizationID, CarrierConnectionID: req.CarrierConnectionID, Name: name, Direction: req.Direction, Status: req.Status})
+	result, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
+		return repo.Create(ctx, sqlc.CreateTrunkParams{OrganizationID: organizationID, CarrierConnectionID: req.CarrierConnectionID, Name: name, Direction: req.Direction, Status: req.Status})
+	})
 	return result, writeError(err, "trunk", "carrier connection not found")
 }
+
 func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.Trunk, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return nil, err
@@ -53,6 +71,7 @@ func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.Tr
 	}
 	return items, nil
 }
+
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Trunk, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return sqlc.Trunk{}, err
@@ -63,6 +82,7 @@ func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.T
 	item, err := s.repo.Get(ctx, organizationID, id)
 	return item, readError(err, "trunk not found")
 }
+
 func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req UpdateRequest) (sqlc.Trunk, error) {
 	if _, err := s.Get(ctx, organizationID, id); err != nil {
 		return sqlc.Trunk{}, err
@@ -91,17 +111,24 @@ func (s *Service) Update(ctx context.Context, organizationID, id uuid.UUID, req 
 		}
 		req.Status = &value
 	}
-	item, err := s.repo.Update(ctx, sqlc.UpdateTrunkParams{Name: req.Name, Direction: req.Direction, Status: req.Status, ID: id, OrganizationID: organizationID})
+	item, err := s.mutateTrunk(ctx, EventTrunkUpdated, func(repo *Repository) (sqlc.Trunk, error) {
+		return repo.Update(ctx, sqlc.UpdateTrunkParams{Name: req.Name, Direction: req.Direction, Status: req.Status, ID: id, OrganizationID: organizationID})
+	})
 	return item, writeError(err, "trunk", "trunk not found")
 }
+
 func (s *Service) Delete(ctx context.Context, organizationID, id uuid.UUID) error {
-	if _, err := s.Get(ctx, organizationID, id); err != nil {
+	item, err := s.Get(ctx, organizationID, id)
+	if err != nil {
 		return err
 	}
-	if err := s.repo.Disable(ctx, organizationID, id); err != nil {
-		return readError(err, "disable trunk")
+	if item.Status == "disabled" {
+		return nil
 	}
-	return nil
+	_, err = s.mutateTrunk(ctx, EventTrunkDisabled, func(repo *Repository) (sqlc.Trunk, error) {
+		return repo.Disable(ctx, organizationID, id)
+	})
+	return writeError(err, "trunk", "trunk not found")
 }
 
 func (s *Service) CreateEndpoint(ctx context.Context, organizationID, trunkID uuid.UUID, req EndpointCreateRequest) (sqlc.TrunkEndpoint, error) {
@@ -141,9 +168,12 @@ func (s *Service) CreateEndpoint(ctx context.Context, organizationID, trunkID uu
 			return sqlc.TrunkEndpoint{}, err
 		}
 	}
-	item, err := s.repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{OrganizationID: organizationID, TrunkID: trunkID, Host: host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled})
+	item, err := s.mutateEndpoint(ctx, EventTrunkEndpointCreated, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
+		return repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{OrganizationID: organizationID, TrunkID: trunkID, Host: host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled})
+	})
 	return item, writeError(err, "trunk endpoint", "trunk not found")
 }
+
 func (s *Service) ListEndpoints(ctx context.Context, organizationID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
 	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
 		return nil, err
@@ -154,6 +184,7 @@ func (s *Service) ListEndpoints(ctx context.Context, organizationID, trunkID uui
 	}
 	return items, nil
 }
+
 func (s *Service) GetEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
 	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
 		return sqlc.TrunkEndpoint{}, err
@@ -164,6 +195,7 @@ func (s *Service) GetEndpoint(ctx context.Context, organizationID, trunkID, id u
 	item, err := s.repo.GetEndpoint(ctx, organizationID, trunkID, id)
 	return item, readError(err, "trunk endpoint not found")
 }
+
 func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID, req EndpointUpdateRequest) (sqlc.TrunkEndpoint, error) {
 	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
 		return sqlc.TrunkEndpoint{}, err
@@ -207,17 +239,102 @@ func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, i
 			return sqlc.TrunkEndpoint{}, err
 		}
 	}
-	item, err := s.repo.UpdateEndpoint(ctx, sqlc.UpdateTrunkEndpointParams{Host: req.Host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled, ID: id, TrunkID: trunkID, OrganizationID: organizationID})
+	item, err := s.mutateEndpoint(ctx, EventTrunkEndpointUpdated, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
+		return repo.UpdateEndpoint(ctx, sqlc.UpdateTrunkEndpointParams{Host: req.Host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled, ID: id, TrunkID: trunkID, OrganizationID: organizationID})
+	})
 	return item, writeError(err, "trunk endpoint", "trunk endpoint not found")
 }
+
 func (s *Service) DeleteEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) error {
 	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
 		return err
 	}
-	if err := s.repo.DeleteEndpoint(ctx, organizationID, trunkID, id); err != nil {
-		return readError(err, "delete trunk endpoint")
+	_, err := s.mutateEndpoint(ctx, EventTrunkEndpointDeleted, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
+		return repo.DeleteEndpoint(ctx, organizationID, trunkID, id)
+	})
+	return writeError(err, "trunk endpoint", "trunk endpoint not found")
+}
+
+func (s *Service) mutateTrunk(ctx context.Context, eventType EventType, mutation func(*Repository) (sqlc.Trunk, error)) (sqlc.Trunk, error) {
+	if s.db == nil || s.outbox == nil {
+		return sqlc.Trunk{}, fmt.Errorf("trunk database is required for domain events")
 	}
-	return nil
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return sqlc.Trunk{}, fmt.Errorf("begin trunk transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	item, err := mutation(s.repo.WithTx(tx))
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+	occurredAt := time.Now().UTC()
+	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
+		Subject:       string(eventType),
+		AggregateType: "trunk",
+		AggregateID:   item.ID,
+		Payload: Event{
+			EventType:      eventType,
+			OrganizationID: item.OrganizationID,
+			TrunkID:        item.ID,
+			Resource:       response(item),
+			OccurredAt:     occurredAt,
+		},
+		Headers: eventHeaders(eventType, item.OrganizationID),
+	}); err != nil {
+		return sqlc.Trunk{}, fmt.Errorf("insert trunk outbox event: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.Trunk{}, fmt.Errorf("commit trunk transaction: %w", err)
+	}
+	return item, nil
+}
+
+func (s *Service) mutateEndpoint(ctx context.Context, eventType EventType, mutation func(*Repository) (sqlc.TrunkEndpoint, error)) (sqlc.TrunkEndpoint, error) {
+	if s.db == nil || s.outbox == nil {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("trunk database is required for domain events")
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("begin trunk endpoint transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	item, err := mutation(s.repo.WithTx(tx))
+	if err != nil {
+		return sqlc.TrunkEndpoint{}, err
+	}
+	occurredAt := time.Now().UTC()
+	endpointID := item.ID
+	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
+		Subject:       string(eventType),
+		AggregateType: "trunk_endpoint",
+		AggregateID:   item.ID,
+		Payload: Event{
+			EventType:      eventType,
+			OrganizationID: item.OrganizationID,
+			TrunkID:        item.TrunkID,
+			EndpointID:     &endpointID,
+			Resource:       endpointResponse(item),
+			OccurredAt:     occurredAt,
+		},
+		Headers: eventHeaders(eventType, item.OrganizationID),
+	}); err != nil {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("insert trunk endpoint outbox event: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("commit trunk endpoint transaction: %w", err)
+	}
+	return item, nil
+}
+
+func eventHeaders(eventType EventType, organizationID uuid.UUID) map[string]string {
+	return map[string]string{
+		"event_type":      string(eventType),
+		"organization_id": organizationID.String(),
+		"schema_version":  "1",
+	}
 }
 
 func readError(err error, message string) error {
@@ -229,6 +346,7 @@ func readError(err error, message string) error {
 	}
 	return apperror.NewInternal(message, err)
 }
+
 func writeError(err error, resource, notFound string) error {
 	if err == nil {
 		return nil
