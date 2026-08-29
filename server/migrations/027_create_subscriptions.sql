@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     starts_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     renews_at TIMESTAMPTZ,
     ends_at TIMESTAMPTZ,
+    billing_provider TEXT,
+    provider_subscription_id TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -20,8 +22,22 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     ),
     CONSTRAINT chk_subscriptions_period CHECK (
         renews_at IS NULL OR ends_at IS NULL OR renews_at <= ends_at
+    ),
+    CONSTRAINT chk_subscriptions_billing_provider CHECK (
+        billing_provider IS NULL OR (length(trim(billing_provider)) > 0 AND billing_provider !~ '[[:space:]]')
+    ),
+    CONSTRAINT chk_subscriptions_provider_subscription_id CHECK (
+        provider_subscription_id IS NULL OR length(trim(provider_subscription_id)) > 0
+    ),
+    CONSTRAINT chk_subscriptions_billing_pair CHECK (
+        (billing_provider IS NULL AND provider_subscription_id IS NULL)
+        OR (billing_provider IS NOT NULL AND provider_subscription_id IS NOT NULL)
     )
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_subscriptions_provider_subscription
+    ON subscriptions (billing_provider, provider_subscription_id)
+    WHERE billing_provider IS NOT NULL AND provider_subscription_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_customer_status
     ON subscriptions (customer_id, status, created_at DESC);
