@@ -148,3 +148,35 @@ func TestHangupStateClassification(t *testing.T) {
 		}
 	}
 }
+
+func TestMediaStateClassification(t *testing.T) {
+	held := sqlc.Call{MediaState: string(MediaStateHeld)}
+	if !isHeld(held) || isMediaActive(held) {
+		t.Fatal("held call media state was classified incorrectly")
+	}
+	if err := validateMediaState(held); err != nil {
+		t.Fatalf("held media state returned error: %v", err)
+	}
+
+	active := sqlc.Call{MediaState: string(MediaStateActive)}
+	if isHeld(active) || !isMediaActive(active) {
+		t.Fatal("active call media state was classified incorrectly")
+	}
+	if err := validateMediaState(active); err != nil {
+		t.Fatalf("active media state returned error: %v", err)
+	}
+
+	invalid := sqlc.Call{MediaState: "unknown"}
+	if err := validateMediaState(invalid); err == nil {
+		t.Fatal("invalid media state expected conflict")
+	}
+}
+
+func TestStatusForState(t *testing.T) {
+	if got := statusForState(string(StateInitiating)); got != StatusInitiated {
+		t.Fatalf("initiating state mapped to %q, want %q", got, StatusInitiated)
+	}
+	if got := statusForState(string(StateAnswered)); got != StatusAnswered {
+		t.Fatalf("answered state mapped to %q, want %q", got, StatusAnswered)
+	}
+}
