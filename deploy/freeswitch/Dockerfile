@@ -25,7 +25,9 @@ RUN chmod 0755 \
       /usr/local/bin/leamout-freeswitch-entrypoint \
     && mkdir -p /etc/freeswitch/autoload_configs \
       /etc/freeswitch/sip_profiles \
-      /etc/freeswitch/dialplan
+      /etc/freeswitch/dialplan \
+    && command -v freeswitch >/dev/null \
+    && command -v fs_cli >/dev/null
 
 WORKDIR /etc/freeswitch
 
@@ -36,4 +38,4 @@ EXPOSE 5060/tcp
 EXPOSE 16384-32768/udp
 
 ENTRYPOINT ["/usr/local/bin/leamout-freeswitch-entrypoint"]
-CMD ["freeswitch", "-nf"]
+CMD ["freeswitch", "-nonat", "-nf"]
