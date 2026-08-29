@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const completeRecording = `-- name: CompleteRecording :one
@@ -98,22 +97,22 @@ INSERT INTO recordings (
     $7,
     $8,
     $9,
-    $10
+    COALESCE($10, NOW())
 )
 RETURNING id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 `
 
 type CreateRecordingParams struct {
-	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
-	CallID          uuid.UUID          `db:"call_id" json:"call_id"`
-	Status          interface{}        `db:"status" json:"status"`
-	StorageKey      *string            `db:"storage_key" json:"storage_key"`
-	StorageProvider *string            `db:"storage_provider" json:"storage_provider"`
-	StorageBucket   *string            `db:"storage_bucket" json:"storage_bucket"`
-	StorageUrl      *string            `db:"storage_url" json:"storage_url"`
-	FileSizeBytes   *int64             `db:"file_size_bytes" json:"file_size_bytes"`
-	Format          *string            `db:"format" json:"format"`
-	StartedAt       pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	OrganizationID  uuid.UUID   `db:"organization_id" json:"organization_id"`
+	CallID          uuid.UUID   `db:"call_id" json:"call_id"`
+	Status          interface{} `db:"status" json:"status"`
+	StorageKey      *string     `db:"storage_key" json:"storage_key"`
+	StorageProvider *string     `db:"storage_provider" json:"storage_provider"`
+	StorageBucket   *string     `db:"storage_bucket" json:"storage_bucket"`
+	StorageUrl      *string     `db:"storage_url" json:"storage_url"`
+	FileSizeBytes   *int64      `db:"file_size_bytes" json:"file_size_bytes"`
+	Format          *string     `db:"format" json:"format"`
+	StartedAt       interface{} `db:"started_at" json:"started_at"`
 }
 
 func (q *Queries) CreateRecording(ctx context.Context, arg CreateRecordingParams) (Recording, error) {
@@ -235,6 +234,7 @@ SELECT id, organization_id, call_id, status, storage_key, storage_provider, stor
 FROM recordings
 WHERE organization_id = $1
   AND id = $2
+  AND status <> 'deleted'
 LIMIT 1
 `
 
@@ -266,11 +266,84 @@ func (q *Queries) GetRecording(ctx context.Context, arg GetRecordingParams) (Rec
 	return i, err
 }
 
+const getRecordingByCallStorageKey = `-- name: GetRecordingByCallStorageKey :one
+SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+FROM recordings
+WHERE call_id = $1
+  AND storage_key = $2
+LIMIT 1
+`
+
+type GetRecordingByCallStorageKeyParams struct {
+	CallID     uuid.UUID `db:"call_id" json:"call_id"`
+	StorageKey *string   `db:"storage_key" json:"storage_key"`
+}
+
+func (q *Queries) GetRecordingByCallStorageKey(ctx context.Context, arg GetRecordingByCallStorageKeyParams) (Recording, error) {
+	row := q.db.QueryRow(ctx, getRecordingByCallStorageKey, arg.CallID, arg.StorageKey)
+	var i Recording
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CallID,
+		&i.Status,
+		&i.StorageKey,
+		&i.StorageProvider,
+		&i.StorageBucket,
+		&i.StorageUrl,
+		&i.FileSizeBytes,
+		&i.Format,
+		&i.DurationSeconds,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getRecordingIncludingDeleted = `-- name: GetRecordingIncludingDeleted :one
+SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
+FROM recordings
+WHERE organization_id = $1
+  AND id = $2
+LIMIT 1
+`
+
+type GetRecordingIncludingDeletedParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) GetRecordingIncludingDeleted(ctx context.Context, arg GetRecordingIncludingDeletedParams) (Recording, error) {
+	row := q.db.QueryRow(ctx, getRecordingIncludingDeleted, arg.OrganizationID, arg.ID)
+	var i Recording
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.CallID,
+		&i.Status,
+		&i.StorageKey,
+		&i.StorageProvider,
+		&i.StorageBucket,
+		&i.StorageUrl,
+		&i.FileSizeBytes,
+		&i.Format,
+		&i.DurationSeconds,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listCallRecordings = `-- name: ListCallRecordings :many
 SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 FROM recordings
 WHERE organization_id = $1
   AND call_id = $2
+  AND status <> 'deleted'
 ORDER BY created_at DESC
 `
 

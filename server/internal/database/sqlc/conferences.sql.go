@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createConference = `-- name: CreateConference :one
@@ -24,17 +23,17 @@ INSERT INTO conferences (
     $2,
     $3,
     COALESCE($4, 'active'),
-    $5
+    COALESCE($5, NOW())
 )
 RETURNING id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 `
 
 type CreateConferenceParams struct {
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ApplicationID  *uuid.UUID         `db:"application_id" json:"application_id"`
-	Name           string             `db:"name" json:"name"`
-	State          interface{}        `db:"state" json:"state"`
-	StartedAt      pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	OrganizationID uuid.UUID   `db:"organization_id" json:"organization_id"`
+	ApplicationID  *uuid.UUID  `db:"application_id" json:"application_id"`
+	Name           string      `db:"name" json:"name"`
+	State          interface{} `db:"state" json:"state"`
+	StartedAt      interface{} `db:"started_at" json:"started_at"`
 }
 
 func (q *Queries) CreateConference(ctx context.Context, arg CreateConferenceParams) (Conference, error) {
@@ -58,6 +57,93 @@ func (q *Queries) CreateConference(ctx context.Context, arg CreateConferencePara
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const endConference = `-- name: EndConference :one
+UPDATE conferences
+SET
+    state = 'ended',
+    ended_at = COALESCE(ended_at, NOW()),
+    updated_at = NOW()
+WHERE organization_id = $1
+  AND id = $2
+  AND state = 'active'
+RETURNING id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
+`
+
+type EndConferenceParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) EndConference(ctx context.Context, arg EndConferenceParams) (Conference, error) {
+	row := q.db.QueryRow(ctx, endConference, arg.OrganizationID, arg.ID)
+	var i Conference
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ApplicationID,
+		&i.Name,
+		&i.State,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const endConferenceParticipants = `-- name: EndConferenceParticipants :many
+UPDATE conference_participants
+SET
+    state = 'left',
+    left_at = COALESCE(left_at, NOW()),
+    muted = false,
+    deaf = false,
+    speaking = false,
+    updated_at = NOW()
+WHERE organization_id = $1
+  AND conference_id = $2
+  AND state IN ('joining', 'joined')
+RETURNING id, organization_id, conference_id, call_participant_id, state, muted, deaf, speaking, joined_at, left_at, created_at, updated_at
+`
+
+type EndConferenceParticipantsParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ConferenceID   uuid.UUID `db:"conference_id" json:"conference_id"`
+}
+
+func (q *Queries) EndConferenceParticipants(ctx context.Context, arg EndConferenceParticipantsParams) ([]ConferenceParticipant, error) {
+	rows, err := q.db.Query(ctx, endConferenceParticipants, arg.OrganizationID, arg.ConferenceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ConferenceParticipant{}
+	for rows.Next() {
+		var i ConferenceParticipant
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.ConferenceID,
+			&i.CallParticipantID,
+			&i.State,
+			&i.Muted,
+			&i.Deaf,
+			&i.Speaking,
+			&i.JoinedAt,
+			&i.LeftAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getConference = `-- name: GetConference :one
@@ -163,41 +249,4 @@ func (q *Queries) ListConferences(ctx context.Context, arg ListConferencesParams
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateConferenceState = `-- name: UpdateConferenceState :one
-UPDATE conferences
-SET
-    state = $1,
-    ended_at = CASE
-        WHEN $1::text = 'ended' THEN COALESCE(ended_at, NOW())
-        ELSE ended_at
-    END,
-    updated_at = NOW()
-WHERE organization_id = $2
-  AND id = $3
-RETURNING id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
-`
-
-type UpdateConferenceStateParams struct {
-	State          string    `db:"state" json:"state"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	ID             uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) UpdateConferenceState(ctx context.Context, arg UpdateConferenceStateParams) (Conference, error) {
-	row := q.db.QueryRow(ctx, updateConferenceState, arg.State, arg.OrganizationID, arg.ID)
-	var i Conference
-	err := row.Scan(
-		&i.ID,
-		&i.OrganizationID,
-		&i.ApplicationID,
-		&i.Name,
-		&i.State,
-		&i.StartedAt,
-		&i.EndedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }
