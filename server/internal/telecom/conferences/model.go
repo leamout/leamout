@@ -17,6 +17,41 @@ type AddParticipantRequest struct {
 	CallParticipantID *uuid.UUID `json:"call_participant_id,omitempty"`
 }
 
+type State string
+
+const (
+	StateActive State = "active"
+	StateEnded  State = "ended"
+)
+
+type ParticipantState string
+
+const (
+	ParticipantJoining ParticipantState = "joining"
+	ParticipantJoined  ParticipantState = "joined"
+	ParticipantLeft    ParticipantState = "left"
+	ParticipantFailed  ParticipantState = "failed"
+)
+
+type EventType string
+
+const (
+	EventConferenceCreated    EventType = "conference.created"
+	EventConferenceEnded      EventType = "conference.ended"
+	EventParticipantJoined    EventType = "conference.participant.joined"
+	EventParticipantLeft      EventType = "conference.participant.left"
+	EventParticipantFailed    EventType = "conference.participant.failed"
+)
+
+type Event struct {
+	EventType      EventType      `json:"event_type"`
+	OrganizationID uuid.UUID      `json:"organization_id"`
+	ConferenceID   uuid.UUID      `json:"conference_id"`
+	ParticipantID  *uuid.UUID     `json:"participant_id,omitempty"`
+	Resource       any            `json:"resource"`
+	OccurredAt     time.Time      `json:"occurred_at"`
+}
+
 type ConferenceResponse struct {
 	ID             uuid.UUID  `json:"id"`
 	OrganizationID uuid.UUID  `json:"organization_id"`
