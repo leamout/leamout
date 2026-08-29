@@ -155,18 +155,6 @@ type ConferenceParticipant struct {
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-type Customer struct {
-	ID                 uuid.UUID          `db:"id" json:"id"`
-	Name               string             `db:"name" json:"name"`
-	Email              *string            `db:"email" json:"email"`
-	Status             string             `db:"status" json:"status"`
-	ExternalReference  *string            `db:"external_reference" json:"external_reference"`
-	BillingProvider    *string            `db:"billing_provider" json:"billing_provider"`
-	ProviderCustomerID *string            `db:"provider_customer_id" json:"provider_customer_id"`
-	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type Deployment struct {
 	ID            uuid.UUID          `db:"id" json:"id"`
 	LicenseID     uuid.UUID          `db:"license_id" json:"license_id"`
@@ -183,7 +171,7 @@ type Deployment struct {
 type Entitlement struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	PlanID         *uuid.UUID         `db:"plan_id" json:"plan_id"`
-	CustomerID     *uuid.UUID         `db:"customer_id" json:"customer_id"`
+	OrganizationID *uuid.UUID         `db:"organization_id" json:"organization_id"`
 	LicenseID      *uuid.UUID         `db:"license_id" json:"license_id"`
 	EntitlementKey string             `db:"entitlement_key" json:"entitlement_key"`
 	Kind           string             `db:"kind" json:"kind"`
@@ -197,7 +185,7 @@ type Entitlement struct {
 
 type Invoice struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
-	CustomerID     uuid.UUID          `db:"customer_id" json:"customer_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	InvoiceNumber  string             `db:"invoice_number" json:"invoice_number"`
 	Currency       string             `db:"currency" json:"currency"`
@@ -231,7 +219,7 @@ type InvoiceItem struct {
 
 type License struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
-	CustomerID     uuid.UUID          `db:"customer_id" json:"customer_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status         string             `db:"status" json:"status"`
 	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
@@ -322,7 +310,7 @@ type OutboxEvent struct {
 
 type Payment struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
-	CustomerID        uuid.UUID          `db:"customer_id" json:"customer_id"`
+	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
 	InvoiceID         *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
 	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
@@ -433,7 +421,7 @@ type Subscriber struct {
 
 type Subscription struct {
 	ID                     uuid.UUID          `db:"id" json:"id"`
-	CustomerID             uuid.UUID          `db:"customer_id" json:"customer_id"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
 	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
 	Status                 string             `db:"status" json:"status"`
 	StartsAt               pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
@@ -473,7 +461,7 @@ type TrunkEndpoint struct {
 
 type UsageEvent struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
-	CustomerID     uuid.UUID          `db:"customer_id" json:"customer_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	MeterID        uuid.UUID          `db:"meter_id" json:"meter_id"`
 	Quantity       int64              `db:"quantity" json:"quantity"`
