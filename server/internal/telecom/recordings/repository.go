@@ -94,6 +94,20 @@ func (r *Repository) List(
 	})
 }
 
+func (r *Repository) ListForReconciliation(
+	ctx context.Context,
+	updatedBefore time.Time,
+	batchSize int32,
+) ([]sqlc.Recording, error) {
+	return r.queries.ListRecordingsForReconciliation(ctx, sqlc.ListRecordingsForReconciliationParams{
+		UpdatedBefore: pgtype.Timestamptz{
+			Time:  updatedBefore,
+			Valid: true,
+		},
+		BatchSize: batchSize,
+	})
+}
+
 func (r *Repository) Start(
 	ctx context.Context,
 	call sqlc.Call,
