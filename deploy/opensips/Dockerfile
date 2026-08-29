@@ -9,20 +9,25 @@ RUN apt-get update \
     && printf '%s\n' \
         'deb [signed-by=/usr/share/keyrings/opensips.gpg] https://apt.opensips.org bookworm 4.0-releases' \
         > /etc/apt/sources.list.d/opensips.list \
-    && printf 'Package: opensips opensips-*\nPin: version %s*\nPin-Priority: 1001\n' \
-        "$OPENSIPS_VERSION" \
-        > /etc/apt/preferences.d/opensips \
     && apt-get update \
+    && package_version="$(apt-cache madison opensips | awk -v wanted="$OPENSIPS_VERSION" '$3 ~ ("^" wanted "([.-]|$)") {print $3; exit}')" \
+    && test -n "$package_version" || { \
+        echo "OpenSIPS $OPENSIPS_VERSION is unavailable in the official 4.0 release repository" >&2; \
+        exit 1; \
+       } \
     && apt-get install -y --no-install-recommends \
-        opensips \
-        opensips-auth-modules \
-        opensips-postgres-module \
+        "opensips=$package_version" \
+        "opensips-auth-modules=$package_version" \
+        "opensips-postgres-module=$package_version" \
     && installed_version="$(dpkg-query -W -f='${Version}' opensips)" \
-    && case "$installed_version" in \
-        "$OPENSIPS_VERSION"*) ;; \
-        *) echo "expected OpenSIPS $OPENSIPS_VERSION, got $installed_version" >&2; exit 1 ;; \
-       esac \
-    && for module in auth.so auth_db.so db_postgres.so pike.so rtpengine.so sqlops.so; do \
+    && test "$installed_version" = "$package_version" \
+    && for module in \
+        auth.so \
+        auth_db.so \
+        db_postgres.so \
+        pike.so \
+        rtpengine.so \
+        sqlops.so; do \
         find /usr/lib -type f -name "$module" -print -quit | grep -q . || { \
             echo "required OpenSIPS module missing: $module" >&2; \
             exit 1; \
