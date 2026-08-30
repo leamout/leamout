@@ -661,6 +661,59 @@ func (q *Queries) MarkCallRinging(ctx context.Context, arg MarkCallRingingParams
 	return i, err
 }
 
+const setCallRouteAttribution = `-- name: SetCallRouteAttribution :one
+UPDATE calls
+SET
+    carrier_connection_id = $1,
+    trunk_id = $2,
+    trunk_endpoint_id = $3,
+    updated_at = NOW()
+WHERE organization_id = $4
+  AND id = $5
+RETURNING id, organization_id, application_id, carrier_connection_id, trunk_id, trunk_endpoint_id, direction, state, media_state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
+`
+
+type SetCallRouteAttributionParams struct {
+	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	TrunkID             *uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	TrunkEndpointID     *uuid.UUID `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
+	OrganizationID      uuid.UUID  `db:"organization_id" json:"organization_id"`
+	ID                  uuid.UUID  `db:"id" json:"id"`
+}
+
+func (q *Queries) SetCallRouteAttribution(ctx context.Context, arg SetCallRouteAttributionParams) (Call, error) {
+	row := q.db.QueryRow(ctx, setCallRouteAttribution,
+		arg.CarrierConnectionID,
+		arg.TrunkID,
+		arg.TrunkEndpointID,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	var i Call
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ApplicationID,
+		&i.CarrierConnectionID,
+		&i.TrunkID,
+		&i.TrunkEndpointID,
+		&i.Direction,
+		&i.State,
+		&i.MediaState,
+		&i.FromUri,
+		&i.ToUri,
+		&i.SipCallID,
+		&i.ProviderID,
+		&i.StartedAt,
+		&i.AnsweredAt,
+		&i.EndedAt,
+		&i.HangupReason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateCallState = `-- name: UpdateCallState :one
 UPDATE calls
 SET
