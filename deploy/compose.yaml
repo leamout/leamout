@@ -56,8 +56,8 @@ services:
     networks:
       - leamout-core
 
-  api:
-    image: leamout/api:dev
+  server:
+    image: leamout/server:1.0.0
     build:
       context: ../server
       dockerfile: Dockerfile
@@ -85,7 +85,7 @@ services:
       - leamout-core
 
   worker:
-    image: leamout/worker:dev
+    image: leamout/worker:1.0.0
     build:
       context: ../server
       dockerfile: Dockerfile
