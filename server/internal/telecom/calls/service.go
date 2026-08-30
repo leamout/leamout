@@ -86,8 +86,8 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 
 	call, err := s.repo.createOutbound(ctx, organizationID, req, RouteAttribution{
 		CarrierConnectionID: route.CarrierConnectionID,
-		TrunkID:              route.TrunkID,
-		TrunkEndpointID:      route.EndpointID,
+		TrunkID:             route.TrunkID,
+		TrunkEndpointID:     route.EndpointID,
 	}, sipCallID)
 	if err != nil {
 		if hangupErr := s.controller.Hangup(ctx, sipCallID); hangupErr != nil {
@@ -292,7 +292,7 @@ func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) 
 	if err := validateControl(call, controlPlay); err != nil {
 		return err
 	}
-	if req.Path, err = require(req.Path, "path"); err != nil {
+	if req.Path, err = require(req.Destination, "destination"); err != nil {
 		return err
 	}
 	return mediaError("play audio", s.controller.Play(ctx, externalID, req.Path))
