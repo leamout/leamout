@@ -2,6 +2,9 @@ CREATE TABLE IF NOT EXISTS calls (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
     application_id UUID REFERENCES voice_applications(id) ON DELETE SET NULL,
+    carrier_connection_id UUID,
+    trunk_id UUID,
+    trunk_endpoint_id UUID,
     direction TEXT NOT NULL,
     state TEXT NOT NULL DEFAULT 'initiating',
     media_state TEXT NOT NULL DEFAULT 'active',
@@ -16,6 +19,15 @@ CREATE TABLE IF NOT EXISTS calls (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT fk_calls_carrier_connection_org
+        FOREIGN KEY (carrier_connection_id, organization_id)
+        REFERENCES carrier_connections(id, organization_id),
+    CONSTRAINT fk_calls_trunk_org
+        FOREIGN KEY (trunk_id, organization_id)
+        REFERENCES trunks(id, organization_id),
+    CONSTRAINT fk_calls_trunk_endpoint_org
+        FOREIGN KEY (trunk_endpoint_id, organization_id)
+        REFERENCES trunk_endpoints(id, organization_id),
     CONSTRAINT chk_calls_direction CHECK (direction IN ('inbound', 'outbound')),
     CONSTRAINT chk_calls_state CHECK (
         state IN ('initiating', 'ringing', 'answered', 'active', 'completed', 'failed', 'cancelled')
@@ -39,6 +51,18 @@ CREATE INDEX IF NOT EXISTS idx_calls_organization_state
 
 CREATE INDEX IF NOT EXISTS idx_calls_application_created
     ON calls (application_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_calls_carrier_connection_id
+    ON calls (carrier_connection_id)
+    WHERE carrier_connection_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_calls_trunk_id
+    ON calls (trunk_id)
+    WHERE trunk_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_calls_trunk_endpoint_id
+    ON calls (trunk_endpoint_id)
+    WHERE trunk_endpoint_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_calls_sip_call_id
     ON calls (sip_call_id)
