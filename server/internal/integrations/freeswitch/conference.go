@@ -15,6 +15,9 @@ func (c *Client) Conference(ctx context.Context, req ConferenceRequest) (Confere
 	if err != nil {
 		return ConferenceResult{}, err
 	}
+	if err := commandReplyError(reply); err != nil {
+		return ConferenceResult{}, err
+	}
 	return ConferenceResult(reply), nil
 }
 

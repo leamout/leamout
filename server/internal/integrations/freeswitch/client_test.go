@@ -1,6 +1,9 @@
 package freeswitch
 
-import "testing"
+import (
+	"net"
+	"testing"
+)
 
 func TestFreeSWITCHStatusUp(t *testing.T) {
 	tests := []struct {
@@ -44,5 +47,25 @@ func TestFreeSWITCHStatusUp(t *testing.T) {
 				t.Fatalf("freeSWITCHStatusUp() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCommandReplyError(t *testing.T) {
+	if err := commandReplyError(Reply{Body: "+OK"}); err != nil {
+		t.Fatalf("commandReplyError(+OK) = %v", err)
+	}
+	err := commandReplyError(Reply{Body: "-ERR Conference not found"})
+	if err == nil || err.Error() != "FreeSWITCH command failed: -ERR Conference not found" {
+		t.Fatalf("commandReplyError(-ERR) = %v", err)
+	}
+}
+
+func TestWriteCommandRejectsLineBreaks(t *testing.T) {
+	client, server := net.Pipe()
+	defer func() { _ = client.Close() }()
+	defer func() { _ = server.Close() }()
+
+	if _, err := writeCommand(client, "api status\napi reloadxml"); err == nil {
+		t.Fatal("writeCommand() error = nil for a multi-line command")
 	}
 }

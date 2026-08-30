@@ -3,6 +3,7 @@ package freeswitch
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -204,6 +205,31 @@ func TestCommandClearsWriteDeadline(t *testing.T) {
 	}
 }
 
+func TestCommandTimeoutReconnectsBeforeNextCommand(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	client.commandTimeout = 30 * time.Millisecond
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	started := time.Now()
+	if _, err := client.Command(context.Background(), "slow"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("slow Command() error = %v, want context deadline exceeded", err)
+	}
+	if elapsed := time.Since(started); elapsed > 150*time.Millisecond {
+		t.Fatalf("slow Command() took %s, want command timeout to bound it", elapsed)
+	}
+
+	waitFor(t, time.Second, client.Ready)
+	if _, err := client.Command(context.Background(), "status"); err != nil {
+		t.Fatalf("Command() after timeout recovery error = %v", err)
+	}
+}
+
 func TestUnholdUsesFreeSWITCHArgumentOrder(t *testing.T) {
 	server := newFakeESLServer(t, "secret")
 	defer server.Close()
@@ -396,6 +422,11 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		case command == "api status":
 			body := "UP 0 years, 0 days, 0 hours, 0 minutes, 1 second"
 			if _, err := fmt.Fprintf(conn, "Content-Type: api/response\nContent-Length: %d\n\n%s", len(body), body); err != nil {
+				return
+			}
+		case command == "api slow":
+			time.Sleep(100 * time.Millisecond)
+			if _, err := fmt.Fprint(conn, "Content-Type: api/response\nContent-Length: 3\n\n+OK"); err != nil {
 				return
 			}
 		default:

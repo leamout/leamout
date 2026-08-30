@@ -48,8 +48,13 @@ func (c *Client) commandOK(ctx context.Context, command string) error {
 	if err != nil {
 		return err
 	}
-	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(reply.Body)), "-ERR") {
-		return fmt.Errorf("FreeSWITCH command failed: %s", strings.TrimSpace(reply.Body))
+	return commandReplyError(reply)
+}
+
+func commandReplyError(reply Reply) error {
+	body := strings.TrimSpace(reply.Body)
+	if strings.HasPrefix(strings.ToUpper(body), "-ERR") {
+		return fmt.Errorf("FreeSWITCH command failed: %s", body)
 	}
 	return nil
 }
