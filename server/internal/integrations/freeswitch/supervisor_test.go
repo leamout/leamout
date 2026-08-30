@@ -3,8 +3,10 @@ package freeswitch
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -184,6 +186,136 @@ func newTestClient(t *testing.T, address, password string) *Client {
 	return client
 }
 
+func TestCommandClearsWriteDeadline(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	client.commandTimeout = 30 * time.Millisecond
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if _, err := client.Command(context.Background(), "status"); err != nil {
+		t.Fatalf("first Command() error = %v", err)
+	}
+	time.Sleep(2 * client.commandTimeout)
+	if _, err := client.Command(context.Background(), "status"); err != nil {
+		t.Fatalf("Command() after the previous deadline error = %v", err)
+	}
+}
+
+func TestCommandTimeoutReconnectsBeforeNextCommand(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	client.commandTimeout = 30 * time.Millisecond
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	started := time.Now()
+	if _, err := client.Command(context.Background(), "slow"); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("slow Command() error = %v, want context deadline exceeded", err)
+	}
+	if elapsed := time.Since(started); elapsed > 150*time.Millisecond {
+		t.Fatalf("slow Command() took %s, want command timeout to bound it", elapsed)
+	}
+
+	waitFor(t, time.Second, client.Ready)
+	if _, err := client.Command(context.Background(), "status"); err != nil {
+		t.Fatalf("Command() after timeout recovery error = %v", err)
+	}
+}
+
+func TestUnholdUsesFreeSWITCHArgumentOrder(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if err := client.Unhold(context.Background(), "call-id"); err != nil {
+		t.Fatalf("Unhold() error = %v", err)
+	}
+	if got, want := server.LastCommand(), "api uuid_hold off call-id"; got != want {
+		t.Fatalf("Unhold() command = %q, want %q", got, want)
+	}
+}
+
+func TestBreakPreservesQueuedChannelApplications(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if err := client.Break(context.Background(), "call-id"); err != nil {
+		t.Fatalf("Break() error = %v", err)
+	}
+	if got, want := server.LastCommand(), "bgapi uuid_break call-id"; got != want {
+		t.Fatalf("Break() command = %q, want %q", got, want)
+	}
+}
+
+func TestBGAPIParsesJobUUIDFromReplyText(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	job, err := client.BGAPI(context.Background(), "uuid_break call-id")
+	if err != nil {
+		t.Fatalf("BGAPI() error = %v", err)
+	}
+	if job.ID != "test-job" {
+		t.Fatalf("BGAPI() job ID = %q, want test-job", job.ID)
+	}
+}
+
+func TestPlaybackUsesDisplaceWithoutBreakingPark(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	const path = "tone_stream://%(30000,0,440)"
+	if err := client.PlayAudio(context.Background(), "call-id", path); err != nil {
+		t.Fatalf("PlayAudio() error = %v", err)
+	}
+	if err := client.StopAudio(context.Background(), "call-id"); err != nil {
+		t.Fatalf("StopAudio() error = %v", err)
+	}
+
+	want := []string{
+		"api uuid_displace call-id start " + path + " 0 mux",
+		"api uuid_setvar call-id " + playbackPathVariable + " " + path,
+		"api uuid_getvar call-id " + playbackPathVariable,
+		"api uuid_displace call-id stop " + path,
+		"api uuid_setvar call-id " + playbackPathVariable,
+	}
+	if got := server.Commands(); !slices.Equal(got, want) {
+		t.Fatalf("playback commands = %#v, want %#v", got, want)
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
 
@@ -208,6 +340,8 @@ type fakeESLServer struct {
 	mu          sync.Mutex
 	connections map[net.Conn]struct{}
 	latest      net.Conn
+	lastCommand string
+	commands    []string
 
 	wg sync.WaitGroup
 }
@@ -240,6 +374,18 @@ func (s *fakeESLServer) Address() string {
 
 func (s *fakeESLServer) SubscriptionCount() int {
 	return int(s.subscriptions.Load())
+}
+
+func (s *fakeESLServer) LastCommand() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastCommand
+}
+
+func (s *fakeESLServer) Commands() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.commands...)
 }
 
 func (s *fakeESLServer) SetAvailable(available bool) {
@@ -338,6 +484,10 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		if err != nil {
 			return
 		}
+		s.mu.Lock()
+		s.lastCommand = command
+		s.commands = append(s.commands, command)
+		s.mu.Unlock()
 
 		switch {
 		case strings.HasPrefix(command, "event plain"):
@@ -348,6 +498,20 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		case command == "api status":
 			body := "UP 0 years, 0 days, 0 hours, 0 minutes, 1 second"
 			if _, err := fmt.Fprintf(conn, "Content-Type: api/response\nContent-Length: %d\n\n%s", len(body), body); err != nil {
+				return
+			}
+		case command == "api slow":
+			time.Sleep(100 * time.Millisecond)
+			if _, err := fmt.Fprint(conn, "Content-Type: api/response\nContent-Length: 3\n\n+OK"); err != nil {
+				return
+			}
+		case command == "api uuid_getvar call-id "+playbackPathVariable:
+			body := "tone_stream://%(30000,0,440)"
+			if _, err := fmt.Fprintf(conn, "Content-Type: api/response\nContent-Length: %d\n\n%s", len(body), body); err != nil {
+				return
+			}
+		case strings.HasPrefix(command, "bgapi "):
+			if _, err := fmt.Fprint(conn, "Content-Type: command/reply\nReply-Text: +OK Job-UUID: test-job\n\n"); err != nil {
 				return
 			}
 		default:

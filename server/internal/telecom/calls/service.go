@@ -69,12 +69,13 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	}
 
 	sipCallID, err := s.controller.Originate(ctx, OriginateRequest{
-		Host:        route.Host,
-		Port:        route.Port,
-		Transport:   route.Transport,
-		Destination: route.To,
-		CallerID:    route.From,
-		Variables:   req.Variables,
+		CarrierConnectionID: route.CarrierConnectionID,
+		Host:                route.Host,
+		Port:                route.Port,
+		Transport:           route.Transport,
+		Destination:         route.To,
+		CallerID:            route.From,
+		Variables:           req.Variables,
 	})
 	if err != nil {
 		return sqlc.Call{}, mediaError("originate call", err)

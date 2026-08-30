@@ -27,7 +27,9 @@ RUN apt-get update \
         db_postgres.so \
         pike.so \
         rtpengine.so \
-        sqlops.so; do \
+        sqlops.so \
+        uac.so \
+        uac_auth.so; do \
         find /usr/lib -type f -name "$module" -print -quit | grep -q . || { \
             echo "required OpenSIPS module missing: $module" >&2; \
             exit 1; \

@@ -104,15 +104,16 @@ func (c *Client) installConnection(conn net.Conn, reader *bufio.Reader) (bool, e
 	}
 
 	replyCh := make(chan Frame)
+	done := make(chan struct{})
 	c.conn = conn
 	c.reader = reader
-	c.done = make(chan struct{})
+	c.done = done
 	c.readErr = make(chan error, 1)
 	c.replyCh = replyCh
 	c.ready = false
 
 	c.wg.Add(1)
-	go c.readLoop(conn, reader, replyCh)
+	go c.readLoop(conn, reader, replyCh, done)
 
 	return true, nil
 }

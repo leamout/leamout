@@ -18,6 +18,7 @@ type Config struct {
 	NATSStreamReplicas    int      `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
 	FreeSWITCHESLAddress  string   `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
 	FreeSWITCHESLPassword string   `env:"FREESWITCH_ESL_PASSWORD,required"`
+	CarrierCredentialKey  string   `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
 	CORSOrigins           []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
 }
 

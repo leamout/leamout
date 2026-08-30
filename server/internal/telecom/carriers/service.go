@@ -2,7 +2,10 @@ package carriers
 
 import (
 	"context"
+	"crypto/md5"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,11 +15,116 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo   *Repository
+	cipher interface{ Encrypt(string) (string, error) }
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, cipher interface{ Encrypt(string) (string, error) }) *Service {
+	return &Service{repo: repo, cipher: cipher}
+}
+
+func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req DigestAuthRequest) (Response, error) {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return Response{}, err
+	}
+	if strings.ToLower(strings.TrimSpace(req.Method)) != "digest" {
+		return Response{}, apperror.NewBadRequest("outbound auth method must be digest")
+	}
+	username, err := requireAuthValue(req.Username, "username")
+	if err != nil {
+		return Response{}, err
+	}
+	secret, err := requireAuthValue(req.Secret, "secret")
+	if err != nil {
+		return Response{}, err
+	}
+	ciphertext, err := s.cipher.Encrypt(secret)
+	if err != nil {
+		return Response{}, apperror.NewInternal("encrypt outbound carrier credential", err)
+	}
+	realm, err := requireAuthValue(req.Realm, "realm")
+	if err != nil {
+		return Response{}, err
+	}
+	if err := s.repo.SetDigestAuth(ctx, org, id, "outbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+		return Response{}, digestWriteError(err, "set outbound carrier auth")
+	}
+	return s.Get(ctx, org, id)
+}
+
+func (s *Service) ClearOutboundAuth(ctx context.Context, org, id uuid.UUID) error {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return err
+	}
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "outbound"), "clear outbound carrier auth")
+}
+
+func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req InboundAuthRequest) (Response, error) {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return Response{}, err
+	}
+	switch strings.ToLower(strings.TrimSpace(req.Method)) {
+	case "ip":
+		if err := s.repo.SetInboundIPAuth(ctx, org, id); err != nil {
+			return Response{}, apperror.NewInternal("set inbound carrier IP auth", err)
+		}
+	case "digest":
+		username, err := requireAuthValue(req.Username, "username")
+		if err != nil {
+			return Response{}, err
+		}
+		secret, err := requireAuthValue(req.Secret, "secret")
+		if err != nil {
+			return Response{}, err
+		}
+		ciphertext, err := s.cipher.Encrypt(secret)
+		if err != nil {
+			return Response{}, apperror.NewInternal("encrypt inbound carrier credential", err)
+		}
+		realm, err := requireAuthValue(req.Realm, "realm")
+		if err != nil {
+			return Response{}, err
+		}
+		if err := s.repo.SetDigestAuth(ctx, org, id, "inbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+			return Response{}, digestWriteError(err, "set inbound carrier auth")
+		}
+	default:
+		return Response{}, apperror.NewBadRequest("inbound auth method must be digest or ip")
+	}
+	return s.Get(ctx, org, id)
+}
+
+func (s *Service) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return err
+	}
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "inbound"), "clear inbound carrier auth")
+}
+
+func requireAuthValue(value, name string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", apperror.NewBadRequest(name + " is required")
+	}
+	return value, nil
+}
+func writeAuthError(err error, message string) error {
+	if err != nil {
+		return apperror.NewInternal(message, err)
+	}
+	return nil
+}
+
+func digestHA1(username, realm, secret string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(username+":"+realm+":"+secret)))
+}
+
+func digestWriteError(err error, message string) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return apperror.NewConflict("digest username and realm are already in use")
+	}
+	return apperror.NewInternal(message, err)
 }
 
 func (s *Service) Create(

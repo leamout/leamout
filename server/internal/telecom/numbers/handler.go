@@ -115,6 +115,25 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) SetCarrierConnection(w http.ResponseWriter, r *http.Request) {
+	organizationID, id, err := ids(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	req, err := helper.DecodeJSON[CarrierConnectionRequest](r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	number, err := h.service.SetCarrierConnection(r.Context(), organizationID, id, req)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, response(number))
+}
+
 func organizationID(r *http.Request) (uuid.UUID, error) {
 	id, ok := middleware.OrganizationIDFromContext(r.Context())
 	if !ok {

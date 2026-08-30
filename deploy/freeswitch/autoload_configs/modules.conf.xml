@@ -6,6 +6,7 @@
 
     <!-- SIP and control-plane event socket -->
     <load module="mod_sofia"/>
+    <load module="mod_loopback"/>
     <load module="mod_event_socket"/>
 
     <!-- Voice v1 call and conference control -->
