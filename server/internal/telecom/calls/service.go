@@ -84,7 +84,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		return sqlc.Call{}, apperror.NewServiceUnavailable("media server returned an empty call id", nil)
 	}
 
-	call, err := s.repo.Create(ctx, organizationID, req, RouteAttribution{
+	call, err := s.repo.createOutbound(ctx, organizationID, req, RouteAttribution{
 		CarrierConnectionID: route.CarrierConnectionID,
 		TrunkID:              route.TrunkID,
 		TrunkEndpointID:      route.EndpointID,
