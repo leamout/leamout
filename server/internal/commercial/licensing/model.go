@@ -16,10 +16,11 @@ const (
 // License is the commercial authority from which deployment entitlements are issued.
 type License struct {
 	ID             string
-	CustomerID     string
+	OrganizationID string
 	SubscriptionID string
 	Status         Status
 	MaxDeployments int
+	SigningKeyID   string
 	IssuedAt       time.Time
 	ExpiresAt      *time.Time
 }
