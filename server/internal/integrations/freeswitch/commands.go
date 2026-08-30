@@ -40,7 +40,17 @@ func (c *Client) BGAPI(ctx context.Context, command string) (Job, error) {
 		return Job{}, fmt.Errorf("FreeSWITCH background command failed: %s", frame.ReplyText())
 	}
 
-	return Job{ID: frame.Header("Job-UUID")}, nil
+	jobID := strings.TrimSpace(frame.Header("Job-UUID"))
+	if jobID == "" {
+		const marker = "Job-UUID:"
+		if _, value, ok := strings.Cut(frame.ReplyText(), marker); ok {
+			jobID = strings.TrimSpace(value)
+		}
+	}
+	if jobID == "" {
+		return Job{}, fmt.Errorf("FreeSWITCH background command returned an empty job UUID")
+	}
+	return Job{ID: jobID}, nil
 }
 
 func (c *Client) commandOK(ctx context.Context, command string) error {

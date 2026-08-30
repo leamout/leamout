@@ -261,8 +261,27 @@ func TestBreakPreservesQueuedChannelApplications(t *testing.T) {
 	if err := client.Break(context.Background(), "call-id"); err != nil {
 		t.Fatalf("Break() error = %v", err)
 	}
-	if got, want := server.LastCommand(), "api uuid_break call-id"; got != want {
+	if got, want := server.LastCommand(), "bgapi uuid_break call-id"; got != want {
 		t.Fatalf("Break() command = %q, want %q", got, want)
+	}
+}
+
+func TestBGAPIParsesJobUUIDFromReplyText(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	job, err := client.BGAPI(context.Background(), "uuid_break call-id")
+	if err != nil {
+		t.Fatalf("BGAPI() error = %v", err)
+	}
+	if job.ID != "test-job" {
+		t.Fatalf("BGAPI() job ID = %q, want test-job", job.ID)
 	}
 }
 
@@ -445,6 +464,10 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		case command == "api slow":
 			time.Sleep(100 * time.Millisecond)
 			if _, err := fmt.Fprint(conn, "Content-Type: api/response\nContent-Length: 3\n\n+OK"); err != nil {
+				return
+			}
+		case strings.HasPrefix(command, "bgapi "):
+			if _, err := fmt.Fprint(conn, "Content-Type: command/reply\nReply-Text: +OK Job-UUID: test-job\n\n"); err != nil {
 				return
 			}
 		default:

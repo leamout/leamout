@@ -115,7 +115,11 @@ func (c *Client) Break(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_break "+commandWord(callID))
+	// uuid_break can wait for an active broadcast application to unwind before
+	// its synchronous API response is written. Queue it through bgapi so a media
+	// stop cannot monopolize the single request/response ESL connection.
+	_, err = c.BGAPI(ctx, "uuid_break "+commandWord(callID))
+	return err
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {
