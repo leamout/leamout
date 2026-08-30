@@ -90,7 +90,9 @@ func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
 	return c.commandOK(ctx, "uuid_broadcast "+commandWords(callID, filePath, "aleg"))
 }
 
-// StopAudio stops media playback on both legs of a call.
+// StopAudio stops the current media application without flushing the channel's
+// remaining private events. In particular, preserving the parked application
+// keeps an ESL-controlled call alive after playback stops.
 func (c *Client) StopAudio(ctx context.Context, callID string) error {
 	return c.Break(ctx, callID)
 }
@@ -113,7 +115,7 @@ func (c *Client) Break(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_break "+commandWords(callID, "all"))
+	return c.commandOK(ctx, "uuid_break "+commandWord(callID))
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {

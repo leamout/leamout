@@ -248,6 +248,24 @@ func TestUnholdUsesFreeSWITCHArgumentOrder(t *testing.T) {
 	}
 }
 
+func TestBreakPreservesQueuedChannelApplications(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if err := client.Break(context.Background(), "call-id"); err != nil {
+		t.Fatalf("Break() error = %v", err)
+	}
+	if got, want := server.LastCommand(), "api uuid_break call-id"; got != want {
+		t.Fatalf("Break() command = %q, want %q", got, want)
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
 
