@@ -7,16 +7,15 @@
       </condition>
     </extension>
 
-    <!-- Temporary inbound PSTN smoke path. OpenSIPS has already authenticated
-         the carrier source and resolved the DID to a trusted voice application.
-         Answer and echo to prove two-way media through RTPengine end to end.
-         Replace this with parked-channel control once the calls consumer owns
-         inbound FreeSWITCH events. -->
-    <extension name="inbound-voice-application-smoke">
+    <!-- OpenSIPS has already authenticated the carrier source and resolved the
+         DID to a trusted voice application. Keep the call unanswered and park
+         it so the Leamout ESL consumer owns its lifecycle and the public call
+         controls decide whether to answer, reject, or execute media actions. -->
+    <extension name="inbound-voice-application">
       <condition field="${sip_h_X-Leamout-Voice-Application-ID}" expression="^.+$">
-        <action application="log" data="NOTICE Leamout inbound PSTN smoke call application=${sip_h_X-Leamout-Voice-Application-ID} did=${destination_number}"/>
-        <action application="answer"/>
-        <action application="echo"/>
+        <action application="log" data="NOTICE Leamout parking inbound call application=${sip_h_X-Leamout-Voice-Application-ID} did=${destination_number}"/>
+        <action application="ring_ready"/>
+        <action application="park"/>
       </condition>
     </extension>
   </context>
