@@ -111,6 +111,9 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
@@ -122,6 +125,9 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
@@ -133,6 +139,9 @@ services:
     restart: unless-stopped
     ports:
       - "3002:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
