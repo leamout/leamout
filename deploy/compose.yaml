@@ -103,6 +103,39 @@ services:
     networks:
       - leamout-core
 
+  web:
+    image: leamout/web:1.0.0
+    build:
+      context: ../clients
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks:
+      - leamout-core
+
+  console:
+    image: leamout/console:1.0.0
+    build:
+      context: ../clients
+      dockerfile: apps/console/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    networks:
+      - leamout-core
+
+  waitlist:
+    image: leamout/waitlist:1.0.0
+    build:
+      context: ../clients
+      dockerfile: apps/waitlist/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    networks:
+      - leamout-core
+
   opensips:
     image: leamout/opensips:4.0.1
     build:
