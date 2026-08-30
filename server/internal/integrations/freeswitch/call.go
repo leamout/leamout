@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	playbackPathVariable       = "leamout_playback_path"
-	displaceHangupOnErrorVar   = "DISPLACE_HANGUP_ON_ERROR"
+	playbackPathVariable     = "leamout_playback_path"
+	displaceHangupOnErrorVar = "DISPLACE_HANGUP_ON_ERROR"
 )
 
 func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, error) {
