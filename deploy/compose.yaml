@@ -61,8 +61,6 @@ services:
     build:
       context: ../server
       dockerfile: Dockerfile
-      args:
-        LEAMOUT_COMMAND: server
     restart: unless-stopped
     environment: *leamout-environment
     ports:
@@ -89,8 +87,7 @@ services:
     build:
       context: ../server
       dockerfile: Dockerfile
-      args:
-        LEAMOUT_COMMAND: worker
+    command: ["/leamout/worker"]
     restart: unless-stopped
     environment: *leamout-environment
     depends_on:
@@ -111,6 +108,9 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
@@ -122,6 +122,9 @@ services:
     restart: unless-stopped
     ports:
       - "3001:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
@@ -133,6 +136,9 @@ services:
     restart: unless-stopped
     ports:
       - "3002:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
