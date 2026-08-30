@@ -20,8 +20,8 @@ type CreateCallRequest struct {
 // RouteAttribution records the concrete route selected for an outbound call.
 type RouteAttribution struct {
 	CarrierConnectionID uuid.UUID
-	TrunkID              uuid.UUID
-	TrunkEndpointID      uuid.UUID
+	TrunkID             uuid.UUID
+	TrunkEndpointID     uuid.UUID
 }
 
 // OriginateRequest is the internal media-controller command produced after
