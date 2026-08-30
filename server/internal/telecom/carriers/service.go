@@ -2,7 +2,7 @@ package carriers
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"strings"
@@ -116,7 +116,7 @@ func writeAuthError(err error, message string) error {
 }
 
 func digestHA1(username, realm, secret string) string {
-	return fmt.Sprintf("%x", md5.Sum([]byte(username+":"+realm+":"+secret)))
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(username+":"+realm+":"+secret)))
 }
 
 func digestWriteError(err error, message string) error {
