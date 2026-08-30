@@ -9,8 +9,35 @@ This roadmap tracks customer-owned SIP carrier connectivity independently from p
 - [x] Encrypted outbound digest credential API.
 - [x] Encrypted inbound digest or source-IP authentication API.
 - [x] Public number-to-carrier-connection assignment API.
-- [ ] Add a built-in generic SIP provider to production bootstrap data.
-- [ ] Apply credential and source-IP changes to OpenSIPS without restart.
+- [x] Add a built-in generic SIP provider to production bootstrap data.
+- [x] Apply source-IP changes immediately (carrier ingress queries PostgreSQL per request).
+- [ ] Materialize encrypted digest credentials into an OpenSIPS-safe runtime auth store without restart.
+
+### Credential activation design
+
+Source-IP authentication is already live immediately because OpenSIPS resolves
+the active CIDR records from PostgreSQL for every new carrier INVITE. Digest
+credentials are different: OpenSIPS cannot consume the API's AES-GCM ciphertext
+directly, and a generic `reload` command would not make those secrets usable.
+
+Implement digest activation as a separate security change:
+
+1. Add an explicit SIP realm to inbound and outbound digest configuration.
+2. Derive and store realm-bound HA1 material for inbound authentication; never
+   expose or copy plaintext credentials into an OpenSIPS-readable table.
+3. Authenticate inbound carrier requests against the active, organization-bound
+   HA1 records and resolve the same carrier connection after authentication.
+4. Add an outbound credential agent that decrypts credentials in trusted
+   application memory and updates FreeSWITCH/OpenSIPS runtime authentication
+   state atomically.
+5. Rotate by installing new runtime material before retiring the previous
+   version, then verify with an authenticated test transaction.
+6. Add acceptance coverage proving set, rotate, and delete take effect without
+   restarting OpenSIPS or exposing plaintext in SQL, logs, or MI responses.
+
+Do not implement this item as an OpenSIPS configuration reload: the current SIP
+route does not reference carrier digest credentials, so reload alone would
+report success while leaving authentication behavior unchanged.
 
 ## Phase 2 — dedicated BYOC acceptance gate
 

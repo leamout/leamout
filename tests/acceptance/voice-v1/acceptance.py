@@ -19,7 +19,6 @@ TOKEN = os.getenv("VOICE_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrs
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "voice-v1-esl-secret")
 DID = os.getenv("VOICE_V1_DID", "+15551234567")
 CALLER = os.getenv("VOICE_V1_CALLER", "+15557654321")
-PROVIDER_ID = "00000000-0000-0000-0000-000000002001"
 ORG_ID = "00000000-0000-0000-0000-000000001001"
 COMPOSE = [
     "docker", "compose",
@@ -214,13 +213,17 @@ def deploy():
 
 def configure_provider():
     _, providers = api("GET", "/v1/carrier-providers/", expected={200})
-    if not any(item["id"] == PROVIDER_ID for item in providers["carrier_providers"]):
-        raise AcceptanceError("synthetic carrier provider fixture is not visible")
+    provider = next(
+        (item for item in providers["carrier_providers"] if item["slug"] == "generic-sip"),
+        None,
+    )
+    if not provider:
+        raise AcceptanceError("built-in generic SIP provider is not visible")
 
     _, connection = api(
         "POST", "/v1/carrier-connections/",
         {
-            "provider_id": PROVIDER_ID,
+            "provider_id": provider["id"],
             "name": "voice-v1-carrier",
             "inbound_enabled": True,
             "codecs": ["PCMU", "PCMA"],
