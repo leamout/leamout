@@ -56,6 +56,17 @@ WHERE state IN ('initiating', 'ringing', 'answered', 'active')
 ORDER BY updated_at ASC
 LIMIT sqlc.arg(batch_size);
 
+-- name: SetCallRouteAttribution :one
+UPDATE calls
+SET
+    carrier_connection_id = sqlc.arg(carrier_connection_id),
+    trunk_id = sqlc.arg(trunk_id),
+    trunk_endpoint_id = sqlc.arg(trunk_endpoint_id),
+    updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+RETURNING *;
+
 -- name: UpdateCallState :one
 UPDATE calls
 SET
