@@ -61,8 +61,6 @@ services:
     build:
       context: ../server
       dockerfile: Dockerfile
-      args:
-        LEAMOUT_COMMAND: server
     restart: unless-stopped
     environment: *leamout-environment
     ports:
@@ -89,8 +87,7 @@ services:
     build:
       context: ../server
       dockerfile: Dockerfile
-      args:
-        LEAMOUT_COMMAND: worker
+    command: ["/leamout/worker"]
     restart: unless-stopped
     environment: *leamout-environment
     depends_on:
