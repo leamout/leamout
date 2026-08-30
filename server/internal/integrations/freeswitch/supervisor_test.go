@@ -305,6 +305,7 @@ func TestPlaybackUsesDisplaceWithoutBreakingPark(t *testing.T) {
 	}
 
 	want := []string{
+		"api uuid_setvar call-id " + displaceHangupOnErrorVar + " false",
 		"api uuid_displace call-id start " + path + " 0 mux",
 		"api uuid_setvar call-id " + playbackPathVariable + " " + path,
 		"api uuid_getvar call-id " + playbackPathVariable,
