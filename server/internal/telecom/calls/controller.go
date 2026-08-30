@@ -157,7 +157,7 @@ func (c *FreeSWITCHController) Play(ctx context.Context, callID, path string) er
 }
 
 func (c *FreeSWITCHController) Stop(ctx context.Context, callID string) error {
-	if err := c.client.Break(ctx, callID); err != nil {
+	if err := c.client.StopAudio(ctx, callID); err != nil {
 		return fmt.Errorf("stop audio: %w", err)
 	}
 	return nil
