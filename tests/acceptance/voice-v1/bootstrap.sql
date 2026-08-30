@@ -19,13 +19,3 @@ VALUES (
     '[]'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO carrier_providers (id, slug, name, adapter, status)
-VALUES (
-    '00000000-0000-0000-0000-000000002001',
-    'voice-v1-test',
-    'Voice v1 Synthetic Carrier',
-    'sip',
-    'active'
-)
-ON CONFLICT (id) DO NOTHING;

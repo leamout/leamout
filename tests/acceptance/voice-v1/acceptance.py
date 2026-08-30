@@ -12,13 +12,13 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import xml.etree.ElementTree as ET
 
 API_BASE = os.getenv("VOICE_V1_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("VOICE_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "voice-v1-esl-secret")
 DID = os.getenv("VOICE_V1_DID", "+15551234567")
 CALLER = os.getenv("VOICE_V1_CALLER", "+15557654321")
-PROVIDER_ID = "00000000-0000-0000-0000-000000002001"
 ORG_ID = "00000000-0000-0000-0000-000000001001"
 COMPOSE = [
     "docker", "compose",
@@ -213,13 +213,17 @@ def deploy():
 
 def configure_provider():
     _, providers = api("GET", "/v1/carrier-providers/", expected={200})
-    if not any(item["id"] == PROVIDER_ID for item in providers["carrier_providers"]):
-        raise AcceptanceError("synthetic carrier provider fixture is not visible")
+    provider = next(
+        (item for item in providers["carrier_providers"] if item["slug"] == "generic-sip"),
+        None,
+    )
+    if not provider:
+        raise AcceptanceError("built-in generic SIP provider is not visible")
 
     _, connection = api(
         "POST", "/v1/carrier-connections/",
         {
-            "provider_id": PROVIDER_ID,
+            "provider_id": provider["id"],
             "name": "voice-v1-carrier",
             "inbound_enabled": True,
             "codecs": ["PCMU", "PCMA"],
@@ -269,11 +273,13 @@ def create_voice_application():
     )
     STATE["number_id"] = number["id"]
 
-    updated = psql(
-        "UPDATE phone_numbers SET carrier_connection_id = "
-        f"'{STATE['connection_id']}'::uuid WHERE id = '{number['id']}'::uuid RETURNING id;"
+    _, assigned = api(
+        "PUT",
+        f"/v1/numbers/{number['id']}/carrier-connection",
+        {"carrier_connection_id": STATE["connection_id"]},
+        expected={200},
     )
-    if number["id"] not in updated:
+    if assigned.get("carrier_connection_id") != STATE["connection_id"]:
         raise AcceptanceError("failed to assign test DID to carrier connection")
 
     _, application = api(
@@ -394,12 +400,17 @@ def hold_resume():
 
 def play_audio():
     call_id = STATE["call_id"]
+    # Keep the generated tone active well beyond the API round trip so this
+    # check exercises stopping live playback rather than racing natural EOF.
+    path = "tone_stream://%(30000,0,440)"
     api(
         "POST", f"/v1/calls/{call_id}/play",
-        {"path": "tone_stream://%(500,0,440)"},
+        {"path": path},
         expected={200},
     )
     time.sleep(0.2)
+    if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
+        raise AcceptanceError("media channel disappeared while playback was active")
     api("POST", f"/v1/calls/{call_id}/stop", expected={200})
     if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
         raise AcceptanceError("media channel disappeared during playback")
@@ -493,7 +504,16 @@ def conference():
 
     try:
         api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
-        if "locked" not in fs_cli("freeswitch", f"conference {name} list").lower():
+        conference_xml = ET.fromstring(fs_cli("freeswitch", "conference xml_list"))
+        locked = next(
+            (
+                conference.get("locked")
+                for conference in conference_xml.iter("conference")
+                if conference.get("name") == name
+            ),
+            None,
+        )
+        if locked != "true":
             raise AcceptanceError("conference lock is not observable in FreeSWITCH")
         api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
         api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
@@ -537,13 +557,20 @@ def webhooks():
     for event in call_events:
         verify_signature(event)
 
-    _, body = api(
-        "GET",
-        f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
-        expected={200},
-    )
-    if not any(item["status"] == "delivered" for item in body["deliveries"]):
-        raise AcceptanceError("webhook API has no delivered attempts")
+    # The receiver observes the request before the delivery worker can persist
+    # the response. Poll the API rather than racing that final database update.
+    def delivered_attempt():
+        _, current = api(
+            "GET",
+            f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
+            expected={200},
+        )
+        return next(
+            (item for item in current["deliveries"] if item["status"] == "succeeded"),
+            False,
+        )
+
+    wait_for("persisted webhook delivery", delivered_attempt)
     return f"{len(call_events)} signed call deliveries verified"
 
 

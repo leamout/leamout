@@ -170,6 +170,8 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 
 	c.commandMu.Lock()
 	defer c.commandMu.Unlock()
+	commandCtx, cancel := context.WithTimeout(ctx, c.commandTimeout)
+	defer cancel()
 
 	c.mu.Lock()
 	conn := c.conn
@@ -181,19 +183,20 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 		return Frame{}, fmt.Errorf("FreeSWITCH client is not connected")
 	}
 
-	deadline, ok := ctx.Deadline()
-	if !ok {
-		deadline = time.Now().Add(c.commandTimeout)
-	}
+	deadline, _ := commandCtx.Deadline()
 	if err := conn.SetWriteDeadline(deadline); err != nil {
 		return Frame{}, fmt.Errorf("set FreeSWITCH command deadline: %w", err)
 	}
 
 	c.writeMu.Lock()
 	_, err := writeCommand(conn, command)
+	clearDeadlineErr := conn.SetWriteDeadline(time.Time{})
 	c.writeMu.Unlock()
 	if err != nil {
 		return Frame{}, fmt.Errorf("write FreeSWITCH command: %w", err)
+	}
+	if clearDeadlineErr != nil {
+		return Frame{}, fmt.Errorf("clear FreeSWITCH command deadline: %w", clearDeadlineErr)
 	}
 
 	select {
@@ -203,8 +206,12 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 		return Frame{}, fmt.Errorf("read FreeSWITCH response: %w", err)
 	case <-done:
 		return Frame{}, fmt.Errorf("FreeSWITCH connection closed")
-	case <-ctx.Done():
-		return Frame{}, fmt.Errorf("FreeSWITCH command: %w", ctx.Err())
+	case <-commandCtx.Done():
+		// A timed-out response can arrive during a later command and corrupt the
+		// request/response pairing. Retire this connection and let the supervisor
+		// establish a clean ESL session before accepting another command.
+		c.disconnect(conn, commandCtx.Err())
+		return Frame{}, fmt.Errorf("FreeSWITCH command: %w", commandCtx.Err())
 	}
 }
 
@@ -212,6 +219,7 @@ func (c *Client) readLoop(
 	conn net.Conn,
 	reader *bufio.Reader,
 	replyCh chan<- Frame,
+	done <-chan struct{},
 ) {
 	defer c.wg.Done()
 
@@ -226,6 +234,8 @@ func (c *Client) readLoop(
 		case ContentTypeCommandReply, ContentTypeAPIResponse:
 			select {
 			case replyCh <- frame:
+			case <-done:
+				return
 			case <-c.lifecycleCtx.Done():
 				c.disconnect(conn, context.Canceled)
 				return
@@ -253,6 +263,7 @@ func (c *Client) disconnect(conn net.Conn, readErr error) {
 	c.ready = false
 	shouldReconnect := !c.closed
 	c.mu.Unlock()
+	_ = conn.Close()
 
 	if readErr == nil {
 		readErr = io.EOF
@@ -293,7 +304,11 @@ func (c *Client) dispatchEvent(frame Frame) {
 }
 
 func writeCommand(conn net.Conn, command string) (int, error) {
-	return fmt.Fprintf(conn, "%s\n\n", strings.TrimSpace(command))
+	command = strings.TrimSpace(command)
+	if strings.ContainsAny(command, "\r\n") {
+		return 0, fmt.Errorf("FreeSWITCH command cannot contain line breaks")
+	}
+	return fmt.Fprintf(conn, "%s\n\n", command)
 }
 
 func readFrame(reader *bufio.Reader) (Frame, error) {

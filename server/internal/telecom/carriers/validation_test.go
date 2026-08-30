@@ -29,3 +29,9 @@ func TestValidateLimits(t *testing.T) {
 		t.Fatal("accepted non-positive limit")
 	}
 }
+
+func TestDigestHA1(t *testing.T) {
+	if got, want := digestHA1("byoc-user", "carrier.example", "rotated-secret"), "9fcc44d55f26bac30b97201af8e5654d"; got != want {
+		t.Fatalf("digestHA1() = %q, want %q", got, want)
+	}
+}

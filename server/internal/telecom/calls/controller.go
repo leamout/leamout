@@ -7,13 +7,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 )
 
 const (
-	openSIPSEgressHost = "opensips"
-	openSIPSEgressPort = 5060
-	routeURIHeaderVar  = "sip_h_X-Leamout-Route-URI"
+	openSIPSEgressHost         = "opensips"
+	openSIPSEgressPort         = 5060
+	routeURIHeaderVar          = "sip_h_X-Leamout-Route-URI"
+	carrierConnectionHeaderVar = "sip_h_X-Leamout-Carrier-Connection-ID"
 )
 
 // FreeSWITCHController adapts the FreeSWITCH client to the calls.Controller interface.
@@ -42,12 +44,10 @@ func (c *FreeSWITCHController) Originate(ctx context.Context, req OriginateReque
 		return "", err
 	}
 
-	variables := make(map[string]string, len(req.Variables)+1)
-	for key, value := range req.Variables {
-		variables[key] = value
+	variables, err := egressVariables(req, routeURI)
+	if err != nil {
+		return "", err
 	}
-	// Always overwrite the reserved routing variable after copying user variables.
-	variables[routeURIHeaderVar] = routeURI
 
 	call, err := c.client.Originate(ctx, freeswitch.OriginateRequest{
 		Endpoint:    endpoint,
@@ -63,6 +63,21 @@ func (c *FreeSWITCHController) Originate(ctx context.Context, req OriginateReque
 	}
 
 	return call.UUID, nil
+}
+
+func egressVariables(req OriginateRequest, routeURI string) (map[string]string, error) {
+	if req.CarrierConnectionID == uuid.Nil {
+		return nil, fmt.Errorf("resolved carrier connection id is required")
+	}
+
+	variables := make(map[string]string, len(req.Variables)+2)
+	for key, value := range req.Variables {
+		variables[key] = value
+	}
+	// Always overwrite reserved metadata after copying user variables.
+	variables[routeURIHeaderVar] = routeURI
+	variables[carrierConnectionHeaderVar] = req.CarrierConnectionID.String()
+	return variables, nil
 }
 
 func freeSWITCHEgress(req OriginateRequest) (string, string, error) {

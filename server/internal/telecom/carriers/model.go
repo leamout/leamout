@@ -38,6 +38,20 @@ type SourceIPCreateRequest struct {
 	CIDR string `json:"cidr"`
 }
 
+type DigestAuthRequest struct {
+	Method   string `json:"method"`
+	Username string `json:"username"`
+	Realm    string `json:"realm"`
+	Secret   string `json:"secret"`
+}
+
+type InboundAuthRequest struct {
+	Method   string `json:"method"`
+	Username string `json:"username,omitempty"`
+	Realm    string `json:"realm,omitempty"`
+	Secret   string `json:"secret,omitempty"`
+}
+
 type Response struct {
 	ID                     uuid.UUID `json:"id"`
 	OrganizationID         uuid.UUID `json:"organization_id"`
