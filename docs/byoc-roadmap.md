@@ -41,12 +41,13 @@ report success while leaving authentication behavior unchanged.
 
 ## Phase 2 — dedicated BYOC acceptance gate
 
-- [ ] Provision a generic carrier exclusively through public APIs.
-- [ ] Complete inbound and outbound calls over UDP.
-- [ ] Reject unknown source IPs and cross-organization DID ownership.
+- [x] Add an independent BYOC v1 Compose gate and CI workflow.
+- [x] Provision a generic carrier exclusively through public APIs.
+- [x] Complete inbound and outbound calls over UDP.
+- [ ] Reject cross-organization DID ownership (unknown source rejection is covered).
 - [ ] Exercise outbound digest authentication and credential rotation.
-- [ ] Verify route attribution records carrier connection, trunk, and endpoint IDs.
-- [ ] Verify configuration survives API, worker, and OpenSIPS restarts.
+- [ ] Persist and verify carrier connection and endpoint IDs in addition to trunk attribution.
+- [x] Verify configuration survives API and OpenSIPS restarts.
 
 ## Phase 3 — endpoint reliability
 
