@@ -69,12 +69,13 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	}
 
 	sipCallID, err := s.controller.Originate(ctx, OriginateRequest{
-		Host:        route.Host,
-		Port:        route.Port,
-		Transport:   route.Transport,
-		Destination: route.To,
-		CallerID:    route.From,
-		Variables:   req.Variables,
+		CarrierConnectionID: route.CarrierConnectionID,
+		Host:                route.Host,
+		Port:                route.Port,
+		Transport:           route.Transport,
+		Destination:         route.To,
+		CallerID:            route.From,
+		Variables:           req.Variables,
 	})
 	if err != nil {
 		return sqlc.Call{}, mediaError("originate call", err)
@@ -84,18 +85,37 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	}
 
 	call, err := s.repo.Create(ctx, organizationID, req, sipCallID)
+	if err != nil {
+		if hangupErr := s.controller.Hangup(ctx, sipCallID); hangupErr != nil {
+			return sqlc.Call{}, apperror.NewInternal(
+				"create call and clean up media call",
+				errors.Join(err, hangupErr),
+			)
+		}
+		return sqlc.Call{}, writeError(err, "create call")
+	}
+
+	// FreeSWITCH's synchronous originate command only returns +OK after the
+	// B-leg has answered and entered the parked application. Persist that fact
+	// immediately so outbound media controls are available on the returned call.
+	answered, err := s.repo.MarkAnswered(ctx, organizationID, call.ID)
 	if err == nil {
-		return call, nil
+		return answered, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		latest, getErr := s.Get(ctx, organizationID, call.ID)
+		if getErr == nil && isConnected(latest.State) {
+			return latest, nil
+		}
 	}
 
 	if hangupErr := s.controller.Hangup(ctx, sipCallID); hangupErr != nil {
 		return sqlc.Call{}, apperror.NewInternal(
-			"create call and clean up media call",
+			"mark outbound call answered and clean up media call",
 			errors.Join(err, hangupErr),
 		)
 	}
-
-	return sqlc.Call{}, writeError(err, "create call")
+	return sqlc.Call{}, apperror.NewInternal("mark outbound call answered", err)
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {

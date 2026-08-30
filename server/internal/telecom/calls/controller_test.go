@@ -1,6 +1,10 @@
 package calls
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/uuid"
+)
 
 func TestFreeSWITCHEgress(t *testing.T) {
 	t.Parallel()
@@ -61,5 +65,31 @@ func TestFreeSWITCHEgress(t *testing.T) {
 				t.Fatalf("freeSWITCHEgress() route URI = %q, want %q", routeURI, tt.wantRouteURI)
 			}
 		})
+	}
+}
+
+func TestEgressVariablesBindResolvedCarrierConnection(t *testing.T) {
+	t.Parallel()
+
+	connectionID := uuid.New()
+	variables, err := egressVariables(OriginateRequest{
+		CarrierConnectionID: connectionID,
+		Variables: map[string]string{
+			routeURIHeaderVar:          "sip:attacker.invalid",
+			carrierConnectionHeaderVar: uuid.NewString(),
+		},
+	}, "sip:carrier.example:5060;transport=udp")
+	if err != nil {
+		t.Fatalf("egressVariables() error = %v", err)
+	}
+	if got := variables[routeURIHeaderVar]; got != "sip:carrier.example:5060;transport=udp" {
+		t.Fatalf("route metadata = %q", got)
+	}
+	if got := variables[carrierConnectionHeaderVar]; got != connectionID.String() {
+		t.Fatalf("carrier connection metadata = %q, want %q", got, connectionID)
+	}
+
+	if _, err := egressVariables(OriginateRequest{}, "sip:carrier.example"); err == nil {
+		t.Fatal("egressVariables() accepted an empty carrier connection id")
 	}
 }

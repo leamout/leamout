@@ -5,15 +5,17 @@ import (
 	"net/netip"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 type Repository struct {
+	db      *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
-func NewRepository(queries *sqlc.Queries) *Repository {
-	return &Repository{queries: queries}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
 func (r *Repository) Create(
@@ -63,6 +65,63 @@ func (r *Repository) Disable(
 			OrganizationID: organizationID,
 		},
 	)
+}
+
+func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direction, username, realm, ciphertext, ha1 string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	if direction == "outbound" {
+		err = q.SetCarrierConnectionOutboundDigestAuth(ctx, sqlc.SetCarrierConnectionOutboundDigestAuthParams{ID: id, OrganizationID: org, AuthUsername: &username, AuthSecretCiphertext: &ciphertext})
+	} else {
+		err = q.SetCarrierConnectionInboundDigestAuth(ctx, sqlc.SetCarrierConnectionInboundDigestAuthParams{ID: id, OrganizationID: org, InboundUsername: &username, InboundSecretCiphertext: &ciphertext})
+	}
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO carrier_digest_credentials (carrier_connection_id, organization_id, direction, username, realm, ha1_md5) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (carrier_connection_id, direction) DO UPDATE SET username=EXCLUDED.username, realm=EXCLUDED.realm, ha1_md5=EXCLUDED.ha1_md5, updated_at=now()`, id, org, direction, username, realm, ha1)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) ClearAuth(ctx context.Context, org, id uuid.UUID, direction string) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	if direction == "outbound" {
+		err = q.ClearCarrierConnectionOutboundAuth(ctx, sqlc.ClearCarrierConnectionOutboundAuthParams{ID: id, OrganizationID: org})
+	} else {
+		err = q.SetCarrierConnectionInboundNoAuth(ctx, sqlc.SetCarrierConnectionInboundNoAuthParams{ID: id, OrganizationID: org})
+	}
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM carrier_digest_credentials WHERE carrier_connection_id=$1 AND organization_id=$2 AND direction=$3`, id, org, direction); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err = r.queries.WithTx(tx).SetCarrierConnectionInboundIPAuth(ctx, sqlc.SetCarrierConnectionInboundIPAuthParams{ID: id, OrganizationID: org}); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM carrier_digest_credentials WHERE carrier_connection_id=$1 AND organization_id=$2 AND direction='inbound'`, id, org); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) CreateSourceIP(

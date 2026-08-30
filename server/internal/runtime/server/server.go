@@ -18,6 +18,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/internal/security/secrets"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
@@ -70,12 +71,19 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("connect FreeSWITCH: %w", err)
 	}
 
-	controller := calls.NewFreeSWITCHController(freeSwitch)
+	callsController := calls.NewFreeSWITCHController(freeSwitch)
+	conferenceController := conferences.NewFreeSWITCHController(freeSwitch)
 
 	logger := logging.New()
 	metricsRegistry := metrics.New()
 
-	modules, err := NewModules(db, controller)
+	credentialCipher, err := secrets.New(cfg.CarrierCredentialKey)
+	if err != nil {
+		_ = freeSwitch.Close()
+		db.Close()
+		return nil, err
+	}
+	modules, err := NewModules(db, callsController, conferenceController, credentialCipher)
 	if err != nil {
 		_ = freeSwitch.Close()
 		db.Close()
@@ -107,7 +115,12 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	}, nil
 }
 
-func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) {
+func NewModules(
+	db *pgxpool.Pool,
+	callsController calls.Controller,
+	conferenceController conferences.Controller,
+	credentialCipher *secrets.Cipher,
+) (Modules, error) {
 	queries := sqlc.New(db)
 
 	sessionRepository := session.NewRepository(queries)
@@ -136,13 +149,13 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 	routingService := routing.NewService(routeResolver)
 
 	callsRepository := calls.NewRepository(db)
-	callsService := calls.NewService(callsRepository, controller, routingService)
+	callsService := calls.NewService(callsRepository, callsController, routingService)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
 
 	conferencesRepository := conferences.NewRepository(db)
-	conferencesService := conferences.NewService(conferencesRepository)
+	conferencesService := conferences.NewService(conferencesRepository, conferenceController)
 
 	subscribersRepository := subscribers.NewRepository(queries)
 	subscribersService := subscribers.NewService(subscribersRepository)
@@ -152,8 +165,8 @@ func NewModules(db *pgxpool.Pool, controller calls.Controller) (Modules, error) 
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
-	carriersRepository := carriers.NewRepository(queries)
-	carriersService := carriers.NewService(carriersRepository)
+	carriersRepository := carriers.NewRepository(db)
+	carriersService := carriers.NewService(carriersRepository, credentialCipher)
 
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)

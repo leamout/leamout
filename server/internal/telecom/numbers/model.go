@@ -21,6 +21,10 @@ type UpdateRequest struct {
 	SMSEnabled   *bool   `json:"sms_enabled,omitempty"`
 }
 
+type CarrierConnectionRequest struct {
+	CarrierConnectionID uuid.UUID `json:"carrier_connection_id"`
+}
+
 type Response struct {
 	ID                  uuid.UUID  `json:"id"`
 	OrganizationID      uuid.UUID  `json:"organization_id"`

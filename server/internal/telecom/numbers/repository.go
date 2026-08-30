@@ -72,3 +72,7 @@ func (r *Repository) Disable(
 		OrganizationID: organizationID,
 	})
 }
+
+func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, id, connectionID uuid.UUID) (sqlc.PhoneNumber, error) {
+	return r.queries.UpdatePhoneNumber(ctx, sqlc.UpdatePhoneNumberParams{ID: id, OrganizationID: organizationID, CarrierConnectionID: &connectionID})
+}

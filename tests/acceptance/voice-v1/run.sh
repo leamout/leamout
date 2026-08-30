@@ -8,6 +8,7 @@ CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-voice-v1.XXXXXX")
 export VOICE_V1_SUITE_DIR="$SCRIPT_DIR"
 export VOICE_V1_CERT_DIR="$CERT_DIR"
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-voice-v1-esl-secret}"
+export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
 export TURN_REALM="${TURN_REALM:-voice-v1.local}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-voice-v1-turn-secret}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
@@ -108,7 +109,6 @@ $COMPOSE up -d --build \
     nats \
     rtpengine \
     freeswitch \
-    opensips \
     voice-v1-carrier \
     voice-v1-webhook
 
@@ -135,6 +135,60 @@ $COMPOSE exec -T postgres \
     psql -v ON_ERROR_STOP=1 -U leamout -d leamout \
     <tests/acceptance/voice-v1/bootstrap.sql \
     >/dev/null
+
+printf '%s\n' "Starting OpenSIPS after database bootstrap..."
+$COMPOSE up -d --build opensips
+
+printf '%s\n' "Waiting for OpenSIPS startup stability..."
+i=0
+stable=0
+while :; do
+    opensips_id=$($COMPOSE ps -q opensips)
+    if [ -n "$opensips_id" ]; then
+        running=$(docker inspect -f '{{.State.Running}}' "$opensips_id" 2>/dev/null || true)
+        restart_count=$(docker inspect -f '{{.RestartCount}}' "$opensips_id" 2>/dev/null || true)
+
+        if [ -n "$restart_count" ] && [ "$restart_count" -gt 0 ] 2>/dev/null; then
+            echo "OpenSIPS restarted during initialization" >&2
+            $COMPOSE logs --no-color --tail=200 opensips >&2 || true
+            exit 1
+        fi
+
+        if [ "$running" = "true" ] && [ "$restart_count" = "0" ]; then
+            stable=$((stable + 1))
+            if [ "$stable" -ge 5 ]; then
+                break
+            fi
+        else
+            stable=0
+        fi
+    else
+        stable=0
+    fi
+
+    i=$((i + 1))
+    if [ "$i" -ge 30 ]; then
+        echo "OpenSIPS did not become stable" >&2
+        $COMPOSE logs --no-color --tail=200 opensips >&2 || true
+        exit 1
+    fi
+    sleep 1
+done
+
+printf '%s\n' "Waiting for FreeSWITCH ESL from the Compose network..."
+i=0
+until $COMPOSE exec -T voice-v1-carrier sh -c '
+    fs_cli -H freeswitch -P 8021 \
+        -p "$FREESWITCH_ESL_PASSWORD" \
+        -x status >/dev/null 2>&1
+'; do
+    i=$((i + 1))
+    if [ "$i" -ge 60 ]; then
+        echo "FreeSWITCH ESL did not become ready/authenticated from the Compose network" >&2
+        exit 1
+    fi
+    sleep 1
+done
 
 $COMPOSE up -d --build api worker
 

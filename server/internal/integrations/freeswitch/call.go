@@ -2,30 +2,33 @@ package freeswitch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
+
+const playbackPathVariable = "leamout_playback_path"
 
 func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, error) {
 	if err := req.Validate(); err != nil {
 		return Call{}, err
 	}
 
-	command := "originate"
-	if prefix := formatVariables(req.Variables); prefix != "" {
-		command += " " + prefix
-	}
+	endpoint := req.Endpoint
 	if req.CallerID != "" {
 		callerIDVar := "origination_caller_id_number=" + commandWord(req.CallerID)
-		if strings.HasSuffix(command, "}") {
-			command = strings.TrimSuffix(command, "}") + "," + callerIDVar + "}"
+		if prefix := formatVariables(req.Variables); prefix != "" {
+			endpoint = strings.TrimSuffix(prefix, "}") + "," + callerIDVar + "}" + endpoint
 		} else {
-			command += " {" + callerIDVar + "}"
+			endpoint = "{" + callerIDVar + "}" + endpoint
 		}
+	} else if prefix := formatVariables(req.Variables); prefix != "" {
+		endpoint = prefix + endpoint
 	}
+
 	// Once the B-leg answers, keep the channel parked under ESL control instead
 	// of sending it through a user-facing dialplan destination.
-	command += " " + commandWords(req.Endpoint, "&park()")
+	command := "originate " + commandWords(endpoint, "&park()")
 
 	reply, err := c.Command(ctx, command)
 	if err != nil {
@@ -72,10 +75,13 @@ func (c *Client) Unhold(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_unhold "+commandWord(callID))
+	// FreeSWITCH resumes a held channel through uuid_hold's "off" form; it
+	// does not expose a uuid_unhold API command.
+	return c.commandOK(ctx, "uuid_hold "+commandWords("off", callID))
 }
 
-// PlayAudio plays an audio file to a call without blocking the ESL client.
+// PlayAudio attaches playback as a media bug so stopping it does not interrupt
+// the park application that owns the ESL-controlled channel.
 func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
 	callID, err := requiredArgument("call ID", callID)
 	if err != nil {
@@ -85,12 +91,45 @@ func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_broadcast "+commandWords(callID, filePath, "aleg"))
+	if err := c.commandOK(ctx, "uuid_displace "+commandWords(callID, "start", filePath, "0", "mux")); err != nil {
+		return err
+	}
+	if err := c.SetVariable(ctx, callID, playbackPathVariable, filePath); err != nil {
+		cleanupErr := c.stopDisplace(ctx, callID, filePath)
+		return errors.Join(err, cleanupErr)
+	}
+	return nil
 }
 
-// StopAudio stops media playback on both legs of a call.
+// StopAudio removes only the media bug created by PlayAudio. The path is kept
+// on the FreeSWITCH channel so any API process can stop playback after restart.
 func (c *Client) StopAudio(ctx context.Context, callID string) error {
-	return c.Break(ctx, callID)
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	filePath, err := c.GetVariable(ctx, callID, playbackPathVariable)
+	if err != nil {
+		return err
+	}
+	if filePath == "" || filePath == "_undef_" {
+		return nil
+	}
+	if err := c.stopDisplace(ctx, callID, filePath); err != nil {
+		return err
+	}
+	return c.UnsetVariable(ctx, callID, playbackPathVariable)
+}
+
+func (c *Client) stopDisplace(ctx context.Context, callID, filePath string) error {
+	reply, err := c.Command(ctx, "uuid_displace "+commandWords(callID, "stop", filePath))
+	if err != nil {
+		return err
+	}
+	if strings.Contains(strings.ToLower(reply.Body), "cannot stop displace session") {
+		return nil
+	}
+	return commandReplyError(reply)
 }
 
 // SendDTMF sends DTMF digits to a call.
@@ -111,7 +150,11 @@ func (c *Client) Break(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_break "+commandWords(callID, "all"))
+	// uuid_break can wait for an active broadcast application to unwind before
+	// its synchronous API response is written. Queue it through bgapi so a media
+	// stop cannot monopolize the single request/response ESL connection.
+	_, err = c.BGAPI(ctx, "uuid_break "+commandWord(callID))
+	return err
 }
 
 func (c *Client) Transfer(ctx context.Context, req TransferRequest) error {

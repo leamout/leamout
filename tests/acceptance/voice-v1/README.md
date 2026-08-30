@@ -40,12 +40,11 @@ The process exits non-zero unless all sixteen checks pass.
 
 ## Test-only bootstrap
 
-Two facts are inserted directly into the isolated test database because they do not currently have public provisioning APIs:
+One fact is inserted directly into the isolated test database because it does not currently have a public provisioning API:
 
-- the synthetic carrier-provider catalog entry;
 - the deterministic organization bearer token used by the runner.
 
-The test DID is created through the public number API, but its carrier ownership is assigned directly afterward because the current number API does not expose `carrier_connection_id`. Carrier connections, source IPs, trunks, trunk endpoints, voice applications, bindings, calls, recordings, conferences, and webhooks are otherwise exercised through their public APIs.
+The test DID and its carrier ownership are configured through the public number API. Carrier connections, source IPs, trunks, trunk endpoints, voice applications, bindings, calls, recordings, conferences, and webhooks are likewise exercised through their public APIs.
 
 All bootstrap data lives in the disposable Compose database and is removed by the default cleanup.
 

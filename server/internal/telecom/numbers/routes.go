@@ -14,5 +14,6 @@ func RegisterRoutes(router chi.Router, handler *Handler, auth func(http.Handler)
 		r.Get("/{number_id}", handler.Get)
 		r.Patch("/{number_id}", handler.Update)
 		r.Delete("/{number_id}", handler.Delete)
+		r.Put("/{number_id}/carrier-connection", handler.SetCarrierConnection)
 	})
 }

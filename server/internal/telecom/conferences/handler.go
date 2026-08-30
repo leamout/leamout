@@ -201,26 +201,29 @@ func (h *Handler) participantAction(
 }
 
 func (h *Handler) Lock(w http.ResponseWriter, r *http.Request) {
-	h.conferenceAction(w, r, "lock")
-}
-
-func (h *Handler) Unlock(w http.ResponseWriter, r *http.Request) {
-	h.conferenceAction(w, r, "unlock")
-}
-
-func (h *Handler) conferenceAction(w http.ResponseWriter, r *http.Request, action string) {
 	org, id, err := conferenceIDs(r)
 	if err == nil {
-		_, err = h.service.Get(r.Context(), org, id)
+		err = h.service.Lock(r.Context(), org, id)
 	}
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
-	httputil.OK(w, map[string]string{
-		"message": "conference " + action + " action completed",
-	})
+	httputil.OK(w, map[string]string{"message": "conference lock action completed"})
+}
+
+func (h *Handler) Unlock(w http.ResponseWriter, r *http.Request) {
+	org, id, err := conferenceIDs(r)
+	if err == nil {
+		err = h.service.Unlock(r.Context(), org, id)
+	}
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	httputil.OK(w, map[string]string{"message": "conference unlock action completed"})
 }
 
 func decode(w http.ResponseWriter, r *http.Request, value any) bool {

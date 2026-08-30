@@ -20,12 +20,13 @@ type CreateCallRequest struct {
 // OriginateRequest is the internal media-controller command produced after
 // Leamout resolves a public call request to a concrete telecom route.
 type OriginateRequest struct {
-	Host        string
-	Port        int32
-	Transport   string
-	Destination string
-	CallerID    string
-	Variables   map[string]string
+	CarrierConnectionID uuid.UUID
+	Host                string
+	Port                int32
+	Transport           string
+	Destination         string
+	CallerID            string
+	Variables           map[string]string
 }
 
 type InboundCallEvent struct {

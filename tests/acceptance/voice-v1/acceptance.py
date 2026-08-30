@@ -12,13 +12,13 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import xml.etree.ElementTree as ET
 
 API_BASE = os.getenv("VOICE_V1_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("VOICE_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "voice-v1-esl-secret")
 DID = os.getenv("VOICE_V1_DID", "+15551234567")
 CALLER = os.getenv("VOICE_V1_CALLER", "+15557654321")
-PROVIDER_ID = "00000000-0000-0000-0000-000000002001"
 ORG_ID = "00000000-0000-0000-0000-000000001001"
 COMPOSE = [
     "docker", "compose",
@@ -57,7 +57,7 @@ def fs_cli(service, command):
     return compose(
         "exec", "-T", service,
         "fs_cli",
-        "-H", "127.0.0.1",
+        "-H", service,
         "-P", "8021",
         "-p", ESL_PASSWORD,
         "-x", command,
@@ -104,7 +104,14 @@ def api(method, path, payload=None, auth=True, expected=None):
     if not raw:
         return status, None
     try:
-        return status, json.loads(raw)
+        parsed = json.loads(raw)
+        if (
+            isinstance(parsed, dict)
+            and parsed.get("success") is True
+            and "data" in parsed
+        ):
+            parsed = parsed["data"]
+        return status, parsed
     except json.JSONDecodeError:
         return status, raw.decode(errors="replace")
 
@@ -206,13 +213,17 @@ def deploy():
 
 def configure_provider():
     _, providers = api("GET", "/v1/carrier-providers/", expected={200})
-    if not any(item["id"] == PROVIDER_ID for item in providers["carrier_providers"]):
-        raise AcceptanceError("synthetic carrier provider fixture is not visible")
+    provider = next(
+        (item for item in providers["carrier_providers"] if item["slug"] == "generic-sip"),
+        None,
+    )
+    if not provider:
+        raise AcceptanceError("built-in generic SIP provider is not visible")
 
     _, connection = api(
         "POST", "/v1/carrier-connections/",
         {
-            "provider_id": PROVIDER_ID,
+            "provider_id": provider["id"],
             "name": "voice-v1-carrier",
             "inbound_enabled": True,
             "codecs": ["PCMU", "PCMA"],
@@ -262,11 +273,13 @@ def create_voice_application():
     )
     STATE["number_id"] = number["id"]
 
-    updated = psql(
-        "UPDATE phone_numbers SET carrier_connection_id = "
-        f"'{STATE['connection_id']}'::uuid WHERE id = '{number['id']}'::uuid RETURNING id;"
+    _, assigned = api(
+        "PUT",
+        f"/v1/numbers/{number['id']}/carrier-connection",
+        {"carrier_connection_id": STATE["connection_id"]},
+        expected={200},
     )
-    if number["id"] not in updated:
+    if assigned.get("carrier_connection_id") != STATE["connection_id"]:
         raise AcceptanceError("failed to assign test DID to carrier connection")
 
     _, application = api(
@@ -335,13 +348,25 @@ def inbound_call():
 
     inbound = wait_for("inbound call persistence", probe, timeout=15)
     STATE["inbound_call_id"] = inbound["id"]
-    fs_cli("voice-v1-carrier", f"uuid_kill {carrier_uuid}")
-    wait_call(
-        inbound["id"],
-        lambda call: call["state"] in {"completed", "failed", "cancelled"},
-        "inbound terminal state",
-    )
-    return f"carrier ingress created inbound call {inbound['id']}"
+    STATE["inbound_carrier_uuid"] = carrier_uuid
+    return f"carrier ingress created live inbound call {inbound['id']}"
+
+
+def answer_inbound():
+    call_id = STATE["inbound_call_id"]
+    try:
+        _, call = api("POST", f"/v1/calls/{call_id}/answer", expected={200})
+        if call["state"] not in {"answered", "active"}:
+            raise AcceptanceError(f"answer state is {call['state']}")
+
+        _, ended = api("POST", f"/v1/calls/{call_id}/hangup", expected={200})
+        if ended["state"] not in {"completed", "cancelled"}:
+            raise AcceptanceError(f"inbound hangup state is {ended['state']}")
+        return f"inbound answer and hangup persisted {ended['state']}"
+    finally:
+        carrier_uuid = STATE.get("inbound_carrier_uuid")
+        if carrier_uuid:
+            fs_cli("voice-v1-carrier", f"uuid_kill {carrier_uuid}")
 
 
 def outbound_call():
@@ -357,16 +382,11 @@ def outbound_call():
     )
     if call["direction"] != "outbound" or not call.get("sip_call_id"):
         raise AcceptanceError("outbound call has no media identity")
+    if call["state"] not in {"answered", "active"}:
+        raise AcceptanceError(f"answered outbound call persisted as {call['state']}")
     STATE["call_id"] = call["id"]
     STATE["sip_call_id"] = call["sip_call_id"]
-    return f"outbound call {call['id']} reached the synthetic carrier"
-
-
-def answer():
-    _, call = api("POST", f"/v1/calls/{STATE['call_id']}/answer", expected={200})
-    if call["state"] not in {"answered", "active"}:
-        raise AcceptanceError(f"answer state is {call['state']}")
-    return "connected state persisted"
+    return f"outbound call {call['id']} reached an answered carrier leg"
 
 
 def hold_resume():
@@ -380,12 +400,17 @@ def hold_resume():
 
 def play_audio():
     call_id = STATE["call_id"]
+    # Keep the generated tone active well beyond the API round trip so this
+    # check exercises stopping live playback rather than racing natural EOF.
+    path = "tone_stream://%(30000,0,440)"
     api(
         "POST", f"/v1/calls/{call_id}/play",
-        {"path": "tone_stream://%(500,0,440)"},
+        {"path": path},
         expected={200},
     )
     time.sleep(0.2)
+    if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
+        raise AcceptanceError("media channel disappeared while playback was active")
     api("POST", f"/v1/calls/{call_id}/stop", expected={200})
     if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
         raise AcceptanceError("media channel disappeared during playback")
@@ -443,12 +468,12 @@ def transfer():
     return "live call transferred to the local 9196 dialplan"
 
 
-def hangup():
+def hangup_outbound():
     _, call = api("POST", f"/v1/calls/{STATE['call_id']}/hangup", expected={200})
     if call["state"] not in {"completed", "cancelled"}:
         raise AcceptanceError(f"hangup state is {call['state']}")
     STATE["terminal_state"] = call["state"]
-    return f"hangup persisted {call['state']}"
+    return f"outbound cleanup persisted {call['state']}"
 
 
 def conference():
@@ -461,17 +486,40 @@ def conference():
     if item["state"] != "active":
         raise AcceptanceError("conference API did not create active state")
 
-    media = fs_cli("freeswitch", "conference list")
-    if name not in media:
-        raise AcceptanceError(
-            "conference exists only in control-plane state; no matching FreeSWITCH conference exists"
-        )
+    # FreeSWITCH conference rooms are dynamic media objects: the conference
+    # application creates the room when its first member enters and destroys it
+    # when the last member leaves. Use a background loopback call as the live
+    # synthetic participant before asserting media-plane conference controls.
+    fs_cli(
+        "freeswitch",
+        "bgapi originate "
+        f"{{origination_caller_id_number={CALLER}}}"
+        f"loopback/9196/leamout &conference({name}@default)",
+    )
+    wait_for(
+        "conference media room",
+        lambda: name if name in fs_cli("freeswitch", "conference list") else False,
+        timeout=15,
+    )
 
-    api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
-    if "locked" not in fs_cli("freeswitch", f"conference {name} list").lower():
-        raise AcceptanceError("conference lock is not observable in FreeSWITCH")
-    api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
-    api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
+    try:
+        api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
+        conference_xml = ET.fromstring(fs_cli("freeswitch", "conference xml_list"))
+        locked = next(
+            (
+                conference.get("locked")
+                for conference in conference_xml.iter("conference")
+                if conference.get("name") == name
+            ),
+            None,
+        )
+        if locked != "true":
+            raise AcceptanceError("conference lock is not observable in FreeSWITCH")
+        api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
+        api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
+    finally:
+        fs_cli("freeswitch", f"conference {name} kick all")
+
     return "conference lifecycle and controls are observable in FreeSWITCH"
 
 
@@ -509,13 +557,20 @@ def webhooks():
     for event in call_events:
         verify_signature(event)
 
-    _, body = api(
-        "GET",
-        f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
-        expected={200},
-    )
-    if not any(item["status"] == "delivered" for item in body["deliveries"]):
-        raise AcceptanceError("webhook API has no delivered attempts")
+    # The receiver observes the request before the delivery worker can persist
+    # the response. Poll the API rather than racing that final database update.
+    def delivered_attempt():
+        _, current = api(
+            "GET",
+            f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
+            expected={200},
+        )
+        return next(
+            (item for item in current["deliveries"] if item["status"] == "succeeded"),
+            False,
+        )
+
+    wait_for("persisted webhook delivery", delivered_attempt)
     return f"{len(call_events)} signed call deliveries verified"
 
 
@@ -591,21 +646,22 @@ def main():
         RESULTS[14] = ("FAIL", "Receive webhooks", f"webhook setup failed: {error}")
         print(f"FAIL 14 Receive webhooks: webhook setup failed: {error}")
 
-    record(4, "Receive an inbound call", inbound_call)
+    inbound_ok = record(4, "Receive an inbound call", inbound_call)
+    if inbound_ok:
+        record(6, "Answer/hang up", answer_inbound)
 
     if record(5, "Originate an outbound call", outbound_call):
-        if record(6, "Answer/hang up", answer):
-            record(8, "Hold/resume", hold_resume)
-            record(9, "Play audio", play_audio)
-            record(10, "Record", record_audio)
-            record(7, "Transfer", transfer)
-            try:
-                detail = hangup()
-                RESULTS[6] = ("PASS", "Answer/hang up", detail)
-                print(f"PASS 06 Answer/hang up: {detail}")
-            except Exception as error:
-                RESULTS[6] = ("FAIL", "Answer/hang up", f"hangup failed: {error}")
-                print(f"FAIL 06 Answer/hang up: hangup failed: {error}")
+        record(8, "Hold/resume", hold_resume)
+        record(9, "Play audio", play_audio)
+        record(10, "Record", record_audio)
+        record(7, "Transfer", transfer)
+        try:
+            detail = hangup_outbound()
+            print(f"PASS outbound cleanup: {detail}")
+        except Exception as error:
+            print(f"FAIL outbound cleanup: {error}")
+            if RESULTS.get(6, ("FAIL",))[0] == "PASS":
+                RESULTS[6] = ("FAIL", "Answer/hang up", f"outbound hangup failed: {error}")
 
     record(11, "Create/manage conferences", conference)
     record(12, "Receive normalized call events", normalized_events)
