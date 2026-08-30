@@ -1,17 +1,21 @@
-# syntax=docker/dockerfile:1
-
 ARG GO_VERSION=1.26.6
 
-FROM golang:${GO_VERSION}-alpine AS builder
+FROM golang:${GO_VERSION}-alpine AS build
 
 WORKDIR /src
+
+RUN apk add --no-cache \
+    ca-certificates \
+    git \
+    tzdata
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN set -eux; \
+    CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/server \
@@ -24,14 +28,17 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 FROM alpine:3.22
 
-ARG LEAMOUT_COMMAND=server
+WORKDIR /leamout
 
-RUN apk add --no-cache ca-certificates \
+RUN apk add --no-cache \
+        ca-certificates \
+        tzdata \
     && addgroup -S leamout \
-    && adduser -S -G leamout leamout
+    && adduser -S -D -H -G leamout leamout
 
-COPY --from=builder /out/${LEAMOUT_COMMAND} /usr/local/bin/leamout
+COPY --from=build /out/server /leamout/server
+COPY --from=build /out/worker /leamout/worker
 
 USER leamout
 
-ENTRYPOINT ["/usr/local/bin/leamout"]
+CMD ["/leamout/server"]
