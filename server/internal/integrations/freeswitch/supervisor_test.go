@@ -184,6 +184,26 @@ func newTestClient(t *testing.T, address, password string) *Client {
 	return client
 }
 
+func TestCommandClearsWriteDeadline(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	client.commandTimeout = 30 * time.Millisecond
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if _, err := client.Command(context.Background(), "status"); err != nil {
+		t.Fatalf("first Command() error = %v", err)
+	}
+	time.Sleep(2 * client.commandTimeout)
+	if _, err := client.Command(context.Background(), "status"); err != nil {
+		t.Fatalf("Command() after the previous deadline error = %v", err)
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
 

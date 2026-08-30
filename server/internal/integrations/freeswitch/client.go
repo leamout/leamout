@@ -191,9 +191,13 @@ func (c *Client) command(ctx context.Context, command string) (Frame, error) {
 
 	c.writeMu.Lock()
 	_, err := writeCommand(conn, command)
+	clearDeadlineErr := conn.SetWriteDeadline(time.Time{})
 	c.writeMu.Unlock()
 	if err != nil {
 		return Frame{}, fmt.Errorf("write FreeSWITCH command: %w", err)
+	}
+	if clearDeadlineErr != nil {
+		return Frame{}, fmt.Errorf("clear FreeSWITCH command deadline: %w", clearDeadlineErr)
 	}
 
 	select {

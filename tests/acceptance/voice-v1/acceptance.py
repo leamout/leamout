@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+import xml.etree.ElementTree as ET
 
 API_BASE = os.getenv("VOICE_V1_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("VOICE_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
@@ -493,7 +494,16 @@ def conference():
 
     try:
         api("POST", f"/v1/conferences/{item['id']}/lock", expected={200})
-        if "locked" not in fs_cli("freeswitch", f"conference {name} list").lower():
+        conference_xml = ET.fromstring(fs_cli("freeswitch", "conference xml_list"))
+        locked = next(
+            (
+                conference.get("locked")
+                for conference in conference_xml.iter("conference")
+                if conference.get("name") == name
+            ),
+            None,
+        )
+        if locked != "true":
             raise AcceptanceError("conference lock is not observable in FreeSWITCH")
         api("POST", f"/v1/conferences/{item['id']}/unlock", expected={200})
         api("DELETE", f"/v1/conferences/{item['id']}", expected={200})
@@ -546,7 +556,7 @@ def webhooks():
             expected={200},
         )
         return next(
-            (item for item in current["deliveries"] if item["status"] == "delivered"),
+            (item for item in current["deliveries"] if item["status"] == "succeeded"),
             False,
         )
 
