@@ -395,12 +395,17 @@ def hold_resume():
 
 def play_audio():
     call_id = STATE["call_id"]
+    # Keep the generated tone active well beyond the API round trip so this
+    # check exercises stopping live playback rather than racing natural EOF.
+    path = "tone_stream://%(30000,0,440)"
     api(
         "POST", f"/v1/calls/{call_id}/play",
-        {"path": "tone_stream://%(500,0,440)"},
+        {"path": path},
         expected={200},
     )
     time.sleep(0.2)
+    if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
+        raise AcceptanceError("media channel disappeared while playback was active")
     api("POST", f"/v1/calls/{call_id}/stop", expected={200})
     if "true" not in fs_cli("freeswitch", f"uuid_exists {STATE['sip_call_id']}").lower():
         raise AcceptanceError("media channel disappeared during playback")

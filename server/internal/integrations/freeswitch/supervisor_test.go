@@ -296,7 +296,7 @@ func TestPlaybackUsesDisplaceWithoutBreakingPark(t *testing.T) {
 	}
 	defer func() { _ = client.Close() }()
 
-	const path = "tone_stream://%(500,0,440)"
+	const path = "tone_stream://%(30000,0,440)"
 	if err := client.PlayAudio(context.Background(), "call-id", path); err != nil {
 		t.Fatalf("PlayAudio() error = %v", err)
 	}
@@ -506,7 +506,7 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 				return
 			}
 		case command == "api uuid_getvar call-id "+playbackPathVariable:
-			body := "tone_stream://%(500,0,440)"
+			body := "tone_stream://%(30000,0,440)"
 			if _, err := fmt.Fprintf(conn, "Content-Type: api/response\nContent-Length: %d\n\n%s", len(body), body); err != nil {
 				return
 			}
