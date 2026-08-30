@@ -17,6 +17,13 @@ type CreateCallRequest struct {
 	Variables     map[string]string `json:"variables,omitempty"`
 }
 
+// RouteAttribution records the concrete route selected for an outbound call.
+type RouteAttribution struct {
+	CarrierConnectionID uuid.UUID
+	TrunkID              uuid.UUID
+	TrunkEndpointID      uuid.UUID
+}
+
 // OriginateRequest is the internal media-controller command produced after
 // Leamout resolves a public call request to a concrete telecom route.
 type OriginateRequest struct {
@@ -59,40 +66,46 @@ type DTMFRequest struct {
 }
 
 type CallResponse struct {
-	ID             uuid.UUID      `json:"id"`
-	OrganizationID uuid.UUID      `json:"organization_id"`
-	ApplicationID  *uuid.UUID     `json:"application_id,omitempty"`
-	Direction      string         `json:"direction"`
-	State          string         `json:"state"`
-	MediaState     CallMediaState `json:"media_state"`
-	From           string         `json:"from"`
-	To             string         `json:"to"`
-	SIPCallID      *string        `json:"sip_call_id,omitempty"`
-	StartedAt      *time.Time     `json:"started_at,omitempty"`
-	AnsweredAt     *time.Time     `json:"answered_at,omitempty"`
-	EndedAt        *time.Time     `json:"ended_at,omitempty"`
-	HangupReason   *string        `json:"hangup_reason,omitempty"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
+	ID                  uuid.UUID      `json:"id"`
+	OrganizationID      uuid.UUID      `json:"organization_id"`
+	ApplicationID       *uuid.UUID     `json:"application_id,omitempty"`
+	CarrierConnectionID *uuid.UUID     `json:"carrier_connection_id,omitempty"`
+	TrunkID             *uuid.UUID     `json:"trunk_id,omitempty"`
+	TrunkEndpointID     *uuid.UUID     `json:"trunk_endpoint_id,omitempty"`
+	Direction           string         `json:"direction"`
+	State               string         `json:"state"`
+	MediaState          CallMediaState `json:"media_state"`
+	From                string         `json:"from"`
+	To                  string         `json:"to"`
+	SIPCallID           *string        `json:"sip_call_id,omitempty"`
+	StartedAt           *time.Time     `json:"started_at,omitempty"`
+	AnsweredAt          *time.Time     `json:"answered_at,omitempty"`
+	EndedAt             *time.Time     `json:"ended_at,omitempty"`
+	HangupReason        *string        `json:"hangup_reason,omitempty"`
+	CreatedAt           time.Time      `json:"created_at"`
+	UpdatedAt           time.Time      `json:"updated_at"`
 }
 
 func callResponse(call sqlc.Call) CallResponse {
 	return CallResponse{
-		ID:             call.ID,
-		OrganizationID: call.OrganizationID,
-		ApplicationID:  call.ApplicationID,
-		Direction:      call.Direction,
-		State:          call.State,
-		MediaState:     CallMediaState(call.MediaState),
-		From:           call.FromUri,
-		To:             call.ToUri,
-		SIPCallID:      call.SipCallID,
-		StartedAt:      pgconv.TimestamptzToTimePtr(call.StartedAt),
-		AnsweredAt:     pgconv.TimestamptzToTimePtr(call.AnsweredAt),
-		EndedAt:        pgconv.TimestamptzToTimePtr(call.EndedAt),
-		HangupReason:   call.HangupReason,
-		CreatedAt:      pgconv.TimestamptzToTime(call.CreatedAt),
-		UpdatedAt:      pgconv.TimestamptzToTime(call.UpdatedAt),
+		ID:                  call.ID,
+		OrganizationID:      call.OrganizationID,
+		ApplicationID:       call.ApplicationID,
+		CarrierConnectionID: call.CarrierConnectionID,
+		TrunkID:             call.TrunkID,
+		TrunkEndpointID:     call.TrunkEndpointID,
+		Direction:           call.Direction,
+		State:               call.State,
+		MediaState:          CallMediaState(call.MediaState),
+		From:                call.FromUri,
+		To:                  call.ToUri,
+		SIPCallID:           call.SipCallID,
+		StartedAt:           pgconv.TimestamptzToTimePtr(call.StartedAt),
+		AnsweredAt:          pgconv.TimestamptzToTimePtr(call.AnsweredAt),
+		EndedAt:             pgconv.TimestamptzToTimePtr(call.EndedAt),
+		HangupReason:        call.HangupReason,
+		CreatedAt:           pgconv.TimestamptzToTime(call.CreatedAt),
+		UpdatedAt:           pgconv.TimestamptzToTime(call.UpdatedAt),
 	}
 }
 
