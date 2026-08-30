@@ -204,6 +204,24 @@ func TestCommandClearsWriteDeadline(t *testing.T) {
 	}
 }
 
+func TestUnholdUsesFreeSWITCHArgumentOrder(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	if err := client.Unhold(context.Background(), "call-id"); err != nil {
+		t.Fatalf("Unhold() error = %v", err)
+	}
+	if got, want := server.LastCommand(), "api uuid_hold off call-id"; got != want {
+		t.Fatalf("Unhold() command = %q, want %q", got, want)
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
 
@@ -228,6 +246,7 @@ type fakeESLServer struct {
 	mu          sync.Mutex
 	connections map[net.Conn]struct{}
 	latest      net.Conn
+	lastCommand string
 
 	wg sync.WaitGroup
 }
@@ -260,6 +279,12 @@ func (s *fakeESLServer) Address() string {
 
 func (s *fakeESLServer) SubscriptionCount() int {
 	return int(s.subscriptions.Load())
+}
+
+func (s *fakeESLServer) LastCommand() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.lastCommand
 }
 
 func (s *fakeESLServer) SetAvailable(available bool) {
@@ -358,6 +383,9 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		if err != nil {
 			return
 		}
+		s.mu.Lock()
+		s.lastCommand = command
+		s.mu.Unlock()
 
 		switch {
 		case strings.HasPrefix(command, "event plain"):
