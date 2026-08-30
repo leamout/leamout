@@ -37,10 +37,11 @@ func (r *Repository) Create(
 	ctx context.Context,
 	organizationID uuid.UUID,
 	req CreateCallRequest,
+	route RouteAttribution,
 	sipCallID string,
 ) (sqlc.Call, error) {
 	return r.createWithEvent(ctx, organizationID, sipCallID, DirectionOutbound, EventCallInitiated, func(q *sqlc.Queries) (sqlc.Call, error) {
-		return q.CreateCall(ctx, sqlc.CreateCallParams{
+		call, err := q.CreateCall(ctx, sqlc.CreateCallParams{
 			OrganizationID: organizationID,
 			ApplicationID:  req.ApplicationID,
 			Direction:      string(DirectionOutbound),
@@ -48,6 +49,16 @@ func (r *Repository) Create(
 			FromUri:        req.From,
 			ToUri:          req.To,
 			SipCallID:      &sipCallID,
+		})
+		if err != nil {
+			return sqlc.Call{}, err
+		}
+		return q.SetCallRouteAttribution(ctx, sqlc.SetCallRouteAttributionParams{
+			CarrierConnectionID: route.CarrierConnectionID,
+			TrunkID:              route.TrunkID,
+			TrunkEndpointID:      route.TrunkEndpointID,
+			OrganizationID:       organizationID,
+			ID:                   call.ID,
 		})
 	})
 }
