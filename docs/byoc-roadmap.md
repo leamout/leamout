@@ -24,14 +24,14 @@ Implement digest activation as a separate security change:
 
 1. [x] Add an explicit SIP realm to inbound and outbound digest configuration.
 2. [x] Derive and store realm-bound HA1 material; never
-   expose or copy plaintext credentials into an OpenSIPS-readable table.
+       expose or copy plaintext credentials into an OpenSIPS-readable table.
 3. [x] Authenticate inbound carrier requests against the active, organization-bound
-   HA1 records and resolve the same carrier connection after authentication.
+       HA1 records and resolve the same carrier connection after authentication.
 4. [x] Add an outbound credential agent that uses the realm-bound HA1 material
-   to answer carrier challenges without exposing plaintext.
+       to answer carrier challenges without exposing plaintext.
 5. [x] Rotate runtime material atomically with encrypted control-plane state.
 6. [x] Add acceptance coverage proving set, rotate, and delete materialization without
-   restarting OpenSIPS or exposing plaintext in SQL, logs, or MI responses.
+       restarting OpenSIPS or exposing plaintext in SQL, logs, or MI responses.
 
 Do not implement this item as an OpenSIPS configuration reload: the current SIP
 route does not reference carrier digest credentials, so reload alone would
@@ -42,9 +42,9 @@ report success while leaving authentication behavior unchanged.
 - [x] Add an independent BYOC v1 Compose gate and CI workflow.
 - [x] Provision a generic carrier exclusively through public APIs.
 - [x] Complete inbound and outbound calls over UDP.
-- [ ] Reject cross-organization DID ownership (unknown source rejection is covered).
-- [ ] Exercise outbound digest authentication and credential rotation.
-- [ ] Persist and verify carrier connection and endpoint IDs in addition to trunk attribution.
+- [x] Reject cross-organization DID ownership (unknown source rejection is covered).
+- [x] Exercise outbound digest authentication and credential rotation.
+- [x] Persist and verify carrier connection and endpoint IDs in addition to trunk attribution.
 - [x] Verify configuration survives API and OpenSIPS restarts.
 
 ## Phase 3 — endpoint reliability
