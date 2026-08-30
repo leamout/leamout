@@ -2,9 +2,12 @@ package freeswitch
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 )
+
+const playbackPathVariable = "leamout_playback_path"
 
 func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, error) {
 	if err := req.Validate(); err != nil {
@@ -77,7 +80,8 @@ func (c *Client) Unhold(ctx context.Context, callID string) error {
 	return c.commandOK(ctx, "uuid_hold "+commandWords("off", callID))
 }
 
-// PlayAudio plays an audio file to a call without blocking the ESL client.
+// PlayAudio attaches playback as a media bug so stopping it does not interrupt
+// the park application that owns the ESL-controlled channel.
 func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
 	callID, err := requiredArgument("call ID", callID)
 	if err != nil {
@@ -87,14 +91,45 @@ func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_broadcast "+commandWords(callID, filePath, "aleg"))
+	if err := c.commandOK(ctx, "uuid_displace "+commandWords(callID, "start", filePath, "0", "mux")); err != nil {
+		return err
+	}
+	if err := c.SetVariable(ctx, callID, playbackPathVariable, filePath); err != nil {
+		cleanupErr := c.stopDisplace(ctx, callID, filePath)
+		return errors.Join(err, cleanupErr)
+	}
+	return nil
 }
 
-// StopAudio stops the current media application without flushing the channel's
-// remaining private events. In particular, preserving the parked application
-// keeps an ESL-controlled call alive after playback stops.
+// StopAudio removes only the media bug created by PlayAudio. The path is kept
+// on the FreeSWITCH channel so any API process can stop playback after restart.
 func (c *Client) StopAudio(ctx context.Context, callID string) error {
-	return c.Break(ctx, callID)
+	callID, err := requiredArgument("call ID", callID)
+	if err != nil {
+		return err
+	}
+	filePath, err := c.GetVariable(ctx, callID, playbackPathVariable)
+	if err != nil {
+		return err
+	}
+	if filePath == "" || filePath == "_undef_" {
+		return nil
+	}
+	if err := c.stopDisplace(ctx, callID, filePath); err != nil {
+		return err
+	}
+	return c.UnsetVariable(ctx, callID, playbackPathVariable)
+}
+
+func (c *Client) stopDisplace(ctx context.Context, callID, filePath string) error {
+	reply, err := c.Command(ctx, "uuid_displace "+commandWords(callID, "stop", filePath))
+	if err != nil {
+		return err
+	}
+	if strings.Contains(strings.ToLower(reply.Body), "cannot stop displace session") {
+		return nil
+	}
+	return commandReplyError(reply)
 }
 
 // SendDTMF sends DTMF digits to a call.

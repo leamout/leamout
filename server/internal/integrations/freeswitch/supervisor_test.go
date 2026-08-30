@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -285,6 +286,36 @@ func TestBGAPIParsesJobUUIDFromReplyText(t *testing.T) {
 	}
 }
 
+func TestPlaybackUsesDisplaceWithoutBreakingPark(t *testing.T) {
+	server := newFakeESLServer(t, "secret")
+	defer server.Close()
+
+	client := newTestClient(t, server.Address(), "secret")
+	if err := client.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect() error = %v", err)
+	}
+	defer func() { _ = client.Close() }()
+
+	const path = "tone_stream://%(500,0,440)"
+	if err := client.PlayAudio(context.Background(), "call-id", path); err != nil {
+		t.Fatalf("PlayAudio() error = %v", err)
+	}
+	if err := client.StopAudio(context.Background(), "call-id"); err != nil {
+		t.Fatalf("StopAudio() error = %v", err)
+	}
+
+	want := []string{
+		"api uuid_displace call-id start " + path + " 0 mux",
+		"api uuid_setvar call-id " + playbackPathVariable + " " + path,
+		"api uuid_getvar call-id " + playbackPathVariable,
+		"api uuid_displace call-id stop " + path,
+		"api uuid_setvar call-id " + playbackPathVariable,
+	}
+	if got := server.Commands(); !slices.Equal(got, want) {
+		t.Fatalf("playback commands = %#v, want %#v", got, want)
+	}
+}
+
 func waitFor(t *testing.T, timeout time.Duration, condition func() bool) {
 	t.Helper()
 
@@ -310,6 +341,7 @@ type fakeESLServer struct {
 	connections map[net.Conn]struct{}
 	latest      net.Conn
 	lastCommand string
+	commands    []string
 
 	wg sync.WaitGroup
 }
@@ -348,6 +380,12 @@ func (s *fakeESLServer) LastCommand() string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.lastCommand
+}
+
+func (s *fakeESLServer) Commands() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]string(nil), s.commands...)
 }
 
 func (s *fakeESLServer) SetAvailable(available bool) {
@@ -448,6 +486,7 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		}
 		s.mu.Lock()
 		s.lastCommand = command
+		s.commands = append(s.commands, command)
 		s.mu.Unlock()
 
 		switch {
@@ -464,6 +503,11 @@ func (s *fakeESLServer) handle(conn net.Conn) {
 		case command == "api slow":
 			time.Sleep(100 * time.Millisecond)
 			if _, err := fmt.Fprint(conn, "Content-Type: api/response\nContent-Length: 3\n\n+OK"); err != nil {
+				return
+			}
+		case command == "api uuid_getvar call-id "+playbackPathVariable:
+			body := "tone_stream://%(500,0,440)"
+			if _, err := fmt.Fprintf(conn, "Content-Type: api/response\nContent-Length: %d\n\n%s", len(body), body); err != nil {
 				return
 			}
 		case strings.HasPrefix(command, "bgapi "):
