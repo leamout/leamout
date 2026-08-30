@@ -2,7 +2,7 @@ package carriers
 
 import (
 	"context"
-	"crypto/sha256"
+	"crypto/md5"
 	"errors"
 	"fmt"
 	"strings"
@@ -116,7 +116,9 @@ func writeAuthError(err error, message string) error {
 }
 
 func digestHA1(username, realm, secret string) string {
-	return fmt.Sprintf("%x", sha256.Sum256([]byte(username+":"+realm+":"+secret)))
+	// SIP Digest with algorithm=MD5 requires the RFC-defined HA1 value.
+	// codeql[go/weak-sensitive-data-hashing]
+	return fmt.Sprintf("%x", md5.Sum([]byte(username+":"+realm+":"+secret)))
 }
 
 func digestWriteError(err error, message string) error {
@@ -376,7 +378,6 @@ func (s *Service) GetProvider(ctx context.Context, id uuid.UUID) (ProviderRespon
 	if err != nil {
 		return ProviderResponse{}, readError(err, "carrier provider not found")
 	}
-
 	return providerResponse(provider), nil
 }
 
