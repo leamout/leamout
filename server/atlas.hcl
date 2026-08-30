@@ -1,6 +1,16 @@
+variable "database_url" {
+  type    = string
+  default = "postgres://postgres:postgres@localhost:5432/leamout?sslmode=disable&search_path=public"
+}
+
+variable "dev_database_url" {
+  type    = string
+  default = "postgres://postgres:postgres@localhost:5432/leamout_atlas_dev?sslmode=disable"
+}
+
 env "local" {
-  url = getenv("DATABASE_URL")
-  dev = getenv("ATLAS_DEV_DATABASE_URL")
+  url = var.database_url
+  dev = var.dev_database_url
 
   migration {
     dir = "file://migrations"
@@ -10,13 +20,5 @@ env "local" {
     migrate {
       diff = "{{ sql . \"  \" }}"
     }
-  }
-}
-
-env "deploy" {
-  url = getenv("DATABASE_URL")
-
-  migration {
-    dir = "file://migrations"
   }
 }
