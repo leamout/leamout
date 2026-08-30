@@ -1,3 +1,37 @@
+-- name: LockLicenseForDeploymentActivation :one
+SELECT l.max_deployments
+FROM licenses AS l
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE l.id = sqlc.arg(license_id)
+  AND l.organization_id = sqlc.arg(organization_id)
+  AND l.status = 'active'
+  AND l.issued_at <= sqlc.arg(activation_time)
+  AND (l.expires_at IS NULL OR l.expires_at > sqlc.arg(activation_time))
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+FOR UPDATE OF l;
+
+-- name: GetDeploymentForActivation :one
+SELECT *
+FROM deployments
+WHERE license_id = sqlc.arg(license_id)
+  AND deployment_id = sqlc.arg(deployment_id)
+LIMIT 1;
+
+-- name: CreateDeploymentAt :one
+INSERT INTO deployments (
+    license_id,
+    deployment_id,
+    name,
+    activated_at
+) VALUES (
+    sqlc.arg(license_id),
+    sqlc.arg(deployment_id),
+    sqlc.narg(name),
+    sqlc.arg(activated_at)
+)
+RETURNING *;
+
 -- name: CreateDeployment :one
 INSERT INTO deployments (
     license_id,
