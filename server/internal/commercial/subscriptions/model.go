@@ -15,11 +15,11 @@ const (
 
 // Subscription binds a customer to a commercial plan for a period of time.
 type Subscription struct {
-	ID             string
-	OrganizationID string
-	PlanID         string
-	Status         Status
-	StartsAt       time.Time
-	RenewsAt       *time.Time
-	EndsAt         *time.Time
+	ID         string
+	CustomerID string
+	PlanID     string
+	Status     Status
+	StartsAt   time.Time
+	RenewsAt   *time.Time
+	EndsAt     *time.Time
 }
