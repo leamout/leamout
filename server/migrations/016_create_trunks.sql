@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS trunk_endpoints (
         ON DELETE CASCADE,
     CONSTRAINT uq_trunk_endpoints_target
         UNIQUE (trunk_id, host, port, transport, direction),
+    CONSTRAINT uq_trunk_endpoints_id_org UNIQUE (id, organization_id),
     CONSTRAINT chk_trunk_endpoints_host CHECK (
         length(btrim(host)) > 0
         AND host !~ '\\s'

@@ -50,6 +50,26 @@ func TestFreeSWITCHStatusUp(t *testing.T) {
 	}
 }
 
+func TestResponseRowsAcceptsZeroRowEnvelope(t *testing.T) {
+	rows, err := responseRows(`{"row_count":0}`)
+	if err != nil {
+		t.Fatalf("responseRows() error = %v", err)
+	}
+	if len(rows) != 0 {
+		t.Fatalf("responseRows() returned %d rows, want 0", len(rows))
+	}
+}
+
+func TestResponseRowsRejectsMissingRowsWithoutZeroCount(t *testing.T) {
+	if _, err := responseRows(`{"row_count":1}`); err == nil {
+		t.Fatal("responseRows() error = nil for missing rows with non-zero count")
+	}
+
+	if _, err := responseRows(`{"status":"ok"}`); err == nil {
+		t.Fatal("responseRows() error = nil for unrelated status envelope")
+	}
+}
+
 func TestCommandReplyError(t *testing.T) {
 	if err := commandReplyError(Reply{Body: "+OK"}); err != nil {
 		t.Fatalf("commandReplyError(+OK) = %v", err)

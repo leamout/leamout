@@ -12,6 +12,8 @@ services:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
     volumes:
       - ${BYOC_V1_SUITE_DIR:?BYOC_V1_SUITE_DIR is required}/../voice-v1/carrier-dialplan.xml:/leamout-config/dialplan/leamout.xml:ro
+      - ${BYOC_V1_SUITE_DIR:?BYOC_V1_SUITE_DIR is required}/carrier-sip-profile.xml:/leamout-config/sip_profiles/internal.xml:ro
+      - ${BYOC_V1_SUITE_DIR:?BYOC_V1_SUITE_DIR is required}/carrier-directory.xml:/etc/freeswitch/directory/default.xml:ro
     networks:
       leamout-core:
         ipv4_address: 172.30.0.50

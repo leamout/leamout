@@ -7,7 +7,10 @@ import (
 	"strings"
 )
 
-const playbackPathVariable = "leamout_playback_path"
+const (
+	playbackPathVariable     = "leamout_playback_path"
+	displaceHangupOnErrorVar = "DISPLACE_HANGUP_ON_ERROR"
+)
 
 func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, error) {
 	if err := req.Validate(); err != nil {
@@ -89,6 +92,14 @@ func (c *Client) PlayAudio(ctx context.Context, callID, filePath string) error {
 	}
 	filePath, err = requiredArgument("audio file path", filePath)
 	if err != nil {
+		return err
+	}
+
+	// A media-source failure must never tear down an otherwise healthy call.
+	// FreeSWITCH's displace_session can hang up the channel on playback errors;
+	// disable that behavior before attaching the media bug so the API can report
+	// media failure independently from call lifecycle.
+	if err := c.SetVariable(ctx, callID, displaceHangupOnErrorVar, "false"); err != nil {
 		return err
 	}
 	if err := c.commandOK(ctx, "uuid_displace "+commandWords(callID, "start", filePath, "0", "mux")); err != nil {

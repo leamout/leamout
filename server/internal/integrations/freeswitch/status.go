@@ -90,12 +90,16 @@ func responseRows(body string) ([]map[string]any, error) {
 	}
 
 	var envelope struct {
-		Rows []map[string]any `json:"rows"`
+		RowCount *int             `json:"row_count"`
+		Rows     []map[string]any `json:"rows"`
 	}
 	if err := json.Unmarshal([]byte(body), &envelope); err != nil {
 		return nil, fmt.Errorf("decode FreeSWITCH status response: %w", err)
 	}
 	if envelope.Rows == nil {
+		if envelope.RowCount != nil && *envelope.RowCount == 0 {
+			return []map[string]any{}, nil
+		}
 		return nil, fmt.Errorf("decode FreeSWITCH status response: missing rows field")
 	}
 	return envelope.Rows, nil

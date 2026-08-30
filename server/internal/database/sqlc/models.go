@@ -37,22 +37,25 @@ type AuthTransaction struct {
 }
 
 type Call struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ApplicationID  *uuid.UUID         `db:"application_id" json:"application_id"`
-	Direction      string             `db:"direction" json:"direction"`
-	State          string             `db:"state" json:"state"`
-	MediaState     string             `db:"media_state" json:"media_state"`
-	FromUri        string             `db:"from_uri" json:"from_uri"`
-	ToUri          string             `db:"to_uri" json:"to_uri"`
-	SipCallID      *string            `db:"sip_call_id" json:"sip_call_id"`
-	ProviderID     *uuid.UUID         `db:"provider_id" json:"provider_id"`
-	StartedAt      pgtype.Timestamptz `db:"started_at" json:"started_at"`
-	AnsweredAt     pgtype.Timestamptz `db:"answered_at" json:"answered_at"`
-	EndedAt        pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
-	HangupReason   *string            `db:"hangup_reason" json:"hangup_reason"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ApplicationID       *uuid.UUID         `db:"application_id" json:"application_id"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	TrunkID             *uuid.UUID         `db:"trunk_id" json:"trunk_id"`
+	TrunkEndpointID     *uuid.UUID         `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
+	Direction           string             `db:"direction" json:"direction"`
+	State               string             `db:"state" json:"state"`
+	MediaState          string             `db:"media_state" json:"media_state"`
+	FromUri             string             `db:"from_uri" json:"from_uri"`
+	ToUri               string             `db:"to_uri" json:"to_uri"`
+	SipCallID           *string            `db:"sip_call_id" json:"sip_call_id"`
+	ProviderID          *uuid.UUID         `db:"provider_id" json:"provider_id"`
+	StartedAt           pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	AnsweredAt          pgtype.Timestamptz `db:"answered_at" json:"answered_at"`
+	EndedAt             pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	HangupReason        *string            `db:"hangup_reason" json:"hangup_reason"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type CallParticipant struct {
