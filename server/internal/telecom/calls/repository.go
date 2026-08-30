@@ -63,6 +63,16 @@ func (r *Repository) Create(
 	})
 }
 
+func (r *Repository) createOutbound(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateCallRequest,
+	route RouteAttribution,
+	sipCallID string,
+) (sqlc.Call, error) {
+	return r.Create(ctx, organizationID, req, route, sipCallID)
+}
+
 func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) (sqlc.Call, error) {
 	applicationID := event.ApplicationID
 	channelID := event.ChannelID
