@@ -1,7 +1,6 @@
 env "local" {
-  src = "file://migrations"
-
-  dev = "postgres://postgres:postgres@localhost:5432/leamout_dev?sslmode=disable"
+  url = getenv("DATABASE_URL")
+  dev = getenv("ATLAS_DEV_DATABASE_URL")
 
   migration {
     dir = "file://migrations"
@@ -11,5 +10,13 @@ env "local" {
     migrate {
       diff = "{{ sql . \"  \" }}"
     }
+  }
+}
+
+env "deploy" {
+  url = getenv("DATABASE_URL")
+
+  migration {
+    dir = "file://migrations"
   }
 }
