@@ -24,11 +24,11 @@ RETURNING id, organization_id, application_id, carrier_connection_id, trunk_id, 
 `
 
 type SetCallRouteAttributionParams struct {
-	CarrierConnectionID uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
-	TrunkID              uuid.UUID `db:"trunk_id" json:"trunk_id"`
-	TrunkEndpointID      uuid.UUID `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
-	OrganizationID       uuid.UUID `db:"organization_id" json:"organization_id"`
-	ID                   uuid.UUID `db:"id" json:"id"`
+	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	TrunkID             *uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	TrunkEndpointID     *uuid.UUID `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
+	OrganizationID      uuid.UUID  `db:"organization_id" json:"organization_id"`
+	ID                  uuid.UUID  `db:"id" json:"id"`
 }
 
 func (q *Queries) SetCallRouteAttribution(ctx context.Context, arg SetCallRouteAttributionParams) (Call, error) {
