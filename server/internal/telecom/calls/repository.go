@@ -54,23 +54,13 @@ func (r *Repository) Create(
 			return sqlc.Call{}, err
 		}
 		return q.SetCallRouteAttribution(ctx, sqlc.SetCallRouteAttributionParams{
-			CarrierConnectionID: route.CarrierConnectionID,
-			TrunkID:              route.TrunkID,
-			TrunkEndpointID:      route.TrunkEndpointID,
-			OrganizationID:       organizationID,
-			ID:                   call.ID,
+			CarrierConnectionID: &route.CarrierConnectionID,
+			TrunkID:             &route.TrunkID,
+			TrunkEndpointID:     &route.TrunkEndpointID,
+			OrganizationID:      organizationID,
+			ID:                  call.ID,
 		})
 	})
-}
-
-func (r *Repository) createOutbound(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	req CreateCallRequest,
-	route RouteAttribution,
-	sipCallID string,
-) (sqlc.Call, error) {
-	return r.Create(ctx, organizationID, req, route, sipCallID)
 }
 
 func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) (sqlc.Call, error) {
@@ -278,8 +268,6 @@ func (r *Repository) createWithEvent(
 			return sqlc.Call{}, err
 		}
 
-		// A unique violation aborts this transaction. Roll it back before
-		// reading the canonical row created by the concurrent/replayed event.
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 			return sqlc.Call{}, fmt.Errorf("rollback duplicate call transaction: %w", rollbackErr)
 		}
