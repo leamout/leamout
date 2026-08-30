@@ -1,4 +1,4 @@
-h1:c0jeIK/XhuWWXtJZmtEZUh2CKjicIw2fgx7HMhGIkA8=
+h1:0YWf6/DAcfKGbOs3yvqCZ7HbtBsE98H9mc9Y8npQcbQ=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -37,3 +37,4 @@ h1:c0jeIK/XhuWWXtJZmtEZUh2CKjicIw2fgx7HMhGIkA8=
 036_seed_generic_sip_provider.sql h1:vT3FAJyCPzQ0WlKIpxLKwK8/Lv5T0Hx8S4ErwSxD/I0=
 037_create_carrier_digest_credentials.sql h1:MwciXsz2g+BpmKlLpKBD6inwHoRLPWntWNtEaolH9cQ=
 038_create_opensips_digest_auth_views.sql h1:1kmilvTOZYcVi9LxWctwZMcFYPL+n6wnMLDBnPMi5IA=
+039_add_call_route_attribution.sql h1:wPv5OC0jvjSF0Wf7lpwu7bYCNDc3X+rmSkT2n442ZL0=
