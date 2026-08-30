@@ -292,7 +292,7 @@ func (s *Service) Play(ctx context.Context, org, id uuid.UUID, req PlayRequest) 
 	if err := validateControl(call, controlPlay); err != nil {
 		return err
 	}
-	if req.Path, err = require(req.Destination, "destination"); err != nil {
+	if req.Path, err = require(req.Path, "path"); err != nil {
 		return err
 	}
 	return mediaError("play audio", s.controller.Play(ctx, externalID, req.Path))
