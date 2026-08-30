@@ -3,6 +3,7 @@ import json, os, subprocess, sys, time, urllib.error, urllib.request
 
 API = os.getenv("BYOC_V1_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("BYOC_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
+TOKEN_B = os.getenv("BYOC_V1_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnopqrstuvwx")
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "byoc-v1-esl-secret")
 DID, CALLER = "+15551234567", "+15557654321"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/byoc-v1/compose.yaml"]
@@ -19,9 +20,9 @@ def compose(*args, check=True): return run(COMPOSE + list(args), check)
 def fs(command): return compose("exec", "-T", "byoc-v1-carrier", "fs_cli", "-H", "byoc-v1-carrier", "-P", "8021", "-p", ESL_PASSWORD, "-x", command)
 def psql(sql): return compose("exec", "-T", "postgres", "psql", "-U", "leamout", "-d", "leamout", "-Atc", sql)
 
-def api(method, path, payload=None, expected=(200,)):
+def api(method, path, payload=None, expected=(200,), token=TOKEN):
     data = json.dumps(payload).encode() if payload is not None else None
-    headers = {"Accept": "application/json", "Authorization": f"Bearer {TOKEN}"}
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
     if data: headers["Content-Type"] = "application/json"
     try:
         with urllib.request.urlopen(urllib.request.Request(API + path, data=data, headers=headers, method=method), timeout=15) as r:
@@ -91,6 +92,13 @@ def number_and_app():
     api("POST", f"/v1/voice-applications/{app['id']}/bindings", {"phone_number_id":number["id"]}, (201,))
     return "DID ownership and application binding use public APIs"
 
+def reject_cross_org_did_ownership():
+    foreign_connection = api("POST", "/v1/carrier-connections/", {"provider_id":S["provider"]["id"], "name":"BYOC foreign tenant carrier", "inbound_enabled":True}, (201,), TOKEN_B)
+    api("PUT", f"/v1/numbers/{S['number']['id']}/carrier-connection", {"carrier_connection_id":foreign_connection["id"]}, (404,), TOKEN_B)
+    owned = api("GET", f"/v1/numbers/{S['number']['id']}")
+    if owned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("cross-organization request changed DID ownership")
+    return "tenant B cannot read or reassign tenant A DID ownership"
+
 def rejected_before_allowlist():
     output = fs(f"originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()")
     if "+OK" in output: raise Failure("untrusted carrier source was accepted")
@@ -126,7 +134,7 @@ def restart_persistence():
     return "carrier configuration survives OpenSIPS and API restart"
 
 def main():
-    for name, fn in [("Deploy BYOC stack",deploy),("Discover generic SIP provider",provider),("Manage encrypted carrier auth",connection_and_auth),("Provision trunk endpoint",trunk),("Assign DID ownership",number_and_app),("Reject unknown source",rejected_before_allowlist),("Apply source IP live",add_source_and_inbound),("Complete outbound route",outbound),("Disable carrier routing",disable_rejects_routes),("Recover configuration",restart_persistence)]: check(name, fn)
+    for name, fn in [("Deploy BYOC stack",deploy),("Discover generic SIP provider",provider),("Manage encrypted carrier auth",connection_and_auth),("Provision trunk endpoint",trunk),("Assign DID ownership",number_and_app),("Reject cross-org DID ownership",reject_cross_org_did_ownership),("Reject unknown source",rejected_before_allowlist),("Apply source IP live",add_source_and_inbound),("Complete outbound route",outbound),("Disable carrier routing",disable_rejects_routes),("Recover configuration",restart_persistence)]: check(name, fn)
     failed = len([x for x in RESULTS if not x]); print(f"\nBYOC v1 acceptance {'FAILED' if failed else 'PASSED'}: {failed} failure(s).")
     return 1 if failed else 0
 
