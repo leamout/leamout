@@ -10,15 +10,15 @@ ALTER TABLE calls
     ADD CONSTRAINT fk_calls_carrier_connection_org
         FOREIGN KEY (carrier_connection_id, organization_id)
         REFERENCES carrier_connections(id, organization_id)
-        ON DELETE SET NULL,
+        ON DELETE RESTRICT,
     ADD CONSTRAINT fk_calls_trunk_org
         FOREIGN KEY (trunk_id, organization_id)
         REFERENCES trunks(id, organization_id)
-        ON DELETE SET NULL,
+        ON DELETE RESTRICT,
     ADD CONSTRAINT fk_calls_trunk_endpoint_org
         FOREIGN KEY (trunk_endpoint_id, organization_id)
         REFERENCES trunk_endpoints(id, organization_id)
-        ON DELETE SET NULL;
+        ON DELETE RESTRICT;
 
 CREATE INDEX IF NOT EXISTS idx_calls_carrier_connection_id
     ON calls (carrier_connection_id)
