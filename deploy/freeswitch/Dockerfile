@@ -69,6 +69,7 @@ RUN printf '%s\n' \
       'applications/mod_hash' \
       'codecs/mod_opus' \
       'dialplans/mod_dialplan_xml' \
+      'endpoints/mod_loopback' \
       'endpoints/mod_sofia' \
       'event_handlers/mod_event_socket' \
       'formats/mod_local_stream' \

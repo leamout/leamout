@@ -72,7 +72,9 @@ func (c *Client) Unhold(ctx context.Context, callID string) error {
 	if err != nil {
 		return err
 	}
-	return c.commandOK(ctx, "uuid_unhold "+commandWord(callID))
+	// FreeSWITCH resumes a held channel through uuid_hold's "off" form; it
+	// does not expose a uuid_unhold API command.
+	return c.commandOK(ctx, "uuid_hold "+commandWords(callID, "off"))
 }
 
 // PlayAudio plays an audio file to a call without blocking the ESL client.

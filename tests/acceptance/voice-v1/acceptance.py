@@ -537,13 +537,20 @@ def webhooks():
     for event in call_events:
         verify_signature(event)
 
-    _, body = api(
-        "GET",
-        f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
-        expected={200},
-    )
-    if not any(item["status"] == "delivered" for item in body["deliveries"]):
-        raise AcceptanceError("webhook API has no delivered attempts")
+    # The receiver observes the request before the delivery worker can persist
+    # the response. Poll the API rather than racing that final database update.
+    def delivered_attempt():
+        _, current = api(
+            "GET",
+            f"/v1/webhooks/{STATE['webhook_id']}/deliveries?limit=100",
+            expected={200},
+        )
+        return next(
+            (item for item in current["deliveries"] if item["status"] == "delivered"),
+            False,
+        )
+
+    wait_for("persisted webhook delivery", delivered_attempt)
     return f"{len(call_events)} signed call deliveries verified"
 
 
