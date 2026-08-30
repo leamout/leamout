@@ -12,73 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const lockLicenseForDeploymentActivation = `-- name: LockLicenseForDeploymentActivation :one
-SELECT l.max_deployments
-FROM licenses AS l
-JOIN organizations AS o ON o.id = l.organization_id
-WHERE l.id = $1
-  AND l.organization_id = $2
-  AND l.status = 'active'
-  AND l.issued_at <= $3
-  AND (l.expires_at IS NULL OR l.expires_at > $3)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-FOR UPDATE OF l
-`
-
-type LockLicenseForDeploymentActivationParams struct {
-	LicenseID      uuid.UUID          `db:"license_id" json:"license_id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ActivationTime pgtype.Timestamptz `db:"activation_time" json:"activation_time"`
-}
-
-func (q *Queries) LockLicenseForDeploymentActivation(ctx context.Context, arg LockLicenseForDeploymentActivationParams) (int32, error) {
-	row := q.db.QueryRow(ctx, lockLicenseForDeploymentActivation, arg.LicenseID, arg.OrganizationID, arg.ActivationTime)
-	var maxDeployments int32
-	err := row.Scan(&maxDeployments)
-	return maxDeployments, err
-}
-
-const getDeploymentForActivation = `-- name: GetDeploymentForActivation :one
-SELECT id, license_id, deployment_id, name, status, activated_at, last_seen_at, deactivated_at, created_at, updated_at
-FROM deployments
-WHERE license_id = $1
-  AND deployment_id = $2
-LIMIT 1
-`
-
-type GetDeploymentForActivationParams struct {
-	LicenseID    uuid.UUID `db:"license_id" json:"license_id"`
-	DeploymentID string    `db:"deployment_id" json:"deployment_id"`
-}
-
-func (q *Queries) GetDeploymentForActivation(ctx context.Context, arg GetDeploymentForActivationParams) (Deployment, error) {
-	row := q.db.QueryRow(ctx, getDeploymentForActivation, arg.LicenseID, arg.DeploymentID)
-	var i Deployment
-	err := row.Scan(&i.ID, &i.LicenseID, &i.DeploymentID, &i.Name, &i.Status, &i.ActivatedAt, &i.LastSeenAt, &i.DeactivatedAt, &i.CreatedAt, &i.UpdatedAt)
-	return i, err
-}
-
-const createDeploymentAt = `-- name: CreateDeploymentAt :one
-INSERT INTO deployments (license_id, deployment_id, name, activated_at)
-VALUES ($1, $2, $3, $4)
-RETURNING id, license_id, deployment_id, name, status, activated_at, last_seen_at, deactivated_at, created_at, updated_at
-`
-
-type CreateDeploymentAtParams struct {
-	LicenseID    uuid.UUID          `db:"license_id" json:"license_id"`
-	DeploymentID string             `db:"deployment_id" json:"deployment_id"`
-	Name         *string            `db:"name" json:"name"`
-	ActivatedAt  pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
-}
-
-func (q *Queries) CreateDeploymentAt(ctx context.Context, arg CreateDeploymentAtParams) (Deployment, error) {
-	row := q.db.QueryRow(ctx, createDeploymentAt, arg.LicenseID, arg.DeploymentID, arg.Name, arg.ActivatedAt)
-	var i Deployment
-	err := row.Scan(&i.ID, &i.LicenseID, &i.DeploymentID, &i.Name, &i.Status, &i.ActivatedAt, &i.LastSeenAt, &i.DeactivatedAt, &i.CreatedAt, &i.UpdatedAt)
-	return i, err
-}
-
 const countActiveDeploymentsByLicense = `-- name: CountActiveDeploymentsByLicense :one
 SELECT COUNT(*)
 FROM deployments AS d
@@ -135,6 +68,51 @@ func (q *Queries) CreateDeployment(ctx context.Context, arg CreateDeploymentPara
 		arg.Name,
 		arg.LicenseID,
 		arg.OrganizationID,
+	)
+	var i Deployment
+	err := row.Scan(
+		&i.ID,
+		&i.LicenseID,
+		&i.DeploymentID,
+		&i.Name,
+		&i.Status,
+		&i.ActivatedAt,
+		&i.LastSeenAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const createDeploymentAt = `-- name: CreateDeploymentAt :one
+INSERT INTO deployments (
+    license_id,
+    deployment_id,
+    name,
+    activated_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4
+)
+RETURNING id, license_id, deployment_id, name, status, activated_at, last_seen_at, deactivated_at, created_at, updated_at
+`
+
+type CreateDeploymentAtParams struct {
+	LicenseID    uuid.UUID          `db:"license_id" json:"license_id"`
+	DeploymentID string             `db:"deployment_id" json:"deployment_id"`
+	Name         *string            `db:"name" json:"name"`
+	ActivatedAt  pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
+}
+
+func (q *Queries) CreateDeploymentAt(ctx context.Context, arg CreateDeploymentAtParams) (Deployment, error) {
+	row := q.db.QueryRow(ctx, createDeploymentAt,
+		arg.LicenseID,
+		arg.DeploymentID,
+		arg.Name,
+		arg.ActivatedAt,
 	)
 	var i Deployment
 	err := row.Scan(
@@ -276,6 +254,37 @@ func (q *Queries) GetDeployment(ctx context.Context, arg GetDeploymentParams) (D
 	return i, err
 }
 
+const getDeploymentForActivation = `-- name: GetDeploymentForActivation :one
+SELECT id, license_id, deployment_id, name, status, activated_at, last_seen_at, deactivated_at, created_at, updated_at
+FROM deployments
+WHERE license_id = $1
+  AND deployment_id = $2
+LIMIT 1
+`
+
+type GetDeploymentForActivationParams struct {
+	LicenseID    uuid.UUID `db:"license_id" json:"license_id"`
+	DeploymentID string    `db:"deployment_id" json:"deployment_id"`
+}
+
+func (q *Queries) GetDeploymentForActivation(ctx context.Context, arg GetDeploymentForActivationParams) (Deployment, error) {
+	row := q.db.QueryRow(ctx, getDeploymentForActivation, arg.LicenseID, arg.DeploymentID)
+	var i Deployment
+	err := row.Scan(
+		&i.ID,
+		&i.LicenseID,
+		&i.DeploymentID,
+		&i.Name,
+		&i.Status,
+		&i.ActivatedAt,
+		&i.LastSeenAt,
+		&i.DeactivatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listDeploymentsByLicense = `-- name: ListDeploymentsByLicense :many
 SELECT d.id, d.license_id, d.deployment_id, d.name, d.status, d.activated_at, d.last_seen_at, d.deactivated_at, d.created_at, d.updated_at
 FROM deployments AS d
@@ -322,6 +331,33 @@ func (q *Queries) ListDeploymentsByLicense(ctx context.Context, arg ListDeployme
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockLicenseForDeploymentActivation = `-- name: LockLicenseForDeploymentActivation :one
+SELECT l.max_deployments
+FROM licenses AS l
+JOIN organizations AS o ON o.id = l.organization_id
+WHERE l.id = $1
+  AND l.organization_id = $2
+  AND l.status = 'active'
+  AND l.issued_at <= $3
+  AND (l.expires_at IS NULL OR l.expires_at > $3)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+FOR UPDATE OF l
+`
+
+type LockLicenseForDeploymentActivationParams struct {
+	LicenseID      uuid.UUID          `db:"license_id" json:"license_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ActivationTime pgtype.Timestamptz `db:"activation_time" json:"activation_time"`
+}
+
+func (q *Queries) LockLicenseForDeploymentActivation(ctx context.Context, arg LockLicenseForDeploymentActivationParams) (int32, error) {
+	row := q.db.QueryRow(ctx, lockLicenseForDeploymentActivation, arg.LicenseID, arg.OrganizationID, arg.ActivationTime)
+	var max_deployments int32
+	err := row.Scan(&max_deployments)
+	return max_deployments, err
 }
 
 const touchDeployment = `-- name: TouchDeployment :one
