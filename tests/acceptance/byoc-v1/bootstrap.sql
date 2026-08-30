@@ -12,3 +12,18 @@ VALUES (
     '[]'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO organizations (id, name, status)
+VALUES ('00000000-0000-0000-0000-000000001201', 'BYOC v1 Acceptance Tenant B', 'active')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO organization_tokens (id, organization_id, name, token_hash, token_prefix, scopes)
+VALUES (
+    '00000000-0000-0000-0000-000000001202',
+    '00000000-0000-0000-0000-000000001201',
+    'byoc-v1-acceptance-tenant-b',
+    'PsluPk0pxyRogrUeTi6j2Roc2WZi3zO_ac2M9Agd-ps',
+    'lm_org_v1smoke1',
+    '[]'::jsonb
+)
+ON CONFLICT (id) DO NOTHING;
