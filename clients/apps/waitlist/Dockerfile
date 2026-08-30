@@ -16,14 +16,10 @@ RUN bunx turbo build --filter=@leamout/waitlist
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV HOSTNAME=0.0.0.0
-ENV PORT=3002
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 USER nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/apps/waitlist/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/apps/waitlist/.next/static ./apps/waitlist/.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/apps/waitlist/public ./apps/waitlist/public
-EXPOSE 3002
 CMD ["node", "apps/waitlist/server.js"]
