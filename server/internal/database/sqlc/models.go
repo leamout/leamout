@@ -40,6 +40,9 @@ type Call struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	ApplicationID       *uuid.UUID         `db:"application_id" json:"application_id"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	TrunkID             *uuid.UUID         `db:"trunk_id" json:"trunk_id"`
+	TrunkEndpointID     *uuid.UUID         `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
 	Direction           string             `db:"direction" json:"direction"`
 	State               string             `db:"state" json:"state"`
 	MediaState          string             `db:"media_state" json:"media_state"`
@@ -53,9 +56,6 @@ type Call struct {
 	HangupReason        *string            `db:"hangup_reason" json:"hangup_reason"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
-	TrunkID             *uuid.UUID         `db:"trunk_id" json:"trunk_id"`
-	TrunkEndpointID     *uuid.UUID         `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
 }
 
 type CallParticipant struct {
