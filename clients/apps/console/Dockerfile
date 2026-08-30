@@ -16,10 +16,10 @@ RUN bunx turbo build --filter=@leamout/console
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-USER nextjs
-COPY --from=builder --chown=nextjs:nodejs /app/apps/console/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/console/.next/static ./apps/console/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/console/public ./apps/console/public
+RUN addgroup --system --gid 1001 leamout
+RUN adduser --system --uid 1001 console
+USER console
+COPY --from=builder --chown=console:leamout /app/apps/console/.next/standalone ./
+COPY --from=builder --chown=console:leamout /app/apps/console/.next/static ./apps/console/.next/static
+COPY --from=builder --chown=console:leamout /app/apps/console/public ./apps/console/public
 CMD ["node", "apps/console/server.js"]
