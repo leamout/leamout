@@ -11,7 +11,7 @@ This roadmap tracks customer-owned SIP carrier connectivity independently from p
 - [x] Public number-to-carrier-connection assignment API.
 - [x] Add a built-in generic SIP provider to production bootstrap data.
 - [x] Apply source-IP changes immediately (carrier ingress queries PostgreSQL per request).
-- [ ] Materialize encrypted digest credentials into an OpenSIPS-safe runtime auth store without restart.
+- [x] Materialize encrypted digest credentials into an OpenSIPS-safe HA1 runtime store without restart.
 
 ### Credential activation design
 
@@ -22,17 +22,15 @@ directly, and a generic `reload` command would not make those secrets usable.
 
 Implement digest activation as a separate security change:
 
-1. Add an explicit SIP realm to inbound and outbound digest configuration.
-2. Derive and store realm-bound HA1 material for inbound authentication; never
+1. [x] Add an explicit SIP realm to inbound and outbound digest configuration.
+2. [x] Derive and store realm-bound HA1 material; never
    expose or copy plaintext credentials into an OpenSIPS-readable table.
-3. Authenticate inbound carrier requests against the active, organization-bound
+3. [ ] Authenticate inbound carrier requests against the active, organization-bound
    HA1 records and resolve the same carrier connection after authentication.
-4. Add an outbound credential agent that decrypts credentials in trusted
-   application memory and updates FreeSWITCH/OpenSIPS runtime authentication
-   state atomically.
-5. Rotate by installing new runtime material before retiring the previous
-   version, then verify with an authenticated test transaction.
-6. Add acceptance coverage proving set, rotate, and delete take effect without
+4. [ ] Add an outbound credential agent that uses the realm-bound HA1 material
+   to answer carrier challenges without exposing plaintext.
+5. [x] Rotate runtime material atomically with encrypted control-plane state.
+6. [x] Add acceptance coverage proving set, rotate, and delete materialization without
    restarting OpenSIPS or exposing plaintext in SQL, logs, or MI responses.
 
 Do not implement this item as an OpenSIPS configuration reload: the current SIP

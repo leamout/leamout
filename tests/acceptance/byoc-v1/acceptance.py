@@ -65,12 +65,17 @@ def provider():
 def connection_and_auth():
     item = api("POST", "/v1/carrier-connections/", {"provider_id": S["provider"]["id"], "name": "BYOC synthetic carrier", "inbound_enabled": True}, (201,))
     S["connection"] = item
-    item = api("PUT", f"/v1/carrier-connections/{item['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "secret":"first-secret"})
+    item = api("PUT", f"/v1/carrier-connections/{item['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "realm":"carrier.example", "secret":"first-secret"})
     if not item["has_outbound_credentials"]: raise Failure("outbound credentials were not marked present")
-    api("PUT", f"/v1/carrier-connections/{item['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "secret":"rotated-secret"})
+    api("PUT", f"/v1/carrier-connections/{item['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "realm":"carrier.example", "secret":"rotated-secret"})
     stored = psql(f"SELECT auth_secret_ciphertext FROM carrier_connections WHERE id='{item['id']}'")
     if not stored or "rotated-secret" in stored: raise Failure("credential was not encrypted")
+    runtime = psql(f"SELECT username||':'||realm||':'||ha1_md5 FROM carrier_digest_credentials WHERE carrier_connection_id='{item['id']}' AND direction='outbound'")
+    if runtime != "byoc-user:carrier.example:9fcc44d55f26bac30b97201af8e5654d": raise Failure("realm-bound runtime HA1 was not materialized")
+    opensips_password = psql(f"SELECT password FROM opensips_carrier_digest_credentials WHERE carrier_connection_id='{item['id']}' AND direction='outbound'")
+    if opensips_password != "0x9fcc44d55f26bac30b97201af8e5654d": raise Failure("OpenSIPS-safe HA1 view was not updated")
     api("DELETE", f"/v1/carrier-connections/{item['id']}/outbound-auth", expected=(204,))
+    if psql(f"SELECT count(*) FROM carrier_digest_credentials WHERE carrier_connection_id='{item['id']}'") != "0": raise Failure("runtime credential was not removed")
     return "digest credential set, rotated, encrypted, and removed"
 
 def trunk():

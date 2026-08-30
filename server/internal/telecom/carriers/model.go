@@ -41,12 +41,14 @@ type SourceIPCreateRequest struct {
 type DigestAuthRequest struct {
 	Method   string `json:"method"`
 	Username string `json:"username"`
+	Realm    string `json:"realm"`
 	Secret   string `json:"secret"`
 }
 
 type InboundAuthRequest struct {
 	Method   string `json:"method"`
 	Username string `json:"username,omitempty"`
+	Realm    string `json:"realm,omitempty"`
 	Secret   string `json:"secret,omitempty"`
 }
 

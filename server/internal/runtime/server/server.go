@@ -165,7 +165,7 @@ func NewModules(
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
-	carriersRepository := carriers.NewRepository(queries)
+	carriersRepository := carriers.NewRepository(db)
 	carriersService := carriers.NewService(carriersRepository, credentialCipher)
 
 	trunksRepository := trunks.NewRepository(queries)

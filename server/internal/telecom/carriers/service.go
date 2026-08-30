@@ -2,7 +2,9 @@ package carriers
 
 import (
 	"context"
+	"crypto/md5"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
@@ -40,8 +42,12 @@ func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req Di
 	if err != nil {
 		return Response{}, apperror.NewInternal("encrypt outbound carrier credential", err)
 	}
-	if err := s.repo.SetOutboundDigestAuth(ctx, org, id, username, ciphertext); err != nil {
-		return Response{}, apperror.NewInternal("set outbound carrier auth", err)
+	realm, err := requireAuthValue(req.Realm, "realm")
+	if err != nil {
+		return Response{}, err
+	}
+	if err := s.repo.SetDigestAuth(ctx, org, id, "outbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+		return Response{}, digestWriteError(err, "set outbound carrier auth")
 	}
 	return s.Get(ctx, org, id)
 }
@@ -50,7 +56,7 @@ func (s *Service) ClearOutboundAuth(ctx context.Context, org, id uuid.UUID) erro
 	if _, err := s.Get(ctx, org, id); err != nil {
 		return err
 	}
-	return writeAuthError(s.repo.ClearOutboundAuth(ctx, org, id), "clear outbound carrier auth")
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "outbound"), "clear outbound carrier auth")
 }
 
 func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req InboundAuthRequest) (Response, error) {
@@ -75,8 +81,12 @@ func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req Inb
 		if err != nil {
 			return Response{}, apperror.NewInternal("encrypt inbound carrier credential", err)
 		}
-		if err := s.repo.SetInboundDigestAuth(ctx, org, id, username, ciphertext); err != nil {
-			return Response{}, apperror.NewInternal("set inbound carrier auth", err)
+		realm, err := requireAuthValue(req.Realm, "realm")
+		if err != nil {
+			return Response{}, err
+		}
+		if err := s.repo.SetDigestAuth(ctx, org, id, "inbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+			return Response{}, digestWriteError(err, "set inbound carrier auth")
 		}
 	default:
 		return Response{}, apperror.NewBadRequest("inbound auth method must be digest or ip")
@@ -88,7 +98,7 @@ func (s *Service) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error
 	if _, err := s.Get(ctx, org, id); err != nil {
 		return err
 	}
-	return writeAuthError(s.repo.ClearInboundAuth(ctx, org, id), "clear inbound carrier auth")
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "inbound"), "clear inbound carrier auth")
 }
 
 func requireAuthValue(value, name string) (string, error) {
@@ -103,6 +113,18 @@ func writeAuthError(err error, message string) error {
 		return apperror.NewInternal(message, err)
 	}
 	return nil
+}
+
+func digestHA1(username, realm, secret string) string {
+	return fmt.Sprintf("%x", md5.Sum([]byte(username+":"+realm+":"+secret)))
+}
+
+func digestWriteError(err error, message string) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return apperror.NewConflict("digest username and realm are already in use")
+	}
+	return apperror.NewInternal(message, err)
 }
 
 func (s *Service) Create(
