@@ -5,6 +5,7 @@ API = os.getenv("BYOC_V1_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("BYOC_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
 TOKEN_B = os.getenv("BYOC_V1_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnopqrstuvwx")
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "byoc-v1-esl-secret")
+SUITE_DIR = os.getenv("BYOC_V1_SUITE_DIR", os.path.dirname(os.path.abspath(__file__)))
 DID, CALLER = "+15551234567", "+15557654321"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/byoc-v1/compose.yaml"]
 S, RESULTS = {}, []
@@ -63,26 +64,28 @@ def provider():
     if not item or item["adapter"] != "sip" or item["status"] != "active": raise Failure("generic provider is missing or invalid")
     S["provider"] = item; return f"production provider {item['id']} is active"
 
+def assert_digest_runtime(secret_name, expected_ha1):
+    connection_id = S["connection"]["id"]
+    stored = psql(f"SELECT auth_secret_ciphertext FROM carrier_connections WHERE id='{connection_id}'")
+    if not stored or secret_name in stored: raise Failure("credential was not encrypted")
+    runtime = psql(f"SELECT username||':'||realm||':'||ha1_md5 FROM carrier_digest_credentials WHERE carrier_connection_id='{connection_id}' AND direction='outbound'")
+    expected = f"byoc-user:carrier.example:{expected_ha1}"
+    if runtime != expected: raise Failure(f"realm-bound runtime HA1 mismatch: {runtime!r}")
+    opensips_password = psql(f"SELECT password FROM opensips_outbound_carrier_credentials WHERE carrier_connection_id='{connection_id}'")
+    if opensips_password != "0x" + expected_ha1: raise Failure("OpenSIPS outbound HA1 view was not updated")
+
 def connection_and_auth():
     item = api("POST", "/v1/carrier-connections/", {"provider_id": S["provider"]["id"], "name": "BYOC synthetic carrier", "inbound_enabled": True}, (201,))
     S["connection"] = item
     item = api("PUT", f"/v1/carrier-connections/{item['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "realm":"carrier.example", "secret":"first-secret"})
     if not item["has_outbound_credentials"]: raise Failure("outbound credentials were not marked present")
-    api("PUT", f"/v1/carrier-connections/{item['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "realm":"carrier.example", "secret":"rotated-secret"})
-    stored = psql(f"SELECT auth_secret_ciphertext FROM carrier_connections WHERE id='{item['id']}'")
-    if not stored or "rotated-secret" in stored: raise Failure("credential was not encrypted")
-    runtime = psql(f"SELECT username||':'||realm||':'||ha1_md5 FROM carrier_digest_credentials WHERE carrier_connection_id='{item['id']}' AND direction='outbound'")
-    if runtime != "byoc-user:carrier.example:9fcc44d55f26bac30b97201af8e5654d": raise Failure("realm-bound runtime HA1 was not materialized")
-    opensips_password = psql(f"SELECT password FROM opensips_carrier_digest_credentials WHERE carrier_connection_id='{item['id']}' AND direction='outbound'")
-    if opensips_password != "0x9fcc44d55f26bac30b97201af8e5654d": raise Failure("OpenSIPS-safe HA1 view was not updated")
-    api("DELETE", f"/v1/carrier-connections/{item['id']}/outbound-auth", expected=(204,))
-    if psql(f"SELECT count(*) FROM carrier_digest_credentials WHERE carrier_connection_id='{item['id']}'") != "0": raise Failure("runtime credential was not removed")
-    return "digest credential set, rotated, encrypted, and removed"
+    assert_digest_runtime("first-secret", "367072b7e49f70c083774e6dc9d06af8")
+    return "first digest credential is encrypted and active in OpenSIPS runtime"
 
 def trunk():
     item = api("POST", "/v1/trunks/", {"carrier_connection_id":S["connection"]["id"], "name":"BYOC trunk", "direction":"bidirectional"}, (201,)); S["trunk"] = item
     endpoint = api("POST", f"/v1/trunks/{item['id']}/endpoints", {"host":"byoc-v1-carrier", "port":5060, "transport":"udp", "direction":"bidirectional", "priority":10}, (201,))
-    S["endpoint"] = endpoint; return f"trunk {item['id']} routes to {endpoint['host']}"
+    S["endpoint"] = endpoint; return f"trunk {item['id']} routes to endpoint {endpoint['id']}"
 
 def number_and_app():
     number = api("POST", "/v1/numbers/", {"number":DID, "country_code":"US", "voice_enabled":True}, (201,)); S["number"] = number
@@ -98,6 +101,43 @@ def reject_cross_org_did_ownership():
     owned = api("GET", f"/v1/numbers/{S['number']['id']}")
     if owned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("cross-organization request changed DID ownership")
     return "tenant B cannot read or reassign tenant A DID ownership"
+
+def outbound(label):
+    call = api("POST", "/v1/calls/", {"application_id":S["app"]["id"], "trunk_id":S["trunk"]["id"], "from":CALLER, "to":DID}, (201,))
+    S[f"outbound_{label}"] = call
+    expected = {
+        "carrier_connection_id": S["connection"]["id"],
+        "trunk_id": S["trunk"]["id"],
+        "trunk_endpoint_id": S["endpoint"]["id"],
+    }
+    for field, value in expected.items():
+        if call.get(field) != value: raise Failure(f"{field}={call.get(field)!r}, want {value}")
+    if not call.get("sip_call_id"): raise Failure("outbound call has no SIP call id")
+    persisted = api("GET", f"/v1/calls/{call['id']}")
+    for field, value in expected.items():
+        if persisted.get(field) != value: raise Failure(f"persisted {field}={persisted.get(field)!r}, want {value}")
+    return f"{label} authenticated call {call['id']} persisted connection/trunk/endpoint attribution"
+
+def first_authenticated_outbound():
+    return outbound("first-secret")
+
+def write_carrier_secret(secret):
+    path = os.path.join(SUITE_DIR, "carrier-directory.xml")
+    content = f'''<include>\n  <domain name="carrier.example">\n    <groups>\n      <group name="default">\n        <users>\n          <user id="byoc-user">\n            <params>\n              <param name="password" value="{secret}"/>\n            </params>\n          </user>\n        </users>\n      </group>\n    </groups>\n  </domain>\n</include>\n'''
+    with open(path, "w", encoding="utf-8") as f: f.write(content)
+    output = fs("reloadxml")
+    if "+OK" not in output: raise Failure("carrier did not reload rotated directory credential: " + output)
+
+def rotate_and_authenticated_outbound():
+    opensips_before = compose("ps", "-q", "opensips")
+    if not opensips_before: raise Failure("OpenSIPS container id is unavailable before rotation")
+    api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/outbound-auth", {"method":"digest", "username":"byoc-user", "realm":"carrier.example", "secret":"rotated-secret"})
+    assert_digest_runtime("rotated-secret", "9fcc44d55f26bac30b97201af8e5654d")
+    write_carrier_secret("rotated-secret")
+    opensips_after = compose("ps", "-q", "opensips")
+    if opensips_after != opensips_before: raise Failure("OpenSIPS restarted during credential rotation")
+    detail = outbound("rotated-secret")
+    return detail + "; OpenSIPS container remained unchanged"
 
 def rejected_before_allowlist():
     output = fs(f"originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()")
@@ -116,11 +156,6 @@ def add_source_and_inbound():
     if "+OK" in rejected: raise Failure("removed carrier source remained authorized")
     return "source-IP addition and removal took effect without OpenSIPS restart"
 
-def outbound():
-    call = api("POST", "/v1/calls/", {"application_id":S["app"]["id"], "trunk_id":S["trunk"]["id"], "from":CALLER, "to":DID}, (201,)); S["outbound"] = call
-    if call.get("trunk_id") != S["trunk"]["id"] or not call.get("sip_call_id"): raise Failure("outbound route attribution is incomplete")
-    return f"outbound call {call['id']} reached the BYOC carrier"
-
 def disable_rejects_routes():
     api("PATCH", f"/v1/carrier-connections/{S['connection']['id']}", {"status":"disabled"})
     api("POST", "/v1/calls/", {"trunk_id":S["trunk"]["id"], "from":CALLER, "to":DID}, (409,))
@@ -134,7 +169,21 @@ def restart_persistence():
     return "carrier configuration survives OpenSIPS and API restart"
 
 def main():
-    for name, fn in [("Deploy BYOC stack",deploy),("Discover generic SIP provider",provider),("Manage encrypted carrier auth",connection_and_auth),("Provision trunk endpoint",trunk),("Assign DID ownership",number_and_app),("Reject cross-org DID ownership",reject_cross_org_did_ownership),("Reject unknown source",rejected_before_allowlist),("Apply source IP live",add_source_and_inbound),("Complete outbound route",outbound),("Disable carrier routing",disable_rejects_routes),("Recover configuration",restart_persistence)]: check(name, fn)
+    tests = [
+        ("Deploy BYOC stack", deploy),
+        ("Discover generic SIP provider", provider),
+        ("Activate first outbound digest credential", connection_and_auth),
+        ("Provision trunk endpoint", trunk),
+        ("Assign DID ownership", number_and_app),
+        ("Reject cross-org DID ownership", reject_cross_org_did_ownership),
+        ("Authenticate outbound with first secret", first_authenticated_outbound),
+        ("Rotate digest auth without OpenSIPS restart", rotate_and_authenticated_outbound),
+        ("Reject unknown source", rejected_before_allowlist),
+        ("Apply source IP live", add_source_and_inbound),
+        ("Disable carrier routing", disable_rejects_routes),
+        ("Recover configuration", restart_persistence),
+    ]
+    for name, fn in tests: check(name, fn)
     failed = len([x for x in RESULTS if not x]); print(f"\nBYOC v1 acceptance {'FAILED' if failed else 'PASSED'}: {failed} failure(s).")
     return 1 if failed else 0
 
