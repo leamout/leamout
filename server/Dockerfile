@@ -11,20 +11,26 @@ RUN go mod download
 
 COPY . .
 
-ARG LEAMOUT_COMMAND=server
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -trimpath \
-    -ldflags="-s -w" \
-    -o /out/leamout \
-    "./cmd/${LEAMOUT_COMMAND}"
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/server \
+        ./cmd/server; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/worker \
+        ./cmd/worker
 
 FROM alpine:3.22
+
+ARG LEAMOUT_COMMAND=server
 
 RUN apk add --no-cache ca-certificates \
     && addgroup -S leamout \
     && adduser -S -G leamout leamout
 
-COPY --from=builder /out/leamout /usr/local/bin/leamout
+COPY --from=builder /out/${LEAMOUT_COMMAND} /usr/local/bin/leamout
 
 USER leamout
 
