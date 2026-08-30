@@ -270,11 +270,13 @@ def create_voice_application():
     )
     STATE["number_id"] = number["id"]
 
-    updated = psql(
-        "UPDATE phone_numbers SET carrier_connection_id = "
-        f"'{STATE['connection_id']}'::uuid WHERE id = '{number['id']}'::uuid RETURNING id;"
+    _, assigned = api(
+        "PUT",
+        f"/v1/numbers/{number['id']}/carrier-connection",
+        {"carrier_connection_id": STATE["connection_id"]},
+        expected={200},
     )
-    if number["id"] not in updated:
+    if assigned.get("carrier_connection_id") != STATE["connection_id"]:
         raise AcceptanceError("failed to assign test DID to carrier connection")
 
     _, application = api(

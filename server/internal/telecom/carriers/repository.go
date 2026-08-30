@@ -65,6 +65,22 @@ func (r *Repository) Disable(
 	)
 }
 
+func (r *Repository) SetOutboundDigestAuth(ctx context.Context, org, id uuid.UUID, username, secret string) error {
+	return r.queries.SetCarrierConnectionOutboundDigestAuth(ctx, sqlc.SetCarrierConnectionOutboundDigestAuthParams{ID: id, OrganizationID: org, AuthUsername: &username, AuthSecretCiphertext: &secret})
+}
+func (r *Repository) ClearOutboundAuth(ctx context.Context, org, id uuid.UUID) error {
+	return r.queries.ClearCarrierConnectionOutboundAuth(ctx, sqlc.ClearCarrierConnectionOutboundAuthParams{ID: id, OrganizationID: org})
+}
+func (r *Repository) SetInboundDigestAuth(ctx context.Context, org, id uuid.UUID, username, secret string) error {
+	return r.queries.SetCarrierConnectionInboundDigestAuth(ctx, sqlc.SetCarrierConnectionInboundDigestAuthParams{ID: id, OrganizationID: org, InboundUsername: &username, InboundSecretCiphertext: &secret})
+}
+func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID) error {
+	return r.queries.SetCarrierConnectionInboundIPAuth(ctx, sqlc.SetCarrierConnectionInboundIPAuthParams{ID: id, OrganizationID: org})
+}
+func (r *Repository) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error {
+	return r.queries.SetCarrierConnectionInboundNoAuth(ctx, sqlc.SetCarrierConnectionInboundNoAuthParams{ID: id, OrganizationID: org})
+}
+
 func (r *Repository) CreateSourceIP(
 	ctx context.Context,
 	organizationID uuid.UUID,

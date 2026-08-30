@@ -110,6 +110,20 @@ func (s *Service) Delete(
 	return writeError(s.repo.Disable(ctx, organizationID, id), "disable phone number")
 }
 
+func (s *Service) SetCarrierConnection(ctx context.Context, organizationID, id uuid.UUID, req CarrierConnectionRequest) (sqlc.PhoneNumber, error) {
+	if err := validIDs(organizationID, id); err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	if req.CarrierConnectionID == uuid.Nil {
+		return sqlc.PhoneNumber{}, apperror.NewBadRequest("carrier_connection_id is required")
+	}
+	result, err := s.repo.SetCarrierConnection(ctx, organizationID, id, req.CarrierConnectionID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.PhoneNumber{}, apperror.NewNotFound("phone number or active carrier connection not found")
+	}
+	return result, writeError(err, "assign carrier connection")
+}
+
 func validIDs(organizationID, id uuid.UUID) error {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return err

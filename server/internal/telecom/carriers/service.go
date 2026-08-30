@@ -3,6 +3,7 @@ package carriers
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -12,11 +13,96 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo   *Repository
+	cipher interface{ Encrypt(string) (string, error) }
 }
 
-func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+func NewService(repo *Repository, cipher interface{ Encrypt(string) (string, error) }) *Service {
+	return &Service{repo: repo, cipher: cipher}
+}
+
+func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req DigestAuthRequest) (Response, error) {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return Response{}, err
+	}
+	if strings.ToLower(strings.TrimSpace(req.Method)) != "digest" {
+		return Response{}, apperror.NewBadRequest("outbound auth method must be digest")
+	}
+	username, err := requireAuthValue(req.Username, "username")
+	if err != nil {
+		return Response{}, err
+	}
+	secret, err := requireAuthValue(req.Secret, "secret")
+	if err != nil {
+		return Response{}, err
+	}
+	ciphertext, err := s.cipher.Encrypt(secret)
+	if err != nil {
+		return Response{}, apperror.NewInternal("encrypt outbound carrier credential", err)
+	}
+	if err := s.repo.SetOutboundDigestAuth(ctx, org, id, username, ciphertext); err != nil {
+		return Response{}, apperror.NewInternal("set outbound carrier auth", err)
+	}
+	return s.Get(ctx, org, id)
+}
+
+func (s *Service) ClearOutboundAuth(ctx context.Context, org, id uuid.UUID) error {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return err
+	}
+	return writeAuthError(s.repo.ClearOutboundAuth(ctx, org, id), "clear outbound carrier auth")
+}
+
+func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req InboundAuthRequest) (Response, error) {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return Response{}, err
+	}
+	switch strings.ToLower(strings.TrimSpace(req.Method)) {
+	case "ip":
+		if err := s.repo.SetInboundIPAuth(ctx, org, id); err != nil {
+			return Response{}, apperror.NewInternal("set inbound carrier IP auth", err)
+		}
+	case "digest":
+		username, err := requireAuthValue(req.Username, "username")
+		if err != nil {
+			return Response{}, err
+		}
+		secret, err := requireAuthValue(req.Secret, "secret")
+		if err != nil {
+			return Response{}, err
+		}
+		ciphertext, err := s.cipher.Encrypt(secret)
+		if err != nil {
+			return Response{}, apperror.NewInternal("encrypt inbound carrier credential", err)
+		}
+		if err := s.repo.SetInboundDigestAuth(ctx, org, id, username, ciphertext); err != nil {
+			return Response{}, apperror.NewInternal("set inbound carrier auth", err)
+		}
+	default:
+		return Response{}, apperror.NewBadRequest("inbound auth method must be digest or ip")
+	}
+	return s.Get(ctx, org, id)
+}
+
+func (s *Service) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error {
+	if _, err := s.Get(ctx, org, id); err != nil {
+		return err
+	}
+	return writeAuthError(s.repo.ClearInboundAuth(ctx, org, id), "clear inbound carrier auth")
+}
+
+func requireAuthValue(value, name string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", apperror.NewBadRequest(name + " is required")
+	}
+	return value, nil
+}
+func writeAuthError(err error, message string) error {
+	if err != nil {
+		return apperror.NewInternal(message, err)
+	}
+	return nil
 }
 
 func (s *Service) Create(

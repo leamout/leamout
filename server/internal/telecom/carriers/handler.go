@@ -94,6 +94,60 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) SetOutboundAuth(w http.ResponseWriter, r *http.Request) { h.setAuth(w, r, true) }
+func (h *Handler) SetInboundAuth(w http.ResponseWriter, r *http.Request)  { h.setAuth(w, r, false) }
+func (h *Handler) setAuth(w http.ResponseWriter, r *http.Request, outbound bool) {
+	org, id, err := connectionIDs(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	if outbound {
+		req, e := helper.DecodeJSON[DigestAuthRequest](r)
+		if e != nil {
+			httputil.Error(w, e)
+			return
+		}
+		item, e := h.service.SetOutboundAuth(r.Context(), org, id, req)
+		if e != nil {
+			httputil.Error(w, e)
+			return
+		}
+		httputil.OK(w, item)
+		return
+	}
+	req, err := helper.DecodeJSON[InboundAuthRequest](r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	item, err := h.service.SetInboundAuth(r.Context(), org, id, req)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, item)
+}
+func (h *Handler) ClearOutboundAuth(w http.ResponseWriter, r *http.Request) { h.clearAuth(w, r, true) }
+func (h *Handler) ClearInboundAuth(w http.ResponseWriter, r *http.Request)  { h.clearAuth(w, r, false) }
+func (h *Handler) clearAuth(w http.ResponseWriter, r *http.Request, outbound bool) {
+	org, id, err := connectionIDs(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	if outbound {
+		err = h.service.ClearOutboundAuth(r.Context(), org, id)
+	} else {
+		err = h.service.ClearInboundAuth(r.Context(), org, id)
+	}
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) CreateSourceIP(w http.ResponseWriter, r *http.Request) {
 	org, id, err := connectionIDs(r)
 	if err != nil {
