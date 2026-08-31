@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -98,11 +97,8 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, err
 	}
 	turnService, err := realtime.NewService(realtime.Config{
-		AuthSecret:  cfg.TURNAuthSecret,
-		URLs:        cfg.TURNPublicURLs,
-		TTL:         10 * time.Minute,
-		IssueLimit:  60,
-		IssueWindow: time.Minute,
+		AuthSecret: cfg.TURNAuthSecret,
+		URLs:       cfg.TURNPublicURLs,
 	}, redisClient)
 	if err != nil {
 		_ = freeSwitch.Close()
