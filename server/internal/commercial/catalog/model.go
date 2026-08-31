@@ -52,15 +52,15 @@ type Plan struct {
 // Active/effective bounds control acquisition availability without rewriting
 // historical subscriptions that already reference this price.
 type Price struct {
-	ID             uuid.UUID
-	PlanID         uuid.UUID
-	Currency       string
-	AmountMinor    int64
+	ID              uuid.UUID
+	PlanID          uuid.UUID
+	Currency        string
+	AmountMinor     int64
 	BillingInterval BillingInterval
-	Active         bool
-	EffectiveFrom  time.Time
-	EffectiveUntil *time.Time
-	CreatedAt      time.Time
+	Active          bool
+	EffectiveFrom   time.Time
+	EffectiveUntil  *time.Time
+	CreatedAt       time.Time
 }
 
 func (p Price) EffectiveAt(at time.Time) bool {
