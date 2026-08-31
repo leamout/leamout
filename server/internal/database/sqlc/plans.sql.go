@@ -11,56 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const createPlan = `-- name: CreatePlan :one
-INSERT INTO plans (
-    product_id,
-    code,
-    name,
-    description,
-    active
-)
-SELECT
-    p.id AS product_id,
-    $1 AS code,
-    $2 AS name,
-    $3 AS description,
-    COALESCE($4, true) AS active
-FROM products AS p
-WHERE p.id = $5
-  AND p.active = true
-RETURNING id, product_id, code, name, description, active, created_at, updated_at
-`
-
-type CreatePlanParams struct {
-	Code        string    `db:"code" json:"code"`
-	Name        string    `db:"name" json:"name"`
-	Description *string   `db:"description" json:"description"`
-	Active      *bool     `db:"active" json:"active"`
-	ProductID   uuid.UUID `db:"product_id" json:"product_id"`
-}
-
-func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error) {
-	row := q.db.QueryRow(ctx, createPlan,
-		arg.Code,
-		arg.Name,
-		arg.Description,
-		arg.Active,
-		arg.ProductID,
-	)
-	var i Plan
-	err := row.Scan(
-		&i.ID,
-		&i.ProductID,
-		&i.Code,
-		&i.Name,
-		&i.Description,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getPlanByCode = `-- name: GetPlanByCode :one
 SELECT id, product_id, code, name, description, active, created_at, updated_at
 FROM plans
@@ -180,52 +130,4 @@ func (q *Queries) ListPlansByProduct(ctx context.Context, productID uuid.UUID) (
 		return nil, err
 	}
 	return items, nil
-}
-
-const updatePlan = `-- name: UpdatePlan :one
-UPDATE plans AS pl
-SET
-    code = COALESCE($1, pl.code),
-    name = COALESCE($2, pl.name),
-    description = COALESCE($3, pl.description),
-    active = COALESCE($4, pl.active),
-    updated_at = NOW()
-FROM products AS p
-WHERE pl.id = $5
-  AND p.id = pl.product_id
-  AND (
-      COALESCE($4, pl.active) = false
-      OR p.active = true
-  )
-RETURNING pl.id, pl.product_id, pl.code, pl.name, pl.description, pl.active, pl.created_at, pl.updated_at
-`
-
-type UpdatePlanParams struct {
-	Code        *string   `db:"code" json:"code"`
-	Name        *string   `db:"name" json:"name"`
-	Description *string   `db:"description" json:"description"`
-	Active      *bool     `db:"active" json:"active"`
-	ID          uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) UpdatePlan(ctx context.Context, arg UpdatePlanParams) (Plan, error) {
-	row := q.db.QueryRow(ctx, updatePlan,
-		arg.Code,
-		arg.Name,
-		arg.Description,
-		arg.Active,
-		arg.ID,
-	)
-	var i Plan
-	err := row.Scan(
-		&i.ID,
-		&i.ProductID,
-		&i.Code,
-		&i.Name,
-		&i.Description,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }
