@@ -124,7 +124,7 @@ func (r *Repository) ListPrices(ctx context.Context, planID uuid.UUID, activeOnl
 	if activeOnly {
 		rows, err = r.queries.ListActivePricesByPlan(ctx, sqlc.ListActivePricesByPlanParams{
 			PlanID: planID,
-			At:     pgconv.Timestamptz(at),
+			At:     pgconv.NullableTimestamptz(&at),
 		})
 	} else {
 		rows, err = r.queries.ListPricesByPlan(ctx, planID)
