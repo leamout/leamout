@@ -135,21 +135,31 @@ func (s *Service) EffectiveForOrganizationAt(ctx context.Context, organizationID
 
 // EffectiveForOrganizationPlanAt resolves organization capabilities against an already-selected plan.
 func (s *Service) EffectiveForOrganizationPlanAt(ctx context.Context, organizationID, planID uuid.UUID, at time.Time) (EntitlementSet, error) {
-	if err := validateID(organizationID, ErrOrganizationIDRequired); err != nil {
+	resolution, err := s.ResolveForOrganizationPlanAt(ctx, organizationID, planID, at)
+	if err != nil {
 		return EntitlementSet{}, err
 	}
+	return resolution.Set, nil
+}
+
+// ResolveForOrganizationPlanAt resolves organization capabilities and the earliest
+// entitlement activation/expiration boundary that can invalidate the result.
+func (s *Service) ResolveForOrganizationPlanAt(ctx context.Context, organizationID, planID uuid.UUID, at time.Time) (Resolution, error) {
+	if err := validateID(organizationID, ErrOrganizationIDRequired); err != nil {
+		return Resolution{}, err
+	}
 	if err := validateID(planID, ErrPlanIDRequired); err != nil {
-		return EntitlementSet{}, err
+		return Resolution{}, err
 	}
 	plan, err := s.repo.ListPlan(ctx, planID)
 	if err != nil {
-		return EntitlementSet{}, err
+		return Resolution{}, err
 	}
 	overrides, err := s.repo.ListOrganization(ctx, organizationID)
 	if err != nil {
-		return EntitlementSet{}, err
+		return Resolution{}, err
 	}
-	return resolve(at, plan, overrides)
+	return resolveWithSchedule(at, plan, overrides)
 }
 
 // ForLicense resolves the immutable license-scoped entitlement snapshot at the current time.
@@ -167,6 +177,14 @@ func (s *Service) ForLicenseAt(ctx context.Context, organizationID, licenseID uu
 }
 
 func resolve(at time.Time, base, overrides []Entitlement) (EntitlementSet, error) {
+	resolution, err := resolveWithSchedule(at, base, overrides)
+	if err != nil {
+		return EntitlementSet{}, err
+	}
+	return resolution.Set, nil
+}
+
+func resolveWithSchedule(at time.Time, base, overrides []Entitlement) (Resolution, error) {
 	resolved := make(map[string]Entitlement, len(base)+len(overrides))
 	for _, entitlement := range base {
 		if effectiveAt(entitlement, at) {
@@ -178,7 +196,7 @@ func resolve(at time.Time, base, overrides []Entitlement) (EntitlementSet, error
 			continue
 		}
 		if inherited, ok := resolved[entitlement.Key]; ok && inherited.Kind != entitlement.Kind {
-			return EntitlementSet{}, ErrKindMismatch
+			return Resolution{}, ErrKindMismatch
 		}
 		resolved[entitlement.Key] = entitlement
 	}
@@ -191,17 +209,39 @@ func resolve(at time.Time, base, overrides []Entitlement) (EntitlementSet, error
 		switch entitlement.Kind {
 		case KindFeature:
 			if entitlement.Enabled == nil {
-				return EntitlementSet{}, ErrInvalidEntitlement
+				return Resolution{}, ErrInvalidEntitlement
 			}
 			set.Features[Feature(key)] = *entitlement.Enabled
 		case KindLimit:
 			if entitlement.LimitValue == nil || *entitlement.LimitValue < 0 {
-				return EntitlementSet{}, ErrInvalidEntitlement
+				return Resolution{}, ErrInvalidEntitlement
 			}
 			set.Limits[key] = *entitlement.LimitValue
 		default:
-			return EntitlementSet{}, ErrInvalidEntitlement
+			return Resolution{}, ErrInvalidEntitlement
 		}
 	}
-	return set, nil
+
+	return Resolution{
+		Set:          set,
+		NextChangeAt: nextEntitlementChange(at, base, overrides),
+	}, nil
+}
+
+func nextEntitlementChange(at time.Time, groups ...[]Entitlement) *time.Time {
+	var next *time.Time
+	for _, group := range groups {
+		for _, entitlement := range group {
+			for _, boundary := range []*time.Time{entitlement.StartsAt, entitlement.ExpiresAt} {
+				if boundary == nil || !boundary.After(at) {
+					continue
+				}
+				if next == nil || boundary.Before(*next) {
+					value := *boundary
+					next = &value
+				}
+			}
+		}
+	}
+	return next
 }
