@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/pkg/apperror"
 )
@@ -101,7 +102,8 @@ func truncateValidationError(message string) string {
 }
 
 func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req DigestAuthRequest) (Response, error) {
-	if _, err := s.Get(ctx, org, id); err != nil {
+	current, err := s.Get(ctx, org, id)
+	if err != nil {
 		return Response{}, err
 	}
 	if strings.ToLower(strings.TrimSpace(req.Method)) != "digest" {
@@ -123,7 +125,11 @@ func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req Di
 	if err != nil {
 		return Response{}, err
 	}
-	if err := s.repo.SetDigestAuth(ctx, org, id, "outbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+	event, err := credentialAuditEvent(ctx, org, id, "outbound", "digest", current.HasOutboundCredentials)
+	if err != nil {
+		return Response{}, apperror.NewInternal("attribute outbound credential audit event", err)
+	}
+	if err := s.repo.SetDigestAuth(ctx, org, id, "outbound", username, realm, ciphertext, digestHA1(username, realm, secret), event); err != nil {
 		return Response{}, digestWriteError(err, "set outbound carrier auth")
 	}
 	return s.Get(ctx, org, id)
@@ -133,16 +139,25 @@ func (s *Service) ClearOutboundAuth(ctx context.Context, org, id uuid.UUID) erro
 	if _, err := s.Get(ctx, org, id); err != nil {
 		return err
 	}
-	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "outbound"), "clear outbound carrier auth")
+	event, err := credentialDeletionAuditEvent(ctx, org, id, "outbound")
+	if err != nil {
+		return apperror.NewInternal("attribute outbound credential deletion", err)
+	}
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "outbound", event), "clear outbound carrier auth")
 }
 
 func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req InboundAuthRequest) (Response, error) {
-	if _, err := s.Get(ctx, org, id); err != nil {
+	current, err := s.Get(ctx, org, id)
+	if err != nil {
 		return Response{}, err
 	}
 	switch strings.ToLower(strings.TrimSpace(req.Method)) {
 	case "ip":
-		if err := s.repo.SetInboundIPAuth(ctx, org, id); err != nil {
+		event, err := credentialAuditEvent(ctx, org, id, "inbound", "ip", current.InboundAuthMethod != "none")
+		if err != nil {
+			return Response{}, apperror.NewInternal("attribute inbound authentication audit event", err)
+		}
+		if err := s.repo.SetInboundIPAuth(ctx, org, id, event); err != nil {
 			return Response{}, apperror.NewInternal("set inbound carrier IP auth", err)
 		}
 	case "digest":
@@ -162,7 +177,11 @@ func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req Inb
 		if err != nil {
 			return Response{}, err
 		}
-		if err := s.repo.SetDigestAuth(ctx, org, id, "inbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+		event, err := credentialAuditEvent(ctx, org, id, "inbound", "digest", current.InboundAuthMethod != "none")
+		if err != nil {
+			return Response{}, apperror.NewInternal("attribute inbound credential audit event", err)
+		}
+		if err := s.repo.SetDigestAuth(ctx, org, id, "inbound", username, realm, ciphertext, digestHA1(username, realm, secret), event); err != nil {
 			return Response{}, digestWriteError(err, "set inbound carrier auth")
 		}
 	default:
@@ -175,7 +194,35 @@ func (s *Service) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error
 	if _, err := s.Get(ctx, org, id); err != nil {
 		return err
 	}
-	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "inbound"), "clear inbound carrier auth")
+	event, err := credentialDeletionAuditEvent(ctx, org, id, "inbound")
+	if err != nil {
+		return apperror.NewInternal("attribute inbound credential deletion", err)
+	}
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "inbound", event), "clear inbound carrier auth")
+}
+
+func credentialAuditEvent(ctx context.Context, organizationID, targetID uuid.UUID, direction, method string, rotation bool) (audit.Event, error) {
+	action := "carrier.credential_set"
+	if rotation {
+		action = "carrier.credential_rotated"
+	}
+	actor, err := audit.ActorFromContext(ctx)
+	if err != nil {
+		return audit.Event{}, err
+	}
+	return audit.NewEvent(organizationID, actor, action, "carrier_connection", targetID, map[string]any{
+		"direction": direction, "auth_method": method, "credential": "[REDACTED]",
+	})
+}
+
+func credentialDeletionAuditEvent(ctx context.Context, organizationID, targetID uuid.UUID, direction string) (audit.Event, error) {
+	actor, err := audit.ActorFromContext(ctx)
+	if err != nil {
+		return audit.Event{}, err
+	}
+	return audit.NewEvent(organizationID, actor, "carrier.credential_deleted", "carrier_connection", targetID, map[string]any{
+		"direction": direction, "credential": "[REDACTED]",
+	})
 }
 
 func requireAuthValue(value, name string) (string, error) {

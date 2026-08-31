@@ -13,6 +13,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
+	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
@@ -195,7 +196,7 @@ func NewModules(
 	subscribersRepository := subscribers.NewRepository(queries)
 	subscribersService := subscribers.NewService(subscribersRepository)
 
-	numbersRepository := numbers.NewRepository(queries)
+	numbersRepository := numbers.NewRepository(db)
 	numbersService := numbers.NewService(numbersRepository)
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
@@ -208,6 +209,8 @@ func NewModules(
 
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
+	auditRepository := audit.NewRepository(db)
+	auditService := audit.NewService(auditRepository)
 
 	resolver := authn.NewResolver(
 		sessionService,
@@ -292,6 +295,11 @@ func NewModules(
 			Repository: webhooksRepository,
 			Service:    webhooksService,
 			Handler:    webhooks.NewHandler(webhooksService),
+		},
+		Audit: AuditModule{
+			Repository: auditRepository,
+			Service:    auditService,
+			Handler:    audit.NewHandler(auditService),
 		},
 		Conferences: ConferencesModule{
 			Repository: conferencesRepository,

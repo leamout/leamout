@@ -81,7 +81,10 @@ report success while leaving authentication behavior unchanged.
   - [x] Count quota rejections and primary/failover endpoint selections.
   - [x] Publish endpoint probe results, health, and latency.
   - [x] Bound resource-attributed Prometheus series cardinality.
-- [ ] Add audit events for credential rotation and number reassignment.
+- [x] Add audit events for credential rotation and number reassignment.
+  - [x] Record credential set, rotation, and deletion with redacted metadata.
+  - [x] Record number assignment and reassignment with previous/new carrier IDs.
+  - [x] Attribute append-only events to the actor, organization, target, and timestamp.
 - [ ] Add carrier test-call and configuration-validation workflows.
   - [x] Add an on-demand configuration validator with bounded SIP OPTIONS probes.
   - [ ] Add a controlled, destination-allowlisted test-call workflow.

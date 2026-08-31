@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
@@ -117,7 +118,25 @@ func (s *Service) SetCarrierConnection(ctx context.Context, organizationID, id u
 	if req.CarrierConnectionID == uuid.Nil {
 		return sqlc.PhoneNumber{}, apperror.NewBadRequest("carrier_connection_id is required")
 	}
-	result, err := s.repo.SetCarrierConnection(ctx, organizationID, id, req.CarrierConnectionID)
+	current, err := s.Get(ctx, organizationID, id)
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	actor, err := audit.ActorFromContext(ctx)
+	if err != nil {
+		return sqlc.PhoneNumber{}, apperror.NewInternal("attribute number assignment audit event", err)
+	}
+	action := "number.carrier_assigned"
+	metadata := map[string]any{"carrier_connection_id": req.CarrierConnectionID}
+	if current.CarrierConnectionID != nil {
+		action = "number.carrier_reassigned"
+		metadata["previous_carrier_connection_id"] = *current.CarrierConnectionID
+	}
+	event, err := audit.NewEvent(organizationID, actor, action, "phone_number", id, metadata)
+	if err != nil {
+		return sqlc.PhoneNumber{}, apperror.NewInternal("create number assignment audit event", err)
+	}
+	result, err := s.repo.SetCarrierConnection(ctx, organizationID, id, req.CarrierConnectionID, event)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return sqlc.PhoneNumber{}, apperror.NewNotFound("phone number or active carrier connection not found")
 	}

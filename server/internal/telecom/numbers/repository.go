@@ -4,15 +4,18 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/audit"
 )
 
 type Repository struct {
+	db      *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
-func NewRepository(queries *sqlc.Queries) *Repository {
-	return &Repository{queries: queries}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
 func (r *Repository) Create(
@@ -73,6 +76,21 @@ func (r *Repository) Disable(
 	})
 }
 
-func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, id, connectionID uuid.UUID) (sqlc.PhoneNumber, error) {
-	return r.queries.UpdatePhoneNumber(ctx, sqlc.UpdatePhoneNumberParams{ID: id, OrganizationID: organizationID, CarrierConnectionID: &connectionID})
+func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, id, connectionID uuid.UUID, event audit.Event) (sqlc.PhoneNumber, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	number, err := r.queries.WithTx(tx).UpdatePhoneNumber(ctx, sqlc.UpdatePhoneNumberParams{ID: id, OrganizationID: organizationID, CarrierConnectionID: &connectionID})
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	if err := audit.Insert(ctx, tx, event); err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	return number, nil
 }

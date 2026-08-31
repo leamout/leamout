@@ -4,6 +4,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
@@ -33,6 +34,7 @@ type Modules struct {
 	Recordings           RecordingsModule
 	Conferences          ConferencesModule
 	Webhooks             WebhooksModule
+	Audit                AuditModule
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
 	Subscribers          SubscribersModule
@@ -107,6 +109,12 @@ type WebhooksModule struct {
 	Repository *webhooks.Repository
 	Service    *webhooks.Service
 	Handler    *webhooks.Handler
+}
+
+type AuditModule struct {
+	Repository *audit.Repository
+	Service    *audit.Service
+	Handler    *audit.Handler
 }
 
 type SIPDomainsModule struct {
