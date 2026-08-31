@@ -49,7 +49,7 @@ func TestMapWriteErrorPreservesUnknownUniqueViolation(t *testing.T) {
 		Code:           "23505",
 		ConstraintName: "some_future_unique_constraint",
 	}
-	if got := mapWriteError(pgErr); got != pgErr {
+	if got := mapWriteError(pgErr); !errors.Is(got, pgErr) {
 		t.Fatalf("mapWriteError() error = %v, want original error", got)
 	}
 }
