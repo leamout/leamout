@@ -185,7 +185,12 @@ func mapWriteError(err error) error {
 	if errors.As(err, &pgErr) {
 		switch pgErr.Code {
 		case "23505":
-			return ErrProviderConflict
+			switch pgErr.ConstraintName {
+			case "uq_subscriptions_current_organization":
+				return ErrCurrentSubscriptionExists
+			case "uq_subscriptions_provider_subscription":
+				return ErrProviderConflict
+			}
 		case "23514":
 			return ErrInvalidPeriod
 		}

@@ -123,13 +123,23 @@ active
 
 New subscriptions may start only as `pending` or `active`. The default is `pending`.
 
-## Current subscription lookup
+## Current subscription invariant
 
-For commercial decisions, an organization may have historical subscription rows. The current lookup selects the newest subscription in `active` or `past_due` state for an active organization.
+An organization can keep historical subscriptions and may have pending rows, but it may have **at most one current subscription**. Current means a row in either `active` or `past_due` state.
 
-A caller must not treat an arbitrary historical subscription as the organization's current commercial state.
+PostgreSQL enforces this with the partial unique index:
 
-The singular current-subscription model is the current implemented constraint. Supporting independent concurrent commercial relationships per product should be introduced only together with the corresponding resolution semantics rather than inferred from historical rows.
+```text
+uq_subscriptions_current_organization
+    UNIQUE (organization_id)
+    WHERE status IN ('active', 'past_due')
+```
+
+This is a database invariant rather than only a service pre-check so concurrent creates or status transitions cannot produce two current rows. Attempts to create or transition another current subscription return `ErrCurrentSubscriptionExists`.
+
+The current lookup still orders by start/create time for deterministic reads of legacy data, but healthy post-migration state contains at most one matching row.
+
+Supporting independent concurrent commercial relationships per product should be introduced only together with an explicit product-scoped resolution model and a replacement for this invariant.
 
 ## Provider boundary
 
@@ -191,6 +201,8 @@ product active
 ```
 
 The database foreign key additionally prevents a persisted `price_id` from referring to a different `plan_id`.
+
+PostgreSQL also enforces the singular-current-subscription rule, so the state and entitlement resolvers cannot silently choose among multiple active/past-due subscriptions.
 
 This preserves the commercial-domain rule that SQL must enforce ownership and resource validity even when middleware or service authorization fails.
 
