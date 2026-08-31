@@ -93,7 +93,7 @@ func validatePeriod(startsAt time.Time, renewsAt, endsAt *time.Time) error {
 }
 
 func normalizeCreate(input CreateInput, now time.Time) (CreateInput, error) {
-	if err := validateID(input.PlanID, ErrPlanIDRequired); err != nil {
+	if err := validateID(input.PriceID, ErrPriceIDRequired); err != nil {
 		return CreateInput{}, err
 	}
 	status, err := normalizeInitialStatus(input.Status)
