@@ -148,7 +148,7 @@ features[]
 limits[]
 ```
 
-Feature and limit keys are normalized and sorted before encoding. Times are normalized to UTC whole seconds. That makes the v1 payload deterministic for the same normalized claims.
+Feature and limit keys are normalized and sorted before encoding. A key cannot appear as both a feature and a limit. Times are normalized to UTC whole seconds. That makes the v1 payload deterministic for the same normalized claims.
 
 Features and limits use sorted arrays in the wire format rather than JSON maps. The runtime reconstructs maps after verification.
 
@@ -164,13 +164,13 @@ payload   = base64url(canonical claims JSON)
 signature = base64url(Ed25519 signature)
 ```
 
-Signatures use domain separation:
+Signatures authenticate both the selected key identity and payload using domain separation:
 
 ```text
-"leamout-license-v1\0" || payload
+"leamout-license-v1\0" || key_id || "\0" || payload
 ```
 
-so the same signing key cannot accidentally treat a payload from another protocol as a Leamout license artifact.
+This prevents `key_id` substitution even if the same public key is temporarily registered under multiple rotation identifiers, and prevents a payload from another protocol from being treated as a Leamout license artifact.
 
 The decoder rejects unknown JSON fields, unsupported versions, unsupported algorithms, malformed base64, malformed claims, invalid signatures, unknown key IDs, wrong deployment IDs, artifacts used before `issued_at`, and artifacts at or after `expires_at`.
 
