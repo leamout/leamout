@@ -2,6 +2,7 @@ package catalog
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -9,10 +10,11 @@ import (
 // Service owns read-side catalog access used by commercial workflows.
 type Service struct {
 	repo *Repository
+	now  func() time.Time
 }
 
 func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{repo: repo, now: time.Now}
 }
 
 func (s *Service) GetProduct(ctx context.Context, id uuid.UUID) (Product, error) {
@@ -57,4 +59,21 @@ func (s *Service) ListPlans(ctx context.Context, productID uuid.UUID, activeOnly
 		return nil, err
 	}
 	return s.repo.ListPlans(ctx, productID, activeOnly)
+}
+
+func (s *Service) GetPrice(ctx context.Context, id uuid.UUID) (Price, error) {
+	if err := normalizeID(id); err != nil {
+		return Price{}, err
+	}
+	return s.repo.GetPrice(ctx, id)
+}
+
+func (s *Service) ListPrices(ctx context.Context, planID uuid.UUID, activeOnly bool) ([]Price, error) {
+	if err := normalizeID(planID); err != nil {
+		return nil, err
+	}
+	if _, err := s.repo.GetPlan(ctx, planID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListPrices(ctx, planID, activeOnly, s.now())
 }
