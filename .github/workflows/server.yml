@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: server-${{ github.workflow }}-${{ github.ref }}
@@ -64,10 +64,8 @@ jobs:
         working-directory: server
 
     steps:
-      - name: Checkout PR head
+      - name: Checkout
         uses: actions/checkout@v7
-        with:
-          ref: ${{ github.head_ref }}
 
       - name: Set up Go
         uses: actions/setup-go@v7
@@ -75,29 +73,11 @@ jobs:
           go-version-file: server/go.mod
           cache: true
 
-      - name: Set up Atlas
-        uses: ariga/setup-atlas@v0
-
       - name: Install sqlc
         run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
       - name: Generate sqlc
         run: sqlc generate
 
-      - name: Hash migrations
-        run: atlas migrate hash --dir file://migrations
-
-      - name: Commit generated artifacts
-        working-directory: .
-        run: |
-          if git diff --quiet -- server/internal/database/sqlc server/migrations/atlas.sum && test -z "$(git status --porcelain -- server/internal/database/sqlc server/migrations/atlas.sum)"; then
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server/internal/database/sqlc server/migrations/atlas.sum
-          git commit -m "Regenerate commercial database artifacts"
-          git push origin HEAD:${{ github.head_ref }}
-
       - name: Check generated code
-        run: git diff --exit-code -- internal/database/sqlc migrations/atlas.sum
+        run: git diff --exit-code -- internal/database/sqlc
