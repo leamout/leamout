@@ -14,12 +14,11 @@ import (
 
 // Repository persists subscription state within an organization boundary.
 type Repository struct {
-	db      *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db, queries: sqlc.New(db)}
+	return &Repository{queries: sqlc.New(db)}
 }
 
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Subscription, error) {
@@ -109,32 +108,12 @@ func (r *Repository) UpdatePeriod(ctx context.Context, organizationID, id uuid.U
 // matches expected. This prevents concurrent provider events from overwriting a
 // terminal or otherwise newer lifecycle state observed after service validation.
 func (r *Repository) UpdateStatus(ctx context.Context, organizationID, id uuid.UUID, expected, status Status) (Subscription, error) {
-	var row sqlc.Subscription
-	err := r.db.QueryRow(ctx, `
-UPDATE subscriptions AS s
-SET status = $1, updated_at = NOW()
-FROM organizations AS o
-WHERE s.organization_id = $2
-  AND s.id = $3
-  AND s.status = $4
-  AND o.id = s.organization_id
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-RETURNING s.id, s.organization_id, s.plan_id, s.status, s.starts_at,
-          s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id,
-          s.created_at, s.updated_at`, string(status), organizationID, id, string(expected)).Scan(
-		&row.ID,
-		&row.OrganizationID,
-		&row.PlanID,
-		&row.Status,
-		&row.StartsAt,
-		&row.RenewsAt,
-		&row.EndsAt,
-		&row.BillingProvider,
-		&row.ProviderSubscriptionID,
-		&row.CreatedAt,
-		&row.UpdatedAt,
-	)
+	row, err := r.queries.CompareAndSetSubscriptionStatus(ctx, sqlc.CompareAndSetSubscriptionStatusParams{
+		Status:         string(status),
+		OrganizationID: organizationID,
+		ID:             id,
+		ExpectedStatus: string(expected),
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Subscription{}, ErrInvalidTransition
