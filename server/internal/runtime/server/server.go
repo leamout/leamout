@@ -12,6 +12,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
+	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
@@ -23,6 +24,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
+	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
@@ -39,6 +41,7 @@ type Server struct {
 	Router     *chi.Mux
 	Modules    Modules
 	FreeSWITCH freeswitch.MediaController
+	Redis      *redisintegration.Client
 
 	Logger  *logging.Logger
 	Metrics *metrics.Registry
@@ -59,14 +62,23 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
+	redisClient, err := redisintegration.New(ctx, redisintegration.DefaultConfig(cfg.RedisURL))
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("connect Redis: %w", err)
+	}
+
 	freeSwitch, err := freeswitch.New(
 		freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword),
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize FreeSWITCH client: %w", err)
 	}
 	if err := freeSwitch.Connect(ctx); err != nil {
+		_ = freeSwitch.Close()
+		_ = redisClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("connect FreeSWITCH: %w", err)
 	}
@@ -80,12 +92,24 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	credentialCipher, err := secrets.New(cfg.CarrierCredentialKey)
 	if err != nil {
 		_ = freeSwitch.Close()
+		_ = redisClient.Close()
 		db.Close()
 		return nil, err
 	}
-	modules, err := NewModules(db, callsController, conferenceController, credentialCipher)
+	turnService, err := realtime.NewService(realtime.Config{
+		AuthSecret: cfg.TURNAuthSecret,
+		URLs:       cfg.TURNPublicURLs,
+	}, redisClient)
 	if err != nil {
 		_ = freeSwitch.Close()
+		_ = redisClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
+	}
+	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService)
+	if err != nil {
+		_ = freeSwitch.Close()
+		_ = redisClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
@@ -102,7 +126,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		middleware.CORS(cfg.CORSOrigins, cfg.IsDevelopment()),
 	)
 
-	RegisterHealthRoutes(router, db, freeSwitch)
+	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
 	RegisterRoutes(router, modules)
 
 	return &Server{
@@ -110,6 +134,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		Router:     router,
 		Modules:    modules,
 		FreeSWITCH: freeSwitch,
+		Redis:      redisClient,
 		Logger:     logger,
 		Metrics:    metricsRegistry,
 	}, nil
@@ -120,6 +145,7 @@ func NewModules(
 	callsController calls.Controller,
 	conferenceController conferences.Controller,
 	credentialCipher *secrets.Cipher,
+	turnService *realtime.Service,
 ) (Modules, error) {
 	queries := sqlc.New(db)
 
@@ -263,6 +289,10 @@ func NewModules(
 			Service:    conferencesService,
 			Handler:    conferences.NewHandler(conferencesService),
 		},
+		Realtime: RealtimeModule{
+			Service: turnService,
+			Handler: realtime.NewHandler(turnService),
+		},
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil
@@ -271,6 +301,9 @@ func NewModules(
 func (s *Server) Close() {
 	if s.FreeSWITCH != nil {
 		_ = s.FreeSWITCH.Close()
+	}
+	if s.Redis != nil {
+		_ = s.Redis.Close()
 	}
 	if s.DB != nil {
 		s.DB.Close()

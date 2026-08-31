@@ -19,6 +19,10 @@ type readinessMedia interface {
 	HealthCheck(context.Context) error
 }
 
+type readinessCache interface {
+	Ping(context.Context) error
+}
+
 type readinessResponse struct {
 	Status string            `json:"status"`
 	Checks map[string]string `json:"checks"`
@@ -27,6 +31,7 @@ type readinessResponse struct {
 func RegisterHealthRoutes(
 	router chi.Router,
 	database readinessDatabase,
+	cache readinessCache,
 	media readinessMedia,
 ) {
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -39,12 +44,17 @@ func RegisterHealthRoutes(
 
 		checks := map[string]string{
 			"database":   "ok",
+			"redis":      "ok",
 			"freeswitch": "ok",
 		}
 		status := http.StatusNoContent
 
 		if database == nil || database.Ping(ctx) != nil {
 			checks["database"] = "unavailable"
+			status = http.StatusServiceUnavailable
+		}
+		if cache == nil || cache.Ping(ctx) != nil {
+			checks["redis"] = "unavailable"
 			status = http.StatusServiceUnavailable
 		}
 		if media == nil || media.HealthCheck(ctx) != nil {

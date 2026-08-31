@@ -10,11 +10,15 @@ import (
 
 // CreateCallRequest contains the public routing intent for an outbound call.
 type CreateCallRequest struct {
-	ApplicationID *uuid.UUID        `json:"application_id,omitempty"`
-	TrunkID       uuid.UUID         `json:"trunk_id"`
-	From          string            `json:"from"`
-	To            string            `json:"to"`
-	Variables     map[string]string `json:"variables,omitempty"`
+	ApplicationID   *uuid.UUID        `json:"application_id,omitempty"`
+	TrunkID         uuid.UUID         `json:"trunk_id"`
+	From            string            `json:"from"`
+	To              string            `json:"to"`
+	Variables       map[string]string `json:"variables,omitempty"`
+	Privacy         bool              `json:"privacy,omitempty"`
+	DTMFMode        string            `json:"dtmf_mode,omitempty"`
+	Codecs          []string          `json:"codecs,omitempty"`
+	MediaEncryption string            `json:"media_encryption,omitempty"`
 }
 
 // RouteAttribution records the concrete route selected for an outbound call.
@@ -34,6 +38,10 @@ type OriginateRequest struct {
 	Destination         string
 	CallerID            string
 	Variables           map[string]string
+	Privacy             bool
+	DTMFMode            string
+	Codecs              []string
+	MediaEncryption     string
 }
 
 type InboundCallEvent struct {

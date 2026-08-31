@@ -3,7 +3,7 @@ FROM debian:bookworm-slim
 ARG OPENSIPS_VERSION=4.0.1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl \
+    && apt-get install -y --no-install-recommends ca-certificates curl openssl \
     && curl -fsSL https://apt.opensips.org/keyring.gpg \
         -o /usr/share/keyrings/opensips.gpg \
     && printf '%s\n' \
@@ -19,6 +19,7 @@ RUN apt-get update \
         "opensips=$package_version" \
         "opensips-auth-modules=$package_version" \
         "opensips-postgres-module=$package_version" \
+        "opensips-tls-module=$package_version" \
     && installed_version="$(dpkg-query -W -f='${Version}' opensips)" \
     && test "$installed_version" = "$package_version" \
     && for module in \
@@ -28,6 +29,9 @@ RUN apt-get update \
         pike.so \
         rtpengine.so \
         sqlops.so \
+        tls_mgm.so \
+        tls_openssl.so \
+        proto_tls.so \
         uac.so \
         uac_auth.so; do \
         find /usr/lib -type f -name "$module" -print -quit | grep -q . || { \
@@ -41,8 +45,15 @@ RUN apt-get update \
 COPY opensips.cfg /etc/opensips/opensips.cfg
 COPY tls.cfg /etc/opensips/tls.cfg
 
-RUN opensips -C -f /etc/opensips/opensips.cfg
+RUN install -d -m 0700 /etc/opensips/tls \
+    && openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+        -subj '/CN=opensips-build-check.invalid' \
+        -keyout /etc/opensips/tls/privkey.pem \
+        -out /etc/opensips/tls/fullchain.pem >/dev/null 2>&1 \
+    && cp /etc/ssl/certs/ca-certificates.crt /etc/opensips/tls/carrier-ca.pem \
+    && opensips -C -f /etc/opensips/opensips.cfg \
+    && rm -rf /etc/opensips/tls
 
-EXPOSE 5060/udp 5060/tcp
+EXPOSE 5060/udp 5060/tcp 5061/tcp
 
 CMD ["opensips", "-F", "-f", "/etc/opensips/opensips.cfg"]

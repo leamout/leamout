@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createTrunk = `-- name: CreateTrunk :one
@@ -87,7 +88,7 @@ SELECT
 FROM trunks AS t
 WHERE t.id = $2
   AND t.organization_id = $1
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
 `
 
 type CreateTrunkEndpointParams struct {
@@ -128,6 +129,13 @@ func (q *Queries) CreateTrunkEndpoint(ctx context.Context, arg CreateTrunkEndpoi
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HealthStatus,
+		&i.ConsecutiveFailures,
+		&i.LastCheckedAt,
+		&i.LastResponseCode,
+		&i.LastLatencyMs,
+		&i.LastError,
+		&i.CooldownUntil,
 	)
 	return i, err
 }
@@ -137,7 +145,7 @@ DELETE FROM trunk_endpoints
 WHERE id = $1
   AND trunk_id = $2
   AND organization_id = $3
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
 `
 
 type DeleteTrunkEndpointParams struct {
@@ -162,6 +170,13 @@ func (q *Queries) DeleteTrunkEndpoint(ctx context.Context, arg DeleteTrunkEndpoi
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HealthStatus,
+		&i.ConsecutiveFailures,
+		&i.LastCheckedAt,
+		&i.LastResponseCode,
+		&i.LastLatencyMs,
+		&i.LastError,
+		&i.CooldownUntil,
 	)
 	return i, err
 }
@@ -248,7 +263,7 @@ func (q *Queries) GetTrunkByID(ctx context.Context, arg GetTrunkByIDParams) (Tru
 }
 
 const getTrunkEndpointByID = `-- name: GetTrunkEndpointByID :one
-SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at
+SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
 FROM trunk_endpoints
 WHERE id = $1
   AND trunk_id = $2
@@ -278,12 +293,19 @@ func (q *Queries) GetTrunkEndpointByID(ctx context.Context, arg GetTrunkEndpoint
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HealthStatus,
+		&i.ConsecutiveFailures,
+		&i.LastCheckedAt,
+		&i.LastResponseCode,
+		&i.LastLatencyMs,
+		&i.LastError,
+		&i.CooldownUntil,
 	)
 	return i, err
 }
 
 const listActiveOutboundTrunkEndpoints = `-- name: ListActiveOutboundTrunkEndpoints :many
-SELECT te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.created_at, te.updated_at
+SELECT te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.created_at, te.updated_at, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until
 FROM trunk_endpoints AS te
 JOIN trunks AS t
   ON t.id = te.trunk_id
@@ -298,6 +320,7 @@ WHERE t.id = $1
   AND cc.status = 'active'
   AND te.enabled = true
   AND te.direction IN ('outbound', 'bidirectional')
+  AND te.health_status <> 'unhealthy'
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC
 `
 
@@ -328,6 +351,13 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.HealthStatus,
+			&i.ConsecutiveFailures,
+			&i.LastCheckedAt,
+			&i.LastResponseCode,
+			&i.LastLatencyMs,
+			&i.LastError,
+			&i.CooldownUntil,
 		); err != nil {
 			return nil, err
 		}
@@ -340,7 +370,7 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 }
 
 const listTrunkEndpoints = `-- name: ListTrunkEndpoints :many
-SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at
+SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
 FROM trunk_endpoints
 WHERE trunk_id = $1
   AND organization_id = $2
@@ -374,6 +404,85 @@ func (q *Queries) ListTrunkEndpoints(ctx context.Context, arg ListTrunkEndpoints
 			&i.Enabled,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.HealthStatus,
+			&i.ConsecutiveFailures,
+			&i.LastCheckedAt,
+			&i.LastResponseCode,
+			&i.LastLatencyMs,
+			&i.LastError,
+			&i.CooldownUntil,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTrunkEndpointsForHealthCheck = `-- name: ListTrunkEndpointsForHealthCheck :many
+WITH due AS (
+    SELECT te.id
+    FROM trunk_endpoints AS te
+    JOIN trunks AS t
+      ON t.id = te.trunk_id
+     AND t.organization_id = te.organization_id
+    JOIN carrier_connections AS cc
+      ON cc.id = t.carrier_connection_id
+     AND cc.organization_id = t.organization_id
+    WHERE te.enabled = true
+      AND t.status = 'active'
+      AND cc.status = 'active'
+      AND (te.cooldown_until IS NULL OR te.cooldown_until <= $1)
+      AND (te.last_checked_at IS NULL OR te.last_checked_at <= $2)
+    ORDER BY te.last_checked_at ASC NULLS FIRST
+    LIMIT $3
+    FOR UPDATE OF te SKIP LOCKED
+)
+UPDATE trunk_endpoints AS te
+SET last_checked_at = $1
+FROM due
+WHERE te.id = due.id
+RETURNING te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.created_at, te.updated_at, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until
+`
+
+type ListTrunkEndpointsForHealthCheckParams struct {
+	CheckedAt pgtype.Timestamptz `db:"checked_at" json:"checked_at"`
+	DueBefore pgtype.Timestamptz `db:"due_before" json:"due_before"`
+	BatchSize int32              `db:"batch_size" json:"batch_size"`
+}
+
+func (q *Queries) ListTrunkEndpointsForHealthCheck(ctx context.Context, arg ListTrunkEndpointsForHealthCheckParams) ([]TrunkEndpoint, error) {
+	rows, err := q.db.Query(ctx, listTrunkEndpointsForHealthCheck, arg.CheckedAt, arg.DueBefore, arg.BatchSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []TrunkEndpoint{}
+	for rows.Next() {
+		var i TrunkEndpoint
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.TrunkID,
+			&i.Host,
+			&i.Port,
+			&i.Transport,
+			&i.Direction,
+			&i.Priority,
+			&i.Weight,
+			&i.Enabled,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.HealthStatus,
+			&i.ConsecutiveFailures,
+			&i.LastCheckedAt,
+			&i.LastResponseCode,
+			&i.LastLatencyMs,
+			&i.LastError,
+			&i.CooldownUntil,
 		); err != nil {
 			return nil, err
 		}
@@ -463,6 +572,120 @@ func (q *Queries) ListTrunksByOrganizationID(ctx context.Context, organizationID
 	return items, nil
 }
 
+const markTrunkEndpointHealthy = `-- name: MarkTrunkEndpointHealthy :one
+UPDATE trunk_endpoints
+SET health_status = 'healthy',
+    consecutive_failures = 0,
+    last_checked_at = $1,
+    last_response_code = $2,
+    last_latency_ms = $3,
+    last_error = NULL,
+    cooldown_until = NULL
+WHERE id = $4
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+`
+
+type MarkTrunkEndpointHealthyParams struct {
+	CheckedAt    pgtype.Timestamptz `db:"checked_at" json:"checked_at"`
+	ResponseCode *int32             `db:"response_code" json:"response_code"`
+	LatencyMs    *int32             `db:"latency_ms" json:"latency_ms"`
+	ID           uuid.UUID          `db:"id" json:"id"`
+}
+
+func (q *Queries) MarkTrunkEndpointHealthy(ctx context.Context, arg MarkTrunkEndpointHealthyParams) (TrunkEndpoint, error) {
+	row := q.db.QueryRow(ctx, markTrunkEndpointHealthy,
+		arg.CheckedAt,
+		arg.ResponseCode,
+		arg.LatencyMs,
+		arg.ID,
+	)
+	var i TrunkEndpoint
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.TrunkID,
+		&i.Host,
+		&i.Port,
+		&i.Transport,
+		&i.Direction,
+		&i.Priority,
+		&i.Weight,
+		&i.Enabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HealthStatus,
+		&i.ConsecutiveFailures,
+		&i.LastCheckedAt,
+		&i.LastResponseCode,
+		&i.LastLatencyMs,
+		&i.LastError,
+		&i.CooldownUntil,
+	)
+	return i, err
+}
+
+const markTrunkEndpointProbeFailed = `-- name: MarkTrunkEndpointProbeFailed :one
+UPDATE trunk_endpoints
+SET consecutive_failures = consecutive_failures + 1,
+    health_status = CASE
+        WHEN consecutive_failures + 1 >= $1 THEN 'unhealthy'
+        ELSE health_status
+    END,
+    last_checked_at = $2,
+    last_response_code = NULL,
+    last_latency_ms = $3,
+    last_error = $4,
+    cooldown_until = CASE
+        WHEN consecutive_failures + 1 >= $1 THEN $5
+        ELSE NULL
+    END
+WHERE id = $6
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+`
+
+type MarkTrunkEndpointProbeFailedParams struct {
+	FailureThreshold int32              `db:"failure_threshold" json:"failure_threshold"`
+	CheckedAt        pgtype.Timestamptz `db:"checked_at" json:"checked_at"`
+	LatencyMs        *int32             `db:"latency_ms" json:"latency_ms"`
+	LastError        *string            `db:"last_error" json:"last_error"`
+	CooldownUntil    pgtype.Timestamptz `db:"cooldown_until" json:"cooldown_until"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+}
+
+func (q *Queries) MarkTrunkEndpointProbeFailed(ctx context.Context, arg MarkTrunkEndpointProbeFailedParams) (TrunkEndpoint, error) {
+	row := q.db.QueryRow(ctx, markTrunkEndpointProbeFailed,
+		arg.FailureThreshold,
+		arg.CheckedAt,
+		arg.LatencyMs,
+		arg.LastError,
+		arg.CooldownUntil,
+		arg.ID,
+	)
+	var i TrunkEndpoint
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.TrunkID,
+		&i.Host,
+		&i.Port,
+		&i.Transport,
+		&i.Direction,
+		&i.Priority,
+		&i.Weight,
+		&i.Enabled,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.HealthStatus,
+		&i.ConsecutiveFailures,
+		&i.LastCheckedAt,
+		&i.LastResponseCode,
+		&i.LastLatencyMs,
+		&i.LastError,
+		&i.CooldownUntil,
+	)
+	return i, err
+}
+
 const updateTrunk = `-- name: UpdateTrunk :one
 UPDATE trunks
 SET
@@ -515,11 +738,28 @@ SET
     priority = COALESCE($5, priority),
     weight = COALESCE($6, weight),
     enabled = COALESCE($7, enabled),
+    health_status = CASE
+        WHEN $1::TEXT IS NOT NULL
+          OR $2::INTEGER IS NOT NULL
+          OR $3::TEXT IS NOT NULL THEN 'unknown'
+        ELSE health_status
+    END,
+    consecutive_failures = CASE
+        WHEN $1::TEXT IS NOT NULL
+          OR $2::INTEGER IS NOT NULL
+          OR $3::TEXT IS NOT NULL THEN 0
+        ELSE consecutive_failures
+    END,
+    last_checked_at = CASE WHEN $1::TEXT IS NOT NULL OR $2::INTEGER IS NOT NULL OR $3::TEXT IS NOT NULL THEN NULL ELSE last_checked_at END,
+    last_response_code = CASE WHEN $1::TEXT IS NOT NULL OR $2::INTEGER IS NOT NULL OR $3::TEXT IS NOT NULL THEN NULL ELSE last_response_code END,
+    last_latency_ms = CASE WHEN $1::TEXT IS NOT NULL OR $2::INTEGER IS NOT NULL OR $3::TEXT IS NOT NULL THEN NULL ELSE last_latency_ms END,
+    last_error = CASE WHEN $1::TEXT IS NOT NULL OR $2::INTEGER IS NOT NULL OR $3::TEXT IS NOT NULL THEN NULL ELSE last_error END,
+    cooldown_until = CASE WHEN $1::TEXT IS NOT NULL OR $2::INTEGER IS NOT NULL OR $3::TEXT IS NOT NULL THEN NULL ELSE cooldown_until END,
     updated_at = NOW()
 WHERE id = $8
   AND trunk_id = $9
   AND organization_id = $10
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
 `
 
 type UpdateTrunkEndpointParams struct {
@@ -562,6 +802,13 @@ func (q *Queries) UpdateTrunkEndpoint(ctx context.Context, arg UpdateTrunkEndpoi
 		&i.Enabled,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.HealthStatus,
+		&i.ConsecutiveFailures,
+		&i.LastCheckedAt,
+		&i.LastResponseCode,
+		&i.LastLatencyMs,
+		&i.LastError,
+		&i.CooldownUntil,
 	)
 	return i, err
 }

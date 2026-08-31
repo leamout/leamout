@@ -47,6 +47,9 @@ The repository currently contains the foundations of the Leamout control plane:
 
 Some capabilities described in the documentation are intentionally **roadmap design**, not current product behavior. In particular, full billing/rating, SMPP messaging, realtime AI media, production HA, and hosted carrier products are not presented as complete.
 
+Implementation progress for programmable call control is tracked in the
+[call orchestration roadmap](docs/call-orchestration-roadmap.md).
+
 ## Architecture
 
 Leamout separates control-plane business logic from telecom data-plane components.

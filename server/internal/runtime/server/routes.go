@@ -11,6 +11,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
+	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
@@ -101,6 +102,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		conferences.RegisterRoutes(
 			r,
 			modules.Conferences.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
+		realtime.RegisterRoutes(
+			r,
+			modules.Realtime.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
 	})
