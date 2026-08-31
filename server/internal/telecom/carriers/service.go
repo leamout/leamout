@@ -6,25 +6,104 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/audit"
+	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
 type Service struct {
 	repo   *Repository
 	cipher interface{ Encrypt(string) (string, error) }
+	prober routing.EndpointProber
 }
 
 func NewService(repo *Repository, cipher interface{ Encrypt(string) (string, error) }) *Service {
-	return &Service{repo: repo, cipher: cipher}
+	return &Service{repo: repo, cipher: cipher, prober: routing.NewSIPOptionsProber()}
+}
+
+// Validate checks that a carrier connection has an eligible outbound topology
+// and performs bounded SIP OPTIONS probes without changing circuit-breaker
+// state. It is an explicit operator workflow, not a substitute for the worker's
+// continuous endpoint health checks.
+func (s *Service) Validate(ctx context.Context, organizationID, connectionID uuid.UUID) (ValidationResponse, error) {
+	connection, err := s.Get(ctx, organizationID, connectionID)
+	if err != nil {
+		return ValidationResponse{}, err
+	}
+	result := ValidationResponse{CarrierConnectionID: connectionID, Issues: []ValidationIssue{}, Endpoints: []EndpointValidation{}}
+	probeRootCtx, cancelProbes := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelProbes()
+	if connection.Status != "active" {
+		result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "connection_inactive", Message: "carrier connection must be active"})
+	}
+	if connection.OutboundAuthMethod == "digest" && !connection.HasOutboundCredentials {
+		result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "outbound_credentials_missing", Message: "digest outbound authentication requires active credentials"})
+	}
+
+	trunks, err := s.repo.ListConnectionTrunks(ctx, organizationID, connectionID)
+	if err != nil {
+		return ValidationResponse{}, apperror.NewInternal("list carrier connection trunks for validation", err)
+	}
+	eligibleTrunks := 0
+	for _, trunk := range trunks {
+		if trunk.Status != "active" || (trunk.Direction != "outbound" && trunk.Direction != "bidirectional") {
+			continue
+		}
+		eligibleTrunks++
+		endpoints, err := s.repo.ListTrunkEndpoints(ctx, organizationID, trunk.ID)
+		if err != nil {
+			return ValidationResponse{}, apperror.NewInternal("list trunk endpoints for validation", err)
+		}
+		eligibleEndpoints := 0
+		for _, endpoint := range endpoints {
+			if !endpoint.Enabled || (endpoint.Direction != "outbound" && endpoint.Direction != "bidirectional") {
+				continue
+			}
+			eligibleEndpoints++
+			check := EndpointValidation{TrunkID: trunk.ID, EndpointID: endpoint.ID, Host: endpoint.Host, Port: endpoint.Port, Transport: endpoint.Transport}
+			probeCtx, cancel := context.WithTimeout(probeRootCtx, 2*time.Second)
+			probe, probeErr := s.prober.Probe(probeCtx, endpoint)
+			cancel()
+			check.LatencyMS = probe.Latency.Milliseconds()
+			if probeErr != nil {
+				check.Error = truncateValidationError(probeErr.Error())
+				endpointID, trunkID := endpoint.ID, trunk.ID
+				result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "endpoint_unreachable", Message: check.Error, TrunkID: &trunkID, EndpointID: &endpointID})
+			} else {
+				check.Reachable = true
+				check.ResponseCode = &probe.ResponseCode
+			}
+			result.Endpoints = append(result.Endpoints, check)
+		}
+		if eligibleEndpoints == 0 {
+			trunkID := trunk.ID
+			result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "no_eligible_endpoints", Message: "active outbound trunk has no enabled outbound endpoint", TrunkID: &trunkID})
+		}
+	}
+	if eligibleTrunks == 0 {
+		result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "no_eligible_trunks", Message: "carrier connection has no active outbound trunk"})
+	}
+	result.Valid = len(result.Issues) == 0
+	return result, nil
+}
+
+func truncateValidationError(message string) string {
+	message = strings.TrimSpace(message)
+	if len(message) > 512 {
+		return message[:512]
+	}
+	return message
 }
 
 func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req DigestAuthRequest) (Response, error) {
-	if _, err := s.Get(ctx, org, id); err != nil {
+	current, err := s.Get(ctx, org, id)
+	if err != nil {
 		return Response{}, err
 	}
 	if strings.ToLower(strings.TrimSpace(req.Method)) != "digest" {
@@ -46,7 +125,11 @@ func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req Di
 	if err != nil {
 		return Response{}, err
 	}
-	if err := s.repo.SetDigestAuth(ctx, org, id, "outbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+	event, err := credentialAuditEvent(ctx, org, id, "outbound", "digest", current.HasOutboundCredentials)
+	if err != nil {
+		return Response{}, apperror.NewInternal("attribute outbound credential audit event", err)
+	}
+	if err := s.repo.SetDigestAuth(ctx, org, id, "outbound", username, realm, ciphertext, digestHA1(username, realm, secret), event); err != nil {
 		return Response{}, digestWriteError(err, "set outbound carrier auth")
 	}
 	return s.Get(ctx, org, id)
@@ -56,16 +139,25 @@ func (s *Service) ClearOutboundAuth(ctx context.Context, org, id uuid.UUID) erro
 	if _, err := s.Get(ctx, org, id); err != nil {
 		return err
 	}
-	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "outbound"), "clear outbound carrier auth")
+	event, err := credentialDeletionAuditEvent(ctx, org, id, "outbound")
+	if err != nil {
+		return apperror.NewInternal("attribute outbound credential deletion", err)
+	}
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "outbound", event), "clear outbound carrier auth")
 }
 
 func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req InboundAuthRequest) (Response, error) {
-	if _, err := s.Get(ctx, org, id); err != nil {
+	current, err := s.Get(ctx, org, id)
+	if err != nil {
 		return Response{}, err
 	}
 	switch strings.ToLower(strings.TrimSpace(req.Method)) {
 	case "ip":
-		if err := s.repo.SetInboundIPAuth(ctx, org, id); err != nil {
+		event, err := credentialAuditEvent(ctx, org, id, "inbound", "ip", current.InboundAuthMethod != "none")
+		if err != nil {
+			return Response{}, apperror.NewInternal("attribute inbound authentication audit event", err)
+		}
+		if err := s.repo.SetInboundIPAuth(ctx, org, id, event); err != nil {
 			return Response{}, apperror.NewInternal("set inbound carrier IP auth", err)
 		}
 	case "digest":
@@ -85,7 +177,11 @@ func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req Inb
 		if err != nil {
 			return Response{}, err
 		}
-		if err := s.repo.SetDigestAuth(ctx, org, id, "inbound", username, realm, ciphertext, digestHA1(username, realm, secret)); err != nil {
+		event, err := credentialAuditEvent(ctx, org, id, "inbound", "digest", current.InboundAuthMethod != "none")
+		if err != nil {
+			return Response{}, apperror.NewInternal("attribute inbound credential audit event", err)
+		}
+		if err := s.repo.SetDigestAuth(ctx, org, id, "inbound", username, realm, ciphertext, digestHA1(username, realm, secret), event); err != nil {
 			return Response{}, digestWriteError(err, "set inbound carrier auth")
 		}
 	default:
@@ -98,7 +194,35 @@ func (s *Service) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error
 	if _, err := s.Get(ctx, org, id); err != nil {
 		return err
 	}
-	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "inbound"), "clear inbound carrier auth")
+	event, err := credentialDeletionAuditEvent(ctx, org, id, "inbound")
+	if err != nil {
+		return apperror.NewInternal("attribute inbound credential deletion", err)
+	}
+	return writeAuthError(s.repo.ClearAuth(ctx, org, id, "inbound", event), "clear inbound carrier auth")
+}
+
+func credentialAuditEvent(ctx context.Context, organizationID, targetID uuid.UUID, direction, method string, rotation bool) (audit.Event, error) {
+	action := "carrier.credential_set"
+	if rotation {
+		action = "carrier.credential_rotated"
+	}
+	actor, err := audit.ActorFromContext(ctx)
+	if err != nil {
+		return audit.Event{}, err
+	}
+	return audit.NewEvent(organizationID, actor, action, "carrier_connection", targetID, map[string]any{
+		"direction": direction, "auth_method": method, "credential": "[REDACTED]",
+	})
+}
+
+func credentialDeletionAuditEvent(ctx context.Context, organizationID, targetID uuid.UUID, direction string) (audit.Event, error) {
+	actor, err := audit.ActorFromContext(ctx)
+	if err != nil {
+		return audit.Event{}, err
+	}
+	return audit.NewEvent(organizationID, actor, "carrier.credential_deleted", "carrier_connection", targetID, map[string]any{
+		"direction": direction, "credential": "[REDACTED]",
+	})
 }
 
 func requireAuthValue(value, name string) (string, error) {

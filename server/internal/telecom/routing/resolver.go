@@ -15,6 +15,7 @@ import (
 
 type routeStore interface {
 	GetTrunk(context.Context, uuid.UUID, uuid.UUID) (sqlc.Trunk, error)
+	GetCarrierConnection(context.Context, uuid.UUID, uuid.UUID) (sqlc.CarrierConnection, error)
 	ListOutboundEndpoints(context.Context, uuid.UUID, uuid.UUID) ([]sqlc.TrunkEndpoint, error)
 	ResolveInboundCarrier(context.Context, netip.Addr) (sqlc.CarrierConnection, error)
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
@@ -24,6 +25,15 @@ type routeStore interface {
 type Resolver struct {
 	repo       routeStore
 	pickWeight func(int64) (int64, error)
+	metrics    interface {
+		EndpointSelection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, bool)
+	}
+}
+
+func (r *Resolver) SetMetrics(metrics interface {
+	EndpointSelection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, bool)
+}) {
+	r.metrics = metrics
 }
 
 func NewResolver(repo *Repository) *Resolver {
@@ -35,6 +45,13 @@ func (r *Resolver) resolveOutbound(
 	req OutboundRequest,
 ) (OutboundDecision, error) {
 	trunk, err := r.repo.GetTrunk(ctx, req.OrganizationID, req.TrunkID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return OutboundDecision{}, ErrNoRoute
+		}
+		return OutboundDecision{}, err
+	}
+	connection, err := r.repo.GetCarrierConnection(ctx, req.OrganizationID, trunk.CarrierConnectionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return OutboundDecision{}, ErrNoRoute
@@ -64,6 +81,10 @@ func (r *Resolver) resolveOutbound(
 	if err != nil {
 		return OutboundDecision{}, err
 	}
+	if r.metrics != nil {
+		failover := len(endpoints) > 0 && endpoint.Priority > endpoints[0].Priority
+		r.metrics.EndpointSelection(ctx, trunk.CarrierConnectionID, trunk.ID, endpoint.ID, failover)
+	}
 	return OutboundDecision{
 		OrganizationID:      req.OrganizationID,
 		CarrierConnectionID: trunk.CarrierConnectionID,
@@ -74,6 +95,9 @@ func (r *Resolver) resolveOutbound(
 		Transport:           endpoint.Transport,
 		From:                req.From,
 		To:                  req.To,
+		MaxCPS:              connection.MaxCps,
+		MaxConcurrentCalls:  connection.MaxConcurrentCalls,
+		MaxDailyMinutes:     connection.MaxDailyMinutes,
 	}, nil
 }
 

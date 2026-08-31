@@ -4,9 +4,11 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/carrier_tests"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
@@ -33,11 +35,13 @@ type Modules struct {
 	Recordings           RecordingsModule
 	Conferences          ConferencesModule
 	Webhooks             WebhooksModule
+	Audit                AuditModule
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
 	Subscribers          SubscribersModule
 	Trunks               TrunksModule
 	Carriers             CarriersModule
+	CarrierTests         CarrierTestsModule
 	Realtime             RealtimeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
@@ -109,6 +113,12 @@ type WebhooksModule struct {
 	Handler    *webhooks.Handler
 }
 
+type AuditModule struct {
+	Repository *audit.Repository
+	Service    *audit.Service
+	Handler    *audit.Handler
+}
+
 type SIPDomainsModule struct {
 	Repository *sip_domains.Repository
 	Service    *sip_domains.Service
@@ -137,6 +147,12 @@ type CarriersModule struct {
 	Repository *carriers.Repository
 	Service    *carriers.Service
 	Handler    *carriers.Handler
+}
+
+type CarrierTestsModule struct {
+	Repository *carrier_tests.Repository
+	Service    *carrier_tests.Service
+	Handler    *carrier_tests.Handler
 }
 
 type RealtimeModule struct {

@@ -29,13 +29,20 @@ type RouteResolver interface {
 	ResolveOutbound(context.Context, routing.OutboundRequest) (routing.OutboundDecision, error)
 }
 
+type TelecomMetrics interface {
+	Call(context.Context, string, uuid.UUID, uuid.UUID, uuid.UUID)
+	LimitRejection(context.Context, string, uuid.UUID)
+}
+
 type Service struct {
 	repo       *Repository
 	controller Controller
 	routes     RouteResolver
+	admission  *AdmissionController
+	metrics    TelecomMetrics
 }
 
-func NewService(repo *Repository, controller Controller, routes RouteResolver) *Service {
+func NewService(repo *Repository, controller Controller, routes RouteResolver, admission ...*AdmissionController) *Service {
 	if repo == nil {
 		panic("calls: repository is required")
 	}
@@ -46,8 +53,14 @@ func NewService(repo *Repository, controller Controller, routes RouteResolver) *
 		panic("calls: route resolver is required")
 	}
 
-	return &Service{repo: repo, controller: controller, routes: routes}
+	service := &Service{repo: repo, controller: controller, routes: routes}
+	if len(admission) > 0 {
+		service.admission = admission[0]
+	}
+	return service
 }
+
+func (s *Service) SetMetrics(metrics TelecomMetrics) { s.metrics = metrics }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
@@ -67,6 +80,25 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return sqlc.Call{}, routeError(err)
 	}
+	s.recordCall(ctx, "attempted", route.CarrierConnectionID, route.TrunkID, route.EndpointID)
+	leaseID := ""
+	if s.admission != nil {
+		leaseID, err = s.admission.Admit(ctx, CallLimits{
+			CarrierConnectionID: route.CarrierConnectionID,
+			MaxCPS:              route.MaxCPS,
+			MaxConcurrent:       route.MaxConcurrentCalls,
+			MaxDailyMinutes:     route.MaxDailyMinutes,
+		})
+		if err != nil {
+			s.recordLimitRejection(ctx, err, route.CarrierConnectionID)
+			return sqlc.Call{}, admissionError(err)
+		}
+		defer func() {
+			if leaseID != "" {
+				_ = s.admission.Release(context.WithoutCancel(ctx), route.CarrierConnectionID, leaseID)
+			}
+		}()
+	}
 
 	sipCallID, err := s.controller.Originate(ctx, OriginateRequest{
 		CarrierConnectionID: route.CarrierConnectionID,
@@ -82,10 +114,18 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		MediaEncryption:     req.MediaEncryption,
 	})
 	if err != nil {
+		s.recordCall(ctx, "failed", route.CarrierConnectionID, route.TrunkID, route.EndpointID)
 		return sqlc.Call{}, mediaError("originate call", err)
 	}
 	if sipCallID == "" {
 		return sqlc.Call{}, apperror.NewServiceUnavailable("media server returned an empty call id", nil)
+	}
+	if s.admission != nil {
+		if err := s.admission.Bind(ctx, route.CarrierConnectionID, leaseID, sipCallID); err != nil {
+			_ = s.controller.Hangup(context.WithoutCancel(ctx), sipCallID)
+			return sqlc.Call{}, apperror.NewServiceUnavailable("call quota coordination unavailable", err)
+		}
+		leaseID = sipCallID
 	}
 
 	call, err := s.repo.Create(ctx, organizationID, req, RouteAttribution{
@@ -108,11 +148,15 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	// immediately so outbound media controls are available on the returned call.
 	answered, err := s.repo.MarkAnswered(ctx, organizationID, call.ID)
 	if err == nil {
+		s.recordCall(ctx, "answered", route.CarrierConnectionID, route.TrunkID, route.EndpointID)
+		leaseID = ""
 		return answered, nil
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		latest, getErr := s.Get(ctx, organizationID, call.ID)
 		if getErr == nil && isConnected(latest.State) {
+			s.recordCall(ctx, "answered", route.CarrierConnectionID, route.TrunkID, route.EndpointID)
+			leaseID = ""
 			return latest, nil
 		}
 	}
@@ -164,6 +208,9 @@ func (s *Service) Answer(ctx context.Context, organizationID, id uuid.UUID) (sql
 
 	updated, err := s.repo.MarkAnswered(ctx, organizationID, call.ID)
 	if err == nil {
+		if call.CarrierConnectionID != nil {
+			s.recordCall(ctx, "answered", *call.CarrierConnectionID, uuidValue(call.TrunkID), uuidValue(call.TrunkEndpointID))
+		}
 		return updated, nil
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -184,6 +231,11 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 	if err := s.controller.Hangup(ctx, externalID); err != nil {
 		return sqlc.Call{}, mediaError("hang up call", err)
 	}
+	if s.admission != nil && call.CarrierConnectionID != nil {
+		if err := s.admission.Release(ctx, *call.CarrierConnectionID, externalID); err != nil {
+			return sqlc.Call{}, apperror.NewServiceUnavailable("release call quota lease", err)
+		}
+	}
 
 	var updated sqlc.Call
 	if isPreAnswer(call.State) {
@@ -194,6 +246,13 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 		return sqlc.Call{}, invalidControlState(controlHangup, call.State)
 	}
 	if err == nil {
+		if call.CarrierConnectionID != nil {
+			metricState := "failed"
+			if updated.State == string(StateCompleted) {
+				metricState = "completed"
+			}
+			s.recordCall(ctx, metricState, *call.CarrierConnectionID, uuidValue(call.TrunkID), uuidValue(call.TrunkEndpointID))
+		}
 		return updated, nil
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -360,6 +419,48 @@ func routeError(err error) error {
 		return apperror.NewForbidden("caller identity is not authorized for this trunk")
 	}
 	return apperror.NewInternal("resolve outbound route", err)
+}
+
+func (s *Service) recordCall(ctx context.Context, state string, carrier, trunk, endpoint uuid.UUID) {
+	if s.metrics != nil {
+		s.metrics.Call(ctx, state, carrier, trunk, endpoint)
+	}
+}
+
+func (s *Service) recordLimitRejection(ctx context.Context, err error, carrier uuid.UUID) {
+	if s.metrics == nil {
+		return
+	}
+	reason := "coordination"
+	switch {
+	case errors.Is(err, ErrCPSLimit):
+		reason = "cps"
+	case errors.Is(err, ErrConcurrentLimit):
+		reason = "concurrent"
+	case errors.Is(err, ErrDailyLimit):
+		reason = "daily_minutes"
+	}
+	s.metrics.LimitRejection(ctx, reason, carrier)
+}
+
+func uuidValue(value *uuid.UUID) uuid.UUID {
+	if value == nil {
+		return uuid.Nil
+	}
+	return *value
+}
+
+func admissionError(err error) error {
+	switch {
+	case errors.Is(err, ErrCPSLimit):
+		return apperror.NewTooManyRequests("carrier calls-per-second limit reached")
+	case errors.Is(err, ErrConcurrentLimit):
+		return apperror.NewTooManyRequests("carrier concurrent-call limit reached")
+	case errors.Is(err, ErrDailyLimit):
+		return apperror.NewTooManyRequests("carrier daily-minute limit reached")
+	default:
+		return apperror.NewServiceUnavailable("call quota coordination unavailable", err)
+	}
 }
 
 func readCall(call sqlc.Call, err error) (sqlc.Call, error) {

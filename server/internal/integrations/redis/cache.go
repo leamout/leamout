@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	redisv9 "github.com/redis/go-redis/v9"
 )
 
 // Get returns the value stored at key. A missing key returns redis.Nil.
@@ -102,6 +104,142 @@ return 0
 		return false, fmt.Errorf("apply Redis fixed-window rate limit: %w", err)
 	}
 	return allowed, nil
+}
+
+// AcquireCallLease atomically applies a per-second admission counter and a
+// concurrent-call lease. Expired leases are removed before counting so a
+// crashed process cannot hold capacity forever.
+func (c *Client) AcquireCallLease(ctx context.Context, prefix, leaseID string, maxCPS, maxConcurrent int64, ttl time.Duration) (bool, string, error) {
+	if err := c.validateKey(prefix); err != nil {
+		return false, "", err
+	}
+	if ctx == nil || leaseID == "" || maxCPS <= 0 || maxConcurrent <= 0 || ttl <= 0 {
+		return false, "", fmt.Errorf("valid call lease context, id, limits, and TTL are required")
+	}
+	const script = `
+redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[1])
+local cps = redis.call('INCR', KEYS[1])
+if cps == 1 then redis.call('PEXPIRE', KEYS[1], 1000) end
+if cps > tonumber(ARGV[2]) then return 'cps' end
+if redis.call('ZCARD', KEYS[2]) >= tonumber(ARGV[3]) then return 'concurrent' end
+redis.call('ZADD', KEYS[2], ARGV[4], ARGV[5])
+redis.call('PEXPIRE', KEYS[2], ARGV[6])
+return 'ok'
+`
+	now := time.Now().UnixMilli()
+	reason, err := c.client.Eval(ctx, script, []string{prefix + ":cps", prefix + ":leases"}, now, maxCPS, maxConcurrent, now+ttl.Milliseconds(), leaseID, ttl.Milliseconds()).Text()
+	if err != nil {
+		return false, "", fmt.Errorf("acquire Redis call lease: %w", err)
+	}
+	return reason == "ok", reason, nil
+}
+
+func (c *Client) BindCallLease(ctx context.Context, prefix, leaseID, callID string) error {
+	if err := c.validateKey(prefix); err != nil {
+		return err
+	}
+	if ctx == nil || leaseID == "" || callID == "" {
+		return fmt.Errorf("call lease context, lease id, and call id are required")
+	}
+	const script = `
+local score = redis.call('ZSCORE', KEYS[1], ARGV[1])
+if not score then return 0 end
+redis.call('ZREM', KEYS[1], ARGV[1])
+redis.call('ZADD', KEYS[1], score, ARGV[2])
+return 1
+`
+	bound, err := c.client.Eval(ctx, script, []string{prefix + ":leases"}, leaseID, callID).Bool()
+	if err != nil {
+		return fmt.Errorf("bind Redis call lease: %w", err)
+	}
+	if !bound {
+		return fmt.Errorf("call lease expired before binding")
+	}
+	return nil
+}
+
+func (c *Client) ReleaseCallLease(ctx context.Context, prefix, callOrLeaseID string) error {
+	if err := c.validateKey(prefix); err != nil {
+		return err
+	}
+	if ctx == nil || callOrLeaseID == "" {
+		return fmt.Errorf("call lease context and id are required")
+	}
+	if err := c.client.ZRem(ctx, prefix+":leases", callOrLeaseID).Err(); err != nil {
+		return fmt.Errorf("release Redis call lease: %w", err)
+	}
+	return nil
+}
+
+// RefreshCallLease renews or reconstructs a lease from durable active-call
+// state. Reconciliation uses this after worker or Redis restarts.
+func (c *Client) RefreshCallLease(ctx context.Context, prefix, callID string, ttl time.Duration) error {
+	if err := c.validateKey(prefix); err != nil {
+		return err
+	}
+	if ctx == nil || callID == "" || ttl <= 0 {
+		return fmt.Errorf("call lease context, id, and TTL are required")
+	}
+	key := prefix + ":leases"
+	if err := c.client.ZAdd(ctx, key, redisv9.Z{Score: float64(time.Now().Add(ttl).UnixMilli()), Member: callID}).Err(); err != nil {
+		return fmt.Errorf("refresh Redis call lease: %w", err)
+	}
+	if err := c.client.PExpire(ctx, key, ttl).Err(); err != nil {
+		return fmt.Errorf("expire refreshed Redis call leases: %w", err)
+	}
+	return nil
+}
+
+// IncrementMetric updates a shared bounded metric series. New series are
+// refused once maxSeries is reached, preventing tenant-created resources from
+// causing unbounded label cardinality.
+func (c *Client) IncrementMetric(ctx context.Context, field string, maxSeries int64) error {
+	if ctx == nil || field == "" || maxSeries <= 0 {
+		return fmt.Errorf("metric context, field, and series limit are required")
+	}
+	const script = `
+if redis.call('HEXISTS', KEYS[1], ARGV[1]) == 0 and redis.call('HLEN', KEYS[1]) >= tonumber(ARGV[2]) then
+  return 0
+end
+redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+return 1
+`
+	if _, err := c.client.Eval(ctx, script, []string{"telecom:metrics:counters"}, field, maxSeries).Result(); err != nil {
+		return fmt.Errorf("increment shared telecom metric: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) SetMetricGauge(ctx context.Context, field string, value float64, maxSeries int64) error {
+	if ctx == nil || field == "" || maxSeries <= 0 {
+		return fmt.Errorf("metric context, field, and series limit are required")
+	}
+	const script = `
+if redis.call('HEXISTS', KEYS[1], ARGV[1]) == 0 and redis.call('HLEN', KEYS[1]) >= tonumber(ARGV[3]) then
+  return 0
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+return 1
+`
+	if _, err := c.client.Eval(ctx, script, []string{"telecom:metrics:gauges"}, field, value, maxSeries).Result(); err != nil {
+		return fmt.Errorf("set shared telecom metric gauge: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) TelecomMetrics(ctx context.Context) (map[string]string, map[string]string, error) {
+	if ctx == nil {
+		return nil, nil, fmt.Errorf("metric context is required")
+	}
+	counters, err := c.client.HGetAll(ctx, "telecom:metrics:counters").Result()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read shared telecom counters: %w", err)
+	}
+	gauges, err := c.client.HGetAll(ctx, "telecom:metrics:gauges").Result()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read shared telecom gauges: %w", err)
+	}
+	return counters, gauges, nil
 }
 
 // GetJSON retrieves a JSON value into dst.

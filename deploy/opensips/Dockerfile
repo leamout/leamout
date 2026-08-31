@@ -20,6 +20,7 @@ RUN apt-get update \
         "opensips-auth-modules=$package_version" \
         "opensips-postgres-module=$package_version" \
         "opensips-tls-module=$package_version" \
+        "opensips-wss-module=$package_version" \
     && installed_version="$(dpkg-query -W -f='${Version}' opensips)" \
     && test "$installed_version" = "$package_version" \
     && for module in \
@@ -32,6 +33,7 @@ RUN apt-get update \
         tls_mgm.so \
         tls_openssl.so \
         proto_tls.so \
+        proto_wss.so \
         uac.so \
         uac_auth.so; do \
         find /usr/lib -type f -name "$module" -print -quit | grep -q . || { \
@@ -54,6 +56,6 @@ RUN install -d -m 0700 /etc/opensips/tls \
     && opensips -C -f /etc/opensips/opensips.cfg \
     && rm -rf /etc/opensips/tls
 
-EXPOSE 5060/udp 5060/tcp 5061/tcp
+EXPOSE 5060/udp 5060/tcp 5061/tcp 5062/tcp
 
 CMD ["opensips", "-F", "-f", "/etc/opensips/opensips.cfg"]

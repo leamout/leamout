@@ -67,7 +67,7 @@ func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) 
 	applicationID := event.ApplicationID
 	channelID := event.ChannelID
 	return r.createWithEvent(ctx, event.OrganizationID, channelID, DirectionInbound, EventCallRinging, func(q *sqlc.Queries) (sqlc.Call, error) {
-		return q.CreateCall(ctx, sqlc.CreateCallParams{
+		call, err := q.CreateCall(ctx, sqlc.CreateCallParams{
 			OrganizationID: event.OrganizationID,
 			ApplicationID:  &applicationID,
 			Direction:      string(DirectionInbound),
@@ -75,6 +75,14 @@ func (r *Repository) CreateInbound(ctx context.Context, event InboundCallEvent) 
 			FromUri:        event.From,
 			ToUri:          event.To,
 			SipCallID:      &channelID,
+		})
+		if err != nil {
+			return sqlc.Call{}, err
+		}
+		return q.SetCallRouteAttribution(ctx, sqlc.SetCallRouteAttributionParams{
+			CarrierConnectionID: &event.CarrierConnectionID,
+			OrganizationID:      event.OrganizationID,
+			ID:                  call.ID,
 		})
 	})
 }
@@ -132,6 +140,27 @@ func (r *Repository) ListForReconciliation(
 		},
 		BatchSize: batchSize,
 	})
+}
+
+// CarrierDailySeconds derives usage from durable call timestamps. Active calls
+// contribute through the current database time, so API restarts cannot reset
+// or undercount the daily allowance.
+func (r *Repository) CarrierDailySeconds(ctx context.Context, carrierID uuid.UUID, day time.Time) (int64, error) {
+	var seconds int64
+	err := r.db.QueryRow(ctx, `
+SELECT COALESCE(SUM(GREATEST(0, EXTRACT(EPOCH FROM (COALESCE(ended_at, NOW()) - GREATEST(answered_at, $2))))), 0)::BIGINT
+FROM calls
+WHERE carrier_connection_id = $1
+  AND answered_at IS NOT NULL
+  AND answered_at < $2 + INTERVAL '1 day'
+  AND COALESCE(ended_at, NOW()) >= $2`, carrierID, day).Scan(&seconds)
+	return seconds, err
+}
+
+func (r *Repository) CarrierCallLimits(ctx context.Context, organizationID, carrierID uuid.UUID) (CallLimits, error) {
+	limits := CallLimits{CarrierConnectionID: carrierID}
+	err := r.db.QueryRow(ctx, `SELECT max_cps, max_concurrent_calls, max_daily_minutes FROM carrier_connections WHERE id=$1 AND organization_id=$2 AND status='active'`, carrierID, organizationID).Scan(&limits.MaxCPS, &limits.MaxConcurrent, &limits.MaxDailyMinutes)
+	return limits, err
 }
 
 func (r *Repository) MarkRinging(

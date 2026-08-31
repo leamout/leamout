@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -15,6 +16,22 @@ func (s *Service) EnsureInbound(ctx context.Context, event InboundCallEvent) err
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("find inbound call: %w", err)
 	}
+	s.recordCall(ctx, "attempted", event.CarrierConnectionID, uuid.Nil, uuid.Nil)
+	if s.admission != nil {
+		limits, err := s.repo.CarrierCallLimits(ctx, event.OrganizationID, event.CarrierConnectionID)
+		if err != nil {
+			return s.rejectInbound(ctx, event, "CALL_QUOTA_UNAVAILABLE", fmt.Errorf("load inbound carrier call limits: %w", err))
+		}
+		leaseID, err := s.admission.Admit(ctx, limits)
+		if err != nil {
+			s.recordLimitRejection(ctx, err, event.CarrierConnectionID)
+			return s.rejectInbound(ctx, event, "CALL_LIMIT_REJECTED", admissionError(err))
+		}
+		if err := s.admission.Bind(ctx, event.CarrierConnectionID, leaseID, event.ChannelID); err != nil {
+			_ = s.admission.Release(context.WithoutCancel(ctx), event.CarrierConnectionID, leaseID)
+			return s.rejectInbound(ctx, event, "CALL_QUOTA_UNAVAILABLE", fmt.Errorf("bind inbound call quota lease: %w", err))
+		}
+	}
 
 	if _, err := s.repo.CreateInbound(ctx, event); err == nil {
 		return nil
@@ -22,8 +39,26 @@ func (s *Service) EnsureInbound(ctx context.Context, event InboundCallEvent) err
 		// A concurrent or replayed event may have won the unique-key race.
 		return nil
 	} else {
+		if s.admission != nil {
+			_ = s.admission.Release(context.WithoutCancel(ctx), event.CarrierConnectionID, event.ChannelID)
+		}
 		return fmt.Errorf("create inbound call: %w", err)
 	}
+}
+
+func (s *Service) rejectInbound(ctx context.Context, event InboundCallEvent, reason string, cause error) error {
+	call, err := s.repo.CreateInbound(ctx, event)
+	if err != nil {
+		return errors.Join(cause, fmt.Errorf("persist rejected inbound call: %w", err))
+	}
+	if _, err := s.repo.MarkFailed(context.WithoutCancel(ctx), event.OrganizationID, call.ID, &reason); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return errors.Join(cause, fmt.Errorf("mark rejected inbound call failed: %w", err))
+	}
+	if err := s.controller.Hangup(context.WithoutCancel(ctx), event.ChannelID); err != nil {
+		return errors.Join(cause, fmt.Errorf("hang up rejected inbound call: %w", err))
+	}
+	s.recordCall(ctx, "failed", event.CarrierConnectionID, uuid.Nil, uuid.Nil)
+	return nil
 }
 
 func (s *Service) MarkInboundAnswered(ctx context.Context, event InboundCallEvent) error {
@@ -42,6 +77,7 @@ func (s *Service) MarkInboundAnswered(ctx context.Context, event InboundCallEven
 	if _, err := s.repo.MarkAnswered(ctx, event.OrganizationID, call.ID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("mark inbound call answered: %w", err)
 	}
+	s.recordCall(ctx, "answered", event.CarrierConnectionID, uuid.Nil, uuid.Nil)
 	return nil
 }
 
@@ -72,6 +108,11 @@ func (s *Service) FinishInbound(ctx context.Context, event InboundCallEvent) err
 	}
 
 	var finishErr error
+	if s.admission != nil && call.CarrierConnectionID != nil {
+		if err := s.admission.Release(ctx, *call.CarrierConnectionID, event.ChannelID); err != nil {
+			return fmt.Errorf("release inbound call quota lease: %w", err)
+		}
+	}
 	switch {
 	case event.WasAnswered || call.State == "answered" || call.State == "active":
 		_, finishErr = s.repo.MarkCompleted(ctx, event.OrganizationID, call.ID, reason)
@@ -83,6 +124,11 @@ func (s *Service) FinishInbound(ctx context.Context, event InboundCallEvent) err
 	if finishErr != nil && !errors.Is(finishErr, pgx.ErrNoRows) {
 		return fmt.Errorf("finish inbound call: %w", finishErr)
 	}
+	state := "failed"
+	if event.WasAnswered || call.State == "answered" || call.State == "active" {
+		state = "completed"
+	}
+	s.recordCall(ctx, state, event.CarrierConnectionID, uuid.Nil, uuid.Nil)
 	return nil
 }
 

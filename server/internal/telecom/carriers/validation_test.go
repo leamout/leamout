@@ -1,6 +1,13 @@
 package carriers
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/google/uuid"
+	"github.com/leamout/leamout/internal/security/authn"
+)
 
 func TestNormalizeCIDR(t *testing.T) {
 	got, err := normalizeCIDR("192.0.2.17/24")
@@ -33,5 +40,24 @@ func TestValidateLimits(t *testing.T) {
 func TestDigestHA1(t *testing.T) {
 	if got, want := digestHA1("byoc-user", "carrier.example", "rotated-secret"), "9fcc44d55f26bac30b97201af8e5654d"; got != want {
 		t.Fatalf("digestHA1() = %q, want %q", got, want)
+	}
+}
+
+func TestCredentialAuditEventIsRedactedAndDetectsRotation(t *testing.T) {
+	actorID := uuid.New()
+	ctx := authn.WithPrincipal(context.Background(), authn.Principal{
+		Subject:    authn.Subject{ID: actorID, Type: authn.SubjectUser},
+		Credential: authn.Credential{Type: authn.CredentialSession},
+	})
+	event, err := credentialAuditEvent(ctx, uuid.New(), uuid.New(), "outbound", "digest", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.Action != "carrier.credential_rotated" || event.ActorID != actorID {
+		t.Fatalf("event = %+v", event)
+	}
+	metadata := string(event.Metadata)
+	if !strings.Contains(metadata, "[REDACTED]") || strings.Contains(metadata, "secret") {
+		t.Fatalf("unsafe audit metadata: %s", metadata)
 	}
 }

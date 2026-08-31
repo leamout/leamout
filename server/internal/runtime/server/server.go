@@ -13,6 +13,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
+	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
@@ -21,6 +22,7 @@ import (
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/security/secrets"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/carrier_tests"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
@@ -87,7 +89,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	conferenceController := conferences.NewFreeSWITCHController(freeSwitch)
 
 	logger := logging.New()
-	metricsRegistry := metrics.New()
+	metricsRegistry := metrics.New(redisClient)
 
 	credentialCipher, err := secrets.New(cfg.CarrierCredentialKey)
 	if err != nil {
@@ -106,7 +108,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
 	}
-	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService)
+	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient, cfg.CarrierTestDestinations)
 	if err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
@@ -127,6 +129,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	)
 
 	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
+	router.Handle("/metrics", metrics.Handler(metricsRegistry))
 	RegisterRoutes(router, modules)
 
 	return &Server{
@@ -146,6 +149,8 @@ func NewModules(
 	conferenceController conferences.Controller,
 	credentialCipher *secrets.Cipher,
 	turnService *realtime.Service,
+	redisClient *redisintegration.Client,
+	carrierTestDestinations []string,
 ) (Modules, error) {
 	queries := sqlc.New(db)
 
@@ -172,10 +177,17 @@ func NewModules(
 
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
+	telecomMetrics := metrics.New(redisClient)
+	routeResolver.SetMetrics(telecomMetrics)
 	routingService := routing.NewService(routeResolver)
 
 	callsRepository := calls.NewRepository(db)
-	callsService := calls.NewService(callsRepository, callsController, routingService)
+	callAdmission, err := calls.NewAdmissionController(redisClient, callsRepository)
+	if err != nil {
+		return Modules{}, err
+	}
+	callsService := calls.NewService(callsRepository, callsController, routingService, callAdmission)
+	callsService.SetMetrics(telecomMetrics)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
@@ -186,19 +198,26 @@ func NewModules(
 	subscribersRepository := subscribers.NewRepository(queries)
 	subscribersService := subscribers.NewService(subscribersRepository)
 
-	numbersRepository := numbers.NewRepository(queries)
+	numbersRepository := numbers.NewRepository(db)
 	numbersService := numbers.NewService(numbersRepository)
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
 	carriersRepository := carriers.NewRepository(db)
 	carriersService := carriers.NewService(carriersRepository, credentialCipher)
+	carrierTestsRepository := carrier_tests.NewRepository(db)
+	carrierTestsService, err := carrier_tests.NewService(carrierTestsRepository, routingService, callsController, redisClient, carrierTestDestinations)
+	if err != nil {
+		return Modules{}, err
+	}
 
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
 
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
+	auditRepository := audit.NewRepository(db)
+	auditService := audit.NewService(auditRepository)
 
 	resolver := authn.NewResolver(
 		sessionService,
@@ -274,6 +293,11 @@ func NewModules(
 			Service:    carriersService,
 			Handler:    carriers.NewHandler(carriersService),
 		},
+		CarrierTests: CarrierTestsModule{
+			Repository: carrierTestsRepository,
+			Service:    carrierTestsService,
+			Handler:    carrier_tests.NewHandler(carrierTestsService),
+		},
 		Trunks: TrunksModule{
 			Repository: trunksRepository,
 			Service:    trunksService,
@@ -283,6 +307,11 @@ func NewModules(
 			Repository: webhooksRepository,
 			Service:    webhooksService,
 			Handler:    webhooks.NewHandler(webhooksService),
+		},
+		Audit: AuditModule{
+			Repository: auditRepository,
+			Service:    auditService,
+			Handler:    audit.NewHandler(auditService),
 		},
 		Conferences: ConferencesModule{
 			Repository: conferencesRepository,

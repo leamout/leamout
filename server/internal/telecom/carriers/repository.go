@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/modules/audit"
 )
 
 type Repository struct {
@@ -67,7 +68,7 @@ func (r *Repository) Disable(
 	)
 }
 
-func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direction, username, realm, ciphertext, ha1 string) error {
+func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direction, username, realm, ciphertext, ha1 string, event audit.Event) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -86,10 +87,13 @@ func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direc
 	if err != nil {
 		return err
 	}
+	if err := audit.Insert(ctx, tx, event); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
 
-func (r *Repository) ClearAuth(ctx context.Context, org, id uuid.UUID, direction string) error {
+func (r *Repository) ClearAuth(ctx context.Context, org, id uuid.UUID, direction string, event audit.Event) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -107,9 +111,12 @@ func (r *Repository) ClearAuth(ctx context.Context, org, id uuid.UUID, direction
 	if _, err = tx.Exec(ctx, `DELETE FROM carrier_digest_credentials WHERE carrier_connection_id=$1 AND organization_id=$2 AND direction=$3`, id, org, direction); err != nil {
 		return err
 	}
+	if err := audit.Insert(ctx, tx, event); err != nil {
+		return err
+	}
 	return tx.Commit(ctx)
 }
-func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID) error {
+func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID, event audit.Event) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return err
@@ -119,6 +126,9 @@ func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID) er
 		return err
 	}
 	if _, err = tx.Exec(ctx, `DELETE FROM carrier_digest_credentials WHERE carrier_connection_id=$1 AND organization_id=$2 AND direction='inbound'`, id, org); err != nil {
+		return err
+	}
+	if err := audit.Insert(ctx, tx, event); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -176,4 +186,18 @@ func (r *Repository) ListProviders(ctx context.Context) ([]sqlc.CarrierProvider,
 
 func (r *Repository) GetProvider(ctx context.Context, id uuid.UUID) (sqlc.CarrierProvider, error) {
 	return r.queries.GetCarrierProviderByID(ctx, id)
+}
+
+func (r *Repository) ListConnectionTrunks(ctx context.Context, organizationID, connectionID uuid.UUID) ([]sqlc.Trunk, error) {
+	return r.queries.ListTrunksByCarrierConnectionID(ctx, sqlc.ListTrunksByCarrierConnectionIDParams{
+		CarrierConnectionID: connectionID,
+		OrganizationID:      organizationID,
+	})
+}
+
+func (r *Repository) ListTrunkEndpoints(ctx context.Context, organizationID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
+	return r.queries.ListTrunkEndpoints(ctx, sqlc.ListTrunkEndpointsParams{
+		TrunkID:        trunkID,
+		OrganizationID: organizationID,
+	})
 }

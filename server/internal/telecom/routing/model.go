@@ -31,6 +31,9 @@ type OutboundDecision struct {
 	Transport           string
 	From                string
 	To                  string
+	MaxCPS              int32
+	MaxConcurrentCalls  int32
+	MaxDailyMinutes     *int64
 }
 
 type InboundRequest struct {

@@ -320,7 +320,6 @@ WHERE t.id = $1
   AND cc.status = 'active'
   AND te.enabled = true
   AND te.direction IN ('outbound', 'bidirectional')
-  AND te.health_status <> 'unhealthy'
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC
 `
 

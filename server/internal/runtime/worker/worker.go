@@ -11,9 +11,11 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
+	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
+	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
@@ -23,6 +25,7 @@ type Worker struct {
 	db                      *pgxpool.Pool
 	freeSwitch              *freeswitch.Client
 	nats                    *natsintegration.Client
+	redis                   *redisintegration.Client
 	calls                   *calls.Consumer
 	recordings              *recordings.Consumer
 	callReconciliation      *calls.ReconciliationJob
@@ -48,12 +51,19 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("connect worker NATS: %w", err)
 	}
+	redisClient, err := redisintegration.New(ctx, redisintegration.DefaultConfig(cfg.RedisURL))
+	if err != nil {
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("connect worker Redis: %w", err)
+	}
 	streamLimits := natsintegration.DefaultStreamLimits()
 	streamLimits.Replicas = cfg.NATSStreamReplicas
 	if streamLimits.Replicas <= 0 {
 		streamLimits.Replicas = 1
 	}
 	if err := natsClient.Provision(ctx, streamLimits); err != nil {
+		_ = redisClient.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("provision worker NATS streams: %w", err)
@@ -63,11 +73,13 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword),
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize worker FreeSWITCH client: %w", err)
 	}
 	if err := freeSwitch.Connect(ctx); err != nil {
+		_ = redisClient.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("connect worker FreeSWITCH: %w", err)
@@ -76,10 +88,21 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	queries := sqlc.New(db)
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
+	telecomMetrics := metrics.New(redisClient)
+	routeResolver.SetMetrics(telecomMetrics)
 	routingService := routing.NewService(routeResolver)
 	callsRepository := calls.NewRepository(db)
 	controller := calls.NewFreeSWITCHController(freeSwitch)
-	callsService := calls.NewService(callsRepository, controller, routingService)
+	callAdmission, err := calls.NewAdmissionController(redisClient, callsRepository)
+	if err != nil {
+		_ = redisClient.Close()
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize call admission: %w", err)
+	}
+	callsService := calls.NewService(callsRepository, controller, routingService, callAdmission)
+	callsService.SetMetrics(telecomMetrics)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
@@ -88,29 +111,35 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		callsRepository,
 		freeSwitch,
 		calls.DefaultReconciliationJobConfig(),
+		callAdmission,
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
 	}
+	callReconciliation.SetMetrics(telecomMetrics)
 	endpointHealth, err := routing.NewEndpointHealthJob(
 		queries,
 		routing.NewSIPOptionsProber(),
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize carrier endpoint health job: %w", err)
 	}
+	endpointHealth.SetMetrics(telecomMetrics)
 
 	recordingReconciliation, err := recordings.NewReconciliationJob(
 		recordingsRepository,
 		recordings.DefaultReconciliationJobConfig(),
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
@@ -125,6 +154,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		outbox.DefaultPublisherJobConfig("worker-"+uuid.NewString()),
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
@@ -140,6 +170,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		webhooks.DefaultDeliveryJobConfig("worker-"+uuid.NewString()),
 	)
 	if err != nil {
+		_ = redisClient.Close()
 		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
@@ -150,6 +181,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db:                      db,
 		freeSwitch:              freeSwitch,
 		nats:                    natsClient,
+		redis:                   redisClient,
 		calls:                   calls.NewConsumer(callsService),
 		recordings:              recordings.NewConsumer(recordingsService),
 		callReconciliation:      callReconciliation,
@@ -227,6 +259,9 @@ func (w *Worker) Close() {
 	}
 	if w.nats != nil {
 		_ = w.nats.Close()
+	}
+	if w.redis != nil {
+		_ = w.redis.Close()
 	}
 	if w.db != nil {
 		w.db.Close()

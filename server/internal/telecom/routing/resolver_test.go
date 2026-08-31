@@ -22,6 +22,17 @@ func (f *fakeRouteStore) GetTrunk(context.Context, uuid.UUID, uuid.UUID) (sqlc.T
 	return f.trunk, nil
 }
 
+func (f *fakeRouteStore) GetCarrierConnection(context.Context, uuid.UUID, uuid.UUID) (sqlc.CarrierConnection, error) {
+	connection := f.connection
+	if connection.MaxCps == 0 {
+		connection.MaxCps = 10
+	}
+	if connection.MaxConcurrentCalls == 0 {
+		connection.MaxConcurrentCalls = 100
+	}
+	return connection, nil
+}
+
 func (f *fakeRouteStore) ListOutboundEndpoints(context.Context, uuid.UUID, uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
 	return f.endpoints, nil
 }

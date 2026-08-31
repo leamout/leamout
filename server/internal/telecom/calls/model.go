@@ -45,13 +45,14 @@ type OriginateRequest struct {
 }
 
 type InboundCallEvent struct {
-	OrganizationID uuid.UUID
-	ApplicationID  uuid.UUID
-	ChannelID      string
-	From           string
-	To             string
-	HangupCause    string
-	WasAnswered    bool
+	OrganizationID      uuid.UUID
+	CarrierConnectionID uuid.UUID
+	ApplicationID       uuid.UUID
+	ChannelID           string
+	From                string
+	To                  string
+	HangupCause         string
+	WasAnswered         bool
 }
 
 type TransferRequest struct {

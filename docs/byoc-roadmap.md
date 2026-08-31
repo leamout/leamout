@@ -65,16 +65,29 @@ report success while leaving authentication behavior unchanged.
 ## Phase C — secure WebRTC
 
 - [x] Issue tenant-bound, short-lived TURN credentials through an authenticated API.
-- [ ] Enable SIP over secure WebSocket at the OpenSIPS edge.
-- [ ] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
-- [ ] Add browser acceptance coverage with forced TURN relay.
+- [x] Enable SIP over secure WebSocket at the OpenSIPS edge.
+- [x] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
+- [x] Add browser acceptance coverage with forced TURN relay.
 
 ## Phase 5 — operations and orchestration
 
-- [ ] Enforce CPS, concurrent-call, and daily-minute limits.
-- [ ] Publish metrics per carrier connection, trunk, and endpoint.
-- [ ] Add audit events for credential rotation and number reassignment.
-- [ ] Add carrier test-call and configuration-validation workflows.
+- [x] Enforce CPS, concurrent-call, and daily-minute limits.
+  - [x] Coordinate CPS and concurrent-call admission atomically through Redis.
+  - [x] Calculate daily answered seconds from durable call timestamps.
+  - [x] Fail closed when Redis or durable usage state is unavailable.
+  - [x] Release, renew, and reconstruct leases through lifecycle reconciliation.
+- [x] Publish metrics per carrier connection, trunk, and endpoint.
+  - [x] Count attempted, answered, failed, and completed calls.
+  - [x] Count quota rejections and primary/failover endpoint selections.
+  - [x] Publish endpoint probe results, health, and latency.
+  - [x] Bound resource-attributed Prometheus series cardinality.
+- [x] Add audit events for credential rotation and number reassignment.
+  - [x] Record credential set, rotation, and deletion with redacted metadata.
+  - [x] Record number assignment and reassignment with previous/new carrier IDs.
+  - [x] Attribute append-only events to the actor, organization, target, and timestamp.
+- [x] Add carrier test-call and configuration-validation workflows.
+  - [x] Add an on-demand configuration validator with bounded SIP OPTIONS probes.
+  - [x] Add a controlled, destination-allowlisted test-call workflow.
 - [ ] Add multi-carrier policy only after single-carrier BYOC is reliable.
 
 ## Phase D — production hardening
