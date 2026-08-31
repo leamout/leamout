@@ -16,10 +16,20 @@ const (
 // License is the commercial authority from which deployment entitlements are issued.
 type License struct {
 	ID             string
-	CustomerID     string
+	OrganizationID string
 	SubscriptionID string
 	Status         Status
 	MaxDeployments int
 	IssuedAt       time.Time
 	ExpiresAt      *time.Time
+}
+
+// Deployment is an activated self-hosted installation under a license.
+type Deployment struct {
+	ID             string
+	OrganizationID string
+	LicenseID      string
+	Name           string
+	ActivatedAt    time.Time
+	LastSeenAt     *time.Time
 }
