@@ -10,22 +10,14 @@ import (
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
 
-type subscriptionReader interface {
-	Current(context.Context, uuid.UUID) (subscriptions.Subscription, error)
-}
-
-type entitlementReader interface {
-	EffectiveForOrganizationPlanAt(context.Context, uuid.UUID, uuid.UUID, time.Time) (entitlements.EntitlementSet, error)
-}
-
 // Service resolves the current organization commercial state from its subscription and entitlements.
 type Service struct {
-	subscriptions subscriptionReader
-	entitlements  entitlementReader
+	subscriptions *subscriptions.Service
+	entitlements  *entitlements.Service
 	now           func() time.Time
 }
 
-func NewService(subscriptions subscriptionReader, entitlements entitlementReader) *Service {
+func NewService(subscriptions *subscriptions.Service, entitlements *entitlements.Service) *Service {
 	return &Service{
 		subscriptions: subscriptions,
 		entitlements:  entitlements,
@@ -55,6 +47,10 @@ func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at ti
 		return OrganizationState{}, err
 	}
 
+	return organizationState(organizationID, current, set, at), nil
+}
+
+func organizationState(organizationID uuid.UUID, current subscriptions.Subscription, set entitlements.EntitlementSet, at time.Time) OrganizationState {
 	return OrganizationState{
 		OrganizationID: organizationID,
 		SubscriptionID: current.ID,
@@ -62,7 +58,7 @@ func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at ti
 		Features:       cloneFeatures(set.Features),
 		Limits:         cloneLimits(set.Limits),
 		EffectiveAt:    at,
-	}, nil
+	}
 }
 
 func cloneFeatures(features map[entitlements.Feature]bool) map[string]bool {
