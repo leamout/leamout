@@ -2,9 +2,10 @@ package licensing
 
 import "context"
 
-// Repository persists commercial licenses and their lifecycle state.
+// Repository persists licenses and deployments within an organization boundary.
 type Repository interface {
-	Get(context.Context, string) (License, error)
-	Create(context.Context, License) (License, error)
-	Update(context.Context, License) (License, error)
+	GetLicense(context.Context, string, string) (License, error)
+	CreateLicense(context.Context, License) (License, error)
+	UpdateLicense(context.Context, License) (License, error)
+	ListDeployments(context.Context, string, string) ([]Deployment, error)
 }
