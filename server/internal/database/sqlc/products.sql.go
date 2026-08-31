@@ -11,48 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const createProduct = `-- name: CreateProduct :one
-INSERT INTO products (
-    code,
-    name,
-    description,
-    active
-) VALUES (
-    $1,
-    $2,
-    $3,
-    COALESCE($4, true)
-)
-RETURNING id, code, name, description, active, created_at, updated_at
-`
-
-type CreateProductParams struct {
-	Code        string      `db:"code" json:"code"`
-	Name        string      `db:"name" json:"name"`
-	Description *string     `db:"description" json:"description"`
-	Active      interface{} `db:"active" json:"active"`
-}
-
-func (q *Queries) CreateProduct(ctx context.Context, arg CreateProductParams) (Product, error) {
-	row := q.db.QueryRow(ctx, createProduct,
-		arg.Code,
-		arg.Name,
-		arg.Description,
-		arg.Active,
-	)
-	var i Product
-	err := row.Scan(
-		&i.ID,
-		&i.Code,
-		&i.Name,
-		&i.Description,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getProductByCode = `-- name: GetProductByCode :one
 SELECT id, code, name, description, active, created_at, updated_at
 FROM products
@@ -164,45 +122,4 @@ func (q *Queries) ListProducts(ctx context.Context) ([]Product, error) {
 		return nil, err
 	}
 	return items, nil
-}
-
-const updateProduct = `-- name: UpdateProduct :one
-UPDATE products
-SET
-    code = COALESCE($1, code),
-    name = COALESCE($2, name),
-    description = COALESCE($3, description),
-    active = COALESCE($4, active),
-    updated_at = NOW()
-WHERE id = $5
-RETURNING id, code, name, description, active, created_at, updated_at
-`
-
-type UpdateProductParams struct {
-	Code        *string   `db:"code" json:"code"`
-	Name        *string   `db:"name" json:"name"`
-	Description *string   `db:"description" json:"description"`
-	Active      *bool     `db:"active" json:"active"`
-	ID          uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) UpdateProduct(ctx context.Context, arg UpdateProductParams) (Product, error) {
-	row := q.db.QueryRow(ctx, updateProduct,
-		arg.Code,
-		arg.Name,
-		arg.Description,
-		arg.Active,
-		arg.ID,
-	)
-	var i Product
-	err := row.Scan(
-		&i.ID,
-		&i.Code,
-		&i.Name,
-		&i.Description,
-		&i.Active,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
 }
