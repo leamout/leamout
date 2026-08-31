@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -95,17 +96,17 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
 	}
-	healthConfig := routing.DefaultEndpointHealthConfig()
-	healthConfig.Interval = cfg.EndpointHealthInterval
-	healthConfig.ProbeTimeout = cfg.EndpointHealthProbeTimeout
-	healthConfig.Cooldown = cfg.EndpointHealthCooldown
-	healthConfig.FailureThreshold = cfg.EndpointHealthFailures
-	healthConfig.BatchSize = cfg.EndpointHealthBatchSize
-	healthConfig.Concurrency = cfg.EndpointHealthConcurrency
 	endpointHealth, err := routing.NewEndpointHealthJob(
 		queries,
 		routing.NewSIPOptionsProber(),
-		healthConfig,
+		routing.EndpointHealthConfig{
+			Interval:         10 * time.Second,
+			ProbeTimeout:     2 * time.Second,
+			Cooldown:         30 * time.Second,
+			FailureThreshold: 3,
+			BatchSize:        100,
+			Concurrency:      10,
+		},
 	)
 	if err != nil {
 		_ = freeSwitch.Close()
