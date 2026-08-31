@@ -37,7 +37,7 @@ func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at ti
 	current, err := s.subscriptions.Current(ctx, organizationID)
 	if err != nil {
 		if errors.Is(err, subscriptions.ErrSubscriptionNotFound) {
-			return OrganizationState{}, ErrUnavailable
+			return unsubscribedState(organizationID, at), nil
 		}
 		return OrganizationState{}, err
 	}
@@ -51,14 +51,34 @@ func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at ti
 }
 
 func organizationState(organizationID uuid.UUID, current subscriptions.Subscription, set entitlements.EntitlementSet, at time.Time) OrganizationState {
+	subscriptionID := current.ID
+	planID := current.PlanID
 	return OrganizationState{
 		OrganizationID: organizationID,
-		SubscriptionID: current.ID,
-		PlanID:         current.PlanID,
+		Standing:       standingFromSubscription(current.Status),
+		SubscriptionID: &subscriptionID,
+		PlanID:         &planID,
 		Features:       cloneFeatures(set.Features),
 		Limits:         cloneLimits(set.Limits),
 		EffectiveAt:    at,
 	}
+}
+
+func unsubscribedState(organizationID uuid.UUID, at time.Time) OrganizationState {
+	return OrganizationState{
+		OrganizationID: organizationID,
+		Standing:       StandingUnsubscribed,
+		Features:       map[string]bool{},
+		Limits:         map[string]int64{},
+		EffectiveAt:    at,
+	}
+}
+
+func standingFromSubscription(status subscriptions.Status) Standing {
+	if status == subscriptions.StatusPastDue {
+		return StandingPastDue
+	}
+	return StandingActive
 }
 
 func cloneFeatures(features map[entitlements.Feature]bool) map[string]bool {
