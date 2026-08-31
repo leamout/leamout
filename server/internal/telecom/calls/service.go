@@ -33,9 +33,10 @@ type Service struct {
 	repo       *Repository
 	controller Controller
 	routes     RouteResolver
+	admission  *AdmissionController
 }
 
-func NewService(repo *Repository, controller Controller, routes RouteResolver) *Service {
+func NewService(repo *Repository, controller Controller, routes RouteResolver, admission ...*AdmissionController) *Service {
 	if repo == nil {
 		panic("calls: repository is required")
 	}
@@ -46,7 +47,11 @@ func NewService(repo *Repository, controller Controller, routes RouteResolver) *
 		panic("calls: route resolver is required")
 	}
 
-	return &Service{repo: repo, controller: controller, routes: routes}
+	service := &Service{repo: repo, controller: controller, routes: routes}
+	if len(admission) > 0 {
+		service.admission = admission[0]
+	}
+	return service
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
@@ -67,6 +72,23 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return sqlc.Call{}, routeError(err)
 	}
+	leaseID := ""
+	if s.admission != nil {
+		leaseID, err = s.admission.Admit(ctx, CallLimits{
+			CarrierConnectionID: route.CarrierConnectionID,
+			MaxCPS:              route.MaxCPS,
+			MaxConcurrent:       route.MaxConcurrentCalls,
+			MaxDailyMinutes:     route.MaxDailyMinutes,
+		})
+		if err != nil {
+			return sqlc.Call{}, admissionError(err)
+		}
+		defer func() {
+			if leaseID != "" {
+				_ = s.admission.Release(context.WithoutCancel(ctx), route.CarrierConnectionID, leaseID)
+			}
+		}()
+	}
 
 	sipCallID, err := s.controller.Originate(ctx, OriginateRequest{
 		CarrierConnectionID: route.CarrierConnectionID,
@@ -86,6 +108,13 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	}
 	if sipCallID == "" {
 		return sqlc.Call{}, apperror.NewServiceUnavailable("media server returned an empty call id", nil)
+	}
+	if s.admission != nil {
+		if err := s.admission.Bind(ctx, route.CarrierConnectionID, leaseID, sipCallID); err != nil {
+			_ = s.controller.Hangup(context.WithoutCancel(ctx), sipCallID)
+			return sqlc.Call{}, apperror.NewServiceUnavailable("call quota coordination unavailable", err)
+		}
+		leaseID = sipCallID
 	}
 
 	call, err := s.repo.Create(ctx, organizationID, req, RouteAttribution{
@@ -108,11 +137,13 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	// immediately so outbound media controls are available on the returned call.
 	answered, err := s.repo.MarkAnswered(ctx, organizationID, call.ID)
 	if err == nil {
+		leaseID = ""
 		return answered, nil
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		latest, getErr := s.Get(ctx, organizationID, call.ID)
 		if getErr == nil && isConnected(latest.State) {
+			leaseID = ""
 			return latest, nil
 		}
 	}
@@ -183,6 +214,11 @@ func (s *Service) Hangup(ctx context.Context, organizationID, id uuid.UUID) (sql
 
 	if err := s.controller.Hangup(ctx, externalID); err != nil {
 		return sqlc.Call{}, mediaError("hang up call", err)
+	}
+	if s.admission != nil && call.CarrierConnectionID != nil {
+		if err := s.admission.Release(ctx, *call.CarrierConnectionID, externalID); err != nil {
+			return sqlc.Call{}, apperror.NewServiceUnavailable("release call quota lease", err)
+		}
 	}
 
 	var updated sqlc.Call
@@ -360,6 +396,19 @@ func routeError(err error) error {
 		return apperror.NewForbidden("caller identity is not authorized for this trunk")
 	}
 	return apperror.NewInternal("resolve outbound route", err)
+}
+
+func admissionError(err error) error {
+	switch {
+	case errors.Is(err, ErrCPSLimit):
+		return apperror.NewTooManyRequests("carrier calls-per-second limit reached")
+	case errors.Is(err, ErrConcurrentLimit):
+		return apperror.NewTooManyRequests("carrier concurrent-call limit reached")
+	case errors.Is(err, ErrDailyLimit):
+		return apperror.NewTooManyRequests("carrier daily-minute limit reached")
+	default:
+		return apperror.NewServiceUnavailable("call quota coordination unavailable", err)
+	}
 }
 
 func readCall(call sqlc.Call, err error) (sqlc.Call, error) {

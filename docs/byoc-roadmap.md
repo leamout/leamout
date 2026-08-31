@@ -71,7 +71,11 @@ report success while leaving authentication behavior unchanged.
 
 ## Phase 5 — operations and orchestration
 
-- [ ] Enforce CPS, concurrent-call, and daily-minute limits.
+- [x] Enforce CPS, concurrent-call, and daily-minute limits.
+  - [x] Coordinate CPS and concurrent-call admission atomically through Redis.
+  - [x] Calculate daily answered seconds from durable call timestamps.
+  - [x] Fail closed when Redis or durable usage state is unavailable.
+  - [x] Release, renew, and reconstruct leases through lifecycle reconciliation.
 - [ ] Publish metrics per carrier connection, trunk, and endpoint.
 - [ ] Add audit events for credential rotation and number reassignment.
 - [ ] Add carrier test-call and configuration-validation workflows.

@@ -106,7 +106,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
 	}
-	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService)
+	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient)
 	if err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
@@ -146,6 +146,7 @@ func NewModules(
 	conferenceController conferences.Controller,
 	credentialCipher *secrets.Cipher,
 	turnService *realtime.Service,
+	redisClient *redisintegration.Client,
 ) (Modules, error) {
 	queries := sqlc.New(db)
 
@@ -175,7 +176,11 @@ func NewModules(
 	routingService := routing.NewService(routeResolver)
 
 	callsRepository := calls.NewRepository(db)
-	callsService := calls.NewService(callsRepository, callsController, routingService)
+	callAdmission, err := calls.NewAdmissionController(redisClient, callsRepository)
+	if err != nil {
+		return Modules{}, err
+	}
+	callsService := calls.NewService(callsRepository, callsController, routingService, callAdmission)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)

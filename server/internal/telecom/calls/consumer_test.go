@@ -71,17 +71,19 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 	consumer := &Consumer{service: service}
 	organizationID := uuid.New()
 	applicationID := uuid.New()
+	carrierConnectionID := uuid.New()
 
 	err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
 		Name: "CHANNEL_HANGUP_COMPLETE",
 		Headers: map[string]string{
 			"Unique-ID": "channel-2",
-			"variable_sip_h_X-Leamout-Organization-ID":      organizationID.String(),
-			"variable_sip_h_X-Leamout-Voice-Application-ID": applicationID.String(),
-			"Caller-Caller-ID-Number":                       "+233201234567",
-			"Caller-Destination-Number":                     "+233301234567",
-			"Hangup-Cause":                                  "NORMAL_CLEARING",
-			"variable_answer_epoch":                         "1787976000",
+			"variable_sip_h_X-Leamout-Organization-ID":       organizationID.String(),
+			"variable_sip_h_X-Leamout-Voice-Application-ID":  applicationID.String(),
+			"variable_sip_h_X-Leamout-Carrier-Connection-ID": carrierConnectionID.String(),
+			"Caller-Caller-ID-Number":                        "+233201234567",
+			"Caller-Destination-Number":                      "+233301234567",
+			"Hangup-Cause":                                   "NORMAL_CLEARING",
+			"variable_answer_epoch":                          "1787976000",
 		},
 	})
 	if err != nil {
@@ -95,6 +97,9 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 	}
 	if service.last.ApplicationID != applicationID {
 		t.Fatalf("application = %s, want %s", service.last.ApplicationID, applicationID)
+	}
+	if service.last.CarrierConnectionID != carrierConnectionID {
+		t.Fatalf("carrier connection = %s, want %s", service.last.CarrierConnectionID, carrierConnectionID)
 	}
 	if service.last.ChannelID != "channel-2" {
 		t.Fatalf("channel = %q, want channel-2", service.last.ChannelID)

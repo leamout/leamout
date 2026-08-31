@@ -15,6 +15,7 @@ import (
 
 type routeStore interface {
 	GetTrunk(context.Context, uuid.UUID, uuid.UUID) (sqlc.Trunk, error)
+	GetCarrierConnection(context.Context, uuid.UUID, uuid.UUID) (sqlc.CarrierConnection, error)
 	ListOutboundEndpoints(context.Context, uuid.UUID, uuid.UUID) ([]sqlc.TrunkEndpoint, error)
 	ResolveInboundCarrier(context.Context, netip.Addr) (sqlc.CarrierConnection, error)
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
@@ -35,6 +36,13 @@ func (r *Resolver) resolveOutbound(
 	req OutboundRequest,
 ) (OutboundDecision, error) {
 	trunk, err := r.repo.GetTrunk(ctx, req.OrganizationID, req.TrunkID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return OutboundDecision{}, ErrNoRoute
+		}
+		return OutboundDecision{}, err
+	}
+	connection, err := r.repo.GetCarrierConnection(ctx, req.OrganizationID, trunk.CarrierConnectionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return OutboundDecision{}, ErrNoRoute
@@ -74,6 +82,9 @@ func (r *Resolver) resolveOutbound(
 		Transport:           endpoint.Transport,
 		From:                req.From,
 		To:                  req.To,
+		MaxCPS:              connection.MaxCps,
+		MaxConcurrentCalls:  connection.MaxConcurrentCalls,
+		MaxDailyMinutes:     connection.MaxDailyMinutes,
 	}, nil
 }
 

@@ -44,12 +44,14 @@ type ReconciliationJob struct {
 	inventory channelInventory
 	config    ReconciliationJobConfig
 	now       func() time.Time
+	admission *AdmissionController
 }
 
 func NewReconciliationJob(
 	repo reconciliationRepository,
 	inventory channelInventory,
 	config ReconciliationJobConfig,
+	admission ...*AdmissionController,
 ) (*ReconciliationJob, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("call reconciliation repository is required")
@@ -67,12 +69,16 @@ func NewReconciliationJob(
 		config.BatchSize = 200
 	}
 
-	return &ReconciliationJob{
+	job := &ReconciliationJob{
 		repo:      repo,
 		inventory: inventory,
 		config:    config,
 		now:       time.Now,
-	}, nil
+	}
+	if len(admission) > 0 {
+		job.admission = admission[0]
+	}
+	return job, nil
 }
 
 func (j *ReconciliationJob) Run(ctx context.Context) error {
@@ -126,7 +132,18 @@ func (j *ReconciliationJob) Reconcile(ctx context.Context) error {
 			continue
 		}
 		if _, ok := active[*call.SipCallID]; ok {
+			if j.admission != nil && call.CarrierConnectionID != nil {
+				if err := j.admission.Refresh(ctx, *call.CarrierConnectionID, *call.SipCallID); err != nil {
+					return fmt.Errorf("refresh active call %s quota lease: %w", call.ID, err)
+				}
+			}
 			continue
+		}
+
+		if j.admission != nil && call.CarrierConnectionID != nil {
+			if err := j.admission.Release(ctx, *call.CarrierConnectionID, *call.SipCallID); err != nil {
+				return fmt.Errorf("release reconciled call %s quota lease: %w", call.ID, err)
+			}
 		}
 
 		switch CallState(call.State) {
