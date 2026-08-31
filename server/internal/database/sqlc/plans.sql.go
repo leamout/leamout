@@ -9,7 +9,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createPlan = `-- name: CreatePlan :one
@@ -198,7 +197,7 @@ WHERE pl.id = $5
       COALESCE($4, pl.active) = false
       OR p.active = true
   )
-RETURNING p.id, p.code, p.name, p.description, p.active, p.created_at, p.updated_at, pl.id, product_id, pl.code, pl.name, pl.description, pl.active, pl.created_at, pl.updated_at
+RETURNING pl.id, pl.product_id, pl.code, pl.name, pl.description, pl.active, pl.created_at, pl.updated_at
 `
 
 type UpdatePlanParams struct {
@@ -209,25 +208,7 @@ type UpdatePlanParams struct {
 	ID          uuid.UUID `db:"id" json:"id"`
 }
 
-type UpdatePlanRow struct {
-	ID            uuid.UUID          `db:"id" json:"id"`
-	Code          string             `db:"code" json:"code"`
-	Name          string             `db:"name" json:"name"`
-	Description   *string            `db:"description" json:"description"`
-	Active        bool               `db:"active" json:"active"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	ID_2          uuid.UUID          `db:"id_2" json:"id_2"`
-	ProductID     uuid.UUID          `db:"product_id" json:"product_id"`
-	Code_2        string             `db:"code_2" json:"code_2"`
-	Name_2        string             `db:"name_2" json:"name_2"`
-	Description_2 *string            `db:"description_2" json:"description_2"`
-	Active_2      bool               `db:"active_2" json:"active_2"`
-	CreatedAt_2   pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
-	UpdatedAt_2   pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
-}
-
-func (q *Queries) UpdatePlan(ctx context.Context, arg UpdatePlanParams) (UpdatePlanRow, error) {
+func (q *Queries) UpdatePlan(ctx context.Context, arg UpdatePlanParams) (Plan, error) {
 	row := q.db.QueryRow(ctx, updatePlan,
 		arg.Code,
 		arg.Name,
@@ -235,23 +216,16 @@ func (q *Queries) UpdatePlan(ctx context.Context, arg UpdatePlanParams) (UpdateP
 		arg.Active,
 		arg.ID,
 	)
-	var i UpdatePlanRow
+	var i Plan
 	err := row.Scan(
 		&i.ID,
+		&i.ProductID,
 		&i.Code,
 		&i.Name,
 		&i.Description,
 		&i.Active,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.ID_2,
-		&i.ProductID,
-		&i.Code_2,
-		&i.Name_2,
-		&i.Description_2,
-		&i.Active_2,
-		&i.CreatedAt_2,
-		&i.UpdatedAt_2,
 	)
 	return i, err
 }
