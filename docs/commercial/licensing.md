@@ -2,26 +2,50 @@
 
 Licensing carries Leamout commercial authorization into self-hosted deployments without exposing private signing capability to the self-hosted runtime.
 
-## Commercial flow
+## Boundary
 
 ```text
-organization
-    ↓
-subscription
-    ↓
-effective entitlements
-    ↓
-license
-    ↓
-deployment(s)
+catalog
+   ↓
+subscriptions
+   ↓
+entitlements
+   ↓
+state
+   ↓
+licensing
+   ↓
+self-hosted deployment(s)
 ```
 
-## Current license model
+`commercial/licensing` owns durable licenses, license lifecycle, and activated self-hosted installations. It consumes resolved commercial state; it does not decide catalog pricing, subscription lifecycle, or entitlement inheritance.
+
+## Current implementation
+
+The licensing package now uses UUID-backed domain models and SQLC-backed persistence. License and deployment reads/writes are organization-scoped.
+
+A new license is created from current commercial state:
 
 ```text
-id
-organization_id
-subscription_id
+current active subscription
+        +
+effective organization entitlements
+        ↓
+max.deployments
+        ↓
+pending license
+```
+
+`max_deployments` is a durable snapshot of the resolved `max.deployments` entitlement at license creation time. A caller cannot choose a larger deployment limit directly.
+
+Creating a row is intentionally not described as cryptographic issuance. A license starts `pending`; it becomes `active` only after trusted licensing-authority code has associated a signing key and completed whatever signed-artifact workflow is introduced by the versioned claims format.
+
+## License model
+
+```text
+id                 UUID
+organization_id    UUID
+subscription_id    UUID
 status
 max_deployments
 signing_key_id
@@ -31,91 +55,101 @@ created_at
 updated_at
 ```
 
-Current states are:
+Lifecycle:
 
 ```text
-pending
-active
-suspended
-expired
-revoked
+pending ─────→ active ─────→ suspended ─────→ active
+   │             │              │
+   │             ├──────────────┴────→ expired
+   │             └───────────────────→ revoked
+   └─────────────────────────────────→ revoked
+
+expired / revoked = terminal
 ```
 
-The database validates state names and basic temporal/deployment limits. Service logic owns valid transitions and issuance policy.
+Repeated transitions to the current state are idempotent. License transitions use serializable database transactions so concurrent lifecycle changes cannot silently overwrite one another.
 
-## Licensing authority
+## Deployment activation
 
-License issuance is a commercial-domain responsibility. Private signing material must remain inside the trusted licensing authority and must not be exposed to self-hosted deployments.
+A deployment is one self-hosted Leamout installation using a license slot.
+
+```text
+license
+   ├── deployment node-01
+   ├── deployment node-02
+   └── deployment node-03
+```
+
+Activation requires:
+
+```text
+license.status = active
+license not expired
+active deployments < max_deployments
+```
+
+The same active `deployment_id` is idempotent and returns the existing deployment rather than consuming another slot. A deactivated deployment identity is not silently reactivated.
+
+The repository performs the read/count/create sequence in a PostgreSQL `SERIALIZABLE` transaction and retries serialization failures. That protects `max_deployments` from concurrent activation races without embedding raw SQL in the commercial repository.
+
+Deployment lifecycle currently supports:
+
+```text
+activate
+list
+touch / last-seen
+deactivate
+```
+
+## Signed license artifact
+
+The persistent `License` record is **not** the signed license file/token consumed by a self-hosted runtime.
+
+The future signing boundary remains:
 
 ```text
 commercial state
       ↓
-entitlement resolution
+license record
       ↓
-licensing authority
+versioned claims
       ↓
-signed license
+trusted signer / private key
       ↓
-self-hosted deployment
+signed artifact
+      ↓
+self-hosted runtime
+      ↓
+public-key verification
 ```
 
-## Intended operations
+Do not add `signer.go` merely as a scaffold. Add it together with the concrete, versioned claims format and runtime verifier so signing becomes a real compatibility contract.
 
-Licensing service behavior is expected to include operations such as:
-
-```text
-issue
-activate
-renew
-deactivate
-suspend
-expire
-revoke
-```
-
-These are service methods/use cases, not separate files merely because they may have separate API endpoints.
-
-## Claims
-
-A signed self-hosted license should be based on Leamout-owned commercial identifiers and effective entitlements. Useful claims can include:
-
-```text
-organization
-license identifier
-deployment identifier or deployment policy
-issued/expiry times
-features
-limits
-max deployments
-signing key identifier
-```
-
-The exact signed format should be versioned before it becomes a compatibility contract.
+Useful claims are expected to include Leamout-owned identifiers, validity times, effective feature/limit snapshots, deployment policy, claims version, and signing-key identifier. Exact names/encoding remain deliberately unspecified until that workflow is implemented.
 
 ## Key security
 
-- Private signing keys remain in the trusted commercial licensing authority.
-- Self-hosted deployments receive only what is required to validate issued licenses.
-- `signing_key_id` allows key rotation and verification-key selection.
-- License validation must fail closed for invalid signatures or malformed claims.
+- Private signing keys remain in the trusted Leamout licensing authority.
+- Self-hosted deployments receive only public verification material and signed commercial claims.
+- `signing_key_id` selects verification material and supports key rotation.
+- Invalid signatures or malformed claims must fail closed for new commercial actions.
+- Runtime verification must not require an external payment provider to be online for every call or media action.
 
-Ed25519 is suitable for this asymmetric signing boundary.
+Ed25519 remains a suitable asymmetric signing primitive when the concrete artifact format is implemented.
 
-## Expiry and availability
+## Expiry and active calls
 
-Commercial enforcement must not destroy active telecom sessions.
+Commercial enforcement must not destroy active telecom sessions. If a license expires or becomes invalid while a call is already active, Leamout should not terminate that call solely because of the commercial transition. Enforcement should affect new controlled actions according to policy.
 
-If a license expires or becomes invalid while a call is already active, Leamout should not terminate that call solely because of the commercial transition. Enforcement should generally affect new chargeable/controlled actions according to policy.
+Grace periods, cached renewals, air-gapped licenses, and offline renewal windows remain future policy and are not encoded speculatively.
 
-Self-hosted licensing may later support cached renewal windows, grace periods, and offline/air-gapped licenses. Those policies are not encoded in the current schema.
-
-## Relationship to payment providers
+## Provider independence
 
 Never implement:
 
 ```text
-provider webhook
-    ↓
+payment provider webhook
+        ↓
 direct license signing
 ```
 
@@ -123,14 +157,14 @@ Use:
 
 ```text
 provider event
-    ↓
-payment/subscription reconciliation
-    ↓
-entitlement resolution
-    ↓
-licensing service
-    ↓
-signed license
+     ↓
+Leamout subscription/payment reconciliation
+     ↓
+commercial state
+     ↓
+licensing authority
+     ↓
+signed license artifact
 ```
 
-This keeps license issuance provider-independent and auditable through Leamout domain state.
+PostgreSQL and Leamout domain state remain authoritative.

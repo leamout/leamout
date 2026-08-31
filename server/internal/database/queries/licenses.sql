@@ -27,7 +27,6 @@ WHERE o.id = sqlc.arg(organization_id)
           FROM subscriptions AS s
           WHERE s.id = sqlc.narg(subscription_id)::uuid
             AND s.organization_id = o.id
-            AND s.status IN ('active', 'past_due')
       )
   )
 RETURNING *;
@@ -64,7 +63,7 @@ WHERE l.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 ORDER BY l.created_at DESC;
 
--- name: CompareAndSetLicenseStatus :one
+-- name: UpdateLicenseStatus :one
 UPDATE licenses AS l
 SET
     status = sqlc.arg(status),
@@ -72,11 +71,10 @@ SET
 FROM organizations AS o
 WHERE l.organization_id = sqlc.arg(organization_id)
   AND l.id = sqlc.arg(id)
-  AND l.status = sqlc.arg(expected_status)
   AND o.id = l.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.*;
+RETURNING *;
 
 -- name: UpdateLicenseExpiration :one
 UPDATE licenses AS l
@@ -89,14 +87,4 @@ WHERE l.organization_id = sqlc.arg(organization_id)
   AND o.id = l.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.*;
-
--- name: LockLicenseForActivation :one
-SELECT l.*
-FROM licenses AS l
-JOIN organizations AS o ON o.id = l.organization_id
-WHERE l.organization_id = sqlc.arg(organization_id)
-  AND l.id = sqlc.arg(id)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-FOR UPDATE OF l;
+RETURNING *;

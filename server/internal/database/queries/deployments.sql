@@ -12,8 +12,6 @@ FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
 WHERE l.id = sqlc.arg(license_id)
   AND l.organization_id = sqlc.arg(organization_id)
-  AND l.status = 'active'
-  AND (l.expires_at IS NULL OR l.expires_at > NOW())
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 RETURNING *;
@@ -66,7 +64,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING d.*;
+RETURNING *;
 
 -- name: DeactivateDeployment :one
 UPDATE deployments AS d
@@ -83,4 +81,4 @@ WHERE d.license_id = l.id
   AND l.organization_id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING d.*;
+RETURNING *;
