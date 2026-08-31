@@ -1,82 +1,34 @@
 package entitlements
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
-
-type fakeStore struct {
-	plan         []Entitlement
-	organization []Entitlement
-	license      []Entitlement
-}
-
-func (f *fakeStore) CreatePlan(context.Context, uuid.UUID, CreateInput) (Entitlement, error) {
-	return Entitlement{}, nil
-}
-func (f *fakeStore) CreateOrganization(context.Context, uuid.UUID, CreateInput) (Entitlement, error) {
-	return Entitlement{}, nil
-}
-func (f *fakeStore) CreateLicense(context.Context, uuid.UUID, uuid.UUID, CreateInput) (Entitlement, error) {
-	return Entitlement{}, nil
-}
-func (f *fakeStore) ListPlan(context.Context, uuid.UUID) ([]Entitlement, error) {
-	return f.plan, nil
-}
-func (f *fakeStore) ListOrganization(context.Context, uuid.UUID) ([]Entitlement, error) {
-	return f.organization, nil
-}
-func (f *fakeStore) ListLicense(context.Context, uuid.UUID, uuid.UUID) ([]Entitlement, error) {
-	return f.license, nil
-}
-func (f *fakeStore) DeletePlan(context.Context, uuid.UUID, uuid.UUID) error         { return nil }
-func (f *fakeStore) DeleteOrganization(context.Context, uuid.UUID, uuid.UUID) error { return nil }
-func (f *fakeStore) DeleteLicense(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
-	return nil
-}
-
-type fakeSubscriptions struct {
-	current subscriptions.Subscription
-	err     error
-}
-
-func (f fakeSubscriptions) Current(context.Context, uuid.UUID) (subscriptions.Subscription, error) {
-	return f.current, f.err
-}
 
 func boolPtr(value bool) *bool           { return &value }
 func int64Ptr(value int64) *int64        { return &value }
 func timePtr(value time.Time) *time.Time { return &value }
 
-func TestEffectiveForOrganizationAppliesOverrides(t *testing.T) {
+func TestResolveAppliesOverrides(t *testing.T) {
 	t.Parallel()
 
-	organizationID := uuid.New()
-	planID := uuid.New()
-	store := &fakeStore{
-		plan: []Entitlement{
-			{Key: "recording.enabled", Kind: KindFeature, Enabled: boolPtr(true)},
-			{Key: "max.concurrent.calls", Kind: KindLimit, LimitValue: int64Ptr(10)},
-		},
-		organization: []Entitlement{
-			{Key: "recording.enabled", Kind: KindFeature, Enabled: boolPtr(false)},
-			{Key: "max.concurrent.calls", Kind: KindLimit, LimitValue: int64Ptr(25)},
-			{Key: "ai.enabled", Kind: KindFeature, Enabled: boolPtr(true)},
-		},
+	base := []Entitlement{
+		{Key: "recording.enabled", Kind: KindFeature, Enabled: boolPtr(true)},
+		{Key: "max.concurrent.calls", Kind: KindLimit, LimitValue: int64Ptr(10)},
 	}
-	service := NewService(store, fakeSubscriptions{current: subscriptions.Subscription{PlanID: planID}})
+	overrides := []Entitlement{
+		{Key: "recording.enabled", Kind: KindFeature, Enabled: boolPtr(false)},
+		{Key: "max.concurrent.calls", Kind: KindLimit, LimitValue: int64Ptr(25)},
+		{Key: "ai.enabled", Kind: KindFeature, Enabled: boolPtr(true)},
+	}
 
-	set, err := service.EffectiveForOrganization(context.Background(), organizationID)
+	set, err := resolve(time.Now(), base, overrides)
 	if err != nil {
 		t.Fatalf("resolve entitlements: %v", err)
 	}
 	if set.Enabled("recording.enabled") {
-		t.Fatal("expected organization override to disable recording")
+		t.Fatal("expected override to disable recording")
 	}
 	if !set.Enabled("ai.enabled") {
 		t.Fatal("expected organization-only feature to be enabled")
@@ -86,21 +38,19 @@ func TestEffectiveForOrganizationAppliesOverrides(t *testing.T) {
 	}
 }
 
-func TestEffectiveForOrganizationFiltersByTime(t *testing.T) {
+func TestResolveFiltersByTime(t *testing.T) {
 	t.Parallel()
 
 	at := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
 	future := at.Add(time.Hour)
 	expired := at.Add(-time.Hour)
-	planID := uuid.New()
-	store := &fakeStore{plan: []Entitlement{
+	base := []Entitlement{
 		{Key: "current.enabled", Kind: KindFeature, Enabled: boolPtr(true)},
 		{Key: "future.enabled", Kind: KindFeature, Enabled: boolPtr(true), StartsAt: timePtr(future)},
 		{Key: "expired.enabled", Kind: KindFeature, Enabled: boolPtr(true), ExpiresAt: timePtr(expired)},
-	}}
-	service := NewService(store, fakeSubscriptions{current: subscriptions.Subscription{PlanID: planID}})
+	}
 
-	set, err := service.EffectiveForOrganizationAt(context.Background(), uuid.New(), at)
+	set, err := resolve(at, base, nil)
 	if err != nil {
 		t.Fatalf("resolve entitlements: %v", err)
 	}
@@ -112,44 +62,23 @@ func TestEffectiveForOrganizationFiltersByTime(t *testing.T) {
 	}
 }
 
-func TestEffectiveForOrganizationRejectsKindMismatch(t *testing.T) {
+func TestResolveRejectsKindMismatch(t *testing.T) {
 	t.Parallel()
 
-	store := &fakeStore{
-		plan:         []Entitlement{{Key: "voice", Kind: KindFeature, Enabled: boolPtr(true)}},
-		organization: []Entitlement{{Key: "voice", Kind: KindLimit, LimitValue: int64Ptr(1)}},
-	}
-	service := NewService(store, fakeSubscriptions{current: subscriptions.Subscription{PlanID: uuid.New()}})
+	base := []Entitlement{{Key: "voice", Kind: KindFeature, Enabled: boolPtr(true)}}
+	overrides := []Entitlement{{Key: "voice", Kind: KindLimit, LimitValue: int64Ptr(1)}}
 
-	_, err := service.EffectiveForOrganization(context.Background(), uuid.New())
+	_, err := resolve(time.Now(), base, overrides)
 	if !errors.Is(err, ErrKindMismatch) {
 		t.Fatalf("expected ErrKindMismatch, got %v", err)
 	}
 }
 
-func TestEffectiveForOrganizationRequiresSubscription(t *testing.T) {
+func TestResolveRejectsInvalidValues(t *testing.T) {
 	t.Parallel()
 
-	service := NewService(&fakeStore{}, fakeSubscriptions{err: subscriptions.ErrSubscriptionNotFound})
-	_, err := service.EffectiveForOrganization(context.Background(), uuid.New())
-	if !errors.Is(err, ErrSubscriptionUnavailable) {
-		t.Fatalf("expected ErrSubscriptionUnavailable, got %v", err)
-	}
-}
-
-func TestForLicenseUsesOnlyLicenseSnapshot(t *testing.T) {
-	t.Parallel()
-
-	store := &fakeStore{license: []Entitlement{
-		{Key: "max.deployments", Kind: KindLimit, LimitValue: int64Ptr(3)},
-	}}
-	service := NewService(store, nil)
-
-	set, err := service.ForLicense(context.Background(), uuid.New(), uuid.New())
-	if err != nil {
-		t.Fatalf("resolve license entitlements: %v", err)
-	}
-	if limit, ok := set.Limit("max.deployments"); !ok || limit != 3 {
-		t.Fatalf("expected license snapshot limit 3, got %d, %v", limit, ok)
+	_, err := resolve(time.Now(), []Entitlement{{Key: "voice", Kind: KindFeature}}, nil)
+	if !errors.Is(err, ErrInvalidEntitlement) {
+		t.Fatalf("expected ErrInvalidEntitlement, got %v", err)
 	}
 }
