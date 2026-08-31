@@ -50,6 +50,7 @@ func TestResolveOutboundUsesEligibleEndpoint(t *testing.T) {
 			OrganizationID:      organizationID,
 			CarrierConnectionID: connectionID,
 		},
+		phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true, CarrierConnectionID: &connectionID},
 		endpoints: []sqlc.TrunkEndpoint{{
 			ID:        endpointID,
 			TrunkID:   trunkID,
@@ -95,6 +96,7 @@ func TestResolveOutboundDistributesByWeightAtBestPriority(t *testing.T) {
 				OrganizationID:      organizationID,
 				CarrierConnectionID: uuid.New(),
 			},
+			phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true},
 			endpoints: []sqlc.TrunkEndpoint{
 				{ID: primaryA, TrunkID: trunkID, Host: "primary-a.example", Port: 5060, Transport: "udp", Priority: 10, Weight: 20},
 				{ID: primaryB, TrunkID: trunkID, Host: "primary-b.example", Port: 5060, Transport: "udp", Priority: 10, Weight: 80},
@@ -108,6 +110,7 @@ func TestResolveOutboundDistributesByWeightAtBestPriority(t *testing.T) {
 			return 20, nil
 		},
 	}
+	resolver.repo.(*fakeRouteStore).phone.CarrierConnectionID = &resolver.repo.(*fakeRouteStore).trunk.CarrierConnectionID
 
 	decision, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
 		OrganizationID: organizationID,
@@ -181,6 +184,7 @@ func TestResolveOutboundReturnsNoRouteWithoutEndpoint(t *testing.T) {
 	resolver := &Resolver{repo: &fakeRouteStore{
 		trunk: sqlc.Trunk{ID: trunkID, OrganizationID: organizationID},
 	}}
+	resolver.repo.(*fakeRouteStore).phone = sqlc.PhoneNumber{VoiceEnabled: true, CarrierConnectionID: &resolver.repo.(*fakeRouteStore).trunk.CarrierConnectionID}
 
 	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
 		OrganizationID: organizationID,
@@ -190,6 +194,22 @@ func TestResolveOutboundReturnsNoRouteWithoutEndpoint(t *testing.T) {
 	})
 	if !errors.Is(err, ErrNoRoute) {
 		t.Fatalf("error = %v, want %v", err, ErrNoRoute)
+	}
+}
+
+func TestResolveOutboundRejectsCallerIdentityFromAnotherCarrier(t *testing.T) {
+	organizationID, trunkID := uuid.New(), uuid.New()
+	connectionID, otherConnectionID := uuid.New(), uuid.New()
+	resolver := &Resolver{repo: &fakeRouteStore{
+		trunk: sqlc.Trunk{ID: trunkID, OrganizationID: organizationID, CarrierConnectionID: connectionID},
+		phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true, CarrierConnectionID: &otherConnectionID},
+	}}
+
+	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
+		OrganizationID: organizationID, TrunkID: trunkID, From: "+233200000001", To: "+14155550100",
+	})
+	if !errors.Is(err, ErrCallerIdentity) {
+		t.Fatalf("error = %v, want %v", err, ErrCallerIdentity)
 	}
 }
 

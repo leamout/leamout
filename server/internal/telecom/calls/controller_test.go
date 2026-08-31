@@ -74,6 +74,10 @@ func TestEgressVariablesBindResolvedCarrierConnection(t *testing.T) {
 	connectionID := uuid.New()
 	variables, err := egressVariables(OriginateRequest{
 		CarrierConnectionID: connectionID,
+		Privacy:             true,
+		DTMFMode:            "info",
+		Codecs:              []string{"PCMU", "OPUS"},
+		MediaEncryption:     "sdes_srtp",
 		Variables: map[string]string{
 			routeURIHeaderVar:          "sip:attacker.invalid",
 			carrierConnectionHeaderVar: uuid.NewString(),
@@ -87,6 +91,9 @@ func TestEgressVariablesBindResolvedCarrierConnection(t *testing.T) {
 	}
 	if got := variables[carrierConnectionHeaderVar]; got != connectionID.String() {
 		t.Fatalf("carrier connection metadata = %q, want %q", got, connectionID)
+	}
+	if variables[privacyHeaderVar] != "id" || variables[dtmfTypeVar] != "info" || variables[codecStringVar] != "PCMU,OPUS" || variables[mediaEncryptionHeaderVar] != "sdes_srtp" {
+		t.Fatalf("unexpected protected media variables: %+v", variables)
 	}
 
 	if _, err := egressVariables(OriginateRequest{}, "sip:carrier.example"); err == nil {

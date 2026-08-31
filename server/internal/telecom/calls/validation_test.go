@@ -19,6 +19,10 @@ func TestValidateCreateRequest(t *testing.T) {
 		{name: "missing originator", req: CreateCallRequest{TrunkID: trunkID, To: "1001"}},
 		{name: "missing trunk", req: CreateCallRequest{From: "1000", To: "1001"}},
 		{name: "nil application rejected", req: CreateCallRequest{ApplicationID: ptr(uuid.Nil), TrunkID: trunkID, From: "1000", To: "1001"}},
+		{name: "invalid DTMF mode", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", DTMFMode: "inband"}},
+		{name: "unsupported codec", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", Codecs: []string{"G729"}}},
+		{name: "duplicate codec", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", Codecs: []string{"PCMU", "pcmu"}}},
+		{name: "invalid media encryption", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", MediaEncryption: "dtls"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -26,6 +30,13 @@ func TestValidateCreateRequest(t *testing.T) {
 				t.Fatalf("validateCreateRequest() error = %v, want success %t", err, tt.want)
 			}
 		})
+	}
+	request := CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001"}
+	if err := validateCreateRequest(&request); err != nil {
+		t.Fatalf("validate defaults: %v", err)
+	}
+	if request.DTMFMode != "rfc2833" || request.MediaEncryption != "rtp" || len(request.Codecs) != 4 {
+		t.Fatalf("unexpected media defaults: %+v", request)
 	}
 }
 

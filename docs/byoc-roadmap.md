@@ -57,10 +57,10 @@ report success while leaving authentication behavior unchanged.
 
 ## Phase 4 — secure transports and identity
 
-- [ ] Support SIP TLS with hostname verification.
-- [ ] Support customer CA bundles and optional mutual TLS.
-- [ ] Add caller identity, privacy, DTMF, and codec-order policies.
-- [ ] Add SRTP policy independently from SIP TLS.
+- [x] Support SIP TLS with SNI, verified certificate chains, and hostname-verified health probes.
+- [x] Support deployment-managed customer CA bundles and optional mutual TLS identity.
+- [x] Enforce caller identity ownership and per-call privacy, DTMF, and codec-order policies.
+- [x] Apply SDES-SRTP media policy independently from SIP TLS transport.
 
 ## Phase C — secure WebRTC
 

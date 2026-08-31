@@ -180,6 +180,11 @@ services:
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
+      - "5061:5061/tcp"
+    volumes:
+      - ${OPENSIPS_TLS_CERTIFICATE_PATH:?OPENSIPS_TLS_CERTIFICATE_PATH is required}:/etc/opensips/tls/fullchain.pem:ro
+      - ${OPENSIPS_TLS_PRIVATE_KEY_PATH:?OPENSIPS_TLS_PRIVATE_KEY_PATH is required}:/etc/opensips/tls/privkey.pem:ro
+      - ${OPENSIPS_TLS_CA_BUNDLE_PATH:?OPENSIPS_TLS_CA_BUNDLE_PATH is required}:/etc/opensips/tls/carrier-ca.pem:ro
     depends_on:
       postgres:
         condition: service_healthy

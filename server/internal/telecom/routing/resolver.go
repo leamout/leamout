@@ -41,6 +41,16 @@ func (r *Resolver) resolveOutbound(
 		}
 		return OutboundDecision{}, err
 	}
+	caller, err := r.repo.GetPhoneNumber(ctx, req.OrganizationID, req.From)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return OutboundDecision{}, ErrCallerIdentity
+		}
+		return OutboundDecision{}, err
+	}
+	if !caller.VoiceEnabled || caller.CarrierConnectionID == nil || *caller.CarrierConnectionID != trunk.CarrierConnectionID {
+		return OutboundDecision{}, ErrCallerIdentity
+	}
 
 	endpoints, err := r.repo.ListOutboundEndpoints(ctx, req.OrganizationID, req.TrunkID)
 	if err != nil {

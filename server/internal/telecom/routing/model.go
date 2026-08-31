@@ -10,6 +10,7 @@ var (
 	ErrNoRoute         = errors.New("no route available")
 	ErrCarrierMismatch = errors.New("carrier connection does not own phone number")
 	ErrTenantMismatch  = errors.New("route organization mismatch")
+	ErrCallerIdentity  = errors.New("caller identity is not authorized for carrier route")
 )
 
 type OutboundRequest struct {

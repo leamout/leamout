@@ -76,6 +76,10 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		Destination:         route.To,
 		CallerID:            route.From,
 		Variables:           req.Variables,
+		Privacy:             req.Privacy,
+		DTMFMode:            req.DTMFMode,
+		Codecs:              req.Codecs,
+		MediaEncryption:     req.MediaEncryption,
 	})
 	if err != nil {
 		return sqlc.Call{}, mediaError("originate call", err)
@@ -351,6 +355,9 @@ func (s *Service) controlCall(ctx context.Context, org, id uuid.UUID) (sqlc.Call
 func routeError(err error) error {
 	if errors.Is(err, routing.ErrNoRoute) {
 		return apperror.NewConflict("no outbound route available")
+	}
+	if errors.Is(err, routing.ErrCallerIdentity) {
+		return apperror.NewForbidden("caller identity is not authorized for this trunk")
 	}
 	return apperror.NewInternal("resolve outbound route", err)
 }
