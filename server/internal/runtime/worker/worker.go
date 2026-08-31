@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -99,14 +98,6 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	endpointHealth, err := routing.NewEndpointHealthJob(
 		queries,
 		routing.NewSIPOptionsProber(),
-		routing.EndpointHealthConfig{
-			Interval:         10 * time.Second,
-			ProbeTimeout:     2 * time.Second,
-			Cooldown:         30 * time.Second,
-			FailureThreshold: 3,
-			BatchSize:        100,
-			Concurrency:      10,
-		},
 	)
 	if err != nil {
 		_ = freeSwitch.Close()
