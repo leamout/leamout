@@ -281,7 +281,7 @@ func NewModules(
 		Trunks: TrunksModule{
 			Repository: trunksRepository,
 			Service:    trunksService,
-			Handler:    trunks.NewHandler(trunksService, db),
+			Handler:    trunks.NewHandler(trunksService),
 		},
 		Webhooks: WebhooksModule{
 			Repository: webhooksRepository,
