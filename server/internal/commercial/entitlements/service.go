@@ -146,7 +146,19 @@ func (s *Service) EffectiveForOrganizationAt(ctx context.Context, organizationID
 		}
 		return EntitlementSet{}, err
 	}
-	plan, err := s.store.ListPlan(ctx, current.PlanID)
+	return s.EffectiveForOrganizationPlanAt(ctx, organizationID, current.PlanID, at)
+}
+
+// EffectiveForOrganizationPlanAt resolves organization capabilities against an already-selected plan.
+// Callers that already resolved the current subscription can use this method to keep one state read coherent.
+func (s *Service) EffectiveForOrganizationPlanAt(ctx context.Context, organizationID, planID uuid.UUID, at time.Time) (EntitlementSet, error) {
+	if err := validateID(organizationID, ErrOrganizationIDRequired); err != nil {
+		return EntitlementSet{}, err
+	}
+	if err := validateID(planID, ErrPlanIDRequired); err != nil {
+		return EntitlementSet{}, err
+	}
+	plan, err := s.store.ListPlan(ctx, planID)
 	if err != nil {
 		return EntitlementSet{}, err
 	}
