@@ -34,7 +34,7 @@ func (f *fakeStore) ListOrganization(context.Context, uuid.UUID) ([]Entitlement,
 func (f *fakeStore) ListLicense(context.Context, uuid.UUID, uuid.UUID) ([]Entitlement, error) {
 	return f.license, nil
 }
-func (f *fakeStore) DeletePlan(context.Context, uuid.UUID, uuid.UUID) error { return nil }
+func (f *fakeStore) DeletePlan(context.Context, uuid.UUID, uuid.UUID) error         { return nil }
 func (f *fakeStore) DeleteOrganization(context.Context, uuid.UUID, uuid.UUID) error { return nil }
 func (f *fakeStore) DeleteLicense(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
 	return nil
