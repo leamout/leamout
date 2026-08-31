@@ -56,7 +56,7 @@ func (s *Signer) SignV1(claims LicenseClaimsV1) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	signature := ed25519.Sign(s.privateKey, signatureMessageV1(payload))
+	signature := ed25519.Sign(s.privateKey, signatureMessageV1(s.keyID, payload))
 	return json.Marshal(SignedLicenseV1{
 		Version:   SignedLicenseVersionV1,
 		Algorithm: SignatureAlgorithmV1,
@@ -97,7 +97,7 @@ func (k *Keyring) VerifyV1(artifact []byte, expectedDeploymentID string, at time
 	if !ok {
 		return LicenseClaimsV1{}, ErrSigningKeyUnavailable
 	}
-	if !ed25519.Verify(publicKey, signatureMessageV1(payload), signature) {
+	if !ed25519.Verify(publicKey, signatureMessageV1(envelope.KeyID, payload), signature) {
 		return LicenseClaimsV1{}, ErrInvalidSignature
 	}
 	claims, err := unmarshalClaimsV1(payload)
@@ -154,9 +154,11 @@ func decodeArtifactV1(artifact []byte) (SignedLicenseV1, []byte, []byte, error) 
 	return envelope, payload, signature, nil
 }
 
-func signatureMessageV1(payload []byte) []byte {
-	message := make([]byte, 0, len(signatureDomainV1)+len(payload))
+func signatureMessageV1(keyID string, payload []byte) []byte {
+	message := make([]byte, 0, len(signatureDomainV1)+len(keyID)+1+len(payload))
 	message = append(message, signatureDomainV1...)
+	message = append(message, keyID...)
+	message = append(message, 0)
 	message = append(message, payload...)
 	return message
 }
