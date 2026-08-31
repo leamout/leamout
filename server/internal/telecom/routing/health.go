@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"golang.org/x/sync/errgroup"
@@ -35,9 +36,12 @@ type endpointHealthStore interface {
 }
 
 type EndpointHealthJob struct {
-	store  endpointHealthStore
-	prober EndpointProber
-	now    func() time.Time
+	store   endpointHealthStore
+	prober  EndpointProber
+	now     func() time.Time
+	metrics interface {
+		Probe(context.Context, uuid.UUID, uuid.UUID, bool, float64)
+	}
 }
 
 func NewEndpointHealthJob(store endpointHealthStore, prober EndpointProber) (*EndpointHealthJob, error) {
@@ -45,6 +49,12 @@ func NewEndpointHealthJob(store endpointHealthStore, prober EndpointProber) (*En
 		return nil, fmt.Errorf("endpoint health store and prober are required")
 	}
 	return &EndpointHealthJob{store: store, prober: prober, now: time.Now}, nil
+}
+
+func (j *EndpointHealthJob) SetMetrics(metrics interface {
+	Probe(context.Context, uuid.UUID, uuid.UUID, bool, float64)
+}) {
+	j.metrics = metrics
 }
 
 func (j *EndpointHealthJob) Run(ctx context.Context) error {
@@ -115,6 +125,9 @@ func (j *EndpointHealthJob) checkEndpoint(ctx context.Context, checkedAt time.Ti
 	}
 	if err != nil {
 		return fmt.Errorf("persist carrier endpoint %s health: %w", endpoint.ID, err)
+	}
+	if j.metrics != nil {
+		j.metrics.Probe(ctx, endpoint.TrunkID, endpoint.ID, probeErr == nil, result.Latency.Seconds())
 	}
 	return nil
 }

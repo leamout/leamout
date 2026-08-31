@@ -76,7 +76,11 @@ report success while leaving authentication behavior unchanged.
   - [x] Calculate daily answered seconds from durable call timestamps.
   - [x] Fail closed when Redis or durable usage state is unavailable.
   - [x] Release, renew, and reconstruct leases through lifecycle reconciliation.
-- [ ] Publish metrics per carrier connection, trunk, and endpoint.
+- [x] Publish metrics per carrier connection, trunk, and endpoint.
+  - [x] Count attempted, answered, failed, and completed calls.
+  - [x] Count quota rejections and primary/failover endpoint selections.
+  - [x] Publish endpoint probe results, health, and latency.
+  - [x] Bound resource-attributed Prometheus series cardinality.
 - [ ] Add audit events for credential rotation and number reassignment.
 - [ ] Add carrier test-call and configuration-validation workflows.
   - [x] Add an on-demand configuration validator with bounded SIP OPTIONS probes.

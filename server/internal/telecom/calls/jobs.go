@@ -45,7 +45,10 @@ type ReconciliationJob struct {
 	config    ReconciliationJobConfig
 	now       func() time.Time
 	admission *AdmissionController
+	metrics   TelecomMetrics
 }
+
+func (j *ReconciliationJob) SetMetrics(metrics TelecomMetrics) { j.metrics = metrics }
 
 func NewReconciliationJob(
 	repo reconciliationRepository,
@@ -156,6 +159,13 @@ func (j *ReconciliationJob) Reconcile(ctx context.Context) error {
 		}
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("reconcile call %s: %w", call.ID, err)
+		}
+		if err == nil && j.metrics != nil && call.CarrierConnectionID != nil {
+			state := "failed"
+			if CallState(call.State) == StateAnswered || CallState(call.State) == StateActive {
+				state = "completed"
+			}
+			j.metrics.Call(ctx, state, *call.CarrierConnectionID, uuidValue(call.TrunkID), uuidValue(call.TrunkEndpointID))
 		}
 	}
 

@@ -15,6 +15,7 @@ import (
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
+	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
@@ -87,6 +88,8 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	queries := sqlc.New(db)
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
+	telecomMetrics := metrics.New(redisClient)
+	routeResolver.SetMetrics(telecomMetrics)
 	routingService := routing.NewService(routeResolver)
 	callsRepository := calls.NewRepository(db)
 	controller := calls.NewFreeSWITCHController(freeSwitch)
@@ -99,6 +102,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize call admission: %w", err)
 	}
 	callsService := calls.NewService(callsRepository, controller, routingService, callAdmission)
+	callsService.SetMetrics(telecomMetrics)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)
@@ -116,6 +120,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
 	}
+	callReconciliation.SetMetrics(telecomMetrics)
 	endpointHealth, err := routing.NewEndpointHealthJob(
 		queries,
 		routing.NewSIPOptionsProber(),
@@ -127,6 +132,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize carrier endpoint health job: %w", err)
 	}
+	endpointHealth.SetMetrics(telecomMetrics)
 
 	recordingReconciliation, err := recordings.NewReconciliationJob(
 		recordingsRepository,

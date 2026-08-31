@@ -87,7 +87,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	conferenceController := conferences.NewFreeSWITCHController(freeSwitch)
 
 	logger := logging.New()
-	metricsRegistry := metrics.New()
+	metricsRegistry := metrics.New(redisClient)
 
 	credentialCipher, err := secrets.New(cfg.CarrierCredentialKey)
 	if err != nil {
@@ -127,6 +127,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	)
 
 	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
+	router.Handle("/metrics", metrics.Handler(metricsRegistry))
 	RegisterRoutes(router, modules)
 
 	return &Server{
@@ -173,6 +174,8 @@ func NewModules(
 
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
+	telecomMetrics := metrics.New(redisClient)
+	routeResolver.SetMetrics(telecomMetrics)
 	routingService := routing.NewService(routeResolver)
 
 	callsRepository := calls.NewRepository(db)
@@ -181,6 +184,7 @@ func NewModules(
 		return Modules{}, err
 	}
 	callsService := calls.NewService(callsRepository, callsController, routingService, callAdmission)
+	callsService.SetMetrics(telecomMetrics)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)

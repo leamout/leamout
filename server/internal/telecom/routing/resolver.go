@@ -25,6 +25,15 @@ type routeStore interface {
 type Resolver struct {
 	repo       routeStore
 	pickWeight func(int64) (int64, error)
+	metrics    interface {
+		EndpointSelection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, bool)
+	}
+}
+
+func (r *Resolver) SetMetrics(metrics interface {
+	EndpointSelection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, bool)
+}) {
+	r.metrics = metrics
 }
 
 func NewResolver(repo *Repository) *Resolver {
@@ -71,6 +80,10 @@ func (r *Resolver) resolveOutbound(
 	endpoint, err := r.selectOutboundEndpoint(endpoints)
 	if err != nil {
 		return OutboundDecision{}, err
+	}
+	if r.metrics != nil {
+		failover := len(endpoints) > 0 && endpoint.Priority > endpoints[0].Priority
+		r.metrics.EndpointSelection(ctx, trunk.CarrierConnectionID, trunk.ID, endpoint.ID, failover)
 	}
 	return OutboundDecision{
 		OrganizationID:      req.OrganizationID,

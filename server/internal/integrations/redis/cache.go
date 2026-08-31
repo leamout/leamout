@@ -190,6 +190,58 @@ func (c *Client) RefreshCallLease(ctx context.Context, prefix, callID string, tt
 	return nil
 }
 
+// IncrementMetric updates a shared bounded metric series. New series are
+// refused once maxSeries is reached, preventing tenant-created resources from
+// causing unbounded label cardinality.
+func (c *Client) IncrementMetric(ctx context.Context, field string, maxSeries int64) error {
+	if ctx == nil || field == "" || maxSeries <= 0 {
+		return fmt.Errorf("metric context, field, and series limit are required")
+	}
+	const script = `
+if redis.call('HEXISTS', KEYS[1], ARGV[1]) == 0 and redis.call('HLEN', KEYS[1]) >= tonumber(ARGV[2]) then
+  return 0
+end
+redis.call('HINCRBY', KEYS[1], ARGV[1], 1)
+return 1
+`
+	if _, err := c.client.Eval(ctx, script, []string{"telecom:metrics:counters"}, field, maxSeries).Result(); err != nil {
+		return fmt.Errorf("increment shared telecom metric: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) SetMetricGauge(ctx context.Context, field string, value float64, maxSeries int64) error {
+	if ctx == nil || field == "" || maxSeries <= 0 {
+		return fmt.Errorf("metric context, field, and series limit are required")
+	}
+	const script = `
+if redis.call('HEXISTS', KEYS[1], ARGV[1]) == 0 and redis.call('HLEN', KEYS[1]) >= tonumber(ARGV[3]) then
+  return 0
+end
+redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+return 1
+`
+	if _, err := c.client.Eval(ctx, script, []string{"telecom:metrics:gauges"}, field, value, maxSeries).Result(); err != nil {
+		return fmt.Errorf("set shared telecom metric gauge: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) TelecomMetrics(ctx context.Context) (map[string]string, map[string]string, error) {
+	if ctx == nil {
+		return nil, nil, fmt.Errorf("metric context is required")
+	}
+	counters, err := c.client.HGetAll(ctx, "telecom:metrics:counters").Result()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read shared telecom counters: %w", err)
+	}
+	gauges, err := c.client.HGetAll(ctx, "telecom:metrics:gauges").Result()
+	if err != nil {
+		return nil, nil, fmt.Errorf("read shared telecom gauges: %w", err)
+	}
+	return counters, gauges, nil
+}
+
 // GetJSON retrieves a JSON value into dst.
 func (c *Client) GetJSON(ctx context.Context, key string, dst any) error {
 	if dst == nil {
