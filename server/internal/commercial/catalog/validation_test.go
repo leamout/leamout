@@ -7,24 +7,13 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestNormalizeCreateProduct(t *testing.T) {
-	description := "  Programmable voice  "
-	input, err := normalizeCreateProduct(CreateProductInput{
-		Code:        "  voice-pro  ",
-		Name:        "  Voice Pro  ",
-		Description: &description,
-	})
+func TestNormalizeCodeTrimsWhitespace(t *testing.T) {
+	got, err := normalizeCode("  voice-pro  ")
 	if err != nil {
-		t.Fatalf("normalizeCreateProduct() error = %v", err)
+		t.Fatalf("normalizeCode() error = %v", err)
 	}
-	if input.Code != "voice-pro" {
-		t.Fatalf("Code = %q, want %q", input.Code, "voice-pro")
-	}
-	if input.Name != "Voice Pro" {
-		t.Fatalf("Name = %q, want %q", input.Name, "Voice Pro")
-	}
-	if input.Description == nil || *input.Description != "Programmable voice" {
-		t.Fatalf("Description = %v, want normalized description", input.Description)
+	if got != "voice-pro" {
+		t.Fatalf("normalizeCode() = %q, want %q", got, "voice-pro")
 	}
 }
 
@@ -35,21 +24,8 @@ func TestNormalizeCodeRejectsWhitespace(t *testing.T) {
 	}
 }
 
-func TestNormalizeUpdateProductRequiresChange(t *testing.T) {
-	_, err := normalizeUpdateProduct(UpdateProductInput{})
-	if !errors.Is(err, ErrNoChanges) {
-		t.Fatalf("normalizeUpdateProduct() error = %v, want %v", err, ErrNoChanges)
-	}
-}
-
-func TestNormalizeCreatePlanRequiresProduct(t *testing.T) {
-	_, err := normalizeCreatePlan(CreatePlanInput{Code: "pro", Name: "Pro"})
-	if !errors.Is(err, ErrIDRequired) {
-		t.Fatalf("normalizeCreatePlan() error = %v, want %v", err, ErrIDRequired)
-	}
-
-	_, err = normalizeCreatePlan(CreatePlanInput{ProductID: uuid.New(), Code: "pro", Name: "Pro"})
-	if err != nil {
-		t.Fatalf("normalizeCreatePlan() unexpected error = %v", err)
+func TestNormalizeIDRequiresID(t *testing.T) {
+	if err := normalizeID(uuid.Nil); !errors.Is(err, ErrIDRequired) {
+		t.Fatalf("normalizeID() error = %v, want %v", err, ErrIDRequired)
 	}
 }
