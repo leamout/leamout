@@ -79,5 +79,11 @@ jobs:
       - name: Generate sqlc
         run: sqlc generate
 
+      - name: Upload generated sqlc
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-sqlc
+          path: server/internal/database/sqlc
+
       - name: Check generated code
         run: git diff --exit-code -- internal/database/sqlc
