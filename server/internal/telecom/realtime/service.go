@@ -1,11 +1,13 @@
 package realtime
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1" // #nosec G505 -- coturn's TURN REST authentication protocol requires HMAC-SHA1.
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,28 +16,56 @@ import (
 	"github.com/google/uuid"
 )
 
-type Service struct {
-	config Config
-	now    func() time.Time
-	random io.Reader
+// ErrIssueRateLimited indicates that an organization exhausted its shared
+// credential-issuance quota.
+var ErrIssueRateLimited = errors.New("TURN credential issuance rate limit exceeded")
+
+// IssueLimiter coordinates credential quotas across API replicas.
+type IssueLimiter interface {
+	AllowFixedWindow(context.Context, string, int64, time.Duration) (bool, error)
 }
 
-func NewService(config Config) (*Service, error) {
+type Service struct {
+	config  Config
+	now     func() time.Time
+	random  io.Reader
+	limiter IssueLimiter
+}
+
+func NewService(config Config, limiter IssueLimiter) (*Service, error) {
 	for index := range config.URLs {
 		config.URLs[index] = strings.TrimSpace(config.URLs[index])
 	}
 	if err := validateConfig(config); err != nil {
 		return nil, err
 	}
-	return &Service{config: config, now: time.Now, random: rand.Reader}, nil
+	if limiter == nil {
+		return nil, fmt.Errorf("TURN credential issue limiter is required")
+	}
+	return &Service{config: config, now: time.Now, random: rand.Reader, limiter: limiter}, nil
 }
 
 // Issue creates short-lived credentials compatible with coturn's
 // use-auth-secret mechanism. The expiry is encoded as the first username field
 // so coturn can reject the credential without calling the Leamout API.
-func (s *Service) Issue(organizationID uuid.UUID) (ICECredentials, error) {
+func (s *Service) Issue(ctx context.Context, organizationID uuid.UUID) (ICECredentials, error) {
+	if ctx == nil {
+		return ICECredentials{}, fmt.Errorf("context is required")
+	}
 	if organizationID == uuid.Nil {
 		return ICECredentials{}, fmt.Errorf("organization id is required")
+	}
+	allowed, err := s.limiter.AllowFixedWindow(
+		ctx,
+		"ratelimit:turn-credentials:"+organizationID.String(),
+		s.config.IssueLimit,
+		s.config.IssueWindow,
+	)
+	if err != nil {
+		return ICECredentials{}, fmt.Errorf("rate limit TURN credential issuance: %w", err)
+	}
+	if !allowed {
+		return ICECredentials{}, ErrIssueRateLimited
 	}
 
 	nonce := make([]byte, 16)

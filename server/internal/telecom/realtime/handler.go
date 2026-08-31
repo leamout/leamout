@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/leamout/leamout/internal/runtime/middleware"
@@ -26,10 +27,16 @@ func (h *Handler) IssueICECredentials(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credentials, err := h.service.Issue(organizationID)
+	credentials, err := h.service.Issue(r.Context(), organizationID)
 	if err != nil {
+		if errors.Is(err, ErrIssueRateLimited) {
+			httputil.Error(w, apperror.NewTooManyRequests("TURN credential issuance rate limit exceeded"))
+			return
+		}
 		httputil.Error(w, apperror.NewInternal("issue TURN credentials", err))
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
 	httputil.OK(w, credentials)
 }

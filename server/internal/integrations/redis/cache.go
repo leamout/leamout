@@ -69,6 +69,41 @@ func (c *Client) Exists(ctx context.Context, key string) (bool, error) {
 	return count > 0, nil
 }
 
+// AllowFixedWindow atomically increments a bounded, expiring counter and
+// reports whether the request remains within limit. The Lua script ensures
+// every API replica shares the same decision and that counters cannot persist
+// without an expiry after a process failure.
+func (c *Client) AllowFixedWindow(ctx context.Context, key string, limit int64, window time.Duration) (bool, error) {
+	if err := c.validateKey(key); err != nil {
+		return false, err
+	}
+	if ctx == nil {
+		return false, fmt.Errorf("redis context is nil")
+	}
+	if limit <= 0 {
+		return false, fmt.Errorf("rate limit must be positive")
+	}
+	if window <= 0 {
+		return false, fmt.Errorf("rate limit window must be positive")
+	}
+
+	const script = `
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[1])
+end
+if current <= tonumber(ARGV[2]) then
+  return 1
+end
+return 0
+`
+	allowed, err := c.client.Eval(ctx, script, []string{key}, window.Milliseconds(), limit).Bool()
+	if err != nil {
+		return false, fmt.Errorf("apply Redis fixed-window rate limit: %w", err)
+	}
+	return allowed, nil
+}
+
 // GetJSON retrieves a JSON value into dst.
 func (c *Client) GetJSON(ctx context.Context, key string, dst any) error {
 	if dst == nil {

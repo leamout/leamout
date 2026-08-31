@@ -77,6 +77,15 @@ report success while leaving authentication behavior unchanged.
 - [ ] Add carrier test-call and configuration-validation workflows.
 - [ ] Add multi-carrier policy only after single-carrier BYOC is reliable.
 
+## Phase D — production hardening
+
+- [x] Apply a shared Redis rate limit to tenant TURN credential issuance.
+- [x] Include Redis in API readiness and fail closed when quota state is unavailable.
+- [x] Mark credential responses as non-cacheable.
+- [ ] Add graceful drain controls for OpenSIPS, RTPengine, and FreeSWITCH nodes.
+- [ ] Separate public signaling, public media, and private control networks.
+- [ ] Add certificate and shared-secret rotation runbooks and automation.
+
 ## MVP exit criteria
 
 BYOC v1 is complete when an organization can configure a generic SIP carrier, authenticate both directions, assign a DID, complete inbound and outbound calls, rotate credentials, and recover from component restarts without database intervention.

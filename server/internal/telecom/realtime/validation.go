@@ -24,6 +24,12 @@ func validateConfig(config Config) error {
 	if config.TTL <= 0 || config.TTL > maximumCredentialTTL {
 		return fmt.Errorf("TURN credential TTL must be between 1ns and %s", maximumCredentialTTL)
 	}
+	if config.IssueLimit <= 0 {
+		return fmt.Errorf("TURN credential issue limit must be positive")
+	}
+	if config.IssueWindow <= 0 {
+		return fmt.Errorf("TURN credential issue window must be positive")
+	}
 	return nil
 }
 
