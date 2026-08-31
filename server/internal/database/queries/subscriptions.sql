@@ -93,7 +93,7 @@ WHERE s.organization_id = sqlc.arg(organization_id)
             AND p.active = true
       )
   )
-RETURNING s.*;
+RETURNING *;
 
 -- name: SetSubscriptionProvider :one
 UPDATE subscriptions AS s
@@ -107,4 +107,4 @@ WHERE s.organization_id = sqlc.arg(organization_id)
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING s.*;
+RETURNING *;
