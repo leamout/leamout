@@ -27,6 +27,7 @@ type OrganizationState struct {
 	Features       map[string]bool
 	Limits         map[string]int64
 	EffectiveAt    time.Time
+	NextChangeAt   *time.Time
 }
 
 func (s OrganizationState) Enabled(feature string) bool {
