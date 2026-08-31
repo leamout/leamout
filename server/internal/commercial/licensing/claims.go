@@ -110,6 +110,9 @@ func normalizeClaimsV1(claims LicenseClaimsV1) (LicenseClaimsV1, error) {
 		if value < 0 {
 			return LicenseClaimsV1{}, ErrInvalidClaimLimit
 		}
+		if _, exists := features[normalized]; exists {
+			return LicenseClaimsV1{}, ErrDuplicateClaimKey
+		}
 		if _, exists := limits[normalized]; exists {
 			return LicenseClaimsV1{}, ErrDuplicateClaimKey
 		}
@@ -218,6 +221,9 @@ func unmarshalClaimsV1(payload []byte) (LicenseClaimsV1, error) {
 		}
 		if claim.Value < 0 {
 			return LicenseClaimsV1{}, ErrInvalidClaimLimit
+		}
+		if _, exists := features[key]; exists {
+			return LicenseClaimsV1{}, ErrDuplicateClaimKey
 		}
 		if _, exists := limits[key]; exists {
 			return LicenseClaimsV1{}, ErrDuplicateClaimKey
