@@ -1,6 +1,18 @@
 # Subscriptions
 
-Subscriptions connect an organization to a commercial plan and provide the commercial lifecycle used by licensing and managed billing.
+Subscriptions connect an organization to a reusable catalog plan and provide the commercial lifecycle used by entitlement resolution, licensing, and managed billing.
+
+## Module boundary
+
+```text
+catalog
+   ↓
+subscription
+   ↓
+entitlements / state / licensing
+```
+
+`commercial/subscriptions` owns the organization's commercial relationship to a plan. It does not own product/plan definitions, entitlement resolution, license signing, usage pricing, invoices, or payment-provider implementations.
 
 ## Model
 
@@ -41,7 +53,7 @@ Leamout does not currently store `billing_provider` or `provider_customer_id` on
 
 ## Lifecycle
 
-Current states:
+Current states and service-owned transitions:
 
 ```text
 pending
@@ -54,7 +66,23 @@ active
    └──→ expired
 ```
 
-The database constrains valid state names, while service logic should define which transitions are allowed and why.
+`cancelled` and `expired` are terminal states. Re-applying the current state is treated as an idempotent no-op so repeated reconciliation/provider events do not create artificial transition failures.
+
+New subscriptions may start only as `pending` or `active`. The default is `pending`.
+
+## Catalog eligibility
+
+Creating a subscription or changing its plan requires:
+
+```text
+plan.active = true
+        +
+product.active = true
+```
+
+The subscription service checks this through the catalog domain before persistence, while the SQL write path repeats the active plan/product constraint to protect against service or authorization mistakes and races.
+
+A cancelled or expired subscription cannot change plans.
 
 ## Current subscription lookup
 
@@ -76,6 +104,8 @@ Leamout commercial state
 
 External providers are reconciliation sources, not the owner of Leamout's domain model.
 
+Provider references are normalized and persisted as paired values. The `(billing_provider, provider_subscription_id)` pair is globally unique when present.
+
 A provider webhook should normally follow this direction:
 
 ```text
@@ -83,22 +113,34 @@ provider webhook
     ↓
 verify and normalize provider event
     ↓
-reconcile payment/subscription state
+lookup/reconcile Leamout subscription
     ↓
-commercial service rules
+subscription service transition
     ↓
-entitlements / licensing consequences
+entitlements / state / licensing consequences
 ```
 
-It must not directly sign a license.
+It must not directly sign a license or grant entitlements.
 
-## Invariants
+## Period rules
 
-- The organization must be active and not deleted when new subscription state is created or mutated.
-- New subscriptions may use only active plans whose product is active.
-- A plan change should resolve to an active plan/product.
-- Provider subscription identifiers are unique per provider pair.
-- Subscription timestamps must maintain a valid period.
+`starts_at` is immutable after creation in the current model. `renews_at` and `ends_at` may be advanced through subscription period updates.
+
+The following must always hold:
+
+```text
+renews_at >= starts_at
+ends_at >= starts_at
+renews_at <= ends_at   (when both exist)
+```
+
+The current update query treats omitted renewal/end values as "leave unchanged". Explicit clearing of an existing timestamp is intentionally not modeled yet.
+
+## Database defenses
+
+Subscription SQL is organization-scoped for organization-owned reads and mutations. New or changed state requires an active, non-deleted organization. Plan assignment is repeated at SQL level against active plans/products.
+
+This preserves the commercial-domain rule that SQL must enforce ownership and resource validity even when middleware or service authorization fails.
 
 ## Deferred lifecycle fields
 
@@ -110,4 +152,4 @@ cancel_at_period_end
 cancelled_at
 ```
 
-Add these when service behavior requires them rather than encoding a speculative billing lifecycle.
+Add these when concrete service behavior requires them rather than encoding a speculative billing lifecycle.
