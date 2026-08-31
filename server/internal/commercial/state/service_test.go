@@ -27,7 +27,7 @@ func TestOrganizationStateBuildsResolvedState(t *testing.T) {
 		Status:         subscriptions.StatusActive,
 	}
 
-	resolved := organizationState(organizationID, current, set, at)
+	resolved := organizationState(organizationID, current, entitlements.Resolution{Set: set}, at)
 	if resolved.OrganizationID != organizationID {
 		t.Fatalf("OrganizationID = %v, want %v", resolved.OrganizationID, organizationID)
 	}
@@ -43,11 +43,43 @@ func TestOrganizationStateBuildsResolvedState(t *testing.T) {
 	if resolved.EffectiveAt != at {
 		t.Fatalf("EffectiveAt = %v, want %v", resolved.EffectiveAt, at)
 	}
+	if resolved.NextChangeAt != nil {
+		t.Fatalf("NextChangeAt = %v, want nil", resolved.NextChangeAt)
+	}
 	if !resolved.Enabled("recording.enabled") {
 		t.Fatal("expected recording.enabled to be enabled")
 	}
 	if limit, ok := resolved.Limit("max.concurrent.calls"); !ok || limit != 25 {
 		t.Fatalf("Limit(max.concurrent.calls) = %d, %v, want 25, true", limit, ok)
+	}
+}
+
+func TestOrganizationStateUsesEarliestKnownChange(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 8, 31, 10, 0, 0, 0, time.UTC)
+	entitlementChange := at.Add(time.Hour)
+	subscriptionEnd := at.Add(2 * time.Hour)
+	resolved := organizationState(
+		uuid.New(),
+		subscriptions.Subscription{
+			ID:     uuid.New(),
+			PlanID: uuid.New(),
+			Status: subscriptions.StatusActive,
+			EndsAt: &subscriptionEnd,
+		},
+		entitlements.Resolution{
+			Set: entitlements.EntitlementSet{
+				Features: map[entitlements.Feature]bool{},
+				Limits:   map[string]int64{},
+			},
+			NextChangeAt: &entitlementChange,
+		},
+		at,
+	)
+
+	if resolved.NextChangeAt == nil || !resolved.NextChangeAt.Equal(entitlementChange) {
+		t.Fatalf("NextChangeAt = %v, want %v", resolved.NextChangeAt, entitlementChange)
 	}
 }
 
@@ -58,7 +90,12 @@ func TestOrganizationStateDoesNotAliasEntitlementMaps(t *testing.T) {
 		Features: map[entitlements.Feature]bool{"recording.enabled": true},
 		Limits:   map[string]int64{"max.concurrent.calls": 25},
 	}
-	resolved := organizationState(uuid.New(), subscriptions.Subscription{ID: uuid.New(), PlanID: uuid.New(), Status: subscriptions.StatusActive}, set, time.Now())
+	resolved := organizationState(
+		uuid.New(),
+		subscriptions.Subscription{ID: uuid.New(), PlanID: uuid.New(), Status: subscriptions.StatusActive},
+		entitlements.Resolution{Set: set},
+		time.Now(),
+	)
 
 	resolved.Features["recording.enabled"] = false
 	resolved.Limits["max.concurrent.calls"] = 1
@@ -98,6 +135,9 @@ func TestUnsubscribedStateIsKnownCommercialState(t *testing.T) {
 	}
 	if resolved.EffectiveAt != at {
 		t.Fatalf("EffectiveAt = %v, want %v", resolved.EffectiveAt, at)
+	}
+	if resolved.NextChangeAt != nil {
+		t.Fatalf("NextChangeAt = %v, want nil", resolved.NextChangeAt)
 	}
 }
 
