@@ -52,7 +52,7 @@ func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]Subs
 	return result, nil
 }
 
-func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Subscription, error) {
+func (r *Repository) Create(ctx context.Context, organizationID, planID uuid.UUID, input CreateInput) (Subscription, error) {
 	status := (*string)(nil)
 	if input.Status != nil {
 		value := string(*input.Status)
@@ -70,7 +70,8 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 		EndsAt:                 pgconv.NullableTimestamptz(input.EndsAt),
 		BillingProvider:        provider,
 		ProviderSubscriptionID: providerID,
-		PlanID:                 input.PlanID,
+		PlanID:                 planID,
+		PriceID:                input.PriceID,
 		OrganizationID:         organizationID,
 	})
 	if err != nil {
@@ -79,20 +80,21 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 	return subscriptionFromRow(row), nil
 }
 
-func (r *Repository) UpdatePlan(ctx context.Context, organizationID, id, planID uuid.UUID) (Subscription, error) {
-	row, err := r.queries.UpdateSubscription(ctx, sqlc.UpdateSubscriptionParams{
-		PlanID:         &planID,
+func (r *Repository) UpdatePrice(ctx context.Context, organizationID, id, priceID, planID uuid.UUID) (Subscription, error) {
+	row, err := r.queries.ChangeSubscriptionPrice(ctx, sqlc.ChangeSubscriptionPriceParams{
 		OrganizationID: organizationID,
 		ID:             id,
+		PriceID:        priceID,
+		PlanID:         planID,
 	})
 	if err != nil {
 		return Subscription{}, mapWriteError(err)
 	}
-	return subscriptionFromUpdateRow(row), nil
+	return subscriptionFromRow(row), nil
 }
 
 func (r *Repository) UpdatePeriod(ctx context.Context, organizationID, id uuid.UUID, input PeriodUpdate) (Subscription, error) {
-	row, err := r.queries.UpdateSubscription(ctx, sqlc.UpdateSubscriptionParams{
+	row, err := r.queries.UpdateSubscriptionPeriod(ctx, sqlc.UpdateSubscriptionPeriodParams{
 		RenewsAt:       pgconv.NullableTimestamptz(input.RenewsAt),
 		EndsAt:         pgconv.NullableTimestamptz(input.EndsAt),
 		OrganizationID: organizationID,
@@ -101,7 +103,7 @@ func (r *Repository) UpdatePeriod(ctx context.Context, organizationID, id uuid.U
 	if err != nil {
 		return Subscription{}, mapWriteError(err)
 	}
-	return subscriptionFromUpdateRow(row), nil
+	return subscriptionFromRow(row), nil
 }
 
 // UpdateStatus atomically applies a transition only when the persisted status still
@@ -135,7 +137,7 @@ func (r *Repository) SetProvider(ctx context.Context, organizationID, id uuid.UU
 	if err != nil {
 		return Subscription{}, mapWriteError(err)
 	}
-	return subscriptionFromProviderRow(row), nil
+	return subscriptionFromRow(row), nil
 }
 
 func (r *Repository) GetByProvider(ctx context.Context, reference ProviderReference) (Subscription, error) {
@@ -156,6 +158,7 @@ func subscriptionFromRow(row sqlc.Subscription) Subscription {
 		ID:                     row.ID,
 		OrganizationID:         row.OrganizationID,
 		PlanID:                 row.PlanID,
+		PriceID:                row.PriceID,
 		Status:                 Status(row.Status),
 		StartsAt:               pgconv.TimestamptzToTime(row.StartsAt),
 		RenewsAt:               pgconv.TimestamptzToTimePtr(row.RenewsAt),
@@ -164,38 +167,6 @@ func subscriptionFromRow(row sqlc.Subscription) Subscription {
 		ProviderSubscriptionID: row.ProviderSubscriptionID,
 		CreatedAt:              pgconv.TimestamptzToTime(row.CreatedAt),
 		UpdatedAt:              pgconv.TimestamptzToTime(row.UpdatedAt),
-	}
-}
-
-func subscriptionFromUpdateRow(row sqlc.UpdateSubscriptionRow) Subscription {
-	return Subscription{
-		ID:                     row.ID_2,
-		OrganizationID:         row.OrganizationID,
-		PlanID:                 row.PlanID,
-		Status:                 Status(row.Status_2),
-		StartsAt:               pgconv.TimestamptzToTime(row.StartsAt),
-		RenewsAt:               pgconv.TimestamptzToTimePtr(row.RenewsAt),
-		EndsAt:                 pgconv.TimestamptzToTimePtr(row.EndsAt),
-		BillingProvider:        row.BillingProvider,
-		ProviderSubscriptionID: row.ProviderSubscriptionID,
-		CreatedAt:              pgconv.TimestamptzToTime(row.CreatedAt_2),
-		UpdatedAt:              pgconv.TimestamptzToTime(row.UpdatedAt_2),
-	}
-}
-
-func subscriptionFromProviderRow(row sqlc.SetSubscriptionProviderRow) Subscription {
-	return Subscription{
-		ID:                     row.ID_2,
-		OrganizationID:         row.OrganizationID,
-		PlanID:                 row.PlanID,
-		Status:                 Status(row.Status_2),
-		StartsAt:               pgconv.TimestamptzToTime(row.StartsAt),
-		RenewsAt:               pgconv.TimestamptzToTimePtr(row.RenewsAt),
-		EndsAt:                 pgconv.TimestamptzToTimePtr(row.EndsAt),
-		BillingProvider:        row.BillingProvider,
-		ProviderSubscriptionID: row.ProviderSubscriptionID,
-		CreatedAt:              pgconv.TimestamptzToTime(row.CreatedAt_2),
-		UpdatedAt:              pgconv.TimestamptzToTime(row.UpdatedAt_2),
 	}
 }
 
