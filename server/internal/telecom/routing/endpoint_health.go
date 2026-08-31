@@ -196,7 +196,7 @@ func (p *SIPOptionsProber) Probe(ctx context.Context, endpoint sqlc.TrunkEndpoin
 	if err != nil {
 		return ProbeResult{Latency: p.now().Sub(started)}, fmt.Errorf("connect SIP endpoint: %w", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)

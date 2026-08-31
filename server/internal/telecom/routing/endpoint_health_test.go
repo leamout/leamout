@@ -77,11 +77,15 @@ func TestEndpointHealthJobPersistsSuccessAndCircuitBreakerFailure(t *testing.T) 
 }
 
 func TestSIPOptionsProberAcceptsReachableSIPResponse(t *testing.T) {
-	listener, err := net.ListenPacket("udp", "127.0.0.1:0")
+	listener, err := (&net.ListenConfig{}).ListenPacket(context.Background(), "udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen UDP: %v", err)
 	}
-	defer listener.Close()
+	t.Cleanup(func() {
+		if err := listener.Close(); err != nil {
+			t.Errorf("close UDP listener: %v", err)
+		}
+	})
 
 	received := make(chan string, 1)
 	go func() {
