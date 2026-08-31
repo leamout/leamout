@@ -1,22 +1,3 @@
--- name: CreatePlan :one
-INSERT INTO plans (
-    product_id,
-    code,
-    name,
-    description,
-    active
-)
-SELECT
-    p.id AS product_id,
-    sqlc.arg(code) AS code,
-    sqlc.arg(name) AS name,
-    sqlc.narg(description) AS description,
-    COALESCE(sqlc.narg(active), true) AS active
-FROM products AS p
-WHERE p.id = sqlc.arg(product_id)
-  AND p.active = true
-RETURNING *;
-
 -- name: GetPlanByID :one
 SELECT *
 FROM plans
@@ -43,20 +24,3 @@ WHERE pl.product_id = sqlc.arg(product_id)
   AND pl.active = true
   AND p.active = true
 ORDER BY pl.created_at DESC;
-
--- name: UpdatePlan :one
-UPDATE plans AS pl
-SET
-    code = COALESCE(sqlc.narg(code), pl.code),
-    name = COALESCE(sqlc.narg(name), pl.name),
-    description = COALESCE(sqlc.narg(description), pl.description),
-    active = COALESCE(sqlc.narg(active), pl.active),
-    updated_at = NOW()
-FROM products AS p
-WHERE pl.id = sqlc.arg(id)
-  AND p.id = pl.product_id
-  AND (
-      COALESCE(sqlc.narg(active), pl.active) = false
-      OR p.active = true
-  )
-RETURNING pl.*;
