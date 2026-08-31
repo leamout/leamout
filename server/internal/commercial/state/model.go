@@ -1,7 +1,6 @@
 package state
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,10 +15,7 @@ const (
 	StandingPastDue      Standing = "past_due"
 )
 
-var (
-	ErrOrganizationIDRequired = errors.New("organization id is required")
-	ErrUnavailable            = errors.New("commercial state unavailable")
-)
+var ErrOrganizationIDRequired = errors.New("organization id is required")
 
 // OrganizationState is the resolved commercial state consumed by operational modules.
 type OrganizationState struct {
