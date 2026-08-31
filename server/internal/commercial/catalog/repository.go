@@ -3,6 +3,7 @@ package catalog
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -11,7 +12,7 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
-// Repository reads durable product and plan catalog state.
+// Repository reads durable product, plan, and price catalog state.
 type Repository struct {
 	queries *sqlc.Queries
 }
@@ -104,6 +105,40 @@ func (r *Repository) ListPlans(ctx context.Context, productID uuid.UUID, activeO
 	return plans, nil
 }
 
+func (r *Repository) GetPrice(ctx context.Context, id uuid.UUID) (Price, error) {
+	row, err := r.queries.GetPriceByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Price{}, ErrPriceNotFound
+		}
+		return Price{}, err
+	}
+	return priceFromRow(row), nil
+}
+
+func (r *Repository) ListPrices(ctx context.Context, planID uuid.UUID, activeOnly bool, at time.Time) ([]Price, error) {
+	var (
+		rows []sqlc.Price
+		err  error
+	)
+	if activeOnly {
+		rows, err = r.queries.ListActivePricesByPlan(ctx, sqlc.ListActivePricesByPlanParams{
+			PlanID: planID,
+			At:     pgconv.Timestamptz(at),
+		})
+	} else {
+		rows, err = r.queries.ListPricesByPlan(ctx, planID)
+	}
+	if err != nil {
+		return nil, err
+	}
+	prices := make([]Price, 0, len(rows))
+	for _, row := range rows {
+		prices = append(prices, priceFromRow(row))
+	}
+	return prices, nil
+}
+
 func productFromRow(row sqlc.Product) Product {
 	return Product{
 		ID:          row.ID,
@@ -126,5 +161,19 @@ func planFromRow(row sqlc.Plan) Plan {
 		Active:      row.Active,
 		CreatedAt:   pgconv.TimestamptzToTime(row.CreatedAt),
 		UpdatedAt:   pgconv.TimestamptzToTime(row.UpdatedAt),
+	}
+}
+
+func priceFromRow(row sqlc.Price) Price {
+	return Price{
+		ID:              row.ID,
+		PlanID:          row.PlanID,
+		Currency:        row.Currency,
+		AmountMinor:     row.AmountMinor,
+		BillingInterval: BillingInterval(row.BillingInterval),
+		Active:          row.Active,
+		EffectiveFrom:   pgconv.TimestamptzToTime(row.EffectiveFrom),
+		EffectiveUntil:  pgconv.TimestamptzToTimePtr(row.EffectiveUntil),
+		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
 	}
 }
