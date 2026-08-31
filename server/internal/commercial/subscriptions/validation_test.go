@@ -4,6 +4,8 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestValidateTransition(t *testing.T) {
@@ -62,5 +64,23 @@ func TestValidatePeriod(t *testing.T) {
 	badRenew := start.Add(-time.Hour)
 	if err := validatePeriod(start, &badRenew, &end); !errors.Is(err, ErrInvalidPeriod) {
 		t.Fatalf("expected invalid renewal period, got %v", err)
+	}
+}
+
+func TestNormalizeCreateRequiresPrice(t *testing.T) {
+	t.Parallel()
+
+	_, err := normalizeCreate(CreateInput{}, time.Now())
+	if !errors.Is(err, ErrPriceIDRequired) {
+		t.Fatalf("normalizeCreate() error = %v, want %v", err, ErrPriceIDRequired)
+	}
+
+	priceID := uuid.New()
+	got, err := normalizeCreate(CreateInput{PriceID: priceID}, time.Now())
+	if err != nil {
+		t.Fatalf("normalizeCreate() error = %v", err)
+	}
+	if got.PriceID != priceID {
+		t.Fatalf("PriceID = %v, want %v", got.PriceID, priceID)
 	}
 }
