@@ -2,7 +2,10 @@ package routing
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
+	"fmt"
+	"math/big"
 	"net/netip"
 
 	"github.com/google/uuid"
@@ -19,11 +22,12 @@ type routeStore interface {
 }
 
 type Resolver struct {
-	repo routeStore
+	repo       routeStore
+	pickWeight func(int64) (int64, error)
 }
 
 func NewResolver(repo *Repository) *Resolver {
-	return &Resolver{repo: repo}
+	return &Resolver{repo: repo, pickWeight: secureWeightPick}
 }
 
 func (r *Resolver) resolveOutbound(
@@ -46,7 +50,10 @@ func (r *Resolver) resolveOutbound(
 		return OutboundDecision{}, ErrNoRoute
 	}
 
-	endpoint := endpoints[0]
+	endpoint, err := r.selectOutboundEndpoint(endpoints)
+	if err != nil {
+		return OutboundDecision{}, err
+	}
 	return OutboundDecision{
 		OrganizationID:      req.OrganizationID,
 		CarrierConnectionID: trunk.CarrierConnectionID,
@@ -58,6 +65,62 @@ func (r *Resolver) resolveOutbound(
 		From:                req.From,
 		To:                  req.To,
 	}, nil
+}
+
+// selectOutboundEndpoint restricts routing to the best available priority and
+// distributes calls by weight within that priority. Lower-priority endpoints
+// are failover targets and must not receive traffic while a better priority is
+// eligible.
+func (r *Resolver) selectOutboundEndpoint(endpoints []sqlc.TrunkEndpoint) (sqlc.TrunkEndpoint, error) {
+	if len(endpoints) == 0 {
+		return sqlc.TrunkEndpoint{}, ErrNoRoute
+	}
+
+	priority := endpoints[0].Priority
+	var total int64
+	eligible := make([]sqlc.TrunkEndpoint, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		if endpoint.Priority != priority {
+			break
+		}
+		if endpoint.Weight <= 0 {
+			return sqlc.TrunkEndpoint{}, fmt.Errorf("endpoint %s has invalid weight %d", endpoint.ID, endpoint.Weight)
+		}
+		total += int64(endpoint.Weight)
+		eligible = append(eligible, endpoint)
+	}
+
+	picker := r.pickWeight
+	if picker == nil {
+		picker = secureWeightPick
+	}
+	pick, err := picker(total)
+	if err != nil {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("select weighted carrier endpoint: %w", err)
+	}
+	if pick < 0 || pick >= total {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("weighted carrier endpoint selection returned %d outside [0,%d)", pick, total)
+	}
+
+	for _, endpoint := range eligible {
+		if pick < int64(endpoint.Weight) {
+			return endpoint, nil
+		}
+		pick -= int64(endpoint.Weight)
+	}
+
+	return sqlc.TrunkEndpoint{}, fmt.Errorf("weighted carrier endpoint selection exhausted eligible endpoints")
+}
+
+func secureWeightPick(total int64) (int64, error) {
+	if total <= 0 {
+		return 0, fmt.Errorf("total endpoint weight must be positive")
+	}
+	pick, err := rand.Int(rand.Reader, big.NewInt(total))
+	if err != nil {
+		return 0, err
+	}
+	return pick.Int64(), nil
 }
 
 func (r *Resolver) resolveInbound(

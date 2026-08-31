@@ -50,7 +50,8 @@ report success while leaving authentication behavior unchanged.
 ## Phase 3 — endpoint reliability
 
 - [ ] Add SIP OPTIONS health checks and priority failover.
-- [ ] Distribute traffic by weight among equal-priority healthy endpoints.
+- [x] Distribute traffic by weight among equal-priority eligible endpoints.
+- [ ] Exclude unhealthy endpoints from weighted selection.
 - [ ] Add failure cooldowns and circuit-breaker state.
 - [ ] Expose endpoint health and route-attempt diagnostics.
 
