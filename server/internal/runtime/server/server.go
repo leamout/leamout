@@ -23,6 +23,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
+	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
@@ -83,7 +84,17 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, err
 	}
-	modules, err := NewModules(db, callsController, conferenceController, credentialCipher)
+	turnService, err := realtime.NewService(realtime.Config{
+		AuthSecret: cfg.TURNAuthSecret,
+		URLs:       cfg.TURNPublicURLs,
+		TTL:        cfg.TURNCredentialTTL,
+	})
+	if err != nil {
+		_ = freeSwitch.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
+	}
+	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService)
 	if err != nil {
 		_ = freeSwitch.Close()
 		db.Close()
@@ -120,6 +131,7 @@ func NewModules(
 	callsController calls.Controller,
 	conferenceController conferences.Controller,
 	credentialCipher *secrets.Cipher,
+	turnService *realtime.Service,
 ) (Modules, error) {
 	queries := sqlc.New(db)
 
@@ -262,6 +274,10 @@ func NewModules(
 			Repository: conferencesRepository,
 			Service:    conferencesService,
 			Handler:    conferences.NewHandler(conferencesService),
+		},
+		Realtime: RealtimeModule{
+			Service: turnService,
+			Handler: realtime.NewHandler(turnService),
 		},
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,

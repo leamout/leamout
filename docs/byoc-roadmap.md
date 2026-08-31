@@ -62,6 +62,13 @@ report success while leaving authentication behavior unchanged.
 - [ ] Add caller identity, privacy, DTMF, and codec-order policies.
 - [ ] Add SRTP policy independently from SIP TLS.
 
+## Phase C — secure WebRTC
+
+- [x] Issue tenant-bound, short-lived TURN credentials through an authenticated API.
+- [ ] Enable SIP over secure WebSocket at the OpenSIPS edge.
+- [ ] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
+- [ ] Add browser acceptance coverage with forced TURN relay.
+
 ## Phase 5 — operations and orchestration
 
 - [ ] Enforce CPS, concurrent-call, and daily-minute limits.

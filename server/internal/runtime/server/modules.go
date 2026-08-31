@@ -10,6 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
+	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
@@ -37,6 +38,7 @@ type Modules struct {
 	Subscribers          SubscribersModule
 	Trunks               TrunksModule
 	Carriers             CarriersModule
+	Realtime             RealtimeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
@@ -135,4 +137,9 @@ type CarriersModule struct {
 	Repository *carriers.Repository
 	Service    *carriers.Service
 	Handler    *carriers.Handler
+}
+
+type RealtimeModule struct {
+	Service *realtime.Service
+	Handler *realtime.Handler
 }
