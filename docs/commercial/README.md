@@ -63,7 +63,7 @@ license
 deployment(s)
 ```
 
-The subscription describes the commercial relationship. Entitlements describe what is allowed. A license carries the deployable commercial state for self-hosted installations. Deployments represent activated installations under that license.
+The subscription describes the commercial relationship. Entitlements describe what is allowed. Commercial state resolves the effective operational view. A license carries the deployable commercial state for self-hosted installations, including activated deployments under that license.
 
 ## Managed / CPaaS commercial flow
 
@@ -99,10 +99,11 @@ See [security.md](security.md) for the database defense model.
 
 ## Commercial domains
 
-- [Subscriptions](subscriptions.md) — products, plans, subscriptions, and subscription lifecycle.
+- [Catalog](catalog.md) — reusable products, plans, stable offer codes, and activation lifecycle.
+- [Subscriptions](subscriptions.md) — organization-to-plan commercial relationships and subscription lifecycle.
 - [Entitlements](entitlements.md) — feature and limit grants at plan, organization, and license scope.
-- [Licensing](licensing.md) — signed self-hosted commercial state.
-- [Deployments](deployments.md) — activated installations under a license.
+- **State** — resolved commercial capabilities and limits consumed by operational code.
+- [Licensing](licensing.md) — signed self-hosted commercial state and deployment activation.
 - [Metering](metering.md) — authoritative usage ingestion and meters.
 - [Rating](rating.md) — telecom usage price resolution through carrier rates.
 - [Invoicing](invoicing.md) — period charges and historical price snapshots.
