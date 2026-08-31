@@ -58,8 +58,8 @@ func (s *Service) Issue(ctx context.Context, organizationID uuid.UUID) (ICECrede
 	allowed, err := s.limiter.AllowFixedWindow(
 		ctx,
 		"ratelimit:turn-credentials:"+organizationID.String(),
-		s.config.IssueLimit,
-		s.config.IssueWindow,
+		60,
+		time.Minute,
 	)
 	if err != nil {
 		return ICECredentials{}, fmt.Errorf("rate limit TURN credential issuance: %w", err)
@@ -73,7 +73,7 @@ func (s *Service) Issue(ctx context.Context, organizationID uuid.UUID) (ICECrede
 		return ICECredentials{}, fmt.Errorf("generate TURN credential nonce: %w", err)
 	}
 
-	expiresAt := s.now().UTC().Add(s.config.TTL)
+	expiresAt := s.now().UTC().Add(10 * time.Minute)
 	username := fmt.Sprintf("%d:%s:%s", expiresAt.Unix(), organizationID, hex.EncodeToString(nonce))
 	digest := hmac.New(sha1.New, []byte(s.config.AuthSecret))
 	_, _ = digest.Write([]byte(username))

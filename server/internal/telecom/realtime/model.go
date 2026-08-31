@@ -3,11 +3,8 @@ package realtime
 import "time"
 
 type Config struct {
-	AuthSecret  string
-	URLs        []string
-	TTL         time.Duration
-	IssueLimit  int64
-	IssueWindow time.Duration
+	AuthSecret string
+	URLs       []string
 }
 
 type ICECredentials struct {

@@ -97,11 +97,8 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, err
 	}
 	turnService, err := realtime.NewService(realtime.Config{
-		AuthSecret:  cfg.TURNAuthSecret,
-		URLs:        cfg.TURNPublicURLs,
-		TTL:         cfg.TURNCredentialTTL,
-		IssueLimit:  cfg.TURNCredentialIssueLimit,
-		IssueWindow: cfg.TURNCredentialIssueWindow,
+		AuthSecret: cfg.TURNAuthSecret,
+		URLs:       cfg.TURNPublicURLs,
 	}, redisClient)
 	if err != nil {
 		_ = freeSwitch.Close()

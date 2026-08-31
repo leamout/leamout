@@ -28,11 +28,8 @@ func (f *fakeIssueLimiter) AllowFixedWindow(_ context.Context, key string, limit
 
 func validTestConfig() Config {
 	return Config{
-		AuthSecret:  "test-shared-secret-at-least-32-bytes",
-		URLs:        []string{"turn:turn.example.com:3478"},
-		TTL:         10 * time.Minute,
-		IssueLimit:  60,
-		IssueWindow: time.Minute,
+		AuthSecret: "test-shared-secret-at-least-32-bytes",
+		URLs:       []string{"turn:turn.example.com:3478"},
 	}
 }
 
@@ -41,8 +38,6 @@ func TestIssueCreatesTenantBoundExpiringCoturnCredential(t *testing.T) {
 	service, err := NewService(Config{
 		AuthSecret: "test-shared-secret-at-least-32-bytes",
 		URLs:       []string{" stun:turn.example.com:3478 ", "turns:turn.example.com:5349?transport=tcp"},
-		TTL:        10 * time.Minute,
-		IssueLimit: 60, IssueWindow: time.Minute,
 	}, limiter)
 	if err != nil {
 		t.Fatalf("new service: %v", err)
@@ -83,8 +78,7 @@ func TestIssueCreatesTenantBoundExpiringCoturnCredential(t *testing.T) {
 }
 
 func TestIssueReturnsUniqueCredentials(t *testing.T) {
-	config := validTestConfig()
-	service, err := NewService(config, &fakeIssueLimiter{allowed: true})
+	service, err := NewService(validTestConfig(), &fakeIssueLimiter{allowed: true})
 	if err != nil {
 		t.Fatalf("new service: %v", err)
 	}
@@ -109,15 +103,11 @@ func TestNewServiceRejectsUnsafeConfiguration(t *testing.T) {
 		name   string
 		config Config
 	}{
-		{name: "missing secret", config: Config{URLs: []string{"turn:turn.example.com"}, TTL: time.Minute, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "short secret", config: Config{AuthSecret: "secret", URLs: []string{"turn:turn.example.com"}, TTL: time.Minute, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "missing URLs", config: Config{AuthSecret: strings.Repeat("s", 32), TTL: time.Minute, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "insecure URL scheme", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"https://turn.example.com"}, TTL: time.Minute, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "missing URL target", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"turn:?transport=udp"}, TTL: time.Minute, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "zero TTL", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"turn:turn.example.com"}, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "excessive TTL", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"turn:turn.example.com"}, TTL: 25 * time.Hour, IssueLimit: 60, IssueWindow: time.Minute}},
-		{name: "zero issue limit", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"turn:turn.example.com"}, TTL: time.Minute, IssueWindow: time.Minute}},
-		{name: "zero issue window", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"turn:turn.example.com"}, TTL: time.Minute, IssueLimit: 60}},
+		{name: "missing secret", config: Config{URLs: []string{"turn:turn.example.com"}}},
+		{name: "short secret", config: Config{AuthSecret: "secret", URLs: []string{"turn:turn.example.com"}}},
+		{name: "missing URLs", config: Config{AuthSecret: strings.Repeat("s", 32)}},
+		{name: "insecure URL scheme", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"https://turn.example.com"}}},
+		{name: "missing URL target", config: Config{AuthSecret: strings.Repeat("s", 32), URLs: []string{"turn:?transport=udp"}}},
 	}
 
 	for _, tt := range tests {

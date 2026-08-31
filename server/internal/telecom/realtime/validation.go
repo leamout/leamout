@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 )
-
-const maximumCredentialTTL = 24 * time.Hour
 
 func validateConfig(config Config) error {
 	if len(config.AuthSecret) < 32 {
@@ -20,15 +17,6 @@ func validateConfig(config Config) error {
 		if !validICEURL(strings.TrimSpace(rawURL)) {
 			return fmt.Errorf("invalid TURN or STUN URL %q", rawURL)
 		}
-	}
-	if config.TTL <= 0 || config.TTL > maximumCredentialTTL {
-		return fmt.Errorf("TURN credential TTL must be between 1ns and %s", maximumCredentialTTL)
-	}
-	if config.IssueLimit <= 0 {
-		return fmt.Errorf("TURN credential issue limit must be positive")
-	}
-	if config.IssueWindow <= 0 {
-		return fmt.Errorf("TURN credential issue window must be positive")
 	}
 	return nil
 }

@@ -19,26 +19,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type EndpointHealthConfig struct {
-	Interval         time.Duration
-	ProbeTimeout     time.Duration
-	Cooldown         time.Duration
-	FailureThreshold int32
-	BatchSize        int32
-	Concurrency      int
-}
-
-func DefaultEndpointHealthConfig() EndpointHealthConfig {
-	return EndpointHealthConfig{
-		Interval:         10 * time.Second,
-		ProbeTimeout:     2 * time.Second,
-		Cooldown:         30 * time.Second,
-		FailureThreshold: 3,
-		BatchSize:        100,
-		Concurrency:      10,
-	}
-}
-
 type ProbeResult struct {
 	ResponseCode int32
 	Latency      time.Duration
@@ -57,23 +37,19 @@ type endpointHealthStore interface {
 type EndpointHealthJob struct {
 	store  endpointHealthStore
 	prober EndpointProber
-	config EndpointHealthConfig
 	now    func() time.Time
 }
 
-func NewEndpointHealthJob(store endpointHealthStore, prober EndpointProber, config EndpointHealthConfig) (*EndpointHealthJob, error) {
+func NewEndpointHealthJob(store endpointHealthStore, prober EndpointProber) (*EndpointHealthJob, error) {
 	if store == nil || prober == nil {
 		return nil, fmt.Errorf("endpoint health store and prober are required")
 	}
-	if config.Interval <= 0 || config.ProbeTimeout <= 0 || config.Cooldown <= 0 || config.FailureThreshold <= 0 || config.BatchSize <= 0 || config.Concurrency <= 0 {
-		return nil, fmt.Errorf("endpoint health configuration values must be positive")
-	}
-	return &EndpointHealthJob{store: store, prober: prober, config: config, now: time.Now}, nil
+	return &EndpointHealthJob{store: store, prober: prober, now: time.Now}, nil
 }
 
 func (j *EndpointHealthJob) Run(ctx context.Context) error {
 	j.runPass(ctx)
-	ticker := time.NewTicker(j.config.Interval)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for {
 		select {
@@ -95,15 +71,15 @@ func (j *EndpointHealthJob) Check(ctx context.Context) error {
 	checkedAt := j.now().UTC()
 	endpoints, err := j.store.ListTrunkEndpointsForHealthCheck(ctx, sqlc.ListTrunkEndpointsForHealthCheckParams{
 		CheckedAt: postgresTimestamp(checkedAt),
-		DueBefore: postgresTimestamp(checkedAt.Add(-j.config.Interval)),
-		BatchSize: j.config.BatchSize,
+		DueBefore: postgresTimestamp(checkedAt.Add(-10 * time.Second)),
+		BatchSize: 100,
 	})
 	if err != nil {
 		return fmt.Errorf("list carrier endpoints due for health check: %w", err)
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(j.config.Concurrency)
+	group.SetLimit(10)
 	for _, endpoint := range endpoints {
 		group.Go(func() error {
 			return j.checkEndpoint(groupCtx, checkedAt, endpoint)
@@ -116,7 +92,7 @@ func (j *EndpointHealthJob) Check(ctx context.Context) error {
 }
 
 func (j *EndpointHealthJob) checkEndpoint(ctx context.Context, checkedAt time.Time, endpoint sqlc.TrunkEndpoint) error {
-	probeCtx, cancel := context.WithTimeout(ctx, j.config.ProbeTimeout)
+	probeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	result, probeErr := j.prober.Probe(probeCtx, endpoint)
 	cancel()
 	latencyMS := durationMilliseconds(result.Latency)
@@ -129,11 +105,11 @@ func (j *EndpointHealthJob) checkEndpoint(ctx context.Context, checkedAt time.Ti
 	} else {
 		message := truncateProbeError(probeErr.Error())
 		_, err = j.store.MarkTrunkEndpointProbeFailed(ctx, sqlc.MarkTrunkEndpointProbeFailedParams{
-			FailureThreshold: j.config.FailureThreshold,
+			FailureThreshold: 3,
 			CheckedAt:        postgresTimestamp(checkedAt),
 			LatencyMs:        &latencyMS,
 			LastError:        &message,
-			CooldownUntil:    postgresTimestamp(checkedAt.Add(j.config.Cooldown)),
+			CooldownUntil:    postgresTimestamp(checkedAt.Add(30 * time.Second)),
 			ID:               endpoint.ID,
 		})
 	}

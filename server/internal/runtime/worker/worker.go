@@ -95,17 +95,9 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
 	}
-	healthConfig := routing.DefaultEndpointHealthConfig()
-	healthConfig.Interval = cfg.EndpointHealthInterval
-	healthConfig.ProbeTimeout = cfg.EndpointHealthProbeTimeout
-	healthConfig.Cooldown = cfg.EndpointHealthCooldown
-	healthConfig.FailureThreshold = cfg.EndpointHealthFailures
-	healthConfig.BatchSize = cfg.EndpointHealthBatchSize
-	healthConfig.Concurrency = cfg.EndpointHealthConcurrency
 	endpointHealth, err := routing.NewEndpointHealthJob(
 		queries,
 		routing.NewSIPOptionsProber(),
-		healthConfig,
 	)
 	if err != nil {
 		_ = freeSwitch.Close()
