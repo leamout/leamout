@@ -31,10 +31,13 @@ func TestOrganizationStateBuildsResolvedState(t *testing.T) {
 	if resolved.OrganizationID != organizationID {
 		t.Fatalf("OrganizationID = %v, want %v", resolved.OrganizationID, organizationID)
 	}
-	if resolved.SubscriptionID != subscriptionID {
+	if resolved.Standing != StandingActive {
+		t.Fatalf("Standing = %q, want %q", resolved.Standing, StandingActive)
+	}
+	if resolved.SubscriptionID == nil || *resolved.SubscriptionID != subscriptionID {
 		t.Fatalf("SubscriptionID = %v, want %v", resolved.SubscriptionID, subscriptionID)
 	}
-	if resolved.PlanID != planID {
+	if resolved.PlanID == nil || *resolved.PlanID != planID {
 		t.Fatalf("PlanID = %v, want %v", resolved.PlanID, planID)
 	}
 	if resolved.EffectiveAt != at {
@@ -55,7 +58,7 @@ func TestOrganizationStateDoesNotAliasEntitlementMaps(t *testing.T) {
 		Features: map[entitlements.Feature]bool{"recording.enabled": true},
 		Limits:   map[string]int64{"max.concurrent.calls": 25},
 	}
-	resolved := organizationState(uuid.New(), subscriptions.Subscription{ID: uuid.New(), PlanID: uuid.New()}, set, time.Now())
+	resolved := organizationState(uuid.New(), subscriptions.Subscription{ID: uuid.New(), PlanID: uuid.New(), Status: subscriptions.StatusActive}, set, time.Now())
 
 	resolved.Features["recording.enabled"] = false
 	resolved.Limits["max.concurrent.calls"] = 1
@@ -65,5 +68,46 @@ func TestOrganizationStateDoesNotAliasEntitlementMaps(t *testing.T) {
 	}
 	if set.Limits["max.concurrent.calls"] != 25 {
 		t.Fatal("resolved limits must not alias entitlement limits")
+	}
+}
+
+func TestUnsubscribedStateIsKnownCommercialState(t *testing.T) {
+	t.Parallel()
+
+	organizationID := uuid.New()
+	at := time.Date(2026, 8, 31, 11, 0, 0, 0, time.UTC)
+
+	resolved := unsubscribedState(organizationID, at)
+	if resolved.OrganizationID != organizationID {
+		t.Fatalf("OrganizationID = %v, want %v", resolved.OrganizationID, organizationID)
+	}
+	if resolved.Standing != StandingUnsubscribed {
+		t.Fatalf("Standing = %q, want %q", resolved.Standing, StandingUnsubscribed)
+	}
+	if resolved.SubscriptionID != nil {
+		t.Fatalf("SubscriptionID = %v, want nil", resolved.SubscriptionID)
+	}
+	if resolved.PlanID != nil {
+		t.Fatalf("PlanID = %v, want nil", resolved.PlanID)
+	}
+	if len(resolved.Features) != 0 {
+		t.Fatalf("Features = %#v, want empty", resolved.Features)
+	}
+	if len(resolved.Limits) != 0 {
+		t.Fatalf("Limits = %#v, want empty", resolved.Limits)
+	}
+	if resolved.EffectiveAt != at {
+		t.Fatalf("EffectiveAt = %v, want %v", resolved.EffectiveAt, at)
+	}
+}
+
+func TestStandingFromSubscription(t *testing.T) {
+	t.Parallel()
+
+	if got := standingFromSubscription(subscriptions.StatusActive); got != StandingActive {
+		t.Fatalf("active standing = %q, want %q", got, StandingActive)
+	}
+	if got := standingFromSubscription(subscriptions.StatusPastDue); got != StandingPastDue {
+		t.Fatalf("past_due standing = %q, want %q", got, StandingPastDue)
 	}
 }
