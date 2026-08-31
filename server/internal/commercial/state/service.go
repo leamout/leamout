@@ -42,15 +42,15 @@ func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at ti
 		return OrganizationState{}, err
 	}
 
-	set, err := s.entitlements.EffectiveForOrganizationPlanAt(ctx, organizationID, current.PlanID, at)
+	resolution, err := s.entitlements.ResolveForOrganizationPlanAt(ctx, organizationID, current.PlanID, at)
 	if err != nil {
 		return OrganizationState{}, err
 	}
 
-	return organizationState(organizationID, current, set, at), nil
+	return organizationState(organizationID, current, resolution, at), nil
 }
 
-func organizationState(organizationID uuid.UUID, current subscriptions.Subscription, set entitlements.EntitlementSet, at time.Time) OrganizationState {
+func organizationState(organizationID uuid.UUID, current subscriptions.Subscription, resolution entitlements.Resolution, at time.Time) OrganizationState {
 	subscriptionID := current.ID
 	planID := current.PlanID
 	return OrganizationState{
@@ -58,9 +58,10 @@ func organizationState(organizationID uuid.UUID, current subscriptions.Subscript
 		Standing:       standingFromSubscription(current.Status),
 		SubscriptionID: &subscriptionID,
 		PlanID:         &planID,
-		Features:       cloneFeatures(set.Features),
-		Limits:         cloneLimits(set.Limits),
+		Features:       cloneFeatures(resolution.Set.Features),
+		Limits:         cloneLimits(resolution.Set.Limits),
 		EffectiveAt:    at,
+		NextChangeAt:   earliestFuture(at, resolution.NextChangeAt, current.EndsAt),
 	}
 }
 
@@ -79,6 +80,20 @@ func standingFromSubscription(status subscriptions.Status) Standing {
 		return StandingPastDue
 	}
 	return StandingActive
+}
+
+func earliestFuture(at time.Time, values ...*time.Time) *time.Time {
+	var next *time.Time
+	for _, value := range values {
+		if value == nil || !value.After(at) {
+			continue
+		}
+		if next == nil || value.Before(*next) {
+			candidate := *value
+			next = &candidate
+		}
+	}
+	return next
 }
 
 func cloneFeatures(features map[entitlements.Feature]bool) map[string]bool {
