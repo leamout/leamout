@@ -21,7 +21,7 @@ const (
 var (
 	ErrSubscriptionNotFound    = errors.New("subscription not found")
 	ErrOrganizationUnavailable = errors.New("organization is unavailable for subscription changes")
-	ErrPlanUnavailable         = errors.New("subscription plan is unavailable")
+	ErrPriceUnavailable        = errors.New("subscription price is unavailable")
 	ErrInvalidStatus           = errors.New("invalid subscription status")
 	ErrInvalidInitialStatus    = errors.New("subscription must start pending or active")
 	ErrInvalidTransition       = errors.New("invalid subscription status transition")
@@ -32,16 +32,18 @@ var (
 	ErrInvalidProvider         = errors.New("billing provider must not contain whitespace")
 	ErrOrganizationIDRequired  = errors.New("organization id is required")
 	ErrSubscriptionIDRequired  = errors.New("subscription id is required")
-	ErrPlanIDRequired          = errors.New("plan id is required")
+	ErrPriceIDRequired         = errors.New("price id is required")
 	ErrNoChanges               = errors.New("at least one subscription field is required")
-	ErrTerminalSubscription    = errors.New("terminal subscription cannot change plans")
+	ErrTerminalSubscription    = errors.New("terminal subscription cannot change commercial terms")
 )
 
-// Subscription binds an organization to a commercial plan for a period of time.
+// Subscription binds an organization to a commercial plan and acquired price for a period of time.
+// PriceID can be nil only for legacy rows created before price-backed subscriptions were introduced.
 type Subscription struct {
 	ID                     uuid.UUID
 	OrganizationID         uuid.UUID
 	PlanID                 uuid.UUID
+	PriceID                *uuid.UUID
 	Status                 Status
 	StartsAt               time.Time
 	RenewsAt               *time.Time
@@ -59,9 +61,9 @@ type ProviderReference struct {
 	SubscriptionID string
 }
 
-// CreateInput describes a new organization subscription.
+// CreateInput describes a new organization subscription. The selected price determines the plan.
 type CreateInput struct {
-	PlanID   uuid.UUID
+	PriceID  uuid.UUID
 	Status   *Status
 	StartsAt *time.Time
 	RenewsAt *time.Time
