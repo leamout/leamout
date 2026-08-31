@@ -170,16 +170,7 @@ func (r *Repository) UpdatePlan(ctx context.Context, id uuid.UUID, input UpdateP
 		}
 		return Plan{}, mapWriteError(err)
 	}
-	return Plan{
-		ID:          row.ID_2,
-		ProductID:   row.ProductID,
-		Code:        row.Code_2,
-		Name:        row.Name_2,
-		Description: row.Description_2,
-		Active:      row.Active_2,
-		CreatedAt:   pgconv.TimestamptzToTime(row.CreatedAt_2),
-		UpdatedAt:   pgconv.TimestamptzToTime(row.UpdatedAt_2),
-	}, nil
+	return planFromRow(row), nil
 }
 
 func productFromRow(row sqlc.Product) Product {
