@@ -62,6 +62,41 @@ func TestResolveFiltersByTime(t *testing.T) {
 	}
 }
 
+func TestResolveWithScheduleFindsEarliestFutureBoundary(t *testing.T) {
+	t.Parallel()
+
+	at := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+	startsLater := at.Add(2 * time.Hour)
+	expiresSooner := at.Add(30 * time.Minute)
+	expired := at.Add(-time.Minute)
+
+	resolution, err := resolveWithSchedule(at, []Entitlement{
+		{Key: "recording.enabled", Kind: KindFeature, Enabled: boolPtr(true), ExpiresAt: timePtr(expiresSooner)},
+		{Key: "ai.enabled", Kind: KindFeature, Enabled: boolPtr(true), StartsAt: timePtr(startsLater)},
+		{Key: "old.enabled", Kind: KindFeature, Enabled: boolPtr(true), ExpiresAt: timePtr(expired)},
+	}, nil)
+	if err != nil {
+		t.Fatalf("resolve entitlements: %v", err)
+	}
+	if resolution.NextChangeAt == nil || !resolution.NextChangeAt.Equal(expiresSooner) {
+		t.Fatalf("NextChangeAt = %v, want %v", resolution.NextChangeAt, expiresSooner)
+	}
+}
+
+func TestResolveWithScheduleHasNoBoundaryForTimelessEntitlements(t *testing.T) {
+	t.Parallel()
+
+	resolution, err := resolveWithSchedule(time.Now(), []Entitlement{
+		{Key: "recording.enabled", Kind: KindFeature, Enabled: boolPtr(true)},
+	}, nil)
+	if err != nil {
+		t.Fatalf("resolve entitlements: %v", err)
+	}
+	if resolution.NextChangeAt != nil {
+		t.Fatalf("NextChangeAt = %v, want nil", resolution.NextChangeAt)
+	}
+}
+
 func TestResolveRejectsKindMismatch(t *testing.T) {
 	t.Parallel()
 
