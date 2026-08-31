@@ -22,11 +22,15 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) CreateProduct(ctx context.Context, input CreateProductInput) (Product, error) {
+	var active any
+	if input.Active != nil {
+		active = *input.Active
+	}
 	row, err := r.queries.CreateProduct(ctx, sqlc.CreateProductParams{
 		Code:        input.Code,
 		Name:        input.Name,
 		Description: input.Description,
-		Active:      input.Active,
+		Active:      active,
 	})
 	if err != nil {
 		return Product{}, mapWriteError(err)
