@@ -59,4 +59,4 @@ WHERE pl.id = sqlc.arg(id)
       COALESCE(sqlc.narg(active), pl.active) = false
       OR p.active = true
   )
-RETURNING *;
+RETURNING pl.*;
