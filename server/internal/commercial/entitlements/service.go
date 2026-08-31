@@ -9,31 +9,15 @@ import (
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
 
-type store interface {
-	CreatePlan(context.Context, uuid.UUID, CreateInput) (Entitlement, error)
-	CreateOrganization(context.Context, uuid.UUID, CreateInput) (Entitlement, error)
-	CreateLicense(context.Context, uuid.UUID, uuid.UUID, CreateInput) (Entitlement, error)
-	ListPlan(context.Context, uuid.UUID) ([]Entitlement, error)
-	ListOrganization(context.Context, uuid.UUID) ([]Entitlement, error)
-	ListLicense(context.Context, uuid.UUID, uuid.UUID) ([]Entitlement, error)
-	DeletePlan(context.Context, uuid.UUID, uuid.UUID) error
-	DeleteOrganization(context.Context, uuid.UUID, uuid.UUID) error
-	DeleteLicense(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error
-}
-
-type subscriptionReader interface {
-	Current(context.Context, uuid.UUID) (subscriptions.Subscription, error)
-}
-
 // Service owns entitlement validation, scope operations, and effective resolution.
 type Service struct {
-	store         store
-	subscriptions subscriptionReader
+	repo          *Repository
+	subscriptions *subscriptions.Service
 	now           func() time.Time
 }
 
-func NewService(store store, subscriptions subscriptionReader) *Service {
-	return &Service{store: store, subscriptions: subscriptions, now: time.Now}
+func NewService(repo *Repository, subscriptions *subscriptions.Service) *Service {
+	return &Service{repo: repo, subscriptions: subscriptions, now: time.Now}
 }
 
 func (s *Service) CreatePlan(ctx context.Context, planID uuid.UUID, input CreateInput) (Entitlement, error) {
@@ -44,7 +28,7 @@ func (s *Service) CreatePlan(ctx context.Context, planID uuid.UUID, input Create
 	if err != nil {
 		return Entitlement{}, err
 	}
-	return s.store.CreatePlan(ctx, planID, normalized)
+	return s.repo.CreatePlan(ctx, planID, normalized)
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Entitlement, error) {
@@ -55,7 +39,7 @@ func (s *Service) CreateOrganization(ctx context.Context, organizationID uuid.UU
 	if err != nil {
 		return Entitlement{}, err
 	}
-	return s.store.CreateOrganization(ctx, organizationID, normalized)
+	return s.repo.CreateOrganization(ctx, organizationID, normalized)
 }
 
 func (s *Service) CreateLicense(ctx context.Context, organizationID, licenseID uuid.UUID, input CreateInput) (Entitlement, error) {
@@ -69,21 +53,21 @@ func (s *Service) CreateLicense(ctx context.Context, organizationID, licenseID u
 	if err != nil {
 		return Entitlement{}, err
 	}
-	return s.store.CreateLicense(ctx, organizationID, licenseID, normalized)
+	return s.repo.CreateLicense(ctx, organizationID, licenseID, normalized)
 }
 
 func (s *Service) ListPlan(ctx context.Context, planID uuid.UUID) ([]Entitlement, error) {
 	if err := validateID(planID, ErrPlanIDRequired); err != nil {
 		return nil, err
 	}
-	return s.store.ListPlan(ctx, planID)
+	return s.repo.ListPlan(ctx, planID)
 }
 
 func (s *Service) ListOrganization(ctx context.Context, organizationID uuid.UUID) ([]Entitlement, error) {
 	if err := validateID(organizationID, ErrOrganizationIDRequired); err != nil {
 		return nil, err
 	}
-	return s.store.ListOrganization(ctx, organizationID)
+	return s.repo.ListOrganization(ctx, organizationID)
 }
 
 func (s *Service) ListLicense(ctx context.Context, organizationID, licenseID uuid.UUID) ([]Entitlement, error) {
@@ -93,7 +77,7 @@ func (s *Service) ListLicense(ctx context.Context, organizationID, licenseID uui
 	if err := validateID(licenseID, ErrLicenseIDRequired); err != nil {
 		return nil, err
 	}
-	return s.store.ListLicense(ctx, organizationID, licenseID)
+	return s.repo.ListLicense(ctx, organizationID, licenseID)
 }
 
 func (s *Service) DeletePlan(ctx context.Context, planID, id uuid.UUID) error {
@@ -103,7 +87,7 @@ func (s *Service) DeletePlan(ctx context.Context, planID, id uuid.UUID) error {
 	if err := validateID(id, ErrEntitlementIDRequired); err != nil {
 		return err
 	}
-	return s.store.DeletePlan(ctx, planID, id)
+	return s.repo.DeletePlan(ctx, planID, id)
 }
 
 func (s *Service) DeleteOrganization(ctx context.Context, organizationID, id uuid.UUID) error {
@@ -113,7 +97,7 @@ func (s *Service) DeleteOrganization(ctx context.Context, organizationID, id uui
 	if err := validateID(id, ErrEntitlementIDRequired); err != nil {
 		return err
 	}
-	return s.store.DeleteOrganization(ctx, organizationID, id)
+	return s.repo.DeleteOrganization(ctx, organizationID, id)
 }
 
 func (s *Service) DeleteLicense(ctx context.Context, organizationID, licenseID, id uuid.UUID) error {
@@ -126,7 +110,7 @@ func (s *Service) DeleteLicense(ctx context.Context, organizationID, licenseID, 
 	if err := validateID(id, ErrEntitlementIDRequired); err != nil {
 		return err
 	}
-	return s.store.DeleteLicense(ctx, organizationID, licenseID, id)
+	return s.repo.DeleteLicense(ctx, organizationID, licenseID, id)
 }
 
 // EffectiveForOrganization resolves plan defaults and organization overrides at the current time.
@@ -150,7 +134,6 @@ func (s *Service) EffectiveForOrganizationAt(ctx context.Context, organizationID
 }
 
 // EffectiveForOrganizationPlanAt resolves organization capabilities against an already-selected plan.
-// Callers that already resolved the current subscription can use this method to keep one state read coherent.
 func (s *Service) EffectiveForOrganizationPlanAt(ctx context.Context, organizationID, planID uuid.UUID, at time.Time) (EntitlementSet, error) {
 	if err := validateID(organizationID, ErrOrganizationIDRequired); err != nil {
 		return EntitlementSet{}, err
@@ -158,11 +141,11 @@ func (s *Service) EffectiveForOrganizationPlanAt(ctx context.Context, organizati
 	if err := validateID(planID, ErrPlanIDRequired); err != nil {
 		return EntitlementSet{}, err
 	}
-	plan, err := s.store.ListPlan(ctx, planID)
+	plan, err := s.repo.ListPlan(ctx, planID)
 	if err != nil {
 		return EntitlementSet{}, err
 	}
-	overrides, err := s.store.ListOrganization(ctx, organizationID)
+	overrides, err := s.repo.ListOrganization(ctx, organizationID)
 	if err != nil {
 		return EntitlementSet{}, err
 	}
