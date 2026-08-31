@@ -75,10 +75,11 @@ jobs:
           go-version-file: server/go.mod
           cache: true
 
-      - name: Install generators
-        run: |
-          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-          go install ariga.io/atlas/cmd/atlas@latest
+      - name: Set up Atlas
+        uses: ariga/setup-atlas@v0
+
+      - name: Install sqlc
+        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 
       - name: Generate sqlc
         run: sqlc generate
