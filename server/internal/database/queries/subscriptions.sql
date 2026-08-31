@@ -2,6 +2,7 @@
 INSERT INTO subscriptions (
     organization_id,
     plan_id,
+    price_id,
     status,
     starts_at,
     renews_at,
@@ -12,6 +13,7 @@ INSERT INTO subscriptions (
 SELECT
     o.id AS organization_id,
     pl.id AS plan_id,
+    pr.id AS price_id,
     COALESCE(sqlc.narg(status), 'pending') AS status,
     COALESCE(sqlc.narg(starts_at), NOW()) AS starts_at,
     sqlc.narg(renews_at) AS renews_at,
@@ -21,11 +23,17 @@ SELECT
 FROM organizations AS o
 JOIN plans AS pl ON pl.id = sqlc.arg(plan_id)
 JOIN products AS p ON p.id = pl.product_id
+JOIN prices AS pr
+  ON pr.id = sqlc.arg(price_id)
+ AND pr.plan_id = pl.id
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
   AND pl.active = true
   AND p.active = true
+  AND pr.active = true
+  AND pr.effective_from <= COALESCE(sqlc.narg(starts_at), NOW())
+  AND (pr.effective_until IS NULL OR pr.effective_until > COALESCE(sqlc.narg(starts_at), NOW()))
 RETURNING *;
 
 -- name: GetSubscription :one
@@ -68,11 +76,9 @@ WHERE s.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 ORDER BY s.created_at DESC;
 
--- name: UpdateSubscription :one
+-- name: UpdateSubscriptionPeriod :one
 UPDATE subscriptions AS s
 SET
-    plan_id = COALESCE(sqlc.narg(plan_id)::uuid, s.plan_id),
-    status = COALESCE(sqlc.narg(status), s.status),
     renews_at = COALESCE(sqlc.narg(renews_at), s.renews_at),
     ends_at = COALESCE(sqlc.narg(ends_at), s.ends_at),
     updated_at = NOW()
@@ -82,18 +88,45 @@ WHERE s.organization_id = sqlc.arg(organization_id)
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-  AND (
-      sqlc.narg(plan_id)::uuid IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM plans AS pl
-          JOIN products AS p ON p.id = pl.product_id
-          WHERE pl.id = sqlc.narg(plan_id)::uuid
-            AND pl.active = true
-            AND p.active = true
-      )
-  )
-RETURNING *;
+RETURNING s.*;
+
+-- name: ChangeSubscriptionPrice :one
+UPDATE subscriptions AS s
+SET
+    plan_id = pr.plan_id,
+    price_id = pr.id,
+    updated_at = NOW()
+FROM organizations AS o,
+     prices AS pr
+JOIN plans AS pl ON pl.id = pr.plan_id
+JOIN products AS p ON p.id = pl.product_id
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND s.id = sqlc.arg(id)
+  AND o.id = s.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+  AND pr.id = sqlc.arg(price_id)
+  AND pr.plan_id = sqlc.arg(plan_id)
+  AND pr.active = true
+  AND pr.effective_from <= NOW()
+  AND (pr.effective_until IS NULL OR pr.effective_until > NOW())
+  AND pl.active = true
+  AND p.active = true
+RETURNING s.*;
+
+-- name: CompareAndSetSubscriptionStatus :one
+UPDATE subscriptions AS s
+SET
+    status = sqlc.arg(status),
+    updated_at = NOW()
+FROM organizations AS o
+WHERE s.organization_id = sqlc.arg(organization_id)
+  AND s.id = sqlc.arg(id)
+  AND s.status = sqlc.arg(expected_status)
+  AND o.id = s.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING s.*;
 
 -- name: SetSubscriptionProvider :one
 UPDATE subscriptions AS s
@@ -107,4 +140,4 @@ WHERE s.organization_id = sqlc.arg(organization_id)
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING *;
+RETURNING s.*;

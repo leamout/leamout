@@ -388,6 +388,18 @@ type Plan struct {
 	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type Price struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	PlanID          uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Currency        string             `db:"currency" json:"currency"`
+	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
+	BillingInterval string             `db:"billing_interval" json:"billing_interval"`
+	Active          bool               `db:"active" json:"active"`
+	EffectiveFrom   pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
+	EffectiveUntil  pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type ProcessedEvent struct {
 	ConsumerName string             `db:"consumer_name" json:"consumer_name"`
 	EventID      uuid.UUID          `db:"event_id" json:"event_id"`
@@ -471,6 +483,7 @@ type Subscription struct {
 	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
 	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	PriceID                *uuid.UUID         `db:"price_id" json:"price_id"`
 }
 
 type Trunk struct {
