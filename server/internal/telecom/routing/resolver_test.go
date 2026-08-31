@@ -159,6 +159,21 @@ func TestSelectOutboundEndpointWeightBoundaries(t *testing.T) {
 	}
 }
 
+func TestSelectOutboundEndpointFailsOverWhenPrimaryTierIsUnhealthy(t *testing.T) {
+	primaryID, failoverID := uuid.New(), uuid.New()
+	resolver := &Resolver{pickWeight: func(int64) (int64, error) { return 0, nil }}
+	endpoint, err := resolver.selectOutboundEndpoint([]sqlc.TrunkEndpoint{
+		{ID: primaryID, Priority: 10, Weight: 100, HealthStatus: "unhealthy"},
+		{ID: failoverID, Priority: 20, Weight: 100, HealthStatus: "healthy"},
+	})
+	if err != nil {
+		t.Fatalf("select endpoint: %v", err)
+	}
+	if endpoint.ID != failoverID {
+		t.Fatalf("endpoint = %s, want healthy failover %s", endpoint.ID, failoverID)
+	}
+}
+
 func TestResolveOutboundReturnsNoRouteWithoutEndpoint(t *testing.T) {
 	organizationID := uuid.New()
 	trunkID := uuid.New()

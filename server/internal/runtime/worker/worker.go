@@ -26,6 +26,7 @@ type Worker struct {
 	calls                   *calls.Consumer
 	recordings              *recordings.Consumer
 	callReconciliation      *calls.ReconciliationJob
+	endpointHealth          *routing.EndpointHealthJob
 	recordingReconciliation *recordings.ReconciliationJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
@@ -94,6 +95,24 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
 	}
+	healthConfig := routing.DefaultEndpointHealthConfig()
+	healthConfig.Interval = cfg.EndpointHealthInterval
+	healthConfig.ProbeTimeout = cfg.EndpointHealthProbeTimeout
+	healthConfig.Cooldown = cfg.EndpointHealthCooldown
+	healthConfig.FailureThreshold = cfg.EndpointHealthFailures
+	healthConfig.BatchSize = cfg.EndpointHealthBatchSize
+	healthConfig.Concurrency = cfg.EndpointHealthConcurrency
+	endpointHealth, err := routing.NewEndpointHealthJob(
+		queries,
+		routing.NewSIPOptionsProber(),
+		healthConfig,
+	)
+	if err != nil {
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize carrier endpoint health job: %w", err)
+	}
 
 	recordingReconciliation, err := recordings.NewReconciliationJob(
 		recordingsRepository,
@@ -142,6 +161,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		calls:                   calls.NewConsumer(callsService),
 		recordings:              recordings.NewConsumer(recordingsService),
 		callReconciliation:      callReconciliation,
+		endpointHealth:          endpointHealth,
 		recordingReconciliation: recordingReconciliation,
 		outbox:                  outboxJob,
 		webhookConsumer:         webhookConsumer,
@@ -182,12 +202,14 @@ func (w *Worker) Run(ctx context.Context) error {
 	log.Print("worker subscribed to FreeSWITCH call and recording lifecycle events")
 	log.Print("worker started call reconciliation job")
 	log.Print("worker started recording reconciliation job")
+	log.Print("worker started carrier endpoint health job")
 	log.Print("worker started outbox NATS publisher")
 	log.Print("worker started webhook NATS consumer")
 	log.Print("worker started webhook delivery job")
 
-	errCh := make(chan error, 5)
+	errCh := make(chan error, 6)
 	go runComponent(ctx, errCh, "call reconciliation", w.callReconciliation.Run)
+	go runComponent(ctx, errCh, "carrier endpoint health", w.endpointHealth.Run)
 	go runComponent(ctx, errCh, "recording reconciliation", w.recordingReconciliation.Run)
 	go runComponent(ctx, errCh, "outbox publisher", w.outbox.Run)
 	go runComponent(ctx, errCh, "webhook consumer", w.webhookConsumer.Run)

@@ -1,4 +1,4 @@
-h1:2t1g19UlwXHXtJ1lkwy3dA+1PIxej9DU7UxxkoQVpwg=
+h1:J2PaCGVidD3B2GZbY4KMTZWrn/6k0P/LcoKuidSYKzc=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -34,4 +34,5 @@ h1:2t1g19UlwXHXtJ1lkwy3dA+1PIxej9DU7UxxkoQVpwg=
 033_create_invoices.sql h1:V8MInzZ7/XmEK8LXBEht9vB10VfAgDo29oSGDpxv4PI=
 034_create_invoice_items.sql h1:SqOEPhvWLDlPyVqbFv3Ow9Eikv5Kts8eSaMqdQVqaoI=
 035_create_payments.sql h1:P5ndH7HxaK8vTSl9i7TcMHeill+96NF70b5PryPrE1Y=
-037_create_carrier_digest_credentials.sql h1:WzOPz252EhZ3NSxoFcyMJQnh7D4Ilq0naVLj7Dk4GIQ=
+036_create_carrier_digest_credentials.sql h1:s+WU+Cm8aSin0ZZFuebx//zzqrznkzmrmd31KcqsSUo=
+037_add_trunk_endpoint_health.sql h1:JsIOm8AAfkE2nCNMyZvtYy/F0leweqlYRRHQNe67z/4=

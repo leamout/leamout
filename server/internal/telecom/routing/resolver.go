@@ -76,10 +76,18 @@ func (r *Resolver) selectOutboundEndpoint(endpoints []sqlc.TrunkEndpoint) (sqlc.
 		return sqlc.TrunkEndpoint{}, ErrNoRoute
 	}
 
-	priority := endpoints[0].Priority
+	var priority int32
+	prioritySet := false
 	var total int64
 	eligible := make([]sqlc.TrunkEndpoint, 0, len(endpoints))
 	for _, endpoint := range endpoints {
+		if endpoint.HealthStatus == "unhealthy" {
+			continue
+		}
+		if !prioritySet {
+			priority = endpoint.Priority
+			prioritySet = true
+		}
 		if endpoint.Priority != priority {
 			break
 		}
@@ -88,6 +96,9 @@ func (r *Resolver) selectOutboundEndpoint(endpoints []sqlc.TrunkEndpoint) (sqlc.
 		}
 		total += int64(endpoint.Weight)
 		eligible = append(eligible, endpoint)
+	}
+	if len(eligible) == 0 {
+		return sqlc.TrunkEndpoint{}, ErrNoRoute
 	}
 
 	picker := r.pickWeight
