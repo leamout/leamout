@@ -8,6 +8,7 @@ import (
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/carrier_tests"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
@@ -40,6 +41,7 @@ type Modules struct {
 	Subscribers          SubscribersModule
 	Trunks               TrunksModule
 	Carriers             CarriersModule
+	CarrierTests         CarrierTestsModule
 	Realtime             RealtimeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
@@ -145,6 +147,12 @@ type CarriersModule struct {
 	Repository *carriers.Repository
 	Service    *carriers.Service
 	Handler    *carriers.Handler
+}
+
+type CarrierTestsModule struct {
+	Repository *carrier_tests.Repository
+	Service    *carrier_tests.Service
+	Handler    *carrier_tests.Handler
 }
 
 type RealtimeModule struct {
