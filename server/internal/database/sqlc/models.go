@@ -485,18 +485,25 @@ type Trunk struct {
 }
 
 type TrunkEndpoint struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	TrunkID        uuid.UUID          `db:"trunk_id" json:"trunk_id"`
-	Host           string             `db:"host" json:"host"`
-	Port           int32              `db:"port" json:"port"`
-	Transport      string             `db:"transport" json:"transport"`
-	Direction      string             `db:"direction" json:"direction"`
-	Priority       int32              `db:"priority" json:"priority"`
-	Weight         int32              `db:"weight" json:"weight"`
-	Enabled        bool               `db:"enabled" json:"enabled"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	TrunkID             uuid.UUID          `db:"trunk_id" json:"trunk_id"`
+	Host                string             `db:"host" json:"host"`
+	Port                int32              `db:"port" json:"port"`
+	Transport           string             `db:"transport" json:"transport"`
+	Direction           string             `db:"direction" json:"direction"`
+	Priority            int32              `db:"priority" json:"priority"`
+	Weight              int32              `db:"weight" json:"weight"`
+	Enabled             bool               `db:"enabled" json:"enabled"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	HealthStatus        string             `db:"health_status" json:"health_status"`
+	ConsecutiveFailures int32              `db:"consecutive_failures" json:"consecutive_failures"`
+	LastCheckedAt       pgtype.Timestamptz `db:"last_checked_at" json:"last_checked_at"`
+	LastResponseCode    *int32             `db:"last_response_code" json:"last_response_code"`
+	LastLatencyMs       *int32             `db:"last_latency_ms" json:"last_latency_ms"`
+	LastError           *string            `db:"last_error" json:"last_error"`
+	CooldownUntil       pgtype.Timestamptz `db:"cooldown_until" json:"cooldown_until"`
 }
 
 type UsageEvent struct {

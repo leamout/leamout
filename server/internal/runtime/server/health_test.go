@@ -22,6 +22,14 @@ type fakeReadinessMedia struct {
 	err error
 }
 
+type fakeReadinessCache struct {
+	err error
+}
+
+func (f fakeReadinessCache) Ping(context.Context) error {
+	return f.err
+}
+
 func (f fakeReadinessMedia) HealthCheck(context.Context) error {
 	return f.err
 }
@@ -31,6 +39,7 @@ func TestHealthRoutes(t *testing.T) {
 		name       string
 		path       string
 		database   error
+		cache      error
 		media      error
 		wantStatus int
 	}{
@@ -39,7 +48,14 @@ func TestHealthRoutes(t *testing.T) {
 			path:       "/healthz",
 			database:   errors.New("database unavailable"),
 			media:      errors.New("freeswitch unavailable"),
+			cache:      errors.New("redis unavailable"),
 			wantStatus: http.StatusNoContent,
+		},
+		{
+			name:       "readiness fails when Redis is unavailable",
+			path:       "/readyz",
+			cache:      errors.New("redis unavailable"),
+			wantStatus: http.StatusServiceUnavailable,
 		},
 		{
 			name:       "readiness succeeds when dependencies are healthy",
@@ -66,6 +82,7 @@ func TestHealthRoutes(t *testing.T) {
 			RegisterHealthRoutes(
 				router,
 				fakeReadinessDatabase{err: tt.database},
+				fakeReadinessCache{err: tt.cache},
 				fakeReadinessMedia{err: tt.media},
 			)
 

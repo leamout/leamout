@@ -73,18 +73,25 @@ type Response struct {
 }
 
 type EndpointResponse struct {
-	ID             uuid.UUID `json:"id"`
-	OrganizationID uuid.UUID `json:"organization_id"`
-	TrunkID        uuid.UUID `json:"trunk_id"`
-	Host           string    `json:"host"`
-	Port           int32     `json:"port"`
-	Transport      string    `json:"transport"`
-	Direction      string    `json:"direction"`
-	Priority       int32     `json:"priority"`
-	Weight         int32     `json:"weight"`
-	Enabled        bool      `json:"enabled"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID                  uuid.UUID  `json:"id"`
+	OrganizationID      uuid.UUID  `json:"organization_id"`
+	TrunkID             uuid.UUID  `json:"trunk_id"`
+	Host                string     `json:"host"`
+	Port                int32      `json:"port"`
+	Transport           string     `json:"transport"`
+	Direction           string     `json:"direction"`
+	Priority            int32      `json:"priority"`
+	Weight              int32      `json:"weight"`
+	Enabled             bool       `json:"enabled"`
+	HealthStatus        string     `json:"health_status"`
+	ConsecutiveFailures int32      `json:"consecutive_failures"`
+	LastCheckedAt       *time.Time `json:"last_checked_at,omitempty"`
+	LastResponseCode    *int32     `json:"last_response_code,omitempty"`
+	LastLatencyMs       *int32     `json:"last_latency_ms,omitempty"`
+	LastError           *string    `json:"last_error,omitempty"`
+	CooldownUntil       *time.Time `json:"cooldown_until,omitempty"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 func response(trunk sqlc.Trunk) Response {
@@ -93,7 +100,14 @@ func response(trunk sqlc.Trunk) Response {
 }
 
 func endpointResponse(endpoint sqlc.TrunkEndpoint) EndpointResponse {
-	return EndpointResponse{endpoint.ID, endpoint.OrganizationID, endpoint.TrunkID, endpoint.Host,
-		endpoint.Port, endpoint.Transport, endpoint.Direction, endpoint.Priority, endpoint.Weight,
-		endpoint.Enabled, pgconv.TimestamptzToTime(endpoint.CreatedAt), pgconv.TimestamptzToTime(endpoint.UpdatedAt)}
+	return EndpointResponse{
+		ID: endpoint.ID, OrganizationID: endpoint.OrganizationID, TrunkID: endpoint.TrunkID,
+		Host: endpoint.Host, Port: endpoint.Port, Transport: endpoint.Transport, Direction: endpoint.Direction,
+		Priority: endpoint.Priority, Weight: endpoint.Weight, Enabled: endpoint.Enabled,
+		HealthStatus: endpoint.HealthStatus, ConsecutiveFailures: endpoint.ConsecutiveFailures,
+		LastCheckedAt: pgconv.TimestamptzToTimePtr(endpoint.LastCheckedAt), LastResponseCode: endpoint.LastResponseCode,
+		LastLatencyMs: endpoint.LastLatencyMs, LastError: endpoint.LastError,
+		CooldownUntil: pgconv.TimestamptzToTimePtr(endpoint.CooldownUntil),
+		CreatedAt:     pgconv.TimestamptzToTime(endpoint.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(endpoint.UpdatedAt),
+	}
 }

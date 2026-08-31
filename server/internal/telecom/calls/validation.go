@@ -53,6 +53,39 @@ func validateCreateRequest(req *CreateCallRequest) error {
 	if req.To, err = require(req.To, "to"); err != nil {
 		return err
 	}
+	if req.DTMFMode == "" {
+		req.DTMFMode = "rfc2833"
+	}
+	req.DTMFMode = strings.ToLower(strings.TrimSpace(req.DTMFMode))
+	if req.DTMFMode != "rfc2833" && req.DTMFMode != "info" {
+		return apperror.NewBadRequest("dtmf_mode must be rfc2833 or info")
+	}
+	if len(req.Codecs) == 0 {
+		req.Codecs = []string{"PCMU", "PCMA", "G722", "OPUS"}
+	}
+	if len(req.Codecs) > 8 {
+		return apperror.NewBadRequest("codecs cannot contain more than 8 entries")
+	}
+	allowedCodecs := map[string]struct{}{"PCMU": {}, "PCMA": {}, "G722": {}, "OPUS": {}}
+	seen := make(map[string]struct{}, len(req.Codecs))
+	for index, codec := range req.Codecs {
+		codec = strings.ToUpper(strings.TrimSpace(codec))
+		if _, ok := allowedCodecs[codec]; !ok {
+			return apperror.NewBadRequest("unsupported codec: " + codec)
+		}
+		if _, ok := seen[codec]; ok {
+			return apperror.NewBadRequest("duplicate codec: " + codec)
+		}
+		seen[codec] = struct{}{}
+		req.Codecs[index] = codec
+	}
+	if req.MediaEncryption == "" {
+		req.MediaEncryption = "rtp"
+	}
+	req.MediaEncryption = strings.ToLower(strings.TrimSpace(req.MediaEncryption))
+	if req.MediaEncryption != "rtp" && req.MediaEncryption != "sdes_srtp" {
+		return apperror.NewBadRequest("media_encryption must be rtp or sdes_srtp")
+	}
 	return nil
 }
 

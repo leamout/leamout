@@ -16,6 +16,10 @@ const (
 	openSIPSEgressPort         = 5060
 	routeURIHeaderVar          = "sip_h_X-Leamout-Route-URI"
 	carrierConnectionHeaderVar = "sip_h_X-Leamout-Carrier-Connection-ID"
+	privacyHeaderVar           = "sip_h_X-Leamout-Privacy"
+	dtmfTypeVar                = "dtmf_type"
+	codecStringVar             = "absolute_codec_string"
+	mediaEncryptionHeaderVar   = "sip_h_X-Leamout-Media-Encryption"
 )
 
 // FreeSWITCHController adapts the FreeSWITCH client to the calls.Controller interface.
@@ -70,13 +74,19 @@ func egressVariables(req OriginateRequest, routeURI string) (map[string]string, 
 		return nil, fmt.Errorf("resolved carrier connection id is required")
 	}
 
-	variables := make(map[string]string, len(req.Variables)+2)
+	variables := make(map[string]string, len(req.Variables)+5)
 	for key, value := range req.Variables {
 		variables[key] = value
 	}
 	// Always overwrite reserved metadata after copying user variables.
 	variables[routeURIHeaderVar] = routeURI
 	variables[carrierConnectionHeaderVar] = req.CarrierConnectionID.String()
+	if req.Privacy {
+		variables[privacyHeaderVar] = "id"
+	}
+	variables[dtmfTypeVar] = req.DTMFMode
+	variables[codecStringVar] = strings.Join(req.Codecs, ",")
+	variables[mediaEncryptionHeaderVar] = req.MediaEncryption
 	return variables, nil
 }
 

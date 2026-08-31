@@ -38,7 +38,7 @@ func (f *fakeRouteStore) GetVoiceBinding(context.Context, string) (sqlc.GetVoice
 	return f.binding, nil
 }
 
-func TestResolveOutboundUsesFirstEligibleEndpoint(t *testing.T) {
+func TestResolveOutboundUsesEligibleEndpoint(t *testing.T) {
 	organizationID := uuid.New()
 	connectionID := uuid.New()
 	trunkID := uuid.New()
@@ -50,12 +50,15 @@ func TestResolveOutboundUsesFirstEligibleEndpoint(t *testing.T) {
 			OrganizationID:      organizationID,
 			CarrierConnectionID: connectionID,
 		},
+		phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true, CarrierConnectionID: &connectionID},
 		endpoints: []sqlc.TrunkEndpoint{{
 			ID:        endpointID,
 			TrunkID:   trunkID,
 			Host:      "sip.carrier.example",
 			Port:      5060,
 			Transport: "udp",
+			Priority:  10,
+			Weight:    100,
 		}},
 	}}
 
@@ -79,6 +82,101 @@ func TestResolveOutboundUsesFirstEligibleEndpoint(t *testing.T) {
 	}
 }
 
+func TestResolveOutboundDistributesByWeightAtBestPriority(t *testing.T) {
+	organizationID := uuid.New()
+	trunkID := uuid.New()
+	primaryA := uuid.New()
+	primaryB := uuid.New()
+	failover := uuid.New()
+
+	resolver := &Resolver{
+		repo: &fakeRouteStore{
+			trunk: sqlc.Trunk{
+				ID:                  trunkID,
+				OrganizationID:      organizationID,
+				CarrierConnectionID: uuid.New(),
+			},
+			phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true},
+			endpoints: []sqlc.TrunkEndpoint{
+				{ID: primaryA, TrunkID: trunkID, Host: "primary-a.example", Port: 5060, Transport: "udp", Priority: 10, Weight: 20},
+				{ID: primaryB, TrunkID: trunkID, Host: "primary-b.example", Port: 5060, Transport: "udp", Priority: 10, Weight: 80},
+				{ID: failover, TrunkID: trunkID, Host: "failover.example", Port: 5060, Transport: "udp", Priority: 20, Weight: 100},
+			},
+		},
+		pickWeight: func(total int64) (int64, error) {
+			if total != 100 {
+				t.Fatalf("total weight = %d, want 100", total)
+			}
+			return 20, nil
+		},
+	}
+	resolver.repo.(*fakeRouteStore).phone.CarrierConnectionID = &resolver.repo.(*fakeRouteStore).trunk.CarrierConnectionID
+
+	decision, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
+		OrganizationID: organizationID,
+		TrunkID:        trunkID,
+		From:           "+233200000001",
+		To:             "+14155550100",
+	})
+	if err != nil {
+		t.Fatalf("resolve outbound: %v", err)
+	}
+	if decision.EndpointID != primaryB {
+		t.Fatalf("endpoint = %s, want weighted primary %s", decision.EndpointID, primaryB)
+	}
+	if decision.EndpointID == failover {
+		t.Fatal("lower-priority failover endpoint received primary traffic")
+	}
+}
+
+func TestSelectOutboundEndpointWeightBoundaries(t *testing.T) {
+	firstID := uuid.New()
+	secondID := uuid.New()
+	endpoints := []sqlc.TrunkEndpoint{
+		{ID: firstID, Priority: 10, Weight: 2},
+		{ID: secondID, Priority: 10, Weight: 3},
+	}
+
+	tests := []struct {
+		name string
+		pick int64
+		want uuid.UUID
+	}{
+		{name: "first lower boundary", pick: 0, want: firstID},
+		{name: "first upper boundary", pick: 1, want: firstID},
+		{name: "second lower boundary", pick: 2, want: secondID},
+		{name: "second upper boundary", pick: 4, want: secondID},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolver := &Resolver{pickWeight: func(int64) (int64, error) { return tt.pick, nil }}
+			got, err := resolver.selectOutboundEndpoint(endpoints)
+			if err != nil {
+				t.Fatalf("select endpoint: %v", err)
+			}
+			if got.ID != tt.want {
+				t.Fatalf("endpoint = %s, want %s", got.ID, tt.want)
+			}
+		})
+	}
+}
+
+func TestSelectOutboundEndpointFailsOverWhenPrimaryTierIsUnhealthy(t *testing.T) {
+	primaryID, failoverID := uuid.New(), uuid.New()
+	resolver := &Resolver{pickWeight: func(int64) (int64, error) { return 0, nil }}
+	endpoint, err := resolver.selectOutboundEndpoint([]sqlc.TrunkEndpoint{
+		{ID: primaryID, Priority: 10, Weight: 100, HealthStatus: "unhealthy"},
+		{ID: failoverID, Priority: 20, Weight: 100, HealthStatus: "healthy"},
+	})
+	if err != nil {
+		t.Fatalf("select endpoint: %v", err)
+	}
+	if endpoint.ID != failoverID {
+		t.Fatalf("endpoint = %s, want healthy failover %s", endpoint.ID, failoverID)
+	}
+}
+
 func TestResolveOutboundReturnsNoRouteWithoutEndpoint(t *testing.T) {
 	organizationID := uuid.New()
 	trunkID := uuid.New()
@@ -86,6 +184,7 @@ func TestResolveOutboundReturnsNoRouteWithoutEndpoint(t *testing.T) {
 	resolver := &Resolver{repo: &fakeRouteStore{
 		trunk: sqlc.Trunk{ID: trunkID, OrganizationID: organizationID},
 	}}
+	resolver.repo.(*fakeRouteStore).phone = sqlc.PhoneNumber{VoiceEnabled: true, CarrierConnectionID: &resolver.repo.(*fakeRouteStore).trunk.CarrierConnectionID}
 
 	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
 		OrganizationID: organizationID,
@@ -95,6 +194,22 @@ func TestResolveOutboundReturnsNoRouteWithoutEndpoint(t *testing.T) {
 	})
 	if !errors.Is(err, ErrNoRoute) {
 		t.Fatalf("error = %v, want %v", err, ErrNoRoute)
+	}
+}
+
+func TestResolveOutboundRejectsCallerIdentityFromAnotherCarrier(t *testing.T) {
+	organizationID, trunkID := uuid.New(), uuid.New()
+	connectionID, otherConnectionID := uuid.New(), uuid.New()
+	resolver := &Resolver{repo: &fakeRouteStore{
+		trunk: sqlc.Trunk{ID: trunkID, OrganizationID: organizationID, CarrierConnectionID: connectionID},
+		phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true, CarrierConnectionID: &otherConnectionID},
+	}}
+
+	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
+		OrganizationID: organizationID, TrunkID: trunkID, From: "+233200000001", To: "+14155550100",
+	})
+	if !errors.Is(err, ErrCallerIdentity) {
+		t.Fatalf("error = %v, want %v", err, ErrCallerIdentity)
 	}
 }
 

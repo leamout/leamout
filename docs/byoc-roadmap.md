@@ -49,17 +49,25 @@ report success while leaving authentication behavior unchanged.
 
 ## Phase 3 — endpoint reliability
 
-- [ ] Add SIP OPTIONS health checks and priority failover.
-- [ ] Distribute traffic by weight among equal-priority healthy endpoints.
-- [ ] Add failure cooldowns and circuit-breaker state.
-- [ ] Expose endpoint health and route-attempt diagnostics.
+- [x] Add SIP OPTIONS health checks and priority failover.
+- [x] Distribute traffic by weight among equal-priority eligible endpoints.
+- [x] Exclude unhealthy endpoints from weighted selection.
+- [x] Add failure cooldowns and circuit-breaker state.
+- [x] Expose endpoint health diagnostics and selected endpoint attribution.
 
 ## Phase 4 — secure transports and identity
 
-- [ ] Support SIP TLS with hostname verification.
-- [ ] Support customer CA bundles and optional mutual TLS.
-- [ ] Add caller identity, privacy, DTMF, and codec-order policies.
-- [ ] Add SRTP policy independently from SIP TLS.
+- [x] Support SIP TLS with SNI, verified certificate chains, and hostname-verified health probes.
+- [x] Support deployment-managed customer CA bundles and optional mutual TLS identity.
+- [x] Enforce caller identity ownership and per-call privacy, DTMF, and codec-order policies.
+- [x] Apply SDES-SRTP media policy independently from SIP TLS transport.
+
+## Phase C — secure WebRTC
+
+- [x] Issue tenant-bound, short-lived TURN credentials through an authenticated API.
+- [ ] Enable SIP over secure WebSocket at the OpenSIPS edge.
+- [ ] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
+- [ ] Add browser acceptance coverage with forced TURN relay.
 
 ## Phase 5 — operations and orchestration
 
@@ -68,6 +76,15 @@ report success while leaving authentication behavior unchanged.
 - [ ] Add audit events for credential rotation and number reassignment.
 - [ ] Add carrier test-call and configuration-validation workflows.
 - [ ] Add multi-carrier policy only after single-carrier BYOC is reliable.
+
+## Phase D — production hardening
+
+- [x] Apply a shared Redis rate limit to tenant TURN credential issuance.
+- [x] Include Redis in API readiness and fail closed when quota state is unavailable.
+- [x] Mark credential responses as non-cacheable.
+- [ ] Add graceful drain controls for OpenSIPS, RTPengine, and FreeSWITCH nodes.
+- [ ] Separate public signaling, public media, and private control networks.
+- [ ] Add certificate and shared-secret rotation runbooks and automation.
 
 ## MVP exit criteria
 
