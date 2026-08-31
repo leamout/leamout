@@ -70,6 +70,13 @@ type EntitlementSet struct {
 	Limits   map[string]int64
 }
 
+// Resolution carries effective entitlements plus the earliest known entitlement
+// boundary that can require the commercial state to be resolved again.
+type Resolution struct {
+	Set          EntitlementSet
+	NextChangeAt *time.Time
+}
+
 func (e EntitlementSet) Enabled(feature Feature) bool {
 	return e.Features[feature]
 }
