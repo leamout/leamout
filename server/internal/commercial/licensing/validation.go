@@ -6,15 +6,15 @@ import (
 )
 
 var (
-	ErrCustomerRequired       = errors.New("customer_id is required")
+	ErrOrganizationRequired   = errors.New("organization_id is required")
 	ErrInvalidDeploymentLimit = errors.New("max_deployments must be greater than zero")
 	ErrInvalidExpiration      = errors.New("expires_at must be after issued_at")
 )
 
 // Validate checks invariants required before a license is persisted or issued.
 func Validate(license License) error {
-	if strings.TrimSpace(license.CustomerID) == "" {
-		return ErrCustomerRequired
+	if strings.TrimSpace(license.OrganizationID) == "" {
+		return ErrOrganizationRequired
 	}
 	if license.MaxDeployments <= 0 {
 		return ErrInvalidDeploymentLimit
