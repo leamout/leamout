@@ -16,7 +16,7 @@ type store interface {
 	Create(context.Context, uuid.UUID, CreateInput) (Subscription, error)
 	UpdatePlan(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (Subscription, error)
 	UpdatePeriod(context.Context, uuid.UUID, uuid.UUID, PeriodUpdate) (Subscription, error)
-	UpdateStatus(context.Context, uuid.UUID, uuid.UUID, Status) (Subscription, error)
+	UpdateStatus(context.Context, uuid.UUID, uuid.UUID, Status, Status) (Subscription, error)
 	SetProvider(context.Context, uuid.UUID, uuid.UUID, ProviderReference) (Subscription, error)
 	GetByProvider(context.Context, ProviderReference) (Subscription, error)
 }
@@ -122,7 +122,7 @@ func (s *Service) Transition(ctx context.Context, organizationID, id uuid.UUID, 
 	if current.Status == target {
 		return current, nil
 	}
-	return s.store.UpdateStatus(ctx, organizationID, id, target)
+	return s.store.UpdateStatus(ctx, organizationID, id, current.Status, target)
 }
 
 func (s *Service) SetProvider(ctx context.Context, organizationID, id uuid.UUID, reference ProviderReference) (Subscription, error) {
