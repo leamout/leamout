@@ -172,6 +172,7 @@ services:
       - "5060:5060/udp"
       - "5060:5060/tcp"
       - "5061:5061/tcp"
+      - "5062:5062/tcp"
     volumes:
       - ${OPENSIPS_TLS_CERTIFICATE_PATH:?OPENSIPS_TLS_CERTIFICATE_PATH is required}:/etc/opensips/tls/fullchain.pem:ro
       - ${OPENSIPS_TLS_PRIVATE_KEY_PATH:?OPENSIPS_TLS_PRIVATE_KEY_PATH is required}:/etc/opensips/tls/privkey.pem:ro
@@ -195,8 +196,12 @@ services:
       - --realm=${TURN_REALM:?TURN_REALM is required}
       - --static-auth-secret=${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
       - --external-ip=${TURN_EXTERNAL_IP:?TURN_EXTERNAL_IP is required}
+      - --cert=/etc/coturn/tls/fullchain.pem
+      - --pkey=/etc/coturn/tls/privkey.pem
     volumes:
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ${TURN_TLS_CERTIFICATE_PATH:?TURN_TLS_CERTIFICATE_PATH is required}:/etc/coturn/tls/fullchain.pem:ro
+      - ${TURN_TLS_PRIVATE_KEY_PATH:?TURN_TLS_PRIVATE_KEY_PATH is required}:/etc/coturn/tls/privkey.pem:ro
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"

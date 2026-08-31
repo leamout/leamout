@@ -65,9 +65,9 @@ report success while leaving authentication behavior unchanged.
 ## Phase C — secure WebRTC
 
 - [x] Issue tenant-bound, short-lived TURN credentials through an authenticated API.
-- [ ] Enable SIP over secure WebSocket at the OpenSIPS edge.
-- [ ] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
-- [ ] Add browser acceptance coverage with forced TURN relay.
+- [x] Enable SIP over secure WebSocket at the OpenSIPS edge.
+- [x] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
+- [x] Add browser acceptance coverage with forced TURN relay.
 
 ## Phase 5 — operations and orchestration
 
