@@ -44,15 +44,13 @@ func (f fakeEndpointProber) Probe(_ context.Context, endpoint sqlc.TrunkEndpoint
 func TestEndpointHealthJobPersistsSuccessAndCircuitBreakerFailure(t *testing.T) {
 	healthyID, failedID := uuid.New(), uuid.New()
 	store := &fakeHealthStore{endpoints: []sqlc.TrunkEndpoint{{ID: healthyID}, {ID: failedID}}}
-	config := DefaultEndpointHealthConfig()
-	config.Concurrency = 1
 	job, err := NewEndpointHealthJob(store, fakeEndpointProber{
 		results: map[uuid.UUID]ProbeResult{
 			healthyID: {ResponseCode: 200, Latency: 12 * time.Millisecond},
 			failedID:  {Latency: 2 * time.Second},
 		},
 		errors: map[uuid.UUID]error{failedID: errors.New("probe timeout")},
-	}, config)
+	})
 	if err != nil {
 		t.Fatalf("new job: %v", err)
 	}
@@ -71,8 +69,8 @@ func TestEndpointHealthJobPersistsSuccessAndCircuitBreakerFailure(t *testing.T) 
 	if !store.failed[0].CooldownUntil.Time.Equal(now.Add(30*time.Second)) || *store.failed[0].LastError != "probe timeout" {
 		t.Fatalf("failure cooldown = %+v", store.failed[0])
 	}
-	if !store.list.DueBefore.Time.Equal(now.Add(-10 * time.Second)) {
-		t.Fatalf("due before = %s", store.list.DueBefore.Time)
+	if !store.list.DueBefore.Time.Equal(now.Add(-10*time.Second)) || store.list.BatchSize != 100 {
+		t.Fatalf("health query = %+v", store.list)
 	}
 }
 
