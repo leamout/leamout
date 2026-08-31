@@ -11,10 +11,11 @@ import (
 )
 
 type fakeStore struct {
-	current Subscription
-	created CreateInput
-	status  Status
-	planID  uuid.UUID
+	current  Subscription
+	created  CreateInput
+	expected Status
+	status   Status
+	planID   uuid.UUID
 }
 
 func (f *fakeStore) Get(context.Context, uuid.UUID, uuid.UUID) (Subscription, error) {
@@ -38,7 +39,8 @@ func (f *fakeStore) UpdatePeriod(_ context.Context, _, _ uuid.UUID, input Period
 	f.current.EndsAt = input.EndsAt
 	return f.current, nil
 }
-func (f *fakeStore) UpdateStatus(_ context.Context, _, _ uuid.UUID, status Status) (Subscription, error) {
+func (f *fakeStore) UpdateStatus(_ context.Context, _, _ uuid.UUID, expected, status Status) (Subscription, error) {
+	f.expected = expected
 	f.status = status
 	f.current.Status = status
 	return f.current, nil
@@ -128,6 +130,23 @@ func TestTransitionIsIdempotent(t *testing.T) {
 	}
 	if store.status != "" {
 		t.Fatalf("expected no persistence write for idempotent transition, got %s", store.status)
+	}
+}
+
+func TestTransitionUsesExpectedStatus(t *testing.T) {
+	t.Parallel()
+
+	orgID := uuid.New()
+	id := uuid.New()
+	store := &fakeStore{current: Subscription{ID: id, OrganizationID: orgID, Status: StatusActive}}
+	service := NewService(store, fakeCatalog{})
+
+	_, err := service.Transition(context.Background(), orgID, id, StatusPastDue)
+	if err != nil {
+		t.Fatalf("transition: %v", err)
+	}
+	if store.expected != StatusActive || store.status != StatusPastDue {
+		t.Fatalf("expected active -> past_due compare-and-set, got %s -> %s", store.expected, store.status)
 	}
 }
 
