@@ -1,8 +1,6 @@
 package state
 
 import (
-	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -11,31 +9,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
 
-type fakeSubscriptions struct {
-	current subscriptions.Subscription
-	err     error
-}
-
-func (f fakeSubscriptions) Current(context.Context, uuid.UUID) (subscriptions.Subscription, error) {
-	return f.current, f.err
-}
-
-type fakeEntitlements struct {
-	set            entitlements.EntitlementSet
-	err            error
-	organizationID uuid.UUID
-	planID         uuid.UUID
-	at             time.Time
-}
-
-func (f *fakeEntitlements) EffectiveForOrganizationPlanAt(_ context.Context, organizationID, planID uuid.UUID, at time.Time) (entitlements.EntitlementSet, error) {
-	f.organizationID = organizationID
-	f.planID = planID
-	f.at = at
-	return f.set, f.err
-}
-
-func TestResolveBuildsOrganizationState(t *testing.T) {
+func TestOrganizationStateBuildsResolvedState(t *testing.T) {
 	t.Parallel()
 
 	organizationID := uuid.New()
@@ -46,18 +20,14 @@ func TestResolveBuildsOrganizationState(t *testing.T) {
 		Features: map[entitlements.Feature]bool{"recording.enabled": true},
 		Limits:   map[string]int64{"max.concurrent.calls": 25},
 	}
-	resolvedEntitlements := &fakeEntitlements{set: set}
-	service := NewService(fakeSubscriptions{current: subscriptions.Subscription{
+	current := subscriptions.Subscription{
 		ID:             subscriptionID,
 		OrganizationID: organizationID,
 		PlanID:         planID,
 		Status:         subscriptions.StatusActive,
-	}}, resolvedEntitlements)
-
-	resolved, err := service.ResolveAt(context.Background(), organizationID, at)
-	if err != nil {
-		t.Fatalf("ResolveAt() error = %v", err)
 	}
+
+	resolved := organizationState(organizationID, current, set, at)
 	if resolved.OrganizationID != organizationID {
 		t.Fatalf("OrganizationID = %v, want %v", resolved.OrganizationID, organizationID)
 	}
@@ -76,48 +46,24 @@ func TestResolveBuildsOrganizationState(t *testing.T) {
 	if limit, ok := resolved.Limit("max.concurrent.calls"); !ok || limit != 25 {
 		t.Fatalf("Limit(max.concurrent.calls) = %d, %v, want 25, true", limit, ok)
 	}
-	if resolvedEntitlements.organizationID != organizationID || resolvedEntitlements.planID != planID || resolvedEntitlements.at != at {
-		t.Fatal("expected entitlement resolution to use the current subscription plan and evaluation time")
+}
+
+func TestOrganizationStateDoesNotAliasEntitlementMaps(t *testing.T) {
+	t.Parallel()
+
+	set := entitlements.EntitlementSet{
+		Features: map[entitlements.Feature]bool{"recording.enabled": true},
+		Limits:   map[string]int64{"max.concurrent.calls": 25},
 	}
+	resolved := organizationState(uuid.New(), subscriptions.Subscription{ID: uuid.New(), PlanID: uuid.New()}, set, time.Now())
 
 	resolved.Features["recording.enabled"] = false
 	resolved.Limits["max.concurrent.calls"] = 1
-	if !set.Features["recording.enabled"] || set.Limits["max.concurrent.calls"] != 25 {
-		t.Fatal("resolved state must not alias entitlement maps")
+
+	if !set.Features["recording.enabled"] {
+		t.Fatal("resolved features must not alias entitlement features")
 	}
-}
-
-func TestResolveMapsMissingSubscriptionToUnavailable(t *testing.T) {
-	t.Parallel()
-
-	service := NewService(fakeSubscriptions{err: subscriptions.ErrSubscriptionNotFound}, &fakeEntitlements{})
-	_, err := service.Resolve(context.Background(), uuid.New())
-	if !errors.Is(err, ErrUnavailable) {
-		t.Fatalf("Resolve() error = %v, want %v", err, ErrUnavailable)
-	}
-}
-
-func TestResolveRequiresOrganizationID(t *testing.T) {
-	t.Parallel()
-
-	service := NewService(fakeSubscriptions{}, &fakeEntitlements{})
-	_, err := service.Resolve(context.Background(), uuid.Nil)
-	if !errors.Is(err, ErrOrganizationIDRequired) {
-		t.Fatalf("Resolve() error = %v, want %v", err, ErrOrganizationIDRequired)
-	}
-}
-
-func TestResolvePropagatesEntitlementError(t *testing.T) {
-	t.Parallel()
-
-	want := errors.New("resolve entitlements")
-	service := NewService(fakeSubscriptions{current: subscriptions.Subscription{
-		ID:     uuid.New(),
-		PlanID: uuid.New(),
-	}}, &fakeEntitlements{err: want})
-
-	_, err := service.Resolve(context.Background(), uuid.New())
-	if !errors.Is(err, want) {
-		t.Fatalf("Resolve() error = %v, want %v", err, want)
+	if set.Limits["max.concurrent.calls"] != 25 {
+		t.Fatal("resolved limits must not alias entitlement limits")
 	}
 }
