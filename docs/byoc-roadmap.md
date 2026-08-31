@@ -75,6 +75,8 @@ report success while leaving authentication behavior unchanged.
 - [ ] Publish metrics per carrier connection, trunk, and endpoint.
 - [ ] Add audit events for credential rotation and number reassignment.
 - [ ] Add carrier test-call and configuration-validation workflows.
+  - [x] Add an on-demand configuration validator with bounded SIP OPTIONS probes.
+  - [ ] Add a controlled, destination-allowlisted test-call workflow.
 - [ ] Add multi-carrier policy only after single-carrier BYOC is reliable.
 
 ## Phase D — production hardening

@@ -52,6 +52,33 @@ type InboundAuthRequest struct {
 	Secret   string `json:"secret,omitempty"`
 }
 
+type ValidationIssue struct {
+	Severity   string     `json:"severity"`
+	Code       string     `json:"code"`
+	Message    string     `json:"message"`
+	TrunkID    *uuid.UUID `json:"trunk_id,omitempty"`
+	EndpointID *uuid.UUID `json:"endpoint_id,omitempty"`
+}
+
+type EndpointValidation struct {
+	TrunkID      uuid.UUID `json:"trunk_id"`
+	EndpointID   uuid.UUID `json:"endpoint_id"`
+	Host         string    `json:"host"`
+	Port         int32     `json:"port"`
+	Transport    string    `json:"transport"`
+	Reachable    bool      `json:"reachable"`
+	ResponseCode *int32    `json:"response_code,omitempty"`
+	LatencyMS    int64     `json:"latency_ms"`
+	Error        string    `json:"error,omitempty"`
+}
+
+type ValidationResponse struct {
+	CarrierConnectionID uuid.UUID            `json:"carrier_connection_id"`
+	Valid               bool                 `json:"valid"`
+	Issues              []ValidationIssue    `json:"issues"`
+	Endpoints           []EndpointValidation `json:"endpoints"`
+}
+
 type Response struct {
 	ID                     uuid.UUID `json:"id"`
 	OrganizationID         uuid.UUID `json:"organization_id"`

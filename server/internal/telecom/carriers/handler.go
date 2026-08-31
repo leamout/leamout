@@ -62,6 +62,20 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, item)
 }
 
+func (h *Handler) Validate(w http.ResponseWriter, r *http.Request) {
+	org, id, err := connectionIDs(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	result, err := h.service.Validate(r.Context(), org, id)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, result)
+}
+
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	org, id, err := connectionIDs(r)
 	if err != nil {

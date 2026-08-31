@@ -16,6 +16,7 @@ func RegisterRoutes(
 		r.Post("/", handler.Create)
 		r.Get("/", handler.List)
 		r.Get("/{carrier_connection_id}", handler.Get)
+		r.Post("/{carrier_connection_id}/validate", handler.Validate)
 		r.Patch("/{carrier_connection_id}", handler.Update)
 		r.Delete("/{carrier_connection_id}", handler.Delete)
 		r.Put("/{carrier_connection_id}/outbound-auth", handler.SetOutboundAuth)

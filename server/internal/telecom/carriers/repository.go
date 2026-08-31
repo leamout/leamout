@@ -177,3 +177,17 @@ func (r *Repository) ListProviders(ctx context.Context) ([]sqlc.CarrierProvider,
 func (r *Repository) GetProvider(ctx context.Context, id uuid.UUID) (sqlc.CarrierProvider, error) {
 	return r.queries.GetCarrierProviderByID(ctx, id)
 }
+
+func (r *Repository) ListConnectionTrunks(ctx context.Context, organizationID, connectionID uuid.UUID) ([]sqlc.Trunk, error) {
+	return r.queries.ListTrunksByCarrierConnectionID(ctx, sqlc.ListTrunksByCarrierConnectionIDParams{
+		CarrierConnectionID: connectionID,
+		OrganizationID:      organizationID,
+	})
+}
+
+func (r *Repository) ListTrunkEndpoints(ctx context.Context, organizationID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
+	return r.queries.ListTrunkEndpoints(ctx, sqlc.ListTrunkEndpointsParams{
+		TrunkID:        trunkID,
+		OrganizationID: organizationID,
+	})
+}

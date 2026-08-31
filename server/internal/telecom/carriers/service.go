@@ -6,21 +6,98 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
 type Service struct {
 	repo   *Repository
 	cipher interface{ Encrypt(string) (string, error) }
+	prober routing.EndpointProber
 }
 
 func NewService(repo *Repository, cipher interface{ Encrypt(string) (string, error) }) *Service {
-	return &Service{repo: repo, cipher: cipher}
+	return &Service{repo: repo, cipher: cipher, prober: routing.NewSIPOptionsProber()}
+}
+
+// Validate checks that a carrier connection has an eligible outbound topology
+// and performs bounded SIP OPTIONS probes without changing circuit-breaker
+// state. It is an explicit operator workflow, not a substitute for the worker's
+// continuous endpoint health checks.
+func (s *Service) Validate(ctx context.Context, organizationID, connectionID uuid.UUID) (ValidationResponse, error) {
+	connection, err := s.Get(ctx, organizationID, connectionID)
+	if err != nil {
+		return ValidationResponse{}, err
+	}
+	result := ValidationResponse{CarrierConnectionID: connectionID, Issues: []ValidationIssue{}, Endpoints: []EndpointValidation{}}
+	probeRootCtx, cancelProbes := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelProbes()
+	if connection.Status != "active" {
+		result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "connection_inactive", Message: "carrier connection must be active"})
+	}
+	if connection.OutboundAuthMethod == "digest" && !connection.HasOutboundCredentials {
+		result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "outbound_credentials_missing", Message: "digest outbound authentication requires active credentials"})
+	}
+
+	trunks, err := s.repo.ListConnectionTrunks(ctx, organizationID, connectionID)
+	if err != nil {
+		return ValidationResponse{}, apperror.NewInternal("list carrier connection trunks for validation", err)
+	}
+	eligibleTrunks := 0
+	for _, trunk := range trunks {
+		if trunk.Status != "active" || (trunk.Direction != "outbound" && trunk.Direction != "bidirectional") {
+			continue
+		}
+		eligibleTrunks++
+		endpoints, err := s.repo.ListTrunkEndpoints(ctx, organizationID, trunk.ID)
+		if err != nil {
+			return ValidationResponse{}, apperror.NewInternal("list trunk endpoints for validation", err)
+		}
+		eligibleEndpoints := 0
+		for _, endpoint := range endpoints {
+			if !endpoint.Enabled || (endpoint.Direction != "outbound" && endpoint.Direction != "bidirectional") {
+				continue
+			}
+			eligibleEndpoints++
+			check := EndpointValidation{TrunkID: trunk.ID, EndpointID: endpoint.ID, Host: endpoint.Host, Port: endpoint.Port, Transport: endpoint.Transport}
+			probeCtx, cancel := context.WithTimeout(probeRootCtx, 2*time.Second)
+			probe, probeErr := s.prober.Probe(probeCtx, endpoint)
+			cancel()
+			check.LatencyMS = probe.Latency.Milliseconds()
+			if probeErr != nil {
+				check.Error = truncateValidationError(probeErr.Error())
+				endpointID, trunkID := endpoint.ID, trunk.ID
+				result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "endpoint_unreachable", Message: check.Error, TrunkID: &trunkID, EndpointID: &endpointID})
+			} else {
+				check.Reachable = true
+				check.ResponseCode = &probe.ResponseCode
+			}
+			result.Endpoints = append(result.Endpoints, check)
+		}
+		if eligibleEndpoints == 0 {
+			trunkID := trunk.ID
+			result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "no_eligible_endpoints", Message: "active outbound trunk has no enabled outbound endpoint", TrunkID: &trunkID})
+		}
+	}
+	if eligibleTrunks == 0 {
+		result.Issues = append(result.Issues, ValidationIssue{Severity: "error", Code: "no_eligible_trunks", Message: "carrier connection has no active outbound trunk"})
+	}
+	result.Valid = len(result.Issues) == 0
+	return result, nil
+}
+
+func truncateValidationError(message string) string {
+	message = strings.TrimSpace(message)
+	if len(message) > 512 {
+		return message[:512]
+	}
+	return message
 }
 
 func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req DigestAuthRequest) (Response, error) {
