@@ -85,6 +85,42 @@ telecom domain event
 
 Telecom domains produce authoritative usage. The commercial domain meters and rates it, snapshots charges into invoice items, and reconciles payments.
 
+## Strict module structure
+
+Commercial modules use the following file convention. A file exists only when the module owns that responsibility.
+
+| File | Add it when |
+| --- | --- |
+| `model.go` | The module defines domain models, states, errors, commands, inputs, or outputs. |
+| `repository.go` | The module owns durable persistence or database queries. |
+| `service.go` | The module contains business rules, use cases, orchestration, or transaction boundaries. |
+| `validation.go` | The module has reusable domain or input validation. |
+| `handler.go` | The module exposes HTTP endpoints. |
+| `routes.go` | The module registers HTTP routes. It normally exists together with `handler.go`. |
+| `consumer.go` | The module consumes asynchronous events or messages. Events entering the module. |
+| `publisher.go` | The module publishes asynchronous events or messages. Events leaving the module. |
+| `jobs.go` | The module owns scheduled or recurring background work. |
+
+Do not create empty scaffold files for possible future behavior. Add the file when the responsibility is implemented.
+
+## SQLC-only persistence rule
+
+All commercial persistence must go through SQLC.
+
+```text
+commercial/<module>/repository.go
+        ↓
+internal/database/sqlc
+        ↓
+internal/database/queries/*.sql
+        ↓
+PostgreSQL
+```
+
+Repository files may construct `sqlc.*Params`, call generated `*sqlc.Queries` methods, convert generated rows into domain models, and map PostgreSQL/pgx errors into domain errors. They must not embed SQL strings or call `Query`, `QueryRow`, or `Exec` directly for application persistence.
+
+New or changed SQL belongs in `server/internal/database/queries/*.sql`. Generated bindings belong in `server/internal/database/sqlc` and must remain reproducible by `sqlc generate`. The Server workflow verifies that regeneration produces no diff.
+
 ## Source-of-truth rules
 
 1. PostgreSQL commercial state is authoritative.
@@ -94,6 +130,7 @@ Telecom domains produce authoritative usage. The commercial domain meters and ra
 5. Historical invoice pricing must be snapshotted. Old invoices must not be re-rated from current rates.
 6. Usage ingestion must be idempotent.
 7. SQL queries must enforce tenant/resource ownership even when middleware or service authorization fails.
+8. Commercial repositories must use SQLC-generated queries rather than raw SQL.
 
 See [security.md](security.md) for the database defense model.
 
