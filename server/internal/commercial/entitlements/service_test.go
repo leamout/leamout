@@ -49,8 +49,8 @@ func (f fakeSubscriptions) Current(context.Context, uuid.UUID) (subscriptions.Su
 	return f.current, f.err
 }
 
-func boolPtr(value bool) *bool { return &value }
-func int64Ptr(value int64) *int64 { return &value }
+func boolPtr(value bool) *bool           { return &value }
+func int64Ptr(value int64) *int64        { return &value }
 func timePtr(value time.Time) *time.Time { return &value }
 
 func TestEffectiveForOrganizationAppliesOverrides(t *testing.T) {
