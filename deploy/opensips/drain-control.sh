@@ -63,7 +63,9 @@ case "${1:-}" in
     fi
     ;;
   dialogs)
-    response=$(mi 'get_statistics' '[["dialog:active_dialogs"]]')
+    # get_statistics treats entries as statistic/group selectors. Query the
+    # documented dialog: group, then extract the active_dialogs member.
+    response=$(mi 'get_statistics' '{"statistics":["dialog:"]}')
     count=$(printf '%s' "$response" | sed -n 's/.*"dialog:active_dialogs"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
     [ -n "$count" ] || {
       echo "Unable to parse OpenSIPS active dialog count" >&2
