@@ -98,6 +98,56 @@ jobs:
           }
           trap cleanup EXIT
 
+          dump_freeswitch_diagnostics() {
+            echo "--- raw fsctl pause_check ---" >&2
+            docker exec freeswitch-drain-test \
+              fs_cli -H 127.0.0.1 -P 8021 -p test-password \
+              -x 'fsctl pause_check' >&2 || true
+            echo "--- raw show channels count ---" >&2
+            docker exec freeswitch-drain-test \
+              fs_cli -H 127.0.0.1 -P 8021 -p test-password \
+              -x 'show channels count' >&2 || true
+          }
+
+          assert_eq() {
+            expected="$1"
+            shift
+
+            if actual="$("$@")"; then
+              :
+            else
+              rc=$?
+              echo "::error::command failed with exit $rc: $*" >&2
+              dump_freeswitch_diagnostics
+              return "$rc"
+            fi
+
+            if [ "$actual" != "$expected" ]; then
+              echo "::error::expected '$expected', got '$actual': $*" >&2
+              dump_freeswitch_diagnostics
+              return 1
+            fi
+          }
+
+          assert_numeric() {
+            if actual="$("$@")"; then
+              :
+            else
+              rc=$?
+              echo "::error::command failed with exit $rc: $*" >&2
+              dump_freeswitch_diagnostics
+              return "$rc"
+            fi
+
+            case "$actual" in
+              ''|*[!0-9]*)
+                echo "::error::expected numeric output, got '$actual': $*" >&2
+                dump_freeswitch_diagnostics
+                return 1
+                ;;
+            esac
+          }
+
           ready=0
           for _ in $(seq 1 60); do
             if docker exec freeswitch-drain-test \
@@ -107,14 +157,20 @@ jobs:
             fi
             sleep 1
           done
-          test "$ready" -eq 1
+          if [ "$ready" -ne 1 ]; then
+            echo "::error::FreeSWITCH ESL did not become ready within 60 seconds" >&2
+            docker logs freeswitch-drain-test >&2 || true
+            exit 1
+          fi
 
-          test "$(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain status)" = "accepting"
-          test "$(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain enable)" = "draining"
-          test "$(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain status)" = "draining"
-          docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain channels | grep -Eq '^[0-9]+$'
-          test "$(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain resume)" = "accepting"
-          test "$(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain status)" = "accepting"
+          drain=(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain)
+
+          assert_eq accepting "${drain[@]}" status
+          assert_eq draining "${drain[@]}" enable
+          assert_eq draining "${drain[@]}" status
+          assert_numeric "${drain[@]}" channels
+          assert_eq accepting "${drain[@]}" resume
+          assert_eq accepting "${drain[@]}" status
 
   rtpengine:
     name: Build RTPengine
