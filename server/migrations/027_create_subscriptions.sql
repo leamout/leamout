@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
     plan_id UUID NOT NULL REFERENCES plans(id),
+    price_id UUID,
     status TEXT NOT NULL DEFAULT 'pending',
     starts_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     renews_at TIMESTAMPTZ,
@@ -12,6 +13,9 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_subscriptions_id_organization UNIQUE (id, organization_id),
+    CONSTRAINT fk_subscriptions_price_plan
+        FOREIGN KEY (price_id, plan_id)
+        REFERENCES prices(id, plan_id),
     CONSTRAINT chk_subscriptions_status CHECK (
         status IN ('pending', 'active', 'past_due', 'cancelled', 'expired')
     ),
@@ -53,6 +57,10 @@ CREATE INDEX IF NOT EXISTS idx_subscriptions_organization_status
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_plan_status
     ON subscriptions (plan_id, status, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_price
+    ON subscriptions (price_id)
+    WHERE price_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_renews_at
     ON subscriptions (renews_at)
