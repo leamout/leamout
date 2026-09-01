@@ -44,7 +44,8 @@ func TestHandlerPublishesPrometheusTelecomSeries(t *testing.T) {
 	field := series("calls_attempted_total", carrier, uuid.Nil, uuid.Nil, "")
 	registry := New(&fakeSharedStore{counters: map[string]string{field: "7"}, gauges: map[string]string{}})
 	recorder := httptest.NewRecorder()
-	Handler(registry).ServeHTTP(recorder, httptest.NewRequest("GET", "/metrics", nil))
+	request := httptest.NewRequestWithContext(t.Context(), "GET", "/metrics", nil)
+	Handler(registry).ServeHTTP(recorder, request)
 	if recorder.Code != 200 {
 		t.Fatalf("status = %d", recorder.Code)
 	}
