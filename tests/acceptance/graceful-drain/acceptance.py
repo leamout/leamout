@@ -137,6 +137,13 @@ def channel_count(service):
     return int(match.group(1))
 
 
+def channel_exists(service, channel_id):
+    output = fs(service, f"uuid_exists {channel_id}").strip().lower()
+    if output in ("true", "false"):
+        return output == "true"
+    raise Failure(f"unable to parse {service} uuid_exists response: {output!r}")
+
+
 def opensips_dialogs():
     return numeric(
         compose(
@@ -316,14 +323,27 @@ def cleanup_call():
     call = STATE.get("call")
     if not call:
         return
-    api("POST", f"/v1/calls/{call['id']}/hangup")
-    wait("OpenSIPS dialog cleanup", lambda: opensips_dialogs() == 0, 20)
-    wait("Leamout FreeSWITCH channel cleanup", lambda: freeswitch_channels() == 0, 20)
+
+    channel_id = call["sip_call_id"]
+    updated = api("POST", f"/v1/calls/{call['id']}/hangup")
+    time.sleep(0.5)
+    print(
+        "POST-HANGUP "
+        f"api_state={updated.get('state')} "
+        f"leamout_uuid_exists={channel_exists('freeswitch', channel_id)} "
+        f"freeswitch_channels={freeswitch_channels()} "
+        f"carrier_channels={channel_count('graceful-drain-carrier')} "
+        f"opensips_dialogs={opensips_dialogs()} "
+        f"rtpengine_media_sockets={rtpengine_media_sockets()}"
+    )
+
+    wait("Leamout FreeSWITCH channel cleanup", lambda: freeswitch_channels() == 0, 10)
     wait(
         "carrier channel cleanup",
         lambda: channel_count("graceful-drain-carrier") == 0,
-        20,
+        10,
     )
+    wait("OpenSIPS dialog cleanup", lambda: opensips_dialogs() == 0, 20)
     wait("RTPengine media cleanup", lambda: rtpengine_media_sockets() == 0, 20)
 
     originate = STATE.get("originate")
