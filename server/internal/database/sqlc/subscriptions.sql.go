@@ -34,7 +34,7 @@ WHERE s.organization_id = $1
   AND (pr.effective_until IS NULL OR pr.effective_until > NOW())
   AND pl.active = true
   AND p.active = true
-RETURNING s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+RETURNING s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 `
 
 type ChangeSubscriptionPriceParams struct {
@@ -56,6 +56,7 @@ func (q *Queries) ChangeSubscriptionPrice(ctx context.Context, arg ChangeSubscri
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -64,7 +65,6 @@ func (q *Queries) ChangeSubscriptionPrice(ctx context.Context, arg ChangeSubscri
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
@@ -81,7 +81,7 @@ WHERE s.organization_id = $2
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+RETURNING s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 `
 
 type CompareAndSetSubscriptionStatusParams struct {
@@ -103,6 +103,7 @@ func (q *Queries) CompareAndSetSubscriptionStatus(ctx context.Context, arg Compa
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -111,7 +112,6 @@ func (q *Queries) CompareAndSetSubscriptionStatus(ctx context.Context, arg Compa
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
@@ -152,7 +152,7 @@ WHERE o.id = $9
   AND pr.active = true
   AND pr.effective_from <= COALESCE($2, NOW())
   AND (pr.effective_until IS NULL OR pr.effective_until > COALESCE($2, NOW()))
-RETURNING id, organization_id, plan_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at, price_id
+RETURNING id, organization_id, plan_id, price_id, status, starts_at, renews_at, ends_at, billing_provider, provider_subscription_id, created_at, updated_at
 `
 
 type CreateSubscriptionParams struct {
@@ -184,6 +184,7 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -192,13 +193,12 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
 
 const getCurrentSubscription = `-- name: GetCurrentSubscription :one
-SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+SELECT s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 FROM subscriptions AS s
 JOIN organizations AS o ON o.id = s.organization_id
 WHERE s.organization_id = $1
@@ -216,6 +216,7 @@ func (q *Queries) GetCurrentSubscription(ctx context.Context, organizationID uui
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -224,13 +225,12 @@ func (q *Queries) GetCurrentSubscription(ctx context.Context, organizationID uui
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
 
 const getSubscription = `-- name: GetSubscription :one
-SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+SELECT s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 FROM subscriptions AS s
 JOIN organizations AS o ON o.id = s.organization_id
 WHERE s.organization_id = $1
@@ -252,6 +252,7 @@ func (q *Queries) GetSubscription(ctx context.Context, arg GetSubscriptionParams
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -260,13 +261,12 @@ func (q *Queries) GetSubscription(ctx context.Context, arg GetSubscriptionParams
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
 
 const getSubscriptionByProviderID = `-- name: GetSubscriptionByProviderID :one
-SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+SELECT s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 FROM subscriptions AS s
 JOIN organizations AS o ON o.id = s.organization_id
 WHERE s.billing_provider = $1
@@ -288,6 +288,7 @@ func (q *Queries) GetSubscriptionByProviderID(ctx context.Context, arg GetSubscr
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -296,13 +297,12 @@ func (q *Queries) GetSubscriptionByProviderID(ctx context.Context, arg GetSubscr
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
 
 const listSubscriptionsByOrganization = `-- name: ListSubscriptionsByOrganization :many
-SELECT s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+SELECT s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 FROM subscriptions AS s
 JOIN organizations AS o ON o.id = s.organization_id
 WHERE s.organization_id = $1
@@ -324,6 +324,7 @@ func (q *Queries) ListSubscriptionsByOrganization(ctx context.Context, organizat
 			&i.ID,
 			&i.OrganizationID,
 			&i.PlanID,
+			&i.PriceID,
 			&i.Status,
 			&i.StartsAt,
 			&i.RenewsAt,
@@ -332,7 +333,6 @@ func (q *Queries) ListSubscriptionsByOrganization(ctx context.Context, organizat
 			&i.ProviderSubscriptionID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.PriceID,
 		); err != nil {
 			return nil, err
 		}
@@ -356,7 +356,7 @@ WHERE s.organization_id = $3
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+RETURNING s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 `
 
 type SetSubscriptionProviderParams struct {
@@ -378,6 +378,7 @@ func (q *Queries) SetSubscriptionProvider(ctx context.Context, arg SetSubscripti
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -386,7 +387,6 @@ func (q *Queries) SetSubscriptionProvider(ctx context.Context, arg SetSubscripti
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
@@ -403,7 +403,7 @@ WHERE s.organization_id = $3
   AND o.id = s.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING s.id, s.organization_id, s.plan_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at, s.price_id
+RETURNING s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 `
 
 type UpdateSubscriptionPeriodParams struct {
@@ -425,6 +425,7 @@ func (q *Queries) UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscr
 		&i.ID,
 		&i.OrganizationID,
 		&i.PlanID,
+		&i.PriceID,
 		&i.Status,
 		&i.StartsAt,
 		&i.RenewsAt,
@@ -433,7 +434,6 @@ func (q *Queries) UpdateSubscriptionPeriod(ctx context.Context, arg UpdateSubscr
 		&i.ProviderSubscriptionID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.PriceID,
 	)
 	return i, err
 }
