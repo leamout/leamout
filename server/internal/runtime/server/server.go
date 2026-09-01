@@ -22,7 +22,6 @@ import (
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/security/secrets"
 	"github.com/leamout/leamout/internal/telecom/calls"
-	"github.com/leamout/leamout/internal/telecom/carrier_tests"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
 	"github.com/leamout/leamout/internal/telecom/numbers"
@@ -108,7 +107,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
 	}
-	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient, cfg.CarrierTestDestinations)
+	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient)
 	if err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
@@ -150,7 +149,6 @@ func NewModules(
 	credentialCipher *secrets.Cipher,
 	turnService *realtime.Service,
 	redisClient *redisintegration.Client,
-	carrierTestDestinations []string,
 ) (Modules, error) {
 	queries := sqlc.New(db)
 
@@ -205,11 +203,6 @@ func NewModules(
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
 	carriersRepository := carriers.NewRepository(db)
 	carriersService := carriers.NewService(carriersRepository, credentialCipher)
-	carrierTestsRepository := carrier_tests.NewRepository(db)
-	carrierTestsService, err := carrier_tests.NewService(carrierTestsRepository, routingService, callsController, redisClient, carrierTestDestinations)
-	if err != nil {
-		return Modules{}, err
-	}
 
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
@@ -292,11 +285,6 @@ func NewModules(
 			Repository: carriersRepository,
 			Service:    carriersService,
 			Handler:    carriers.NewHandler(carriersService),
-		},
-		CarrierTests: CarrierTestsModule{
-			Repository: carrierTestsRepository,
-			Service:    carrierTestsService,
-			Handler:    carrier_tests.NewHandler(carrierTestsService),
 		},
 		Trunks: TrunksModule{
 			Repository: trunksRepository,
