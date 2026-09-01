@@ -2,7 +2,6 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-compose="docker compose -f $script_dir/compose.yaml"
 timeout_seconds=${LEAMOUT_DRAIN_TIMEOUT_SECONDS:-300}
 poll_seconds=${LEAMOUT_DRAIN_POLL_SECONDS:-2}
 
@@ -15,8 +14,7 @@ esac
 [ "$poll_seconds" -gt 0 ] || { echo "LEAMOUT_DRAIN_POLL_SECONDS must be greater than zero" >&2; exit 2; }
 
 run_compose() {
-  # shellcheck disable=SC2086
-  $compose "$@"
+  (cd "$script_dir" && docker compose "$@")
 }
 
 opensips_control() {
