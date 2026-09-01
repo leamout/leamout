@@ -7,6 +7,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 API = os.getenv("GRACEFUL_DRAIN_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv(
@@ -47,8 +48,8 @@ def compose(*args, check=True):
     return run(COMPOSE + list(args), check)
 
 
-def fs(service, command):
-    return compose(
+def fs_args(service, command):
+    return COMPOSE + [
         "exec",
         "-T",
         service,
@@ -61,7 +62,11 @@ def fs(service, command):
         ESL_PASSWORD,
         "-x",
         command,
-    )
+    ]
+
+
+def fs(service, command):
+    return run(fs_args(service, command))
 
 
 def api(method, path, payload=None, expected=(200,)):
@@ -108,7 +113,9 @@ def wait(description, probe, timeout=30):
             value = probe()
             if value:
                 return value
-        except Exception as error:  # noqa: BLE001 - retain probe diagnostics
+        except Failure:
+            raise
+        except Exception as error:  # noqa: BLE001 - retain transient probe diagnostics
             last_error = error
         time.sleep(0.25)
     detail = f": {last_error}" if last_error else ""
@@ -132,14 +139,26 @@ def channel_count(service):
 
 def opensips_dialogs():
     return numeric(
-        compose("exec", "-T", "opensips", "/usr/local/bin/leamout-opensips-drain", "dialogs"),
+        compose(
+            "exec",
+            "-T",
+            "opensips",
+            "/usr/local/bin/leamout-opensips-drain",
+            "dialogs",
+        ),
         "OpenSIPS dialog count",
     )
 
 
 def freeswitch_channels():
     return numeric(
-        compose("exec", "-T", "freeswitch", "/usr/local/bin/leamout-freeswitch-drain", "channels"),
+        compose(
+            "exec",
+            "-T",
+            "freeswitch",
+            "/usr/local/bin/leamout-freeswitch-drain",
+            "channels",
+        ),
         "FreeSWITCH channel count",
     )
 
@@ -222,23 +241,41 @@ def establish_call():
         for call in api("GET", "/v1/calls/?limit=100")["calls"]
     }
 
-    originate = fs(
-        "graceful-drain-carrier",
-        f"bgapi originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()",
+    originate_uuid = str(uuid.uuid4())
+    originate_command = (
+        "originate "
+        f"{{origination_uuid={originate_uuid},origination_caller_id_number={CALLER},originate_timeout=15}}"
+        f"sofia/internal/{DID}@opensips:5060 &park()"
     )
-    if "+OK Job-UUID:" not in originate:
-        raise Failure(f"carrier did not accept originate job: {originate}")
+    originate = subprocess.Popen(
+        fs_args("graceful-drain-carrier", originate_command),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    STATE["originate"] = originate
+    STATE["originate_uuid"] = originate_uuid
 
     def inbound_call():
         calls = api("GET", "/v1/calls/?limit=100")["calls"]
-        return next(
+        call = next(
             (
-                call
-                for call in calls
-                if call["id"] not in before and call.get("direction") == "inbound"
+                item
+                for item in calls
+                if item["id"] not in before and item.get("direction") == "inbound"
             ),
             None,
         )
+        if call is not None:
+            return call
+
+        if originate.poll() is not None:
+            output, _ = originate.communicate()
+            raise Failure(
+                "carrier originate ended before Leamout created an inbound call "
+                f"(exit={originate.returncode}, uuid={originate_uuid}): {output.strip()!r}"
+            )
+        return None
 
     call = wait("inbound call record", inbound_call, 30)
     STATE["call"] = call
@@ -288,6 +325,15 @@ def cleanup_call():
         20,
     )
     wait("RTPengine media cleanup", lambda: rtpengine_media_sockets() == 0, 20)
+
+    originate = STATE.get("originate")
+    if originate is not None and originate.poll() is None:
+        try:
+            originate.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            originate.terminate()
+            originate.communicate(timeout=5)
+
     print("PASS call cleanup released SIP, application, and media state")
 
 
