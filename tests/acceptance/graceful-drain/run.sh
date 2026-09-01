@@ -1,0 +1,86 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
+
+export GRACEFUL_DRAIN_SUITE_DIR="$SCRIPT_DIR"
+export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-graceful-drain-esl-secret}"
+export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
+export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.30.0.10}"
+export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-graceful-drain-turn-secret}"
+export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
+export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
+export TURN_REALM="${TURN_REALM:-graceful-drain.local}"
+
+COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml"
+
+cleanup() {
+    status=$?
+    trap - EXIT INT TERM
+    if [ "$status" -ne 0 ]; then
+        (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
+        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=250 server worker opensips freeswitch rtpengine graceful-drain-carrier postgres) || true
+    fi
+    if [ "${GRACEFUL_DRAIN_KEEP_STACK:-0}" != "1" ]; then
+        (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
+    fi
+    exit "$status"
+}
+trap cleanup EXIT INT TERM
+
+command -v docker >/dev/null 2>&1 || { echo "docker is required" >&2; exit 1; }
+command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 1; }
+
+mkdir -p "$SCRIPT_DIR/certs"
+openssl req \
+    -x509 \
+    -newkey rsa:2048 \
+    -nodes \
+    -keyout "$SCRIPT_DIR/certs/privkey.pem" \
+    -out "$SCRIPT_DIR/certs/fullchain.pem" \
+    -subj '/CN=graceful-drain.local' \
+    -days 1 \
+    >/dev/null 2>&1
+cp "$SCRIPT_DIR/certs/fullchain.pem" "$SCRIPT_DIR/certs/carrier-ca.pem"
+
+cd "$REPO_ROOT"
+$COMPOSE config --quiet
+
+$COMPOSE up -d --build postgres redis nats rtpengine freeswitch graceful-drain-carrier
+until $COMPOSE exec -T postgres pg_isready -U leamout -d leamout >/dev/null 2>&1; do
+    sleep 1
+done
+
+$COMPOSE up --build migrate
+$COMPOSE exec -T postgres \
+    psql -v ON_ERROR_STOP=1 -U leamout -d leamout \
+    < tests/acceptance/graceful-drain/bootstrap.sql \
+    >/dev/null
+
+$COMPOSE up -d --build opensips server worker
+
+ready=0
+for _ in $(seq 1 90); do
+    if python3 - <<'PY'
+import urllib.request
+try:
+    with urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2) as response:
+        raise SystemExit(0 if response.status == 204 else 1)
+except Exception:
+    raise SystemExit(1)
+PY
+    then
+        ready=1
+        break
+    fi
+    sleep 1
+done
+
+if [ "$ready" -ne 1 ]; then
+    echo "API did not become ready within 90 seconds" >&2
+    exit 1
+fi
+
+python3 tests/acceptance/graceful-drain/acceptance.py
