@@ -20,6 +20,9 @@ cleanup() {
     trap - EXIT INT TERM
     if [ "$status" -ne 0 ]; then
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
+        (cd "$REPO_ROOT" && $COMPOSE exec -T graceful-drain-carrier fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
+        (cd "$REPO_ROOT" && $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
+        (cd "$REPO_ROOT" && $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status) || true
         (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=250 server worker opensips freeswitch rtpengine graceful-drain-carrier postgres) || true
     fi
     if [ "${GRACEFUL_DRAIN_KEEP_STACK:-0}" != "1" ]; then
@@ -71,6 +74,27 @@ $COMPOSE exec -T postgres \
     >/dev/null
 
 $COMPOSE up -d --build opensips server worker
+
+sip_ready=0
+for _ in $(seq 1 60); do
+    if $COMPOSE exec -T graceful-drain-carrier \
+            fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
+            -x 'sofia status profile internal' >/dev/null 2>&1 \
+        && $COMPOSE exec -T freeswitch \
+            fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
+            -x 'sofia status profile internal' >/dev/null 2>&1 \
+        && $COMPOSE exec -T opensips \
+            /usr/local/bin/leamout-opensips-drain status >/dev/null 2>&1; then
+        sip_ready=1
+        break
+    fi
+    sleep 1
+done
+
+if [ "$sip_ready" -ne 1 ]; then
+    echo "SIP services did not become ready within 60 seconds" >&2
+    exit 1
+fi
 
 ready=0
 for _ in $(seq 1 90); do
