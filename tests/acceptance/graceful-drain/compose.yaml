@@ -1,9 +1,7 @@
 services:
   opensips:
     volumes: !reset
-      - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
-      - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
-      - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/certs/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+      - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/certs:/etc/opensips/tls:ro
 
   rtpengine:
     ports: !reset []
