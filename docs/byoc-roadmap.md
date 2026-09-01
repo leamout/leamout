@@ -95,7 +95,7 @@ report success while leaving authentication behavior unchanged.
 - [x] Apply a shared Redis rate limit to tenant TURN credential issuance.
 - [x] Include Redis in API readiness and fail closed when quota state is unavailable.
 - [x] Mark credential responses as non-cacheable.
-- [ ] Add graceful drain controls for OpenSIPS, RTPengine, and FreeSWITCH nodes.
+- [x] Add graceful drain controls for OpenSIPS, RTPengine, and FreeSWITCH nodes.
 - [ ] Separate public signaling, public media, and private control networks.
 - [ ] Add certificate and shared-secret rotation runbooks and automation.
 
