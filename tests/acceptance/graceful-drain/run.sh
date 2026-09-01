@@ -14,10 +14,14 @@ export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export TURN_REALM="${TURN_REALM:-graceful-drain.local}"
 
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml"
+COMPOSE_CONFIG_TMP=""
 
 cleanup() {
     status=$?
     trap - EXIT INT TERM
+    if [ -n "$COMPOSE_CONFIG_TMP" ]; then
+        rm -f "$COMPOSE_CONFIG_TMP"
+    fi
     if [ "$status" -ne 0 ]; then
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
         (cd "$REPO_ROOT" && $COMPOSE exec -T graceful-drain-carrier fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
@@ -48,8 +52,57 @@ openssl req \
     >/dev/null 2>&1
 cp "$SCRIPT_DIR/certs/fullchain.pem" "$SCRIPT_DIR/certs/carrier-ca.pem"
 
+for fixture in fullchain.pem privkey.pem carrier-ca.pem; do
+    test -s "$SCRIPT_DIR/certs/$fixture" || {
+        echo "missing generated TLS fixture: $SCRIPT_DIR/certs/$fixture" >&2
+        exit 1
+    }
+done
+
 cd "$REPO_ROOT"
 $COMPOSE config --quiet
+COMPOSE_CONFIG_TMP=$(mktemp)
+$COMPOSE config --format json > "$COMPOSE_CONFIG_TMP"
+python3 - "$COMPOSE_CONFIG_TMP" "$SCRIPT_DIR/certs" <<'PY'
+import json
+import os
+import sys
+
+config_path, cert_dir = sys.argv[1:]
+with open(config_path, encoding="utf-8") as handle:
+    config = json.load(handle)
+
+volumes = config["services"]["opensips"].get("volumes", [])
+resolved = {
+    item.get("target"): os.path.realpath(item.get("source", ""))
+    for item in volumes
+    if isinstance(item, dict)
+}
+expected = {
+    "/etc/opensips/tls/fullchain.pem": os.path.realpath(
+        os.path.join(cert_dir, "fullchain.pem")
+    ),
+    "/etc/opensips/tls/privkey.pem": os.path.realpath(
+        os.path.join(cert_dir, "privkey.pem")
+    ),
+    "/etc/opensips/tls/carrier-ca.pem": os.path.realpath(
+        os.path.join(cert_dir, "carrier-ca.pem")
+    ),
+}
+
+missing = {
+    target: {"expected": source, "resolved": resolved.get(target)}
+    for target, source in expected.items()
+    if resolved.get(target) != source
+}
+if missing:
+    raise SystemExit(
+        "resolved OpenSIPS TLS mounts do not use acceptance fixtures: "
+        + json.dumps(missing, sort_keys=True)
+    )
+PY
+rm -f "$COMPOSE_CONFIG_TMP"
+COMPOSE_CONFIG_TMP=""
 
 # TEMPORARY: regenerate and print the canonical Atlas checksum so the stale
 # repository atlas.sum can be repaired from Atlas 1.3.0 itself. Remove this
