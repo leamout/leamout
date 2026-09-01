@@ -2,11 +2,9 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-compose="docker compose -f $script_dir/compose.yaml"
 
 run_compose() {
-  # shellcheck disable=SC2086
-  $compose "$@"
+  (cd "$script_dir" && docker compose "$@")
 }
 
 echo "Resuming FreeSWITCH call admission..."
