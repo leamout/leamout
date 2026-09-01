@@ -174,9 +174,9 @@ services:
       - "5061:5061/tcp"
       - "5062:5062/tcp"
     volumes:
-      - ${OPENSIPS_TLS_CERTIFICATE_PATH:?OPENSIPS_TLS_CERTIFICATE_PATH is required}:/etc/opensips/tls/fullchain.pem:ro
-      - ${OPENSIPS_TLS_PRIVATE_KEY_PATH:?OPENSIPS_TLS_PRIVATE_KEY_PATH is required}:/etc/opensips/tls/privkey.pem:ro
-      - ${OPENSIPS_TLS_CA_BUNDLE_PATH:?OPENSIPS_TLS_CA_BUNDLE_PATH is required}:/etc/opensips/tls/carrier-ca.pem:ro
+      - ./deploy/certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ./deploy/certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ./deploy/certs/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -200,8 +200,8 @@ services:
       - --pkey=/etc/coturn/tls/privkey.pem
     volumes:
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - ${TURN_TLS_CERTIFICATE_PATH:?TURN_TLS_CERTIFICATE_PATH is required}:/etc/coturn/tls/fullchain.pem:ro
-      - ${TURN_TLS_PRIVATE_KEY_PATH:?TURN_TLS_PRIVATE_KEY_PATH is required}:/etc/coturn/tls/privkey.pem:ro
+      - ./deploy/certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - ./deploy/certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"
