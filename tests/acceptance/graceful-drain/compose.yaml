@@ -1,0 +1,18 @@
+services:
+  rtpengine:
+    ports: !reset []
+
+  graceful-drain-carrier:
+    image: leamout/graceful-drain-carrier:dev
+    build:
+      context: ../../../deploy/freeswitch
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+    volumes:
+      - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/carrier-dialplan.xml:/leamout-config/dialplan/leamout.xml:ro
+      - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/carrier-sip-profile.xml:/leamout-config/sip_profiles/internal.xml:ro
+    networks:
+      leamout-core:
+        ipv4_address: 172.30.0.50
