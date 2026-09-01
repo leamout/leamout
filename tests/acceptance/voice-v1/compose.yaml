@@ -1,5 +1,5 @@
 services:
-  api:
+  server:
     environment:
       SSL_CERT_FILE: /voice-v1-certs/ca.crt
     volumes:
@@ -10,6 +10,14 @@ services:
       SSL_CERT_FILE: /voice-v1-certs/ca.crt
     volumes:
       - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/ca.crt:/voice-v1-certs/ca.crt:ro
+
+  opensips:
+    environment:
+      OPENSIPS_ADVERTISED_ADDRESS: opensips
+    volumes:
+      - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
 
   rtpengine:
     # The acceptance carrier and FreeSWITCH instances are on leamout-core, so
