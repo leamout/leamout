@@ -168,6 +168,7 @@ services:
       args:
         OPENSIPS_VERSION: 4.0.1
     restart: unless-stopped
+    stop_grace_period: 30s
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
@@ -216,6 +217,7 @@ services:
       context: ./freeswitch
       dockerfile: Dockerfile
     restart: unless-stopped
+    stop_grace_period: 60s
     environment:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
     volumes:
@@ -236,6 +238,7 @@ services:
       args:
         RTPENGINE_REF: mr26.2.1
     restart: unless-stopped
+    stop_grace_period: 30s
     environment:
       RTPENGINE_PUBLIC_IP: ${RTPENGINE_PUBLIC_IP}
     ports:
