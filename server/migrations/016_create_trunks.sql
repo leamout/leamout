@@ -45,6 +45,13 @@ CREATE TABLE IF NOT EXISTS trunk_endpoints (
     priority INTEGER NOT NULL DEFAULT 10,
     weight INTEGER NOT NULL DEFAULT 100,
     enabled BOOLEAN NOT NULL DEFAULT true,
+    health_status TEXT NOT NULL DEFAULT 'unknown',
+    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+    last_checked_at TIMESTAMPTZ,
+    last_response_code INTEGER,
+    last_latency_ms INTEGER,
+    last_error TEXT,
+    cooldown_until TIMESTAMPTZ,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -74,6 +81,18 @@ CREATE TABLE IF NOT EXISTS trunk_endpoints (
     ),
     CONSTRAINT chk_trunk_endpoints_weight CHECK (
         weight > 0
+    ),
+    CONSTRAINT chk_trunk_endpoint_health_status CHECK (
+        health_status IN ('unknown', 'healthy', 'unhealthy')
+    ),
+    CONSTRAINT chk_trunk_endpoint_consecutive_failures CHECK (
+        consecutive_failures >= 0
+    ),
+    CONSTRAINT chk_trunk_endpoint_response_code CHECK (
+        last_response_code IS NULL OR last_response_code BETWEEN 100 AND 699
+    ),
+    CONSTRAINT chk_trunk_endpoint_latency CHECK (
+        last_latency_ms IS NULL OR last_latency_ms >= 0
     )
 );
 
@@ -82,6 +101,10 @@ CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_trunk_enabled
 
 CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_organization_id
     ON trunk_endpoints (organization_id);
+
+CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_health_probe
+    ON trunk_endpoints (health_status, cooldown_until, last_checked_at)
+    WHERE enabled = true;
 
 CREATE TRIGGER set_trunks_updated_at
 BEFORE UPDATE ON trunks

@@ -45,15 +45,3 @@ CREATE TRIGGER enforce_prices_terms_immutable
 BEFORE UPDATE ON prices
 FOR EACH ROW
 EXECUTE FUNCTION enforce_price_terms_immutable();
-
-ALTER TABLE subscriptions
-    ADD COLUMN IF NOT EXISTS price_id UUID;
-
-ALTER TABLE subscriptions
-    ADD CONSTRAINT fk_subscriptions_price_plan
-    FOREIGN KEY (price_id, plan_id)
-    REFERENCES prices(id, plan_id);
-
-CREATE INDEX IF NOT EXISTS idx_subscriptions_price
-    ON subscriptions (price_id)
-    WHERE price_id IS NOT NULL;
