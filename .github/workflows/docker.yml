@@ -4,14 +4,12 @@ on:
   pull_request:
     paths:
       - "deploy/**"
-      - "acceptance/webrtc/**"
       - ".github/workflows/docker.yml"
   push:
     branches:
       - main
     paths:
       - "deploy/**"
-      - "acceptance/webrtc/**"
       - ".github/workflows/docker.yml"
 
 permissions:
