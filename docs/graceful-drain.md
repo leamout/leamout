@@ -6,105 +6,115 @@ The objective is to remove a node from service without dropping established call
 
 ## Safety invariants
 
-A drain must preserve these invariants:
+A drain preserves these invariants:
 
 1. Existing SIP dialogs continue to accept in-dialog requests such as ACK, BYE, CANCEL, and re-INVITE.
 2. Existing RTPengine sessions remain available until their calls end.
 3. FreeSWITCH does not accept new sessions after the drain begins, but existing sessions may complete normally.
-4. New out-of-dialog call attempts fail fast and predictably while OpenSIPS is draining.
-5. A node is stopped only after active signaling and application sessions reach zero, unless an operator explicitly forces termination.
-6. Drain state is reversible before shutdown.
-7. Normal container restart policy must not accidentally turn a drain command into an immediate restart loop.
+4. New out-of-dialog application traffic fails fast while OpenSIPS is draining.
+5. A node is stopped only after active signaling and application sessions reach zero.
+6. Reaching the drain deadline never authorizes automatic call termination.
+7. Drain state is reversible before shutdown.
+8. Normal container restart policy does not turn a drain into an immediate restart loop.
 
-## Drain sequence
+## Implemented controls
 
-The deployment drain command will coordinate the services in this order.
+### OpenSIPS
 
-### 1. Drain OpenSIPS admission
+`deploy/opensips/drain.cfg` reserves global flag position `0` for admission drain state and exposes it through a local-only MI FIFO under `/run/opensips`.
 
-Set an OpenSIPS runtime drain flag through its local management interface.
+The image installs `/usr/local/bin/leamout-opensips-drain` with these commands:
 
-While the flag is active:
+- `enable` — set drain state;
+- `resume` / `disable` — clear drain state;
+- `status` — report `draining` or `accepting`;
+- `dialogs` — return the `dialog:active_dialogs` statistic.
 
-- existing in-dialog requests continue through the normal route;
-- health/diagnostic OPTIONS requests continue to work;
-- new REGISTER, INVITE, and MESSAGE requests are rejected before application routing;
-- the rejection is a temporary service response so callers may retry another node.
+The main request route handles established dialogs first. Diagnostic OPTIONS remains available. The drain route then returns `503 Service Draining` for new out-of-dialog application traffic before REGISTER, INVITE, or MESSAGE processing.
 
-OpenSIPS remains running during the entire call-drain window because it owns signaling for established dialogs.
+### FreeSWITCH
 
-### 2. Pause FreeSWITCH admission
+The image installs `/usr/local/bin/leamout-freeswitch-drain`, which controls the local FreeSWITCH process through `fs_cli` and the existing ESL password.
 
-Use the FreeSWITCH control interface to stop accepting new sessions without terminating active calls.
+Commands:
 
-Do not use `fsctl shutdown elegant` as the first drain action under the current Compose `restart: unless-stopped` policy. An elegant process exit can be interpreted by the container runtime as a restart. The coordinated drain keeps the process alive until the host-side controller intentionally stops the service.
+- `enable` — `fsctl pause`;
+- `resume` / `disable` — `fsctl resume`;
+- `status` — `fsctl pause_check`;
+- `channels` — parse `show channels count`.
 
-### 3. Wait for active calls
+`fsctl pause` prevents new inbound and outbound sessions without hanging up established channels.
 
-The drain controller waits until both signaling and application session counts are zero.
+### RTPengine
 
-The authoritative checks are:
+RTPengine does not need a separate admission switch because OpenSIPS is the component that creates new RTPengine sessions. Once OpenSIPS admission is drained, RTPengine is kept online while active dialogs/channels finish and is intentionally stopped last.
 
-- OpenSIPS active dialog count;
-- FreeSWITCH active session/channel count.
+## Operator commands
 
-RTPengine stays online throughout this period. Because OpenSIPS no longer admits new calls, its active media sessions can only decrease as existing calls terminate.
+Run commands from the repository root.
 
-The wait must have an operator-configurable deadline. Reaching the deadline is a failure, not permission to kill active calls automatically.
+### Drain and stop the telecom node
 
-### 4. Stop the telecom services
+```sh
+./deploy/drain.sh
+```
 
-After the active counts reach zero, stop services intentionally through Compose in dependency-safe order:
+The default deadline is 300 seconds and polling interval is 2 seconds. Override them when necessary:
 
-1. OpenSIPS;
-2. FreeSWITCH;
-3. RTPengine.
+```sh
+LEAMOUT_DRAIN_TIMEOUT_SECONDS=900 \
+LEAMOUT_DRAIN_POLL_SECONDS=5 \
+./deploy/drain.sh
+```
 
-At this point there are no established dialogs or application sessions relying on RTPengine.
+The command performs this sequence:
 
-## Resume sequence
+1. enable OpenSIPS admission drain;
+2. pause FreeSWITCH admission;
+3. poll OpenSIPS active dialogs and FreeSWITCH active channels;
+4. if both reach zero, stop OpenSIPS;
+5. stop FreeSWITCH;
+6. stop RTPengine last.
 
-Before the services are stopped, the operator may cancel a drain:
+If the deadline expires while calls remain, the command exits non-zero and deliberately leaves OpenSIPS and FreeSWITCH drained. It does not kill active calls.
 
-1. resume FreeSWITCH admission;
-2. clear the OpenSIPS runtime drain flag;
-3. verify that new call admission succeeds.
+### Cancel a drain before shutdown
 
-A resume operation must be idempotent.
+```sh
+./deploy/resume.sh
+```
 
-## Implementation slices
+Resume occurs in dependency-safe order:
 
-### Slice 1 — OpenSIPS drain state
+1. FreeSWITCH admission resumes;
+2. OpenSIPS admission resumes.
 
-- add a local-only OpenSIPS management transport;
-- add a shared runtime `draining` flag initialized to false;
-- reject new out-of-dialog application traffic while draining;
-- preserve in-dialog routing before the drain check;
-- expose commands to read, set, and clear the state;
-- validate the configuration at image build time.
+The operation is idempotent while both services are running.
 
-### Slice 2 — coordinated host command
+## Compose shutdown behavior
 
-Add a deployment command that:
+Compose gives the telecom services explicit shutdown grace periods as a final safety net:
 
-- starts and cancels drain mode;
-- pauses/resumes FreeSWITCH admission;
-- polls OpenSIPS and FreeSWITCH active counts;
-- exits non-zero when the drain deadline expires;
-- intentionally stops OpenSIPS, FreeSWITCH, and RTPengine only at zero active calls;
-- is safe to invoke repeatedly.
+- OpenSIPS: 30 seconds;
+- FreeSWITCH: 60 seconds;
+- RTPengine: 30 seconds.
 
-### Slice 3 — acceptance gate
+The coordinated drain normally reaches zero active calls before any process receives its stop signal, so these periods protect unexpected or manual stop paths rather than replacing the drain protocol.
 
-Add automated coverage proving that:
+## Validation
 
-1. an established call survives entry into drain mode;
-2. a new call is rejected while draining;
-3. BYE for the established call succeeds and releases media;
-4. the drain command observes zero active calls;
-5. services can then be stopped without truncating the established call;
-6. cancelling drain restores new-call admission.
+The Docker workflow validates:
+
+- POSIX shell syntax for every drain helper;
+- OpenSIPS drain configuration insertion and route ordering;
+- Compose configuration;
+- OpenSIPS image configuration through the existing `opensips -C` build check;
+- FreeSWITCH image build;
+- a live FreeSWITCH drain helper smoke test covering accepting -> draining -> accepting state and active-channel count parsing;
+- RTPengine image build.
+
+A full call-level acceptance test that establishes a SIP call, enters drain mode, rejects a second call, then completes BYE/media release is still required before marking the BYOC production-hardening roadmap checkbox complete.
 
 ## Completion criteria
 
-The BYOC production-hardening roadmap item is complete only after all three slices are implemented and the acceptance gate is green. Documentation alone does not satisfy the roadmap checkbox.
+The runtime drain implementation is present when the controls above build and pass CI. The roadmap item is complete only when the full call-level acceptance gate is also green; documentation or component-level smoke tests alone do not satisfy that checkbox.
