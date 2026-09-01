@@ -32,10 +32,14 @@
         name="password"
         value="$${event_socket_password}"/>
 
-    <!-- Only allow clients on the trusted local network. -->
+    <!--
+      Restrict ESL to the Leamout control plane. This list includes loopback
+      for container-local maintenance commands and the private Compose subnet
+      for API/worker ESL clients.
+    -->
     <param
         name="apply-inbound-acl"
-        value="localnet.auto"/>
+        value="leamout-esl"/>
 
   </settings>
 </configuration>
