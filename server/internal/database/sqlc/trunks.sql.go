@@ -88,7 +88,7 @@ SELECT
 FROM trunks AS t
 WHERE t.id = $2
   AND t.organization_id = $1
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 `
 
 type CreateTrunkEndpointParams struct {
@@ -127,8 +127,6 @@ func (q *Queries) CreateTrunkEndpoint(ctx context.Context, arg CreateTrunkEndpoi
 		&i.Priority,
 		&i.Weight,
 		&i.Enabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.HealthStatus,
 		&i.ConsecutiveFailures,
 		&i.LastCheckedAt,
@@ -136,6 +134,8 @@ func (q *Queries) CreateTrunkEndpoint(ctx context.Context, arg CreateTrunkEndpoi
 		&i.LastLatencyMs,
 		&i.LastError,
 		&i.CooldownUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -145,7 +145,7 @@ DELETE FROM trunk_endpoints
 WHERE id = $1
   AND trunk_id = $2
   AND organization_id = $3
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 `
 
 type DeleteTrunkEndpointParams struct {
@@ -168,8 +168,6 @@ func (q *Queries) DeleteTrunkEndpoint(ctx context.Context, arg DeleteTrunkEndpoi
 		&i.Priority,
 		&i.Weight,
 		&i.Enabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.HealthStatus,
 		&i.ConsecutiveFailures,
 		&i.LastCheckedAt,
@@ -177,6 +175,8 @@ func (q *Queries) DeleteTrunkEndpoint(ctx context.Context, arg DeleteTrunkEndpoi
 		&i.LastLatencyMs,
 		&i.LastError,
 		&i.CooldownUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -263,7 +263,7 @@ func (q *Queries) GetTrunkByID(ctx context.Context, arg GetTrunkByIDParams) (Tru
 }
 
 const getTrunkEndpointByID = `-- name: GetTrunkEndpointByID :one
-SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 FROM trunk_endpoints
 WHERE id = $1
   AND trunk_id = $2
@@ -291,8 +291,6 @@ func (q *Queries) GetTrunkEndpointByID(ctx context.Context, arg GetTrunkEndpoint
 		&i.Priority,
 		&i.Weight,
 		&i.Enabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.HealthStatus,
 		&i.ConsecutiveFailures,
 		&i.LastCheckedAt,
@@ -300,12 +298,14 @@ func (q *Queries) GetTrunkEndpointByID(ctx context.Context, arg GetTrunkEndpoint
 		&i.LastLatencyMs,
 		&i.LastError,
 		&i.CooldownUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listActiveOutboundTrunkEndpoints = `-- name: ListActiveOutboundTrunkEndpoints :many
-SELECT te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.created_at, te.updated_at, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until
+SELECT te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until, te.created_at, te.updated_at
 FROM trunk_endpoints AS te
 JOIN trunks AS t
   ON t.id = te.trunk_id
@@ -348,8 +348,6 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 			&i.Priority,
 			&i.Weight,
 			&i.Enabled,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.HealthStatus,
 			&i.ConsecutiveFailures,
 			&i.LastCheckedAt,
@@ -357,6 +355,8 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 			&i.LastLatencyMs,
 			&i.LastError,
 			&i.CooldownUntil,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -369,7 +369,7 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 }
 
 const listTrunkEndpoints = `-- name: ListTrunkEndpoints :many
-SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+SELECT id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 FROM trunk_endpoints
 WHERE trunk_id = $1
   AND organization_id = $2
@@ -401,8 +401,6 @@ func (q *Queries) ListTrunkEndpoints(ctx context.Context, arg ListTrunkEndpoints
 			&i.Priority,
 			&i.Weight,
 			&i.Enabled,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.HealthStatus,
 			&i.ConsecutiveFailures,
 			&i.LastCheckedAt,
@@ -410,6 +408,8 @@ func (q *Queries) ListTrunkEndpoints(ctx context.Context, arg ListTrunkEndpoints
 			&i.LastLatencyMs,
 			&i.LastError,
 			&i.CooldownUntil,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -444,7 +444,7 @@ UPDATE trunk_endpoints AS te
 SET last_checked_at = $1
 FROM due
 WHERE te.id = due.id
-RETURNING te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.created_at, te.updated_at, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until
+RETURNING te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until, te.created_at, te.updated_at
 `
 
 type ListTrunkEndpointsForHealthCheckParams struct {
@@ -473,8 +473,6 @@ func (q *Queries) ListTrunkEndpointsForHealthCheck(ctx context.Context, arg List
 			&i.Priority,
 			&i.Weight,
 			&i.Enabled,
-			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.HealthStatus,
 			&i.ConsecutiveFailures,
 			&i.LastCheckedAt,
@@ -482,6 +480,8 @@ func (q *Queries) ListTrunkEndpointsForHealthCheck(ctx context.Context, arg List
 			&i.LastLatencyMs,
 			&i.LastError,
 			&i.CooldownUntil,
+			&i.CreatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -581,7 +581,7 @@ SET health_status = 'healthy',
     last_error = NULL,
     cooldown_until = NULL
 WHERE id = $4
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 `
 
 type MarkTrunkEndpointHealthyParams struct {
@@ -610,8 +610,6 @@ func (q *Queries) MarkTrunkEndpointHealthy(ctx context.Context, arg MarkTrunkEnd
 		&i.Priority,
 		&i.Weight,
 		&i.Enabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.HealthStatus,
 		&i.ConsecutiveFailures,
 		&i.LastCheckedAt,
@@ -619,6 +617,8 @@ func (q *Queries) MarkTrunkEndpointHealthy(ctx context.Context, arg MarkTrunkEnd
 		&i.LastLatencyMs,
 		&i.LastError,
 		&i.CooldownUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -639,7 +639,7 @@ SET consecutive_failures = consecutive_failures + 1,
         ELSE NULL
     END
 WHERE id = $6
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 `
 
 type MarkTrunkEndpointProbeFailedParams struct {
@@ -672,8 +672,6 @@ func (q *Queries) MarkTrunkEndpointProbeFailed(ctx context.Context, arg MarkTrun
 		&i.Priority,
 		&i.Weight,
 		&i.Enabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.HealthStatus,
 		&i.ConsecutiveFailures,
 		&i.LastCheckedAt,
@@ -681,6 +679,8 @@ func (q *Queries) MarkTrunkEndpointProbeFailed(ctx context.Context, arg MarkTrun
 		&i.LastLatencyMs,
 		&i.LastError,
 		&i.CooldownUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -758,7 +758,7 @@ SET
 WHERE id = $8
   AND trunk_id = $9
   AND organization_id = $10
-RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, created_at, updated_at, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until
+RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 `
 
 type UpdateTrunkEndpointParams struct {
@@ -799,8 +799,6 @@ func (q *Queries) UpdateTrunkEndpoint(ctx context.Context, arg UpdateTrunkEndpoi
 		&i.Priority,
 		&i.Weight,
 		&i.Enabled,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.HealthStatus,
 		&i.ConsecutiveFailures,
 		&i.LastCheckedAt,
@@ -808,6 +806,8 @@ func (q *Queries) UpdateTrunkEndpoint(ctx context.Context, arg UpdateTrunkEndpoi
 		&i.LastLatencyMs,
 		&i.LastError,
 		&i.CooldownUntil,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

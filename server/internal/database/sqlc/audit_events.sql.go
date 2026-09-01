@@ -9,20 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
-
-type AuditEvent struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ActorType      string             `db:"actor_type" json:"actor_type"`
-	ActorID        uuid.UUID          `db:"actor_id" json:"actor_id"`
-	Action         string             `db:"action" json:"action"`
-	TargetType     string             `db:"target_type" json:"target_type"`
-	TargetID       uuid.UUID          `db:"target_id" json:"target_id"`
-	Metadata       []byte             `db:"metadata" json:"metadata"`
-	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
-}
 
 const insertAuditEvent = `-- name: InsertAuditEvent :exec
 INSERT INTO audit_events (
@@ -81,23 +68,22 @@ SELECT
 FROM audit_events
 WHERE organization_id = $1
 ORDER BY occurred_at DESC, id DESC
-LIMIT $2::integer
-OFFSET $3::integer
+LIMIT $3::integer
+OFFSET $2::integer
 `
 
 type ListAuditEventsByOrganizationIDParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	LimitCount     int32     `db:"limit_count" json:"limit_count"`
 	OffsetCount    int32     `db:"offset_count" json:"offset_count"`
+	LimitCount     int32     `db:"limit_count" json:"limit_count"`
 }
 
 func (q *Queries) ListAuditEventsByOrganizationID(ctx context.Context, arg ListAuditEventsByOrganizationIDParams) ([]AuditEvent, error) {
-	rows, err := q.db.Query(ctx, listAuditEventsByOrganizationID, arg.OrganizationID, arg.LimitCount, arg.OffsetCount)
+	rows, err := q.db.Query(ctx, listAuditEventsByOrganizationID, arg.OrganizationID, arg.OffsetCount, arg.LimitCount)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	items := []AuditEvent{}
 	for rows.Next() {
 		var i AuditEvent

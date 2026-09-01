@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// Append-only security and configuration audit history. Metadata must never contain plaintext credentials.
+type AuditEvent struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ActorType      string             `db:"actor_type" json:"actor_type"`
+	ActorID        uuid.UUID          `db:"actor_id" json:"actor_id"`
+	Action         string             `db:"action" json:"action"`
+	TargetType     string             `db:"target_type" json:"target_type"`
+	TargetID       uuid.UUID          `db:"target_id" json:"target_id"`
+	Metadata       []byte             `db:"metadata" json:"metadata"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+}
+
 type AuthChallenge struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
 	AuthTransactionID *uuid.UUID         `db:"auth_transaction_id" json:"auth_transaction_id"`
@@ -475,6 +488,7 @@ type Subscription struct {
 	ID                     uuid.UUID          `db:"id" json:"id"`
 	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
 	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	PriceID                *uuid.UUID         `db:"price_id" json:"price_id"`
 	Status                 string             `db:"status" json:"status"`
 	StartsAt               pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
 	RenewsAt               pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
@@ -483,7 +497,6 @@ type Subscription struct {
 	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
 	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	PriceID                *uuid.UUID         `db:"price_id" json:"price_id"`
 }
 
 type Trunk struct {
@@ -508,8 +521,6 @@ type TrunkEndpoint struct {
 	Priority            int32              `db:"priority" json:"priority"`
 	Weight              int32              `db:"weight" json:"weight"`
 	Enabled             bool               `db:"enabled" json:"enabled"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	HealthStatus        string             `db:"health_status" json:"health_status"`
 	ConsecutiveFailures int32              `db:"consecutive_failures" json:"consecutive_failures"`
 	LastCheckedAt       pgtype.Timestamptz `db:"last_checked_at" json:"last_checked_at"`
@@ -517,6 +528,8 @@ type TrunkEndpoint struct {
 	LastLatencyMs       *int32             `db:"last_latency_ms" json:"last_latency_ms"`
 	LastError           *string            `db:"last_error" json:"last_error"`
 	CooldownUntil       pgtype.Timestamptz `db:"cooldown_until" json:"cooldown_until"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type UsageEvent struct {
