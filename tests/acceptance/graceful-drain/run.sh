@@ -16,6 +16,18 @@ export TURN_REALM="${TURN_REALM:-graceful-drain.local}"
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml"
 COMPOSE_CONFIG_TMP=""
 
+fs_diag() {
+    service=$1
+    echo "--- $service active channels ---" >&2
+    (cd "$REPO_ROOT" && $COMPOSE exec -T "$service" \
+        fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
+        -x 'show channels') >&2 || true
+    echo "--- $service calls ---" >&2
+    (cd "$REPO_ROOT" && $COMPOSE exec -T "$service" \
+        fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
+        -x 'show calls') >&2 || true
+}
+
 cleanup() {
     status=$?
     trap - EXIT INT TERM
@@ -24,10 +36,17 @@ cleanup() {
     fi
     if [ "$status" -ne 0 ]; then
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
+        fs_diag graceful-drain-carrier
+        fs_diag freeswitch
+        echo "--- OpenSIPS drain/dialog state ---" >&2
+        (cd "$REPO_ROOT" && $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status) >&2 || true
+        (cd "$REPO_ROOT" && $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain dialogs) >&2 || true
+        echo "--- RTPengine media sockets ---" >&2
+        (cd "$REPO_ROOT" && $COMPOSE exec -T rtpengine sh -lc \
+            "netstat -anu 2>/dev/null | awk 'NR > 2 { n=split(\$4,a,\":\"); p=a[n]+0; if (p >= 23000 && p <= 32768) print \$0 }'") >&2 || true
         (cd "$REPO_ROOT" && $COMPOSE exec -T graceful-drain-carrier fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
         (cd "$REPO_ROOT" && $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
-        (cd "$REPO_ROOT" && $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status) || true
-        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=250 server worker opensips freeswitch rtpengine graceful-drain-carrier postgres) || true
+        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=400 server worker opensips freeswitch rtpengine graceful-drain-carrier postgres) || true
     fi
     if [ "${GRACEFUL_DRAIN_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
@@ -148,6 +167,15 @@ if [ "$sip_ready" -ne 1 ]; then
     echo "SIP services did not become ready within 60 seconds" >&2
     exit 1
 fi
+
+# Acceptance-only wire diagnostics. On failure these traces tell us whether a
+# hangup leaves FreeSWITCH, reaches OpenSIPS, or bypasses the proxy entirely.
+$COMPOSE exec -T graceful-drain-carrier \
+    fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
+    -x 'sofia global siptrace on' >/dev/null
+$COMPOSE exec -T freeswitch \
+    fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
+    -x 'sofia global siptrace on' >/dev/null
 
 ready=0
 for _ in $(seq 1 90); do
