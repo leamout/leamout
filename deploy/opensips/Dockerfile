@@ -27,6 +27,8 @@ RUN apt-get update \
         auth.so \
         auth_db.so \
         db_postgres.so \
+        gflags.so \
+        mi_fifo.so \
         pike.so \
         rtpengine.so \
         sqlops.so \
@@ -46,8 +48,18 @@ RUN apt-get update \
 
 COPY opensips.cfg /etc/opensips/opensips.cfg
 COPY tls.cfg /etc/opensips/tls.cfg
+COPY drain.cfg /etc/opensips/drain.cfg
+COPY apply-drain-config.sh /usr/local/bin/apply-opensips-drain-config
+COPY drain-control.sh /usr/local/bin/leamout-opensips-drain
+COPY entrypoint.sh /usr/local/bin/leamout-opensips-entrypoint
 
-RUN install -d -m 0700 /etc/opensips/tls \
+RUN chmod 0755 \
+        /usr/local/bin/apply-opensips-drain-config \
+        /usr/local/bin/leamout-opensips-drain \
+        /usr/local/bin/leamout-opensips-entrypoint \
+    && /usr/local/bin/apply-opensips-drain-config /etc/opensips/opensips.cfg \
+    && install -d -m 0700 /run/opensips \
+    && install -d -m 0700 /etc/opensips/tls \
     && openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
         -subj '/CN=opensips-build-check.invalid' \
         -keyout /etc/opensips/tls/privkey.pem \
@@ -58,4 +70,5 @@ RUN install -d -m 0700 /etc/opensips/tls \
 
 EXPOSE 5060/udp 5060/tcp 5061/tcp 5062/tcp
 
+ENTRYPOINT ["/usr/local/bin/leamout-opensips-entrypoint"]
 CMD ["opensips", "-F", "-f", "/etc/opensips/opensips.cfg"]

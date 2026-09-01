@@ -95,10 +95,12 @@ COPY sip_profiles/ /leamout-config/sip_profiles/
 COPY dialplan/ /leamout-config/dialplan/
 COPY entrypoint.d/10-leamout-config.sh /docker-entrypoint.d/10-leamout-config.sh
 COPY entrypoint.sh /usr/local/bin/leamout-freeswitch-entrypoint
+COPY drain-control.sh /usr/local/bin/leamout-freeswitch-drain
 
 RUN chmod 0755 \
       /docker-entrypoint.d/10-leamout-config.sh \
       /usr/local/bin/leamout-freeswitch-entrypoint \
+      /usr/local/bin/leamout-freeswitch-drain \
     && mkdir -p \
       /etc/freeswitch/autoload_configs \
       /etc/freeswitch/sip_profiles \

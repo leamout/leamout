@@ -1,0 +1,20 @@
+<configuration
+    name="acl.conf"
+    description="Leamout Network Lists">
+
+  <network-lists>
+
+    <!--
+      FreeSWITCH ESL is an internal control-plane interface. Allow the
+      container-local drain helper over loopback and Leamout control-plane
+      clients on the private Compose network. The port is not published to
+      the host.
+    -->
+    <list name="leamout-esl" default="deny">
+      <node type="allow" cidr="127.0.0.1/32"/>
+      <node type="allow" cidr="::1/128"/>
+      <node type="allow" cidr="172.30.0.0/24"/>
+    </list>
+
+  </network-lists>
+</configuration>

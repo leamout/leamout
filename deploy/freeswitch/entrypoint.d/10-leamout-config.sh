@@ -11,6 +11,10 @@ install -m 0644 \
   /etc/freeswitch/autoload_configs/modules.conf.xml
 
 install -m 0644 \
+  /leamout-config/autoload_configs/acl.conf.xml \
+  /etc/freeswitch/autoload_configs/acl.conf.xml
+
+install -m 0644 \
   /leamout-config/autoload_configs/event_socket.conf.xml \
   /etc/freeswitch/autoload_configs/event_socket.conf.xml
 
