@@ -98,8 +98,6 @@
       "required": [
         "server",
         "worker",
-        "web",
-        "console",
         "opensips",
         "rtpengine",
         "freeswitch",
@@ -112,8 +110,6 @@
       "properties": {
         "server": {"$ref": "#/$defs/image"},
         "worker": {"$ref": "#/$defs/image"},
-        "web": {"$ref": "#/$defs/image"},
-        "console": {"$ref": "#/$defs/image"},
         "opensips": {"$ref": "#/$defs/image"},
         "rtpengine": {"$ref": "#/$defs/image"},
         "freeswitch": {"$ref": "#/$defs/image"},
