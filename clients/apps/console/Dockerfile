@@ -16,7 +16,7 @@ COPY --from=prepare /app/out/json/ .
 RUN bun install --frozen-lockfile
 COPY --from=prepare /app/out/full/ .
 WORKDIR /app/apps/console
-RUN node ../../node_modules/next/dist/bin/next build
+RUN node --run build
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
