@@ -38,6 +38,9 @@ jobs:
         run: |
           sh -n scripts/certs/generate-self-signed.sh
           sh -n scripts/certs/check-certs.sh
+          sh -n scripts/certs/install-system-ca.sh
+          sh -n scripts/certs/provision-letsencrypt.sh
+          sh -n scripts/certs/renew-letsencrypt.sh
           sh -n deploy/drain.sh
           sh -n deploy/resume.sh
           sh -n deploy/opensips/apply-drain-config.sh
@@ -53,6 +56,9 @@ jobs:
             echo "certificate generator unexpectedly overwrote existing files" >&2
             exit 1
           fi
+
+          CERT_DIR=/tmp/leamout-production-certs sh scripts/certs/install-system-ca.sh
+          test -s /tmp/leamout-production-certs/carrier-ca.pem
 
       - name: Verify OpenSIPS drain route placement
         run: |
