@@ -212,7 +212,7 @@ services:
       - "5349:5349/tcp"
       - "49152-65535:49152-65535/udp"
     healthcheck:
-      test: ["CMD-SHELL", "timeout 2 sh -c '</dev/tcp/127.0.0.1/3478'"]
+      test: ["CMD-SHELL", "turnutils_stunclient -p 3478 127.0.0.1 >/dev/null 2>&1"]
       interval: 5s
       timeout: 3s
       retries: 10
