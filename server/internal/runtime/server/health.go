@@ -23,6 +23,10 @@ type readinessCache interface {
 	Ping(context.Context) error
 }
 
+type readinessTURN interface {
+	HealthCheck(context.Context) error
+}
+
 type readinessResponse struct {
 	Status string            `json:"status"`
 	Checks map[string]string `json:"checks"`
@@ -33,6 +37,7 @@ func RegisterHealthRoutes(
 	database readinessDatabase,
 	cache readinessCache,
 	media readinessMedia,
+	turn readinessTURN,
 ) {
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -46,6 +51,7 @@ func RegisterHealthRoutes(
 			"database":   "ok",
 			"redis":      "ok",
 			"freeswitch": "ok",
+			"coturn":     "ok",
 		}
 		status := http.StatusNoContent
 
@@ -59,6 +65,10 @@ func RegisterHealthRoutes(
 		}
 		if media == nil || media.HealthCheck(ctx) != nil {
 			checks["freeswitch"] = "unavailable"
+			status = http.StatusServiceUnavailable
+		}
+		if turn == nil || turn.HealthCheck(ctx) != nil {
+			checks["coturn"] = "unavailable"
 			status = http.StatusServiceUnavailable
 		}
 
