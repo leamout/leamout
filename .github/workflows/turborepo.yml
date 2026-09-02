@@ -1,0 +1,44 @@
+name: Turborepo
+
+on:
+  pull_request:
+    paths:
+      - "clients/**"
+      - ".github/workflows/turborepo.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "clients/**"
+      - ".github/workflows/turborepo.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: turborepo-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    name: Build ${{ matrix.app }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - web
+          - console
+          - waitlist
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build ${{ matrix.app }}
+        run: |
+          docker build \
+            --file "clients/apps/${{ matrix.app }}/Dockerfile" \
+            --tag "leamout/${{ matrix.app }}:ci" \
+            clients

@@ -17,12 +17,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: server-${{ github.workflow }}-${{ github.ref }}
+  group: server-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    name: Build and Test
+    name: Test + lint
     runs-on: ubuntu-latest
 
     defaults:
@@ -38,6 +38,7 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache: true
+          cache-dependency-path: server/go.sum
 
       - name: Download dependencies
         run: go mod download
@@ -46,13 +47,21 @@ jobs:
         run: go mod verify
 
       - name: Check formatting
-        run: |
-          test -z "$(gofmt -l .)"
+        run: test -z "$(gofmt -l .)"
 
       - name: Run tests
         run: go test -race -coverprofile=coverage.out ./...
 
-      - name: Build server
+      - name: Vet
+        run: go vet ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: server
+
+      - name: Build packages
         run: go build ./...
 
   sqlc:
@@ -72,6 +81,7 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache: true
+          cache-dependency-path: server/go.sum
 
       - name: Install sqlc
         run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
@@ -81,3 +91,29 @@ jobs:
 
       - name: Check generated code
         run: git diff --exit-code -- internal/database/sqlc
+
+  migrations:
+    name: Validate migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate Atlas migrations
+        run: |
+          docker run --rm \
+            -v "${PWD}/server/migrations:/migrations:ro" \
+            arigaio/atlas:1.3.0-alpine \
+            migrate validate --dir file:///migrations
+
+  image:
+    name: Build server + worker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build production image
+        run: docker build --tag leamout/server:ci server

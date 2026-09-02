@@ -1,0 +1,127 @@
+name: Telecom
+
+on:
+  pull_request:
+    paths:
+      - "deploy/opensips/**"
+      - "deploy/freeswitch/**"
+      - "deploy/rtpengine/**"
+      - "deploy/drain.sh"
+      - "deploy/resume.sh"
+      - ".github/workflows/telecom.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "deploy/opensips/**"
+      - "deploy/freeswitch/**"
+      - "deploy/rtpengine/**"
+      - "deploy/drain.sh"
+      - "deploy/resume.sh"
+      - ".github/workflows/telecom.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telecom-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scripts:
+    name: Validate telecom scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check shell syntax
+        run: |
+          sh -n deploy/drain.sh
+          sh -n deploy/resume.sh
+          sh -n deploy/opensips/apply-drain-config.sh
+          sh -n deploy/opensips/drain-control.sh
+          sh -n deploy/freeswitch/drain-control.sh
+
+      - name: Verify OpenSIPS drain route placement
+        run: |
+          cp deploy/opensips/opensips.cfg /tmp/opensips.cfg
+          sh deploy/opensips/apply-drain-config.sh /tmp/opensips.cfg
+
+          options_line="$(grep -n 'if (is_method("OPTIONS")' /tmp/opensips.cfg | head -n1 | cut -d: -f1)"
+          drain_line="$(grep -n 'route(LEAMOUT_DRAIN);' /tmp/opensips.cfg | head -n1 | cut -d: -f1)"
+          register_line="$(grep -n '# REGISTER is authenticated' /tmp/opensips.cfg | head -n1 | cut -d: -f1)"
+
+          test "$options_line" -lt "$drain_line"
+          test "$drain_line" -lt "$register_line"
+
+  image:
+    name: Build ${{ matrix.service }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - opensips
+          - freeswitch
+          - rtpengine
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build ${{ matrix.service }}
+        run: |
+          docker build \
+            --file "deploy/${{ matrix.service }}/Dockerfile" \
+            --tag "leamout/${{ matrix.service }}:ci" \
+            "deploy/${{ matrix.service }}"
+
+  freeswitch-drain:
+    name: FreeSWITCH drain helper
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build FreeSWITCH
+        run: |
+          docker build \
+            --file deploy/freeswitch/Dockerfile \
+            --tag leamout/freeswitch:drain-test \
+            deploy/freeswitch
+
+      - name: Exercise drain helper
+        run: |
+          docker run -d \
+            --name freeswitch-drain-test \
+            -e FREESWITCH_ESL_PASSWORD=test-password \
+            leamout/freeswitch:drain-test
+
+          cleanup() {
+            docker rm -f freeswitch-drain-test >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 60); do
+            if docker exec freeswitch-drain-test \
+              fs_cli -H 127.0.0.1 -P 8021 -p test-password -x status >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+
+          test "$ready" -eq 1
+
+          drain="docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain"
+          test "$($drain status)" = accepting
+          test "$($drain enable)" = draining
+          test "$($drain status)" = draining
+          $drain channels | grep -Eq '^[0-9]+$'
+          test "$($drain resume)" = accepting
+          test "$($drain status)" = accepting
