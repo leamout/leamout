@@ -4,6 +4,34 @@ This document is the machine-facing companion to the [self-hosted installation c
 
 Phase 1 does **not** publish `get.leamout.com/install.sh` and does not implement the `leamout` operator CLI. Those belong to Phase 2. Phase 1 establishes the compatibility, integrity, and immutability rules that Phase 2 must consume.
 
+## Product boundary
+
+The self-hosted release contains the Leamout communications runtime, not Leamout's hosted customer-facing web applications.
+
+`clients/apps/web` is the Leamout marketing website and `clients/apps/console` is the hosted dashboard at `console.leamout.com`. Neither application is installed on a customer's self-hosted server.
+
+The intended customer flow is:
+
+```text
+console.leamout.com/sign-up
+        ↓
+create organization / subscription
+        ↓
+obtain a Leamout Commercial License and deployment activation token
+        ↓
+install the self-hosted Leamout runtime
+        ↓
+activate/register the deployment
+        ↓
+see the deployment in console.leamout.com
+```
+
+`console.leamout.com` owns the commercial and fleet-management experience: organizations, subscriptions, licenses, entitlements, deployment registrations, billing, release availability, and support workflows.
+
+The self-hosted deployment owns communications execution and local telecom state. Leamout Cloud is not in the call path. A transient loss of connectivity to `console.leamout.com` must not immediately stop an otherwise valid self-hosted communications runtime; locally stored signed license material is intended to remain verifiable without continuous cloud availability.
+
+The exact activation protocol, deployment identity format, cloud check-in mechanism, grace policy, and remote-management capabilities are later implementation phases. Phase 1 only establishes this product boundary so release artifacts do not accidentally package the hosted console.
+
 ## Supported host matrix
 
 The first self-hosted production artifact contract intentionally supports a narrow Linux matrix.
@@ -133,7 +161,7 @@ The manifest carries:
 - explicit supported host tuples;
 - database migration boundary;
 - CLI artifact filenames and SHA-256 values;
-- immutable image references for all services required by the release.
+- immutable image references for all services required by the self-hosted runtime.
 
 Conceptually:
 
@@ -170,13 +198,11 @@ The fragment above is illustrative only; an actual production manifest must incl
 
 ## Required image set
 
-A Phase 1 production manifest must bind all of these runtime dependencies:
+A Phase 1 self-hosted production manifest must bind all of these runtime dependencies:
 
 ```text
 server
 worker
-web
-console
 opensips
 rtpengine
 freeswitch
@@ -187,9 +213,17 @@ nats
 atlas
 ```
 
-`waitlist` is intentionally excluded from the self-hosted production runtime contract. It is a Leamout website application, not a customer telecom-control-plane dependency.
+The frontend applications are intentionally excluded:
 
-A release validator may add mandatory components in a future manifest schema version, but it must never silently remove a component from an existing schema version.
+```text
+web       -> Leamout-hosted marketing site
+console   -> Leamout-hosted dashboard at console.leamout.com
+waitlist  -> Leamout-hosted website application
+```
+
+The hosted console may show self-hosted deployment registration, license, version, connectivity/check-in, health summaries, usage/capacity metadata, and update availability in later phases, but its container image is never a dependency of the customer's self-hosted runtime.
+
+A release validator may add mandatory runtime components in a future manifest schema version, but it must never silently remove a component from an existing schema version.
 
 ## Image immutability policy
 
@@ -211,7 +245,7 @@ redis:8-alpine
 
 Even a semantic-version tag such as `leamout/server:1.0.0` is not sufficient for the release manifest because a tag can be moved. Tags remain useful for humans and development, but the production manifest records the resolved digest.
 
-The repository's `deploy/compose.yaml` remains a development/CI stack. It may contain build directives and human-readable tags. It is **not** a production release lockfile. Phase 2 must render or otherwise consume a production deployment from a validated release manifest rather than treating the repository Compose tags as immutable customer artifacts.
+The repository's `deploy/compose.yaml` remains a development/CI stack. It may contain build directives and human-readable tags, including the hosted web applications needed for repository-level full-stack development. It is **not** a production release lockfile. Phase 2 must render or otherwise consume a self-hosted production deployment from a validated release manifest rather than treating repository Compose services as the customer runtime definition.
 
 ## Database migration boundary
 
@@ -261,12 +295,13 @@ Changes to release policy must pass the Release Artifacts workflow.
 
 CI verifies at least:
 
-1. the manifest validator accepts the known-good fixture;
+1. the manifest validator accepts the known-good runtime-only fixture;
 2. the validator rejects mutable image references;
 3. the validator rejects placeholder/all-zero digests;
-4. the CLI packager creates the canonical archive shape;
-5. the emitted SHA-256 checksum verifies the produced archive;
-6. shell and Python release tooling is syntactically valid.
+4. the validator rejects hosted frontend images added to a self-hosted manifest;
+5. the CLI packager creates the canonical archive shape;
+6. the emitted SHA-256 checksum verifies the produced archive;
+7. shell and Python release tooling is syntactically valid.
 
 The same validator is intended to run in a future release-publishing workflow before any stable or preview release is published.
 
@@ -275,11 +310,13 @@ The same validator is intended to run in a future release-publishing workflow be
 Phase 1 is complete when:
 
 - the self-hosted installation document is treated as the supported installation contract;
+- the hosted console versus self-hosted runtime boundary is explicit;
 - the supported Linux distributions, versions, architecture, Docker, and kernel minimums are explicit;
 - the CLI release archive, checksum, and detached-signature formats are defined;
 - the release manifest has a versioned machine-readable schema and validation rules;
 - production image references are required to be immutable OCI digests;
-- development Compose tags are explicitly separated from production release pins;
+- `web`, `console`, and `waitlist` are excluded from the customer self-hosted runtime;
+- development Compose tags/services are explicitly separated from production release pins;
 - CI enforces the artifact and manifest invariants.
 
-Publishing `get.leamout.com/install.sh`, implementing the real CLI, installing prerequisites, and adding operator commands remain Phase 2 work.
+Publishing `get.leamout.com/install.sh`, implementing the real CLI, implementing the license activation/register/check-in protocol, installing prerequisites, and adding operator commands remain later-phase work.
