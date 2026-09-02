@@ -1,0 +1,183 @@
+name: Deployment
+
+on:
+  pull_request:
+    paths:
+      - "deploy/compose.yaml"
+      - "scripts/deploy/**"
+      - "scripts/certs/**"
+      - ".env.example"
+      - "Makefile"
+      - ".github/workflows/deployment.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "deploy/compose.yaml"
+      - "scripts/deploy/**"
+      - "scripts/certs/**"
+      - ".env.example"
+      - "Makefile"
+      - ".github/workflows/deployment.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARRIER_CREDENTIAL_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+  ENV_FILE: .env.example
+  COMPOSE_FILE: deploy/compose.yaml
+  COMPOSE_OVERRIDE_FILE: /tmp/compose.ci.yaml
+
+jobs:
+  scripts:
+    name: Deployment scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check shell syntax
+        run: |
+          sh -n scripts/deploy/lib.sh
+          sh -n scripts/deploy/preflight.sh
+          sh -n scripts/deploy/build.sh
+          sh -n scripts/deploy/up.sh
+          sh -n scripts/deploy/deploy.sh
+          sh -n scripts/deploy/restart.sh
+          sh -n scripts/deploy/verify.sh
+          sh -n scripts/certs/generate-self-signed.sh
+          sh -n scripts/certs/check-certs.sh
+          sh -n scripts/certs/install-system-ca.sh
+          sh -n scripts/certs/provision-letsencrypt.sh
+          sh -n scripts/certs/renew-letsencrypt.sh
+          sh -n scripts/certs/certbot-deploy-hook.sh
+          sh -n scripts/certs/install-certbot-renewal.sh
+
+      - name: Exercise certificate helpers
+        run: |
+          CERT_DIR=/tmp/leamout-certs CERT_DAYS=1 sh scripts/certs/generate-self-signed.sh
+          CERT_DIR=/tmp/leamout-certs sh scripts/certs/check-certs.sh
+
+          if CERT_DIR=/tmp/leamout-certs sh scripts/certs/generate-self-signed.sh; then
+            echo "certificate generator unexpectedly overwrote existing files" >&2
+            exit 1
+          fi
+
+          CERT_DIR=/tmp/leamout-production-certs sh scripts/certs/install-system-ca.sh
+          mkdir -p /tmp/leamout-lineage /tmp/leamout-hook-certs
+          cp /tmp/leamout-certs/fullchain.pem /tmp/leamout-lineage/fullchain.pem
+          cp /tmp/leamout-certs/privkey.pem /tmp/leamout-lineage/privkey.pem
+          cp /tmp/leamout-production-certs/carrier-ca.pem /tmp/leamout-hook-certs/carrier-ca.pem
+
+          RENEWED_LINEAGE=/tmp/leamout-lineage \
+          RENEWED_DOMAINS=sip.example.com \
+          TLS_DOMAIN=sip.example.com \
+          CERT_DIR=/tmp/leamout-hook-certs \
+          RESTART_OPENSIPS=0 \
+          sh scripts/certs/certbot-deploy-hook.sh
+
+          CERT_DIR=/tmp/leamout-hook-certs sh scripts/certs/check-certs.sh
+
+  compose:
+    name: Compose configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Generate CI certificates
+        run: CERT_DAYS=1 make certs
+
+      - name: Create CI Compose override
+        run: |
+          cat > /tmp/compose.ci.yaml <<'YAML'
+          services:
+            rtpengine:
+              ports: !reset []
+            coturn:
+              ports: !reset []
+          YAML
+
+      - name: Run deployment preflight
+        run: sh scripts/deploy/preflight.sh
+
+  stack:
+    name: Full-stack smoke
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Generate CI certificates
+        run: CERT_DAYS=1 make certs
+
+      - name: Create CI Compose override
+        run: |
+          cat > /tmp/compose.ci.yaml <<'YAML'
+          services:
+            rtpengine:
+              ports: !reset []
+            coturn:
+              ports: !reset []
+          YAML
+
+      - name: Preflight
+        run: sh scripts/deploy/preflight.sh
+
+      - name: Build backend images
+        env:
+          BUILD_SERVICES: server worker
+        run: sh scripts/deploy/build.sh
+
+      - name: Build frontend images
+        env:
+          BUILD_SERVICES: web console waitlist
+        run: sh scripts/deploy/build.sh
+
+      - name: Build telecom images
+        env:
+          BUILD_SERVICES: opensips freeswitch rtpengine
+        run: sh scripts/deploy/build.sh
+
+      - name: Start stack
+        run: |
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_OVERRIDE_FILE" \
+            up -d --no-build
+
+      - name: Verify stack
+        run: sh scripts/deploy/verify.sh
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_OVERRIDE_FILE" \
+            ps -a || true
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_OVERRIDE_FILE" \
+            logs --no-color --tail=200 || true
+
+      - name: Stop stack
+        if: always()
+        run: |
+          docker compose \
+            --env-file "$ENV_FILE" \
+            -f "$COMPOSE_FILE" \
+            -f "$COMPOSE_OVERRIDE_FILE" \
+            down -v --remove-orphans || true
