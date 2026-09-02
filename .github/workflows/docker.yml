@@ -95,6 +95,8 @@ jobs:
   stack:
     name: Build and start deployment stack
     runs-on: ubuntu-latest
+    env:
+      CARRIER_CREDENTIAL_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
     steps:
       - name: Checkout
@@ -136,11 +138,15 @@ jobs:
 
       - name: Build production images
         run: |
-          docker compose \
-            --env-file .env.example \
-            -f deploy/compose.yaml \
-            -f /tmp/compose.ci.yaml \
-            build
+          for service in server worker web console waitlist opensips freeswitch rtpengine; do
+            echo "::group::Build ${service}"
+            docker compose \
+              --env-file .env.example \
+              -f deploy/compose.yaml \
+              -f /tmp/compose.ci.yaml \
+              build "${service}"
+            echo "::endgroup::"
+          done
 
       - name: Start deployment stack
         run: |
