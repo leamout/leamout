@@ -38,7 +38,8 @@ jobs:
         run: npm install --prefix tests/acceptance/webrtc-v1
 
       - name: Install Chromium
-        run: npx --prefix tests/acceptance/webrtc-v1 playwright install --with-deps chromium
+        working-directory: tests/acceptance/webrtc-v1
+        run: npx playwright install --with-deps chromium
 
       - name: Run forced TURN browser call
         run: sh tests/acceptance/webrtc-v1/run.sh
