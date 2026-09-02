@@ -202,7 +202,7 @@ def deploy():
     wait_api_ready()
     running = set(compose("ps", "--status", "running", "--services").splitlines())
     required = {
-        "postgres", "redis", "nats", "api", "worker", "opensips",
+        "postgres", "redis", "nats", "server", "worker", "opensips",
         "rtpengine", "freeswitch", "voice-v1-carrier", "voice-v1-webhook",
     }
     missing = sorted(required - running)
@@ -400,8 +400,6 @@ def hold_resume():
 
 def play_audio():
     call_id = STATE["call_id"]
-    # Keep the generated tone active well beyond the API round trip so this
-    # check exercises stopping live playback rather than racing natural EOF.
     path = "tone_stream://%(30000,0,440)"
     api(
         "POST", f"/v1/calls/{call_id}/play",
@@ -486,10 +484,6 @@ def conference():
     if item["state"] != "active":
         raise AcceptanceError("conference API did not create active state")
 
-    # FreeSWITCH conference rooms are dynamic media objects: the conference
-    # application creates the room when its first member enters and destroys it
-    # when the last member leaves. Use a background loopback call as the live
-    # synthetic participant before asserting media-plane conference controls.
     fs_cli(
         "freeswitch",
         "bgapi originate "
@@ -557,8 +551,6 @@ def webhooks():
     for event in call_events:
         verify_signature(event)
 
-    # The receiver observes the request before the delivery worker can persist
-    # the response. Poll the API rather than racing that final database update.
     def delivered_attempt():
         _, current = api(
             "GET",
@@ -593,7 +585,7 @@ def restart_safety():
         timeout=30,
     )
 
-    compose("restart", "api")
+    compose("restart", "server")
     wait_api_ready()
     if get_call(STATE["call_id"])["state"] != before["state"]:
         raise AcceptanceError("API/worker restart changed terminal call state")
