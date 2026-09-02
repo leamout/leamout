@@ -12,7 +12,6 @@ export TURN_REALM="${TURN_REALM:-webrtc-v1.local}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-webrtc-v1-turn-secret-0123456789abcdef}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478?transport=udp}"
-export TURN_ADDRESS="${TURN_ADDRESS:-coturn:3478}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.30.0.10}"
 export LEAMOUT_API_URL="${LEAMOUT_API_URL:-http://127.0.0.1:8080}"
 export LEAMOUT_API_TOKEN="${LEAMOUT_API_TOKEN:-lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx}"
@@ -129,7 +128,7 @@ $COMPOSE exec -T postgres \
 printf '%s\n' "Starting OpenSIPS and API..."
 $COMPOSE up -d --build opensips server
 
-printf '%s\n' "Waiting for API readiness including Coturn..."
+printf '%s\n' "Waiting for API readiness..."
 ready=0
 for _ in $(seq 1 90); do
     if curl --fail --silent --output /dev/null "$LEAMOUT_API_URL/readyz"; then
