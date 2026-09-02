@@ -28,7 +28,3 @@ services:
       - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
       - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/opensips/tls/privkey.pem:ro
       - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
-
-  server:
-    environment:
-      TURN_ADDRESS: coturn:3478
