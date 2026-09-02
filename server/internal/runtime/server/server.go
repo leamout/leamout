@@ -7,6 +7,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/entitlements"
+	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -14,6 +19,7 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
+	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
@@ -151,6 +157,15 @@ func NewModules(
 	redisClient *redisintegration.Client,
 ) (Modules, error) {
 	queries := sqlc.New(db)
+	catalogRepository := catalog.NewRepository(db)
+	catalogService := catalog.NewService(catalogRepository)
+	subscriptionsRepository := subscriptions.NewRepository(db)
+	subscriptionsService := subscriptions.NewService(subscriptionsRepository, catalogService)
+	entitlementsRepository := entitlements.NewRepository(db)
+	entitlementsService := entitlements.NewService(entitlementsRepository, subscriptionsService)
+	commercialStateService := commercialstate.NewService(subscriptionsService, entitlementsService)
+	licensingRepository := licensing.NewRepository(db)
+	licensingService := licensing.NewService(licensingRepository, commercialStateService)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -211,6 +226,8 @@ func NewModules(
 	webhooksService := webhooks.NewService(webhooksRepository)
 	auditRepository := audit.NewRepository(db)
 	auditService := audit.NewService(auditRepository)
+	idempotencyRepository := idempotency.NewRepository(queries)
+	idempotencyService := idempotency.NewService(idempotencyRepository, idempotency.DefaultConfig())
 
 	resolver := authn.NewResolver(
 		sessionService,
@@ -221,6 +238,25 @@ func NewModules(
 	organizationMiddleware := middleware.NewOrganizationMiddleware()
 
 	return Modules{
+		Catalog: CatalogModule{
+			Repository: catalogRepository,
+			Service:    catalogService,
+			Handler:    catalog.NewHandler(catalogService),
+		},
+		Licensing: LicensingModule{
+			Repository: licensingRepository,
+			Service:    licensingService,
+			Handler:    licensing.NewHandler(licensingService),
+		},
+		CommercialState: CommercialStateModule{
+			Service: commercialStateService,
+			Handler: commercialstate.NewHandler(commercialStateService),
+		},
+		Subscriptions: SubscriptionsModule{
+			Repository: subscriptionsRepository,
+			Service:    subscriptionsService,
+			Handler:    subscriptions.NewHandler(subscriptionsService),
+		},
 		Auth: AuthModule{
 			Repository: authRepository,
 			Service:    authService,
@@ -300,6 +336,11 @@ func NewModules(
 			Repository: auditRepository,
 			Service:    auditService,
 			Handler:    audit.NewHandler(auditService),
+		},
+		Idempotency: IdempotencyModule{
+			Repository: idempotencyRepository,
+			Service:    idempotencyService,
+			Middleware: middleware.NewIdempotencyMiddleware(idempotencyService),
 		},
 		Conferences: ConferencesModule{
 			Repository: conferencesRepository,

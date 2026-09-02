@@ -1,10 +1,15 @@
 package server
 
 import (
+	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/modules/audit"
+	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
@@ -23,6 +28,10 @@ import (
 )
 
 type Modules struct {
+	Catalog              CatalogModule
+	Licensing            LicensingModule
+	CommercialState      CommercialStateModule
+	Subscriptions        SubscriptionsModule
 	Auth                 AuthModule
 	Session              SessionModule
 	Users                UsersModule
@@ -35,6 +44,7 @@ type Modules struct {
 	Conferences          ConferencesModule
 	Webhooks             WebhooksModule
 	Audit                AuditModule
+	Idempotency          IdempotencyModule
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
 	Subscribers          SubscribersModule
@@ -43,6 +53,29 @@ type Modules struct {
 	Realtime             RealtimeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
+}
+
+type CatalogModule struct {
+	Repository *catalog.Repository
+	Service    *catalog.Service
+	Handler    *catalog.Handler
+}
+
+type LicensingModule struct {
+	Repository *licensing.Repository
+	Service    *licensing.Service
+	Handler    *licensing.Handler
+}
+
+type CommercialStateModule struct {
+	Service *commercialstate.Service
+	Handler *commercialstate.Handler
+}
+
+type SubscriptionsModule struct {
+	Repository *subscriptions.Repository
+	Service    *subscriptions.Service
+	Handler    *subscriptions.Handler
 }
 
 type AuthModule struct {
@@ -115,6 +148,12 @@ type AuditModule struct {
 	Repository *audit.Repository
 	Service    *audit.Service
 	Handler    *audit.Handler
+}
+
+type IdempotencyModule struct {
+	Repository *idempotency.Repository
+	Service    *idempotency.Service
+	Middleware *middleware.IdempotencyMiddleware
 }
 
 type SIPDomainsModule struct {

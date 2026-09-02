@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/pkg/apperror"
 )
 
 // Status describes whether a commercial license may authorize self-hosted deployments.
@@ -29,12 +30,11 @@ const (
 const MaxDeploymentsEntitlement = "max.deployments"
 
 var (
-	ErrLicenseNotFound            = errors.New("license not found")
-	ErrLicenseUnavailable         = errors.New("license is unavailable")
-	ErrCommercialStateUnavailable = errors.New("commercial state does not allow license creation")
-	ErrSubscriptionUnavailable    = errors.New("current subscription is unavailable for licensing")
-	ErrOrganizationIDRequired     = errors.New("organization id is required")
-	ErrLicenseIDRequired          = errors.New("license id is required")
+	ErrLicenseNotFound            = apperror.NewNotFound("license not found")
+	ErrLicenseUnavailable         = apperror.NewConflict("license is unavailable")
+	ErrCommercialStateUnavailable = apperror.NewPaymentRequired("commercial state does not allow license creation")
+	ErrOrganizationIDRequired     = apperror.NewBadRequest("organization id is required")
+	ErrLicenseIDRequired          = apperror.NewBadRequest("license id is required")
 	ErrSigningKeyRequired         = errors.New("signing key id is required before license activation")
 	ErrInvalidSigningKey          = errors.New("signing key id must not contain whitespace")
 	ErrSigningKeyUnavailable      = errors.New("license signing key is unavailable")
@@ -47,15 +47,15 @@ var (
 	ErrDeploymentMismatch         = errors.New("signed license is bound to another deployment")
 	ErrInvalidStatus              = errors.New("invalid license status")
 	ErrInvalidTransition          = errors.New("invalid license status transition")
-	ErrInvalidDeploymentLimit     = errors.New("max deployments must be greater than zero")
-	ErrInvalidExpiration          = errors.New("license expiration must be after issuance")
-	ErrDeploymentIDRequired       = errors.New("deployment id is required")
-	ErrInvalidDeploymentID        = errors.New("deployment id must not contain whitespace")
-	ErrInvalidDeploymentName      = errors.New("deployment name must not be blank")
-	ErrDeploymentNotFound         = errors.New("deployment not found")
-	ErrDeploymentInactive         = errors.New("deployment is deactivated")
-	ErrDeploymentLimitReached     = errors.New("license deployment limit reached")
-	ErrActivationConflict         = errors.New("deployment activation conflicted with another concurrent change")
+	ErrInvalidDeploymentLimit     = apperror.NewConflict("max deployments must be greater than zero")
+	ErrInvalidExpiration          = apperror.NewBadRequest("license expiration must be after issuance")
+	ErrDeploymentIDRequired       = apperror.NewBadRequest("deployment_id is required")
+	ErrInvalidDeploymentID        = apperror.NewBadRequest("deployment_id must not contain whitespace")
+	ErrInvalidDeploymentName      = apperror.NewBadRequest("deployment name must not be blank")
+	ErrDeploymentNotFound         = apperror.NewNotFound("deployment not found")
+	ErrDeploymentInactive         = apperror.NewConflict("deployment is deactivated")
+	ErrDeploymentLimitReached     = apperror.NewConflict("license deployment limit reached")
+	ErrActivationConflict         = apperror.NewConflict("deployment activation conflicted with another concurrent change")
 )
 
 // License is Leamout-owned commercial authority for self-hosted installations.
@@ -95,8 +95,55 @@ type CreateInput struct {
 	ExpiresAt    *time.Time
 }
 
+type entitlementSnapshot struct {
+	Features map[string]bool
+	Limits   map[string]int64
+}
+
 // ActivateDeploymentInput identifies a stable installation requesting a license slot.
 type ActivateDeploymentInput struct {
-	DeploymentID string
-	Name         *string
+	DeploymentID string  `json:"deployment_id"`
+	Name         *string `json:"name,omitempty"`
+}
+
+type licenseResponse struct {
+	ID             uuid.UUID  `json:"id"`
+	OrganizationID uuid.UUID  `json:"organization_id"`
+	SubscriptionID *uuid.UUID `json:"subscription_id,omitempty"`
+	Status         Status     `json:"status"`
+	MaxDeployments int32      `json:"max_deployments"`
+	IssuedAt       time.Time  `json:"issued_at"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+func newLicenseResponse(license License) licenseResponse {
+	return licenseResponse{
+		ID: license.ID, OrganizationID: license.OrganizationID, SubscriptionID: license.SubscriptionID,
+		Status: license.Status, MaxDeployments: license.MaxDeployments, IssuedAt: license.IssuedAt,
+		ExpiresAt: license.ExpiresAt, CreatedAt: license.CreatedAt, UpdatedAt: license.UpdatedAt,
+	}
+}
+
+type deploymentResponse struct {
+	ID            uuid.UUID        `json:"id"`
+	LicenseID     uuid.UUID        `json:"license_id"`
+	DeploymentID  string           `json:"deployment_id"`
+	Name          *string          `json:"name,omitempty"`
+	Status        DeploymentStatus `json:"status"`
+	ActivatedAt   time.Time        `json:"activated_at"`
+	LastSeenAt    *time.Time       `json:"last_seen_at,omitempty"`
+	DeactivatedAt *time.Time       `json:"deactivated_at,omitempty"`
+	CreatedAt     time.Time        `json:"created_at"`
+	UpdatedAt     time.Time        `json:"updated_at"`
+}
+
+func newDeploymentResponse(deployment Deployment) deploymentResponse {
+	return deploymentResponse{
+		ID: deployment.ID, LicenseID: deployment.LicenseID, DeploymentID: deployment.DeploymentID,
+		Name: deployment.Name, Status: deployment.Status, ActivatedAt: deployment.ActivatedAt,
+		LastSeenAt: deployment.LastSeenAt, DeactivatedAt: deployment.DeactivatedAt,
+		CreatedAt: deployment.CreatedAt, UpdatedAt: deployment.UpdatedAt,
+	}
 }
