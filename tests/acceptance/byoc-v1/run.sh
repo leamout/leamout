@@ -6,7 +6,10 @@ REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
 CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-byoc-v1.XXXXXX")
 
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-byoc-v1-esl-secret}"
-export BYOC_V1_SUITE_DIR="$SCRIPT_DIR"
+# The acceptance test rotates the synthetic carrier credential at runtime.
+# Stage all mounted carrier fixtures in the disposable directory so a local run
+# never rewrites tracked files in tests/acceptance/byoc-v1.
+export BYOC_V1_SUITE_DIR="$CERT_DIR"
 export BYOC_V1_CERT_DIR="$CERT_DIR"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
 export TURN_REALM="${TURN_REALM:-byoc-v1.local}"
@@ -27,7 +30,7 @@ cleanup() {
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
         rm -rf "$CERT_DIR"
     else
-        printf '%s\n' "BYOC v1 stack retained; certificates: $CERT_DIR"
+        printf '%s\n' "BYOC v1 stack retained; runtime fixtures and certificates: $CERT_DIR"
     fi
     exit "$status"
 }
@@ -36,6 +39,10 @@ trap cleanup EXIT INT TERM
 command -v docker >/dev/null 2>&1 || { echo "docker is required" >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 1; }
+
+cp "$SCRIPT_DIR/carrier-directory.xml" "$CERT_DIR/carrier-directory.xml"
+cp "$SCRIPT_DIR/carrier-sip-profile.xml" "$CERT_DIR/carrier-sip-profile.xml"
+cp "$SCRIPT_DIR/carrier-dialplan.xml" "$CERT_DIR/carrier-dialplan.xml"
 
 openssl req -x509 -newkey rsa:2048 -nodes \
     -keyout "$CERT_DIR/privkey.pem" \
