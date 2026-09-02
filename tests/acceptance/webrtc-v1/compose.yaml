@@ -11,15 +11,15 @@ services:
       - --external-ip=${TURN_EXTERNAL_IP:?TURN_EXTERNAL_IP is required}
       - --cert=/etc/coturn/tls/fullchain.pem
       - --pkey=/etc/coturn/tls/privkey.pem
-      - --min-port=49160
-      - --max-port=49200
+      - --min-port=${WEBRTC_V1_TURN_MIN_PORT:?WEBRTC_V1_TURN_MIN_PORT is required}
+      - --max-port=${WEBRTC_V1_TURN_MAX_PORT:?WEBRTC_V1_TURN_MAX_PORT is required}
     volumes:
       - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
       - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/coturn/tls/privkey.pem:ro
     ports: !override
       - "3478:3478/udp"
       - "3478:3478/tcp"
-      - "49160-49200:49160-49200/udp"
+      - "${WEBRTC_V1_TURN_MIN_PORT:?WEBRTC_V1_TURN_MIN_PORT is required}-${WEBRTC_V1_TURN_MAX_PORT:?WEBRTC_V1_TURN_MAX_PORT is required}:${WEBRTC_V1_TURN_MIN_PORT:?WEBRTC_V1_TURN_MIN_PORT is required}-${WEBRTC_V1_TURN_MAX_PORT:?WEBRTC_V1_TURN_MAX_PORT is required}/udp"
 
   opensips:
     environment:
