@@ -1,0 +1,31 @@
+services:
+  rtpengine:
+    ports: !reset []
+
+  coturn:
+    command:
+      - --config
+      - /etc/coturn/turnserver.conf
+      - --realm=${TURN_REALM:?TURN_REALM is required}
+      - --static-auth-secret=${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+      - --external-ip=${TURN_EXTERNAL_IP:?TURN_EXTERNAL_IP is required}
+      - --cert=/etc/coturn/tls/fullchain.pem
+      - --pkey=/etc/coturn/tls/privkey.pem
+      - --min-port=49160
+      - --max-port=49200
+    ports: !override
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+
+  opensips:
+    environment:
+      OPENSIPS_ADVERTISED_ADDRESS: 127.0.0.1
+    volumes:
+      - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+
+  server:
+    environment:
+      TURN_ADDRESS: coturn:3478
