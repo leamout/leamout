@@ -53,7 +53,7 @@ def check(name, fn):
 
 def deploy():
     wait("API readiness", lambda: urllib.request.urlopen(API + "/readyz", timeout=2).status == 204, 45)
-    required = {"postgres", "redis", "nats", "rtpengine", "freeswitch", "opensips", "api", "worker", "byoc-v1-carrier"}
+    required = {"postgres", "redis", "nats", "rtpengine", "freeswitch", "opensips", "server", "worker", "byoc-v1-carrier"}
     missing = required - set(compose("ps", "--status", "running", "--services").splitlines())
     if missing: raise Failure("missing services: " + ", ".join(sorted(missing)))
     return "signaling and control stack is running"
@@ -162,7 +162,7 @@ def disable_rejects_routes():
     return "disabled carrier connection rejects new outbound routes"
 
 def restart_persistence():
-    compose("restart", "opensips", "api")
+    compose("restart", "opensips", "server")
     wait("API recovery", lambda: urllib.request.urlopen(API + "/readyz", timeout=2).status == 204, 45)
     item = api("GET", f"/v1/carrier-connections/{S['connection']['id']}")
     if item["status"] != "disabled": raise Failure("carrier state changed after restart")
