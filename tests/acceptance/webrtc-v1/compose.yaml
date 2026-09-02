@@ -13,6 +13,9 @@ services:
       - --pkey=/etc/coturn/tls/privkey.pem
       - --min-port=49160
       - --max-port=49200
+    volumes:
+      - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - ${WEBRTC_V1_CERT_DIR:?WEBRTC_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/coturn/tls/privkey.pem:ro
     ports: !override
       - "3478:3478/udp"
       - "3478:3478/tcp"
