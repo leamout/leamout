@@ -38,6 +38,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			r,
 			modules.Licensing.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			modules.Idempotency.Middleware.Handle,
 		)
 		commercialstate.RegisterRoutes(
 			r,
@@ -48,6 +49,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			r,
 			modules.Subscriptions.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			modules.Idempotency.Middleware.Handle,
 		)
 		auth.RegisterRoutes(
 			r,

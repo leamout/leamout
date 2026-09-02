@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -12,6 +13,7 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
+	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
@@ -34,6 +36,7 @@ type Worker struct {
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
+	idempotencyCleanup      *idempotency.CleanupJob
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
@@ -176,6 +179,14 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize webhook delivery job: %w", err)
 	}
+	idempotencyCleanup, err := idempotency.NewCleanupJob(idempotency.NewRepository(queries), time.Hour)
+	if err != nil {
+		_ = redisClient.Close()
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize idempotency cleanup job: %w", err)
+	}
 
 	return &Worker{
 		db:                      db,
@@ -190,6 +201,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		outbox:                  outboxJob,
 		webhookConsumer:         webhookConsumer,
 		webhookDelivery:         webhookDelivery,
+		idempotencyCleanup:      idempotencyCleanup,
 	}, nil
 }
 
@@ -230,14 +242,16 @@ func (w *Worker) Run(ctx context.Context) error {
 	log.Print("worker started outbox NATS publisher")
 	log.Print("worker started webhook NATS consumer")
 	log.Print("worker started webhook delivery job")
+	log.Print("worker started idempotency cleanup job")
 
-	errCh := make(chan error, 6)
+	errCh := make(chan error, 7)
 	go runComponent(ctx, errCh, "call reconciliation", w.callReconciliation.Run)
 	go runComponent(ctx, errCh, "carrier endpoint health", w.endpointHealth.Run)
 	go runComponent(ctx, errCh, "recording reconciliation", w.recordingReconciliation.Run)
 	go runComponent(ctx, errCh, "outbox publisher", w.outbox.Run)
 	go runComponent(ctx, errCh, "webhook consumer", w.webhookConsumer.Run)
 	go runComponent(ctx, errCh, "webhook delivery", w.webhookDelivery.Run)
+	go runComponent(ctx, errCh, "idempotency cleanup", w.idempotencyCleanup.Run)
 
 	select {
 	case <-ctx.Done():

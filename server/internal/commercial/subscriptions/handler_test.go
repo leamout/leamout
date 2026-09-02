@@ -30,7 +30,7 @@ func TestSubscriptionRoutesRejectInvalidIDs(t *testing.T) {
 	organizationAuth := middleware.NewOrganizationMiddleware().Require
 	RegisterRoutes(router, NewHandler(&Service{}), func(next http.Handler) http.Handler {
 		return auth(organizationAuth(next))
-	})
+	}, func(next http.Handler) http.Handler { return next })
 
 	for _, request := range []*http.Request{
 		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/subscriptions/not-a-uuid", nil),

@@ -103,6 +103,6 @@ func commercialLicenseTestRouter(organizationID uuid.UUID) http.Handler {
 	organizationAuth := middleware.NewOrganizationMiddleware().Require
 	RegisterRoutes(router, NewHandler(&Service{}), func(next http.Handler) http.Handler {
 		return auth(organizationAuth(next))
-	})
+	}, func(next http.Handler) http.Handler { return next })
 	return router
 }

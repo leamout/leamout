@@ -19,6 +19,7 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
+	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
@@ -225,6 +226,8 @@ func NewModules(
 	webhooksService := webhooks.NewService(webhooksRepository)
 	auditRepository := audit.NewRepository(db)
 	auditService := audit.NewService(auditRepository)
+	idempotencyRepository := idempotency.NewRepository(queries)
+	idempotencyService := idempotency.NewService(idempotencyRepository, idempotency.DefaultConfig())
 
 	resolver := authn.NewResolver(
 		sessionService,
@@ -333,6 +336,11 @@ func NewModules(
 			Repository: auditRepository,
 			Service:    auditService,
 			Handler:    audit.NewHandler(auditService),
+		},
+		Idempotency: IdempotencyModule{
+			Repository: idempotencyRepository,
+			Service:    idempotencyService,
+			Middleware: middleware.NewIdempotencyMiddleware(idempotencyService),
 		},
 		Conferences: ConferencesModule{
 			Repository: conferencesRepository,
