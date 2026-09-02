@@ -1,7 +1,6 @@
 package subscriptions
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -30,7 +29,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 
 	subscriptions, err := h.service.List(r.Context(), organizationID)
 	if err != nil {
-		writeSubscriptionError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -50,7 +49,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 
 	subscription, err := h.service.Get(r.Context(), organizationID, subscriptionID)
 	if err != nil {
-		writeSubscriptionError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -71,7 +70,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 
 	subscription, err := h.service.ChangePrice(r.Context(), organizationID, subscriptionID, request.PriceID)
 	if err != nil {
-		writeSubscriptionError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -85,9 +84,9 @@ func (h *Handler) Cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	subscription, err := h.service.Cancel(r.Context(), organizationID, subscriptionID)
+	subscription, err := h.service.Transition(r.Context(), organizationID, subscriptionID, StatusCancelled)
 	if err != nil {
-		writeSubscriptionError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -112,23 +111,4 @@ func requestSubscriptionIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid subscription_id")
 	}
 	return organizationID, subscriptionID, nil
-}
-
-func writeSubscriptionError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, ErrSubscriptionNotFound):
-		httputil.Error(w, apperror.NewNotFound("subscription not found"))
-	case errors.Is(err, ErrPriceUnavailable):
-		httputil.Error(w, apperror.NewBadRequest("subscription price is unavailable"))
-	case errors.Is(err, ErrPriceIDRequired):
-		httputil.Error(w, apperror.NewBadRequest("price_id is required"))
-	case errors.Is(err, ErrTerminalSubscription):
-		httputil.Error(w, apperror.NewConflict("terminal subscription cannot change commercial terms"))
-	case errors.Is(err, ErrInvalidTransition):
-		httputil.Error(w, apperror.NewConflict("subscription cannot be cancelled from its current status"))
-	case errors.Is(err, ErrOrganizationUnavailable):
-		httputil.Error(w, apperror.NewConflict("organization is unavailable for subscription changes"))
-	default:
-		httputil.Error(w, err)
-	}
 }

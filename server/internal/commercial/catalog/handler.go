@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -22,7 +21,7 @@ func NewHandler(service *Service) *Handler {
 func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	products, err := h.service.ListProducts(r.Context(), true)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -36,17 +35,17 @@ func (h *Handler) ListProducts(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetProduct(w http.ResponseWriter, r *http.Request) {
 	id, err := catalogID(r, "product_id")
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
 	product, err := h.service.GetProduct(r.Context(), id)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	if !product.Active {
-		writeCatalogError(w, ErrProductNotFound)
+		httputil.Error(w, ErrProductNotFound)
 		return
 	}
 
@@ -56,22 +55,22 @@ func (h *Handler) GetProduct(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListPlans(w http.ResponseWriter, r *http.Request) {
 	productID, err := catalogID(r, "product_id")
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	product, err := h.service.GetProduct(r.Context(), productID)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	if !product.Active {
-		writeCatalogError(w, ErrProductNotFound)
+		httputil.Error(w, ErrProductNotFound)
 		return
 	}
 
 	plans, err := h.service.ListPlans(r.Context(), productID, true)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -85,26 +84,26 @@ func (h *Handler) ListPlans(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetPlan(w http.ResponseWriter, r *http.Request) {
 	id, err := catalogID(r, "plan_id")
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
 	plan, err := h.service.GetPlan(r.Context(), id)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	if !plan.Active {
-		writeCatalogError(w, ErrPlanNotFound)
+		httputil.Error(w, ErrPlanNotFound)
 		return
 	}
 	product, err := h.service.GetProduct(r.Context(), plan.ProductID)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	if !product.Active {
-		writeCatalogError(w, ErrPlanNotFound)
+		httputil.Error(w, ErrPlanNotFound)
 		return
 	}
 
@@ -114,31 +113,31 @@ func (h *Handler) GetPlan(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ListPrices(w http.ResponseWriter, r *http.Request) {
 	planID, err := catalogID(r, "plan_id")
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	plan, err := h.service.GetPlan(r.Context(), planID)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	if !plan.Active {
-		writeCatalogError(w, ErrPlanNotFound)
+		httputil.Error(w, ErrPlanNotFound)
 		return
 	}
 	product, err := h.service.GetProduct(r.Context(), plan.ProductID)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 	if !product.Active {
-		writeCatalogError(w, ErrPlanNotFound)
+		httputil.Error(w, ErrPlanNotFound)
 		return
 	}
 
 	prices, err := h.service.ListPrices(r.Context(), planID, true)
 	if err != nil {
-		writeCatalogError(w, err)
+		httputil.Error(w, err)
 		return
 	}
 
@@ -155,15 +154,4 @@ func catalogID(r *http.Request, name string) (uuid.UUID, error) {
 		return uuid.Nil, apperror.NewBadRequest("invalid " + name)
 	}
 	return id, nil
-}
-
-func writeCatalogError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, ErrProductNotFound):
-		httputil.Error(w, apperror.NewNotFound("catalog product not found"))
-	case errors.Is(err, ErrPlanNotFound):
-		httputil.Error(w, apperror.NewNotFound("catalog plan not found"))
-	default:
-		httputil.Error(w, err)
-	}
 }

@@ -33,25 +33,6 @@ func TestCatalogRoutesRejectInvalidIDs(t *testing.T) {
 	}
 }
 
-func TestWriteCatalogErrorMapsNotFoundErrors(t *testing.T) {
-	for _, test := range []struct {
-		name string
-		err  error
-	}{
-		{name: "product", err: ErrProductNotFound},
-		{name: "plan", err: ErrPlanNotFound},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			response := httptest.NewRecorder()
-			writeCatalogError(response, test.err)
-
-			if response.Code != http.StatusNotFound {
-				t.Fatalf("expected status 404, got %d", response.Code)
-			}
-		})
-	}
-}
-
 func TestCatalogResponses(t *testing.T) {
 	productID := uuid.New()
 	planID := uuid.New()

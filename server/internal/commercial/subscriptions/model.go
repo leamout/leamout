@@ -1,10 +1,10 @@
 package subscriptions
 
 import (
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/pkg/apperror"
 )
 
 // Status describes the commercial lifecycle of a subscription.
@@ -19,23 +19,23 @@ const (
 )
 
 var (
-	ErrSubscriptionNotFound      = errors.New("subscription not found")
-	ErrOrganizationUnavailable   = errors.New("organization is unavailable for subscription changes")
-	ErrCurrentSubscriptionExists = errors.New("organization already has a current subscription")
-	ErrPriceUnavailable          = errors.New("subscription price is unavailable")
-	ErrInvalidStatus             = errors.New("invalid subscription status")
-	ErrInvalidInitialStatus      = errors.New("subscription must start pending or active")
-	ErrInvalidTransition         = errors.New("invalid subscription status transition")
-	ErrInvalidPeriod             = errors.New("invalid subscription period")
-	ErrProviderConflict          = errors.New("provider subscription identifier already exists")
-	ErrProviderRequired          = errors.New("billing provider is required")
-	ErrProviderIDRequired        = errors.New("provider subscription id is required")
-	ErrInvalidProvider           = errors.New("billing provider must not contain whitespace")
-	ErrOrganizationIDRequired    = errors.New("organization id is required")
-	ErrSubscriptionIDRequired    = errors.New("subscription id is required")
-	ErrPriceIDRequired           = errors.New("price id is required")
-	ErrNoChanges                 = errors.New("at least one subscription field is required")
-	ErrTerminalSubscription      = errors.New("terminal subscription cannot change commercial terms")
+	ErrSubscriptionNotFound      = apperror.NewNotFound("subscription not found")
+	ErrOrganizationUnavailable   = apperror.NewConflict("organization is unavailable for subscription changes")
+	ErrCurrentSubscriptionExists = apperror.NewConflict("organization already has a current subscription")
+	ErrPriceUnavailable          = apperror.NewBadRequest("subscription price is unavailable")
+	ErrInvalidStatus             = apperror.NewBadRequest("invalid subscription status")
+	ErrInvalidInitialStatus      = apperror.NewBadRequest("subscription must start pending or active")
+	ErrInvalidTransition         = apperror.NewConflict("invalid subscription status transition")
+	ErrInvalidPeriod             = apperror.NewBadRequest("invalid subscription period")
+	ErrProviderConflict          = apperror.NewConflict("provider subscription identifier already exists")
+	ErrProviderRequired          = apperror.NewBadRequest("billing provider is required")
+	ErrProviderIDRequired        = apperror.NewBadRequest("provider subscription id is required")
+	ErrInvalidProvider           = apperror.NewBadRequest("billing provider must not contain whitespace")
+	ErrOrganizationIDRequired    = apperror.NewBadRequest("organization id is required")
+	ErrSubscriptionIDRequired    = apperror.NewBadRequest("subscription id is required")
+	ErrPriceIDRequired           = apperror.NewBadRequest("price_id is required")
+	ErrNoChanges                 = apperror.NewBadRequest("at least one subscription field is required")
+	ErrTerminalSubscription      = apperror.NewConflict("terminal subscription cannot change commercial terms")
 )
 
 // Subscription binds an organization to a commercial plan and acquired price for a period of time.

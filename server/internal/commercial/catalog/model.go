@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/pkg/apperror"
 )
 
 // BillingInterval identifies the recurring cadence attached to a catalog price.
@@ -16,13 +17,12 @@ const (
 )
 
 var (
-	ErrProductNotFound        = errors.New("catalog product not found")
-	ErrPlanNotFound           = errors.New("catalog plan not found")
-	ErrPriceNotFound          = errors.New("catalog price not found")
-	ErrCodeRequired           = errors.New("catalog code is required")
-	ErrInvalidCode            = errors.New("catalog code must not contain whitespace")
-	ErrIDRequired             = errors.New("catalog id is required")
-	ErrInvalidBillingInterval = errors.New("invalid catalog billing interval")
+	ErrProductNotFound = apperror.NewNotFound("catalog product not found")
+	ErrPlanNotFound    = apperror.NewNotFound("catalog plan not found")
+	ErrPriceNotFound   = apperror.NewNotFound("catalog price not found")
+	ErrCodeRequired    = errors.New("catalog code is required")
+	ErrInvalidCode     = errors.New("catalog code must not contain whitespace")
+	ErrIDRequired      = errors.New("catalog id is required")
 )
 
 // Product is a commercial product family that groups reusable plans.

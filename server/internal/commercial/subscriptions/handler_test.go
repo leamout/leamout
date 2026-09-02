@@ -55,29 +55,6 @@ func TestSubscriptionHandlerRequiresOrganizationContext(t *testing.T) {
 	}
 }
 
-func TestWriteSubscriptionError(t *testing.T) {
-	for _, test := range []struct {
-		name   string
-		err    error
-		status int
-	}{
-		{name: "not found", err: ErrSubscriptionNotFound, status: http.StatusNotFound},
-		{name: "price unavailable", err: ErrPriceUnavailable, status: http.StatusBadRequest},
-		{name: "price required", err: ErrPriceIDRequired, status: http.StatusBadRequest},
-		{name: "terminal", err: ErrTerminalSubscription, status: http.StatusConflict},
-		{name: "invalid transition", err: ErrInvalidTransition, status: http.StatusConflict},
-		{name: "organization unavailable", err: ErrOrganizationUnavailable, status: http.StatusConflict},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			response := httptest.NewRecorder()
-			writeSubscriptionError(response, test.err)
-			if response.Code != test.status {
-				t.Fatalf("expected status %d, got %d", test.status, response.Code)
-			}
-		})
-	}
-}
-
 func TestSubscriptionResponse(t *testing.T) {
 	subscription := Subscription{
 		ID: uuid.New(), OrganizationID: uuid.New(), PlanID: uuid.New(), Status: StatusActive,
