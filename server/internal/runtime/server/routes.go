@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 
+	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -25,6 +26,11 @@ import (
 
 func RegisterRoutes(r *chi.Mux, modules Modules) {
 	r.Route("/v1", func(r chi.Router) {
+		catalog.RegisterRoutes(
+			r,
+			modules.Catalog.Handler,
+			modules.Authn.RequireSession,
+		)
 		auth.RegisterRoutes(
 			r,
 			modules.Auth.Handler,

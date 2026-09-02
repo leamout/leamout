@@ -1,6 +1,7 @@
 package server
 
 import (
+	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -23,6 +24,7 @@ import (
 )
 
 type Modules struct {
+	Catalog              CatalogModule
 	Auth                 AuthModule
 	Session              SessionModule
 	Users                UsersModule
@@ -43,6 +45,12 @@ type Modules struct {
 	Realtime             RealtimeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
+}
+
+type CatalogModule struct {
+	Repository *catalog.Repository
+	Service    *catalog.Service
+	Handler    *catalog.Handler
 }
 
 type AuthModule struct {

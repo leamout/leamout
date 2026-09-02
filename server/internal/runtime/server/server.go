@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -151,6 +152,8 @@ func NewModules(
 	redisClient *redisintegration.Client,
 ) (Modules, error) {
 	queries := sqlc.New(db)
+	catalogRepository := catalog.NewRepository(db)
+	catalogService := catalog.NewService(catalogRepository)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -221,6 +224,11 @@ func NewModules(
 	organizationMiddleware := middleware.NewOrganizationMiddleware()
 
 	return Modules{
+		Catalog: CatalogModule{
+			Repository: catalogRepository,
+			Service:    catalogService,
+			Handler:    catalog.NewHandler(catalogService),
+		},
 		Auth: AuthModule{
 			Repository: authRepository,
 			Service:    authService,
