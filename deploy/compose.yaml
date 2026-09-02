@@ -7,6 +7,7 @@ x-leamout-environment: &leamout-environment
   FREESWITCH_ESL_ADDRESS: freeswitch:8021
   FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
   CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?CARRIER_CREDENTIAL_ENCRYPTION_KEY is required}
+  TURN_ADDRESS: coturn:3478
   TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
   TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -89,6 +90,8 @@ services:
       redis:
         condition: service_healthy
       nats:
+        condition: service_healthy
+      coturn:
         condition: service_healthy
       freeswitch:
         condition: service_started
@@ -208,6 +211,11 @@ services:
       - "3478:3478/tcp"
       - "5349:5349/tcp"
       - "49152-65535:49152-65535/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 sh -c '</dev/tcp/127.0.0.1/3478'"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     networks:
       - leamout-core
 
@@ -258,6 +266,3 @@ volumes:
 networks:
   leamout-core:
     name: leamout-core
-    ipam:
-      config:
-        - subnet: 172.30.0.0/24
