@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "release_version": "1.0.0-preview.1",
+  "channel": "preview",
+  "source_commit": "1111111111111111111111111111111111111111",
+  "minimum_cli_version": "1.0.0-preview.1",
+  "supported_hosts": [
+    {
+      "os": "ubuntu",
+      "version": "24.04",
+      "arch": "amd64"
+    },
+    {
+      "os": "debian",
+      "version": "13",
+      "arch": "amd64"
+    }
+  ],
+  "database": {
+    "migration": "039_create_idempotency.sql"
+  },
+  "cli_artifacts": [
+    {
+      "os": "linux",
+      "arch": "amd64",
+      "filename": "leamout_1.0.0-preview.1_linux_amd64.tar.gz",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+    }
+  ],
+  "images": {
+    "server": "ghcr.io/leamout/server@sha256:3333333333333333333333333333333333333333333333333333333333333333",
+    "worker": "ghcr.io/leamout/worker@sha256:4444444444444444444444444444444444444444444444444444444444444444",
+    "web": "ghcr.io/leamout/web@sha256:5555555555555555555555555555555555555555555555555555555555555555",
+    "console": "ghcr.io/leamout/console@sha256:6666666666666666666666666666666666666666666666666666666666666666",
+    "opensips": "ghcr.io/leamout/opensips@sha256:7777777777777777777777777777777777777777777777777777777777777777",
+    "rtpengine": "ghcr.io/leamout/rtpengine@sha256:8888888888888888888888888888888888888888888888888888888888888888",
+    "freeswitch": "ghcr.io/leamout/freeswitch@sha256:9999999999999999999999999999999999999999999999999999999999999999",
+    "coturn": "docker.io/coturn/coturn@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "postgres": "docker.io/library/postgres@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "redis": "docker.io/library/redis@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "nats": "docker.io/library/nats@sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "atlas": "docker.io/arigaio/atlas@sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  }
+}
