@@ -48,6 +48,39 @@ trap cleanup EXIT INT TERM
 command -v docker >/dev/null 2>&1 || { echo "docker is required" >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo "openssl is required" >&2; exit 1; }
 command -v npm >/dev/null 2>&1 || { echo "npm is required" >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo "python3 is required" >&2; exit 1; }
+
+if [ -z "${WEBRTC_V1_TURN_MIN_PORT:-}" ] || [ -z "${WEBRTC_V1_TURN_MAX_PORT:-}" ]; then
+    turn_range=$(python3 - <<'PY'
+import random
+import socket
+
+width = 8
+for _ in range(256):
+    start = random.randint(61000, 64999 - width)
+    sockets = []
+    try:
+        for port in range(start, start + width):
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.bind(("0.0.0.0", port))
+            sockets.append(sock)
+    except OSError:
+        pass
+    else:
+        print(start, start + width - 1)
+        break
+    finally:
+        for sock in sockets:
+            sock.close()
+else:
+    raise SystemExit("could not find a free UDP relay range")
+PY
+    )
+    set -- $turn_range
+    export WEBRTC_V1_TURN_MIN_PORT="$1"
+    export WEBRTC_V1_TURN_MAX_PORT="$2"
+fi
+printf '%s\n' "Using Coturn relay ports ${WEBRTC_V1_TURN_MIN_PORT}-${WEBRTC_V1_TURN_MAX_PORT}"
 
 cat >"$CERT_DIR/opensips.ext" <<'EOF'
 subjectAltName=DNS:webrtc-v1.local,DNS:opensips,IP:127.0.0.1
