@@ -16,8 +16,6 @@ MIGRATION = re.compile(r"^[0-9]{3}_[a-z0-9_]+\.sql$")
 REQUIRED_IMAGES = {
     "server",
     "worker",
-    "web",
-    "console",
     "opensips",
     "rtpengine",
     "freeswitch",
