@@ -1,18 +1,22 @@
 ARG NODE_VERSION=24
 ARG BUN_VERSION=1.3.14
 
-FROM oven/bun:${BUN_VERSION}-alpine AS base
+FROM oven/bun:${BUN_VERSION}-alpine AS bun
+
+FROM node:${NODE_VERSION}-alpine AS base
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 WORKDIR /app
 
 FROM base AS prepare
 COPY . .
-RUN bunx turbo@2.10.12 prune @leamout/waitlist --docker
+RUN bun x turbo@2.10.12 prune @leamout/waitlist --docker
 
 FROM base AS builder
 COPY --from=prepare /app/out/json/ .
 RUN bun install --frozen-lockfile
 COPY --from=prepare /app/out/full/ .
-RUN bunx turbo build --filter=@leamout/waitlist
+WORKDIR /app/apps/waitlist
+RUN node ../../node_modules/next/dist/bin/next build
 
 FROM node:${NODE_VERSION}-alpine AS runner
 WORKDIR /app
