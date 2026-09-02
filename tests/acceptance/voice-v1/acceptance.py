@@ -282,6 +282,23 @@ def create_voice_application():
     if assigned.get("carrier_connection_id") != STATE["connection_id"]:
         raise AcceptanceError("failed to assign test DID to carrier connection")
 
+    # Current outbound routing requires the caller identity itself to be an
+    # owned, voice-enabled number on the same carrier connection as the trunk.
+    _, caller_number = api(
+        "POST", "/v1/numbers/",
+        {"number": CALLER, "country_code": "US", "voice_enabled": True},
+        expected={201},
+    )
+    STATE["caller_number_id"] = caller_number["id"]
+    _, caller_assigned = api(
+        "PUT",
+        f"/v1/numbers/{caller_number['id']}/carrier-connection",
+        {"carrier_connection_id": STATE["connection_id"]},
+        expected={200},
+    )
+    if caller_assigned.get("carrier_connection_id") != STATE["connection_id"]:
+        raise AcceptanceError("failed to authorize outbound caller identity")
+
     _, application = api(
         "POST", "/v1/voice-applications/",
         {"name": "voice-v1-acceptance", "caller_id": CALLER},
@@ -325,15 +342,15 @@ def configure_webhook():
 
 def inbound_call():
     existing = {item["id"] for item in list_calls()}
+    carrier_uuid = str(uuid.uuid4())
     output = fs_cli(
         "voice-v1-carrier",
-        "originate "
-        f"{{origination_caller_id_number={CALLER}}}"
+        "bgapi originate "
+        f"{{origination_uuid={carrier_uuid},origination_caller_id_number={CALLER}}}"
         f"sofia/internal/{DID}@opensips:5060 &park()",
     )
-    if "+OK" not in output:
-        raise AcceptanceError(f"synthetic carrier originate failed: {output}")
-    carrier_uuid = output.split("+OK", 1)[1].strip().split()[0]
+    if "+OK Job-UUID:" not in output:
+        raise AcceptanceError(f"synthetic carrier originate was not queued: {output}")
 
     def probe():
         return next(
