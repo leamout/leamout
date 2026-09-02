@@ -5,4 +5,5 @@ SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/lib.sh"
 
 sh "$SCRIPT_DIR/preflight.sh"
-compose up -d --build
+sh "$SCRIPT_DIR/build.sh"
+compose up -d --no-build
