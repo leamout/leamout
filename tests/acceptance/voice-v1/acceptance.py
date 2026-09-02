@@ -165,7 +165,11 @@ def list_recordings():
 
 
 def sink_events():
-    context = ssl._create_unverified_context()
+    cert_dir = os.environ.get("VOICE_V1_CERT_DIR")
+    if not cert_dir:
+        raise AcceptanceError("VOICE_V1_CERT_DIR is required to verify webhook TLS")
+    context = ssl.create_default_context(cafile=os.path.join(cert_dir, "ca.crt"))
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
     request = urllib.request.Request("https://127.0.0.1:18443/events")
     with urllib.request.urlopen(request, timeout=5, context=context) as response:
         return json.loads(response.read())["events"]
