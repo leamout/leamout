@@ -4,18 +4,22 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "scripts/**"
       - "server/**"
       - "clients/**"
       - ".env.example"
+      - "Makefile"
       - ".github/workflows/docker.yml"
   push:
     branches:
       - main
     paths:
       - "deploy/**"
+      - "scripts/**"
       - "server/**"
       - "clients/**"
       - ".env.example"
+      - "Makefile"
       - ".github/workflows/docker.yml"
 
 permissions:
@@ -23,7 +27,7 @@ permissions:
 
 jobs:
   drain-scripts:
-    name: Validate drain controls
+    name: Validate deployment scripts
     runs-on: ubuntu-latest
 
     steps:
@@ -32,11 +36,23 @@ jobs:
 
       - name: Check shell syntax
         run: |
+          sh -n scripts/certs/generate-self-signed.sh
+          sh -n scripts/certs/check-certs.sh
           sh -n deploy/drain.sh
           sh -n deploy/resume.sh
           sh -n deploy/opensips/apply-drain-config.sh
           sh -n deploy/opensips/drain-control.sh
           sh -n deploy/freeswitch/drain-control.sh
+
+      - name: Exercise certificate helpers
+        run: |
+          CERT_DIR=/tmp/leamout-certs CERT_DAYS=1 sh scripts/certs/generate-self-signed.sh
+          CERT_DIR=/tmp/leamout-certs sh scripts/certs/check-certs.sh
+
+          if CERT_DIR=/tmp/leamout-certs sh scripts/certs/generate-self-signed.sh; then
+            echo "certificate generator unexpectedly overwrote existing files" >&2
+            exit 1
+          fi
 
       - name: Verify OpenSIPS drain route placement
         run: |
@@ -103,18 +119,10 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Generate CI TLS certificates
-        run: |
-          mkdir -p deploy/certs
-          openssl req \
-            -x509 \
-            -newkey rsa:2048 \
-            -nodes \
-            -keyout deploy/certs/privkey.pem \
-            -out deploy/certs/fullchain.pem \
-            -subj '/CN=localhost' \
-            -days 1 \
-            >/dev/null 2>&1
-          cp deploy/certs/fullchain.pem deploy/certs/carrier-ca.pem
+        run: CERT_DAYS=1 make certs
+
+      - name: Validate CI TLS certificates
+        run: make check-certs
 
       - name: Validate Docker Compose configuration
         run: docker compose --env-file .env.example -f deploy/compose.yaml config --quiet
