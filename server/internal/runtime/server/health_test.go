@@ -26,19 +26,11 @@ type fakeReadinessCache struct {
 	err error
 }
 
-type fakeReadinessTURN struct {
-	err error
-}
-
 func (f fakeReadinessCache) Ping(context.Context) error {
 	return f.err
 }
 
 func (f fakeReadinessMedia) HealthCheck(context.Context) error {
-	return f.err
-}
-
-func (f fakeReadinessTURN) HealthCheck(context.Context) error {
 	return f.err
 }
 
@@ -49,7 +41,6 @@ func TestHealthRoutes(t *testing.T) {
 		database   error
 		cache      error
 		media      error
-		turn       error
 		wantStatus int
 	}{
 		{
@@ -58,7 +49,6 @@ func TestHealthRoutes(t *testing.T) {
 			database:   errors.New("database unavailable"),
 			media:      errors.New("freeswitch unavailable"),
 			cache:      errors.New("redis unavailable"),
-			turn:       errors.New("coturn unavailable"),
 			wantStatus: http.StatusNoContent,
 		},
 		{
@@ -84,12 +74,6 @@ func TestHealthRoutes(t *testing.T) {
 			media:      errors.New("freeswitch unavailable"),
 			wantStatus: http.StatusServiceUnavailable,
 		},
-		{
-			name:       "readiness fails when coturn is unavailable",
-			path:       "/readyz",
-			turn:       errors.New("coturn unavailable"),
-			wantStatus: http.StatusServiceUnavailable,
-		},
 	}
 
 	for _, tt := range tests {
@@ -100,7 +84,6 @@ func TestHealthRoutes(t *testing.T) {
 				fakeReadinessDatabase{err: tt.database},
 				fakeReadinessCache{err: tt.cache},
 				fakeReadinessMedia{err: tt.media},
-				fakeReadinessTURN{err: tt.turn},
 			)
 
 			request := httptest.NewRequestWithContext(

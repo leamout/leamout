@@ -11,7 +11,6 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
-	"github.com/leamout/leamout/internal/integrations/coturn"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
@@ -44,7 +43,6 @@ type Server struct {
 	Modules    Modules
 	FreeSWITCH freeswitch.MediaController
 	Redis      *redisintegration.Client
-	Coturn     *coturn.Client
 
 	Logger  *logging.Logger
 	Metrics *metrics.Registry
@@ -84,14 +82,6 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		_ = redisClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("connect FreeSWITCH: %w", err)
-	}
-
-	turnClient, err := coturn.New(coturn.DefaultConfig(cfg.TURNAddress))
-	if err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize Coturn client: %w", err)
 	}
 
 	callsController := calls.NewFreeSWITCHController(freeSwitch)
@@ -137,7 +127,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		middleware.CORS(cfg.CORSOrigins, cfg.IsDevelopment()),
 	)
 
-	RegisterHealthRoutes(router, db, redisClient, freeSwitch, turnClient)
+	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
 	router.Handle("/metrics", metrics.Handler(metricsRegistry))
 	RegisterRoutes(router, modules)
 
@@ -147,7 +137,6 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		Modules:    modules,
 		FreeSWITCH: freeSwitch,
 		Redis:      redisClient,
-		Coturn:     turnClient,
 		Logger:     logger,
 		Metrics:    metricsRegistry,
 	}, nil
