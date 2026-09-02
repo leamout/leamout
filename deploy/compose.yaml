@@ -1,3 +1,10 @@
+# Development and CI stack.
+#
+# This file may use build directives and human-readable image tags. It is not a
+# production release lockfile. Self-hosted production releases must resolve the
+# compatible runtime from a validated release manifest whose images are pinned
+# by OCI sha256 digest; see docs/deploy/release-artifacts.md.
+
 x-leamout-environment: &leamout-environment
   APP_ENV: ${APP_ENV:-development}
   DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
