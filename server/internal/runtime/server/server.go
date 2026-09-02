@@ -245,6 +245,10 @@ func NewModules(
 			Service:    licensingService,
 			Handler:    licensing.NewHandler(licensingService),
 		},
+		CommercialState: CommercialStateModule{
+			Service: commercialStateService,
+			Handler: commercialstate.NewHandler(commercialStateService),
+		},
 		Subscriptions: SubscriptionsModule{
 			Repository: subscriptionsRepository,
 			Service:    subscriptionsService,

@@ -5,6 +5,7 @@ import (
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -36,6 +37,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		licensing.RegisterRoutes(
 			r,
 			modules.Licensing.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+		)
+		commercialstate.RegisterRoutes(
+			r,
+			modules.CommercialState.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
 		subscriptions.RegisterRoutes(

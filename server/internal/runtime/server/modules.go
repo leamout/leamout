@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -28,6 +29,7 @@ import (
 type Modules struct {
 	Catalog              CatalogModule
 	Licensing            LicensingModule
+	CommercialState      CommercialStateModule
 	Subscriptions        SubscriptionsModule
 	Auth                 AuthModule
 	Session              SessionModule
@@ -61,6 +63,11 @@ type LicensingModule struct {
 	Repository *licensing.Repository
 	Service    *licensing.Service
 	Handler    *licensing.Handler
+}
+
+type CommercialStateModule struct {
+	Service *commercialstate.Service
+	Handler *commercialstate.Handler
 }
 
 type SubscriptionsModule struct {
