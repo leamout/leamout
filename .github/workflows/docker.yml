@@ -41,6 +41,8 @@ jobs:
           sh -n scripts/certs/install-system-ca.sh
           sh -n scripts/certs/provision-letsencrypt.sh
           sh -n scripts/certs/renew-letsencrypt.sh
+          sh -n scripts/certs/certbot-deploy-hook.sh
+          sh -n scripts/certs/install-certbot-renewal.sh
           sh -n deploy/drain.sh
           sh -n deploy/resume.sh
           sh -n deploy/opensips/apply-drain-config.sh
@@ -59,6 +61,22 @@ jobs:
 
           CERT_DIR=/tmp/leamout-production-certs sh scripts/certs/install-system-ca.sh
           test -s /tmp/leamout-production-certs/carrier-ca.pem
+
+          mkdir -p /tmp/leamout-lineage
+          cp /tmp/leamout-certs/fullchain.pem /tmp/leamout-lineage/fullchain.pem
+          cp /tmp/leamout-certs/privkey.pem /tmp/leamout-lineage/privkey.pem
+          cp /tmp/leamout-production-certs/carrier-ca.pem /tmp/leamout-hook-certs-carrier-ca.pem
+          mkdir -p /tmp/leamout-hook-certs
+          cp /tmp/leamout-hook-certs-carrier-ca.pem /tmp/leamout-hook-certs/carrier-ca.pem
+
+          RENEWED_LINEAGE=/tmp/leamout-lineage \
+          RENEWED_DOMAINS=sip.example.com \
+          TLS_DOMAIN=sip.example.com \
+          CERT_DIR=/tmp/leamout-hook-certs \
+          RESTART_OPENSIPS=0 \
+          sh scripts/certs/certbot-deploy-hook.sh
+
+          CERT_DIR=/tmp/leamout-hook-certs sh scripts/certs/check-certs.sh
 
       - name: Verify OpenSIPS drain route placement
         run: |
