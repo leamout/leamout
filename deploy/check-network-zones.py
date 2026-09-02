@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import pathlib
 import sys
 
 
@@ -81,5 +82,12 @@ for (service, network), wanted in expected_addresses.items():
     actual = ipv4(config, service, network)
     if actual != wanted:
         fail(f"{service} on {network} has {actual!r}, expected {wanted!r}")
+
+acl_path = pathlib.Path("deploy/freeswitch/autoload_configs/acl.conf.xml")
+acl = acl_path.read_text(encoding="utf-8")
+if 'cidr="172.32.0.0/24"' not in acl:
+    fail("FreeSWITCH leamout-esl ACL does not allow the private-control subnet")
+if 'cidr="172.30.0.0/24"' in acl:
+    fail("FreeSWITCH leamout-esl ACL still allows the public-signaling subnet")
 
 print("network-zone topology is valid")
