@@ -67,7 +67,7 @@ report success while leaving authentication behavior unchanged.
 - [x] Issue tenant-bound, short-lived TURN credentials through an authenticated API.
 - [x] Enable SIP over secure WebSocket at the OpenSIPS edge.
 - [x] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
-- [x] Add browser acceptance coverage with forced TURN relay.
+- [ ] Restore browser acceptance coverage with forced TURN relay.
 
 ## Phase 5 — operations and orchestration
 

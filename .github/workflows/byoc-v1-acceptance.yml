@@ -7,7 +7,6 @@ on:
       - "server/**"
       - "deploy/**"
       - "tests/acceptance/byoc-v1/**"
-      - "tests/acceptance/voice-v1/carrier-dialplan.xml"
       - ".github/workflows/byoc-v1-acceptance.yml"
 
 permissions:
