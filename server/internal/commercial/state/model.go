@@ -42,16 +42,7 @@ type organizationStateResponse struct {
 }
 
 func newOrganizationStateResponse(state OrganizationState) organizationStateResponse {
-	return organizationStateResponse{
-		OrganizationID: state.OrganizationID,
-		Standing:       state.Standing,
-		SubscriptionID: state.SubscriptionID,
-		PlanID:         state.PlanID,
-		Features:       state.Features,
-		Limits:         state.Limits,
-		EffectiveAt:    state.EffectiveAt,
-		NextChangeAt:   state.NextChangeAt,
-	}
+	return organizationStateResponse(state)
 }
 
 func (s OrganizationState) Enabled(feature string) bool {
