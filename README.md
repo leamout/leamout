@@ -53,6 +53,10 @@ Implementation progress for programmable call control is tracked in the
 WebRTC, and carrier-connectivity progress is tracked in the
 [BYOC roadmap](docs/byoc-roadmap.md).
 
+The target customer installation, activation, upgrade, backup, and operator CLI
+contract is documented in the
+[self-hosted installation guide](docs/deploy/self-hosted-installation.md).
+
 ## Architecture
 
 Leamout separates control-plane business logic from telecom data-plane components.
