@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://leamout.com/schemas/release-manifest-v1.json",
+  "title": "Leamout self-hosted release manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "release_version",
+    "channel",
+    "source_commit",
+    "minimum_cli_version",
+    "supported_hosts",
+    "database",
+    "cli_artifacts",
+    "images"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "release_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "channel": {
+      "enum": ["stable", "preview"]
+    },
+    "source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "minimum_cli_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "supported_hosts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["os", "version", "arch"],
+        "properties": {
+          "os": {
+            "enum": ["ubuntu", "debian"]
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "arch": {
+            "enum": ["amd64"]
+          }
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["migration"],
+      "properties": {
+        "migration": {
+          "type": "string",
+          "pattern": "^[0-9]{3}_[a-z0-9_]+\\.sql$"
+        }
+      }
+    },
+    "cli_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["os", "arch", "filename", "sha256"],
+        "properties": {
+          "os": {
+            "const": "linux"
+          },
+          "arch": {
+            "enum": ["amd64"]
+          },
+          "filename": {
+            "type": "string",
+            "pattern": "^leamout_[0-9A-Za-z.+-]+_linux_amd64\\.tar\\.gz$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "server",
+        "worker",
+        "web",
+        "console",
+        "opensips",
+        "rtpengine",
+        "freeswitch",
+        "coturn",
+        "postgres",
+        "redis",
+        "nats",
+        "atlas"
+      ],
+      "properties": {
+        "server": {"$ref": "#/$defs/image"},
+        "worker": {"$ref": "#/$defs/image"},
+        "web": {"$ref": "#/$defs/image"},
+        "console": {"$ref": "#/$defs/image"},
+        "opensips": {"$ref": "#/$defs/image"},
+        "rtpengine": {"$ref": "#/$defs/image"},
+        "freeswitch": {"$ref": "#/$defs/image"},
+        "coturn": {"$ref": "#/$defs/image"},
+        "postgres": {"$ref": "#/$defs/image"},
+        "redis": {"$ref": "#/$defs/image"},
+        "nats": {"$ref": "#/$defs/image"},
+        "atlas": {"$ref": "#/$defs/image"}
+      }
+    }
+  },
+  "$defs": {
+    "image": {
+      "type": "string",
+      "pattern": "^.+@sha256:[0-9a-f]{64}$"
+    }
+  }
+}
