@@ -67,7 +67,15 @@ report success while leaving authentication behavior unchanged.
 - [x] Issue tenant-bound, short-lived TURN credentials through an authenticated API.
 - [x] Enable SIP over secure WebSocket at the OpenSIPS edge.
 - [x] Add RTPengine WebRTC-to-SIP DTLS-SRTP and ICE policies.
-- [ ] Restore browser acceptance coverage with forced TURN relay.
+- [x] Restore browser acceptance coverage with forced TURN relay.
+
+The WebRTC v1 acceptance gate provisions its own SIP domain and subscriber through
+public APIs, obtains short-lived ICE credentials from `/v1/realtime/ice-credentials`,
+registers Chromium to OpenSIPS over WSS, and places a real audio call through
+RTPengine and FreeSWITCH. Chromium is configured with `iceTransportPolicy: "relay"`.
+The gate verifies that a TURN relay candidate is gathered, that the nominated media
+path remains inside the Coturn relay-port range, and that inbound RTP audio bytes are
+received. This prevents host or server-reflexive fallback from satisfying the test.
 
 ## Phase 5 — operations and orchestration
 
