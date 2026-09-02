@@ -7,6 +7,12 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/entitlements"
+	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialoperator "github.com/leamout/leamout/internal/commercial/operator"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -130,6 +136,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
 	router.Handle("/metrics", metrics.Handler(metricsRegistry))
 	RegisterRoutes(router, modules)
+	RegisterOperatorRoutes(router, modules, cfg.OperatorAPIKey)
 
 	return &Server{
 		DB:         db,
@@ -151,6 +158,16 @@ func NewModules(
 	redisClient *redisintegration.Client,
 ) (Modules, error) {
 	queries := sqlc.New(db)
+	catalogRepository := catalog.NewRepository(db)
+	catalogService := catalog.NewService(catalogRepository)
+	subscriptionRepository := subscriptions.NewRepository(db)
+	subscriptionService := subscriptions.NewService(subscriptionRepository, catalogService)
+	entitlementRepository := entitlements.NewRepository(db)
+	entitlementService := entitlements.NewService(entitlementRepository, subscriptionService)
+	commercialStateService := commercialstate.NewService(subscriptionService, entitlementService)
+	licensingRepository := licensing.NewRepository(db)
+	licensingService := licensing.NewService(licensingRepository, commercialStateService)
+	operatorHandler := commercialoperator.NewHandler(catalogService, subscriptionService, entitlementService, commercialStateService, licensingService)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -221,6 +238,10 @@ func NewModules(
 	organizationMiddleware := middleware.NewOrganizationMiddleware()
 
 	return Modules{
+		Commercial: CommercialModule{
+			Catalog: catalogService, Subscriptions: subscriptionService, Entitlements: entitlementService,
+			State: commercialStateService, Licensing: licensingService, Operator: operatorHandler,
+		},
 		Auth: AuthModule{
 			Repository: authRepository,
 			Service:    authService,

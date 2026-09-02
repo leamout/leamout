@@ -41,39 +41,39 @@ var (
 // Subscription binds an organization to a commercial plan and acquired price for a period of time.
 // PriceID can be nil only for legacy rows created before price-backed subscriptions were introduced.
 type Subscription struct {
-	ID                     uuid.UUID
-	OrganizationID         uuid.UUID
-	PlanID                 uuid.UUID
-	PriceID                *uuid.UUID
-	Status                 Status
-	StartsAt               time.Time
-	RenewsAt               *time.Time
-	EndsAt                 *time.Time
-	BillingProvider        *string
-	ProviderSubscriptionID *string
-	CreatedAt              time.Time
-	UpdatedAt              time.Time
+	ID                     uuid.UUID  `json:"id"`
+	OrganizationID         uuid.UUID  `json:"organization_id"`
+	PlanID                 uuid.UUID  `json:"plan_id"`
+	PriceID                *uuid.UUID `json:"price_id,omitempty"`
+	Status                 Status     `json:"status"`
+	StartsAt               time.Time  `json:"starts_at"`
+	RenewsAt               *time.Time `json:"renews_at,omitempty"`
+	EndsAt                 *time.Time `json:"ends_at,omitempty"`
+	BillingProvider        *string    `json:"billing_provider,omitempty"`
+	ProviderSubscriptionID *string    `json:"provider_subscription_id,omitempty"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 // ProviderReference identifies the matching subscription at an external billing provider.
 // It is reconciliation metadata; the provider is not the source of truth for subscription state.
 type ProviderReference struct {
-	Provider       string
-	SubscriptionID string
+	Provider       string `json:"provider"`
+	SubscriptionID string `json:"subscription_id"`
 }
 
 // CreateInput describes a new organization subscription. The selected price determines the plan.
 type CreateInput struct {
-	PriceID  uuid.UUID
-	Status   *Status
-	StartsAt *time.Time
-	RenewsAt *time.Time
-	EndsAt   *time.Time
-	Provider *ProviderReference
+	PriceID  uuid.UUID          `json:"price_id"`
+	Status   *Status            `json:"status,omitempty"`
+	StartsAt *time.Time         `json:"starts_at,omitempty"`
+	RenewsAt *time.Time         `json:"renews_at,omitempty"`
+	EndsAt   *time.Time         `json:"ends_at,omitempty"`
+	Provider *ProviderReference `json:"provider,omitempty"`
 }
 
 // PeriodUpdate changes future renewal/end timestamps without changing subscription identity.
 type PeriodUpdate struct {
-	RenewsAt *time.Time
-	EndsAt   *time.Time
+	RenewsAt *time.Time `json:"renews_at"`
+	EndsAt   *time.Time `json:"ends_at"`
 }

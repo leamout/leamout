@@ -108,6 +108,16 @@ func NewConflict(message string) *AppError {
 	}
 }
 
+// NewUnprocessableEntity reports a well-formed request that cannot be applied
+// to the current domain state.
+func NewUnprocessableEntity(message string) *AppError {
+	return &AppError{
+		Code:    "UNPROCESSABLE_ENTITY",
+		Message: message,
+		Status:  http.StatusUnprocessableEntity,
+	}
+}
+
 // NewTooManyRequests creates a rate limit error.
 func NewTooManyRequests(message string) *AppError {
 	return &AppError{

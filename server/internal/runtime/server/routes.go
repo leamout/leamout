@@ -3,11 +3,13 @@ package server
 import (
 	"github.com/go-chi/chi/v5"
 
+	commercialoperator "github.com/leamout/leamout/internal/commercial/operator"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
+	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
@@ -115,5 +117,13 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			modules.Realtime.Handler,
 			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
+	})
+}
+
+// RegisterOperatorRoutes keeps privileged commercial administration outside
+// the customer-facing /v1 API and behind its own credential boundary.
+func RegisterOperatorRoutes(r *chi.Mux, modules Modules, operatorAPIKey string) {
+	r.Route("/internal/v1", func(r chi.Router) {
+		commercialoperator.RegisterRoutes(r, modules.Commercial.Operator, middleware.RequireOperatorKey(operatorAPIKey))
 	})
 }

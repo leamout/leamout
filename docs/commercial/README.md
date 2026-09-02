@@ -159,6 +159,7 @@ See [security.md](security.md) for the database defense model.
 - [Rating](rating.md) — telecom usage economic resolution through carrier rates.
 - [Invoicing](invoicing.md) — period statements and historical monetary snapshots.
 - [Payments](payments.md) — provider-independent payment reconciliation.
+- [Operator API](operator-api.md) — privileged administration of catalog discovery, subscriptions, entitlements, state, and licenses.
 
 ## Current boundaries
 

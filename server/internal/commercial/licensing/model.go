@@ -61,42 +61,42 @@ var (
 // License is Leamout-owned commercial authority for self-hosted installations.
 // The signed artifact format is intentionally separate from this persistence model.
 type License struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	SubscriptionID *uuid.UUID
-	Status         Status
-	MaxDeployments int32
-	SigningKeyID   *string
-	IssuedAt       time.Time
-	ExpiresAt      *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID             uuid.UUID  `json:"id"`
+	OrganizationID uuid.UUID  `json:"organization_id"`
+	SubscriptionID *uuid.UUID `json:"subscription_id,omitempty"`
+	Status         Status     `json:"status"`
+	MaxDeployments int32      `json:"max_deployments"`
+	SigningKeyID   *string    `json:"signing_key_id,omitempty"`
+	IssuedAt       time.Time  `json:"issued_at"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // Deployment is one activated self-hosted installation under a license.
 type Deployment struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	LicenseID      uuid.UUID
-	DeploymentID   string
-	Name           *string
-	Status         DeploymentStatus
-	ActivatedAt    time.Time
-	LastSeenAt     *time.Time
-	DeactivatedAt  *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID             uuid.UUID        `json:"id"`
+	OrganizationID uuid.UUID        `json:"organization_id"`
+	LicenseID      uuid.UUID        `json:"license_id"`
+	DeploymentID   string           `json:"deployment_id"`
+	Name           *string          `json:"name,omitempty"`
+	Status         DeploymentStatus `json:"status"`
+	ActivatedAt    time.Time        `json:"activated_at"`
+	LastSeenAt     *time.Time       `json:"last_seen_at,omitempty"`
+	DeactivatedAt  *time.Time       `json:"deactivated_at,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
 }
 
 // CreateInput contains trusted licensing-authority metadata. Subscription identity
 // and deployment limits are resolved from current commercial state by the service.
 type CreateInput struct {
-	SigningKeyID *string
-	ExpiresAt    *time.Time
+	SigningKeyID *string    `json:"signing_key_id,omitempty"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
 }
 
 // ActivateDeploymentInput identifies a stable installation requesting a license slot.
 type ActivateDeploymentInput struct {
-	DeploymentID string
-	Name         *string
+	DeploymentID string  `json:"deployment_id"`
+	Name         *string `json:"name,omitempty"`
 }

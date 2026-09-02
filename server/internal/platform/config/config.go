@@ -22,6 +22,7 @@ type Config struct {
 	TURNAuthSecret        string   `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
 	CORSOrigins           []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+	OperatorAPIKey        string   `env:"OPERATOR_API_KEY"`
 }
 
 func Load() (Config, error) {

@@ -39,29 +39,29 @@ var (
 
 // Entitlement is one durable feature or limit attached to exactly one scope.
 type Entitlement struct {
-	ID             uuid.UUID
-	PlanID         *uuid.UUID
-	OrganizationID *uuid.UUID
-	LicenseID      *uuid.UUID
-	Key            string
-	Kind           Kind
-	Enabled        *bool
-	LimitValue     *int64
-	StartsAt       *time.Time
-	ExpiresAt      *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID             uuid.UUID  `json:"id"`
+	PlanID         *uuid.UUID `json:"plan_id,omitempty"`
+	OrganizationID *uuid.UUID `json:"organization_id,omitempty"`
+	LicenseID      *uuid.UUID `json:"license_id,omitempty"`
+	Key            string     `json:"key"`
+	Kind           Kind       `json:"kind"`
+	Enabled        *bool      `json:"enabled,omitempty"`
+	LimitValue     *int64     `json:"limit_value,omitempty"`
+	StartsAt       *time.Time `json:"starts_at,omitempty"`
+	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // CreateInput describes the value and optional activation window for an entitlement.
 // The owning scope is supplied by the service method rather than embedded here.
 type CreateInput struct {
-	Key        string
-	Kind       Kind
-	Enabled    *bool
-	LimitValue *int64
-	StartsAt   *time.Time
-	ExpiresAt  *time.Time
+	Key        string     `json:"key"`
+	Kind       Kind       `json:"kind"`
+	Enabled    *bool      `json:"enabled,omitempty"`
+	LimitValue *int64     `json:"limit_value,omitempty"`
+	StartsAt   *time.Time `json:"starts_at,omitempty"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 }
 
 // EntitlementSet is the resolved set of commercial capabilities and limits.

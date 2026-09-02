@@ -27,40 +27,40 @@ var (
 
 // Product is a commercial product family that groups reusable plans.
 type Product struct {
-	ID          uuid.UUID
-	Code        string
-	Name        string
-	Description *string
-	Active      bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID `json:"id"`
+	Code        string    `json:"code"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	Active      bool      `json:"active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Plan is a reusable commercial offer within a product.
 type Plan struct {
-	ID          uuid.UUID
-	ProductID   uuid.UUID
-	Code        string
-	Name        string
-	Description *string
-	Active      bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          uuid.UUID `json:"id"`
+	ProductID   uuid.UUID `json:"product_id"`
+	Code        string    `json:"code"`
+	Name        string    `json:"name"`
+	Description *string   `json:"description,omitempty"`
+	Active      bool      `json:"active"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Price is an immutable set of recurring commercial terms for a plan.
 // Active/effective bounds control acquisition availability without rewriting
 // historical subscriptions that already reference this price.
 type Price struct {
-	ID              uuid.UUID
-	PlanID          uuid.UUID
-	Currency        string
-	AmountMinor     int64
-	BillingInterval BillingInterval
-	Active          bool
-	EffectiveFrom   time.Time
-	EffectiveUntil  *time.Time
-	CreatedAt       time.Time
+	ID              uuid.UUID       `json:"id"`
+	PlanID          uuid.UUID       `json:"plan_id"`
+	Currency        string          `json:"currency"`
+	AmountMinor     int64           `json:"amount_minor"`
+	BillingInterval BillingInterval `json:"billing_interval"`
+	Active          bool            `json:"active"`
+	EffectiveFrom   time.Time       `json:"effective_from"`
+	EffectiveUntil  *time.Time      `json:"effective_until,omitempty"`
+	CreatedAt       time.Time       `json:"created_at"`
 }
 
 func (p Price) EffectiveAt(at time.Time) bool {

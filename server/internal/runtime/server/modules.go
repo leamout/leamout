@@ -1,6 +1,12 @@
 package server
 
 import (
+	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/entitlements"
+	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialoperator "github.com/leamout/leamout/internal/commercial/operator"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -23,6 +29,7 @@ import (
 )
 
 type Modules struct {
+	Commercial           CommercialModule
 	Auth                 AuthModule
 	Session              SessionModule
 	Users                UsersModule
@@ -43,6 +50,15 @@ type Modules struct {
 	Realtime             RealtimeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
+}
+
+type CommercialModule struct {
+	Catalog       *catalog.Service
+	Subscriptions *subscriptions.Service
+	Entitlements  *entitlements.Service
+	State         *commercialstate.Service
+	Licensing     *licensing.Service
+	Operator      *commercialoperator.Handler
 }
 
 type AuthModule struct {
