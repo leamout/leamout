@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -25,6 +26,7 @@ import (
 
 type Modules struct {
 	Catalog              CatalogModule
+	Subscriptions        SubscriptionsModule
 	Auth                 AuthModule
 	Session              SessionModule
 	Users                UsersModule
@@ -51,6 +53,12 @@ type CatalogModule struct {
 	Repository *catalog.Repository
 	Service    *catalog.Service
 	Handler    *catalog.Handler
+}
+
+type SubscriptionsModule struct {
+	Repository *subscriptions.Repository
+	Service    *subscriptions.Service
+	Handler    *subscriptions.Handler
 }
 
 type AuthModule struct {

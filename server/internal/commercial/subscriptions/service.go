@@ -112,6 +112,11 @@ func (s *Service) Transition(ctx context.Context, organizationID, id uuid.UUID, 
 	return s.repo.UpdateStatus(ctx, organizationID, id, current.Status, target)
 }
 
+// Cancel applies the customer-facing terminal subscription transition.
+func (s *Service) Cancel(ctx context.Context, organizationID, id uuid.UUID) (Subscription, error) {
+	return s.Transition(ctx, organizationID, id, StatusCancelled)
+}
+
 func (s *Service) SetProvider(ctx context.Context, organizationID, id uuid.UUID, reference ProviderReference) (Subscription, error) {
 	normalized, err := normalizeProvider(reference)
 	if err != nil {

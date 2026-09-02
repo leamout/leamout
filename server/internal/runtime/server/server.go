@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -154,6 +155,8 @@ func NewModules(
 	queries := sqlc.New(db)
 	catalogRepository := catalog.NewRepository(db)
 	catalogService := catalog.NewService(catalogRepository)
+	subscriptionsRepository := subscriptions.NewRepository(db)
+	subscriptionsService := subscriptions.NewService(subscriptionsRepository, catalogService)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -228,6 +231,11 @@ func NewModules(
 			Repository: catalogRepository,
 			Service:    catalogService,
 			Handler:    catalog.NewHandler(catalogService),
+		},
+		Subscriptions: SubscriptionsModule{
+			Repository: subscriptionsRepository,
+			Service:    subscriptionsService,
+			Handler:    subscriptions.NewHandler(subscriptionsService),
 		},
 		Auth: AuthModule{
 			Repository: authRepository,

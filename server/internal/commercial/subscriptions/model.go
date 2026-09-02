@@ -77,3 +77,36 @@ type PeriodUpdate struct {
 	RenewsAt *time.Time
 	EndsAt   *time.Time
 }
+
+// UpdateRequest contains the customer-controlled subscription fields.
+type UpdateRequest struct {
+	PriceID uuid.UUID `json:"price_id"`
+}
+
+type subscriptionResponse struct {
+	ID             uuid.UUID  `json:"id"`
+	OrganizationID uuid.UUID  `json:"organization_id"`
+	PlanID         uuid.UUID  `json:"plan_id"`
+	PriceID        *uuid.UUID `json:"price_id,omitempty"`
+	Status         Status     `json:"status"`
+	StartsAt       time.Time  `json:"starts_at"`
+	RenewsAt       *time.Time `json:"renews_at,omitempty"`
+	EndsAt         *time.Time `json:"ends_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+func newSubscriptionResponse(subscription Subscription) subscriptionResponse {
+	return subscriptionResponse{
+		ID:             subscription.ID,
+		OrganizationID: subscription.OrganizationID,
+		PlanID:         subscription.PlanID,
+		PriceID:        subscription.PriceID,
+		Status:         subscription.Status,
+		StartsAt:       subscription.StartsAt,
+		RenewsAt:       subscription.RenewsAt,
+		EndsAt:         subscription.EndsAt,
+		CreatedAt:      subscription.CreatedAt,
+		UpdatedAt:      subscription.UpdatedAt,
+	}
+}
