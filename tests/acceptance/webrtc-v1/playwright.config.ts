@@ -18,7 +18,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: "npx vite --host 127.0.0.1",
+    command: "npx vite --host 127.0.0.1 --port 4173 --strictPort",
     port: 4173,
     reuseExistingServer: false,
   },
