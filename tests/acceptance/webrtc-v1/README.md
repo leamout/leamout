@@ -24,8 +24,10 @@ Then run:
 sh tests/acceptance/webrtc-v1/run.sh
 ```
 
-The runner creates disposable TLS material, narrows Coturn to relay ports
-`49160-49200`, starts the required Docker services, applies migrations, provisions
-an isolated acceptance organization, and tears the stack down on exit.
+The runner creates disposable TLS material, selects a small collision-free UDP relay
+range for Coturn, starts the required Docker services, applies migrations, provisions
+an isolated acceptance organization, and tears the stack down on exit. Set
+`WEBRTC_V1_TURN_MIN_PORT` and `WEBRTC_V1_TURN_MAX_PORT` together to use an explicit
+relay range instead.
 
-Set `WEBRTC_V1_KEEP_STACK=1` to keep the failed stack available for inspection.
+Set `WEBRTC_V1_KEEP_STACK=1` to keep a failed stack available for inspection.
