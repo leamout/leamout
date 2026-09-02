@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, os, subprocess, sys, time, urllib.error, urllib.request
+import json, os, subprocess, sys, time, urllib.error, urllib.request, uuid
 
 API = os.getenv("BYOC_V1_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("BYOC_V1_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
@@ -91,9 +91,14 @@ def number_and_app():
     number = api("POST", "/v1/numbers/", {"number":DID, "country_code":"US", "voice_enabled":True}, (201,)); S["number"] = number
     assigned = api("PUT", f"/v1/numbers/{number['id']}/carrier-connection", {"carrier_connection_id":S["connection"]["id"]})
     if assigned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("DID ownership was not assigned")
+
+    caller = api("POST", "/v1/numbers/", {"number":CALLER, "country_code":"US", "voice_enabled":True}, (201,)); S["caller_number"] = caller
+    caller_assigned = api("PUT", f"/v1/numbers/{caller['id']}/carrier-connection", {"carrier_connection_id":S["connection"]["id"]})
+    if caller_assigned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("caller identity ownership was not assigned")
+
     app = api("POST", "/v1/voice-applications/", {"name":"BYOC ingress", "caller_id":CALLER}, (201,)); S["app"] = app
     api("POST", f"/v1/voice-applications/{app['id']}/bindings", {"phone_number_id":number["id"]}, (201,))
-    return "DID ownership and application binding use public APIs"
+    return "DID and caller identity ownership plus application binding use public APIs"
 
 def reject_cross_org_did_ownership():
     foreign_connection = api("POST", "/v1/carrier-connections/", {"provider_id":S["provider"]["id"], "name":"BYOC foreign tenant carrier", "inbound_enabled":True}, (201,), TOKEN_B)
@@ -146,12 +151,21 @@ def rejected_before_allowlist():
 
 def add_source_and_inbound():
     source = api("POST", f"/v1/carrier-connections/{S['connection']['id']}/source-ips", {"cidr":"172.30.0.50/32"}, (201,))
-    before = {x["id"] for x in api("GET", "/v1/calls/?limit=100")["calls"]}
-    output = fs(f"originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()")
-    if "+OK" not in output: raise Failure("allowlisted carrier was rejected: " + output)
-    call = wait("inbound call", lambda: next((x for x in api("GET", "/v1/calls/?limit=100")["calls"] if x["id"] not in before and x["direction"] == "inbound"), None))
-    S["inbound"] = call
-    api("DELETE", f"/v1/carrier-connections/{S['connection']['id']}/source-ips/{source['id']}", expected=(204,))
+    carrier_uuid = str(uuid.uuid4())
+    try:
+        before = {x["id"] for x in api("GET", "/v1/calls/?limit=100")["calls"]}
+        output = fs(
+            "bgapi originate "
+            f"{{origination_uuid={carrier_uuid},origination_caller_id_number={CALLER}}}"
+            f"sofia/internal/{DID}@opensips:5060 &park()"
+        )
+        if "+OK Job-UUID:" not in output: raise Failure("allowlisted carrier originate was not queued: " + output)
+        call = wait("inbound call", lambda: next((x for x in api("GET", "/v1/calls/?limit=100")["calls"] if x["id"] not in before and x["direction"] == "inbound"), None))
+        S["inbound"] = call
+    finally:
+        fs(f"uuid_kill {carrier_uuid}")
+        api("DELETE", f"/v1/carrier-connections/{S['connection']['id']}/source-ips/{source['id']}", expected=(204,))
+
     rejected = fs(f"originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()")
     if "+OK" in rejected: raise Failure("removed carrier source remained authorized")
     return "source-IP addition and removal took effect without OpenSIPS restart"
