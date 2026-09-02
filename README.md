@@ -43,12 +43,15 @@ The repository currently contains the foundations of the Leamout control plane:
 - calls, call legs, and durable call events
 - transactional outbox primitives for asynchronous workflows
 - SQLC-generated database access and Atlas-managed schema workflow
-- a deployable development telecom stack around OpenSIPS, RTPengine, FreeSWITCH, PostgreSQL, Redis, and NATS
+- a deployable development telecom stack around OpenSIPS, RTPengine, FreeSWITCH, Coturn, PostgreSQL, Redis, and NATS
+- browser/WebRTC acceptance coverage that forces TURN relay, registers over WSS, and verifies real RTP media through RTPengine and FreeSWITCH
 
 Some capabilities described in the documentation are intentionally **roadmap design**, not current product behavior. In particular, full billing/rating, SMPP messaging, realtime AI media, production HA, and hosted carrier products are not presented as complete.
 
 Implementation progress for programmable call control is tracked in the
-[call orchestration roadmap](docs/call-orchestration-roadmap.md).
+[call orchestration roadmap](docs/call-orchestration-roadmap.md). BYOC, secure
+WebRTC, and carrier-connectivity progress is tracked in the
+[BYOC roadmap](docs/byoc-roadmap.md).
 
 ## Architecture
 
@@ -65,7 +68,7 @@ Applications / API clients
           └── NATS ──────── durable asynchronous workflows
           │
           ▼
-       OpenSIPS
+       OpenSIPS ◄──── browser SIP over WSS
           │
      ┌────┴────┐
      │         │
@@ -74,9 +77,11 @@ RTPengine   FreeSWITCH
      └────┬────┘
           │
    SIP carriers / PSTN
+
+Browser media ── TURN/STUN via Coturn ──► RTPengine
 ```
 
-**OpenSIPS** owns SIP signaling and routing. **RTPengine** handles media relay and NAT/media anchoring. **FreeSWITCH** is used when calls require application media such as IVR, playback, recording, conferencing, or similar programmable media workloads.
+**OpenSIPS** owns SIP signaling and routing. **RTPengine** handles media relay and NAT/media anchoring, including the WebRTC media boundary. **FreeSWITCH** is used when calls require application media such as IVR, playback, recording, conferencing, or similar programmable media workloads. **Coturn** provides STUN/TURN relay service for browser/WebRTC clients; Leamout issues the short-lived tenant-bound TURN credentials used by those clients.
 
 ## Core principles
 
