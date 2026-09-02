@@ -7,6 +7,8 @@ type AcceptanceConfig = {
   authorizationPassword: string;
   destinationUri: string;
   iceServers: RTCIceServer[];
+  turnRelayMinPort: number;
+  turnRelayMaxPort: number;
 };
 
 declare global {
@@ -15,10 +17,19 @@ declare global {
   }
 }
 
+const inRelayRange = (port: unknown, minPort: number, maxPort: number): boolean =>
+  typeof port === "number" && Number.isInteger(port) && port >= minPort && port <= maxPort;
+
 window.runLeamoutWebRTCAcceptance = async (config) => {
   const uri = UserAgent.makeURI(config.sipUri);
   const destination = UserAgent.makeURI(config.destinationUri);
   if (!uri || !destination) throw new Error("invalid SIP URI");
+  if (!Number.isInteger(config.turnRelayMinPort) || !Number.isInteger(config.turnRelayMaxPort)) {
+    throw new Error("invalid TURN relay port range");
+  }
+  if (config.turnRelayMinPort < 1 || config.turnRelayMaxPort > 65535 || config.turnRelayMinPort > config.turnRelayMaxPort) {
+    throw new Error("invalid TURN relay port range");
+  }
 
   const userAgent = new UserAgent({
     uri,
@@ -67,9 +78,26 @@ window.runLeamoutWebRTCAcceptance = async (config) => {
       report.type === "candidate-pair" && report.state === "succeeded" && report.nominated,
     );
     if (selectedPairs.length !== 1) throw new Error(`expected one selected ICE pair, got ${selectedPairs.length}`);
+
+    const localCandidates = [...stats.values()].filter((report) => report.type === "local-candidate");
+    const gatheredRelayCandidates = localCandidates.filter((candidate) =>
+      candidate.candidateType === "relay" && inRelayRange(candidate.port, config.turnRelayMinPort, config.turnRelayMaxPort),
+    );
+    if (gatheredRelayCandidates.length === 0) {
+      const observed = localCandidates.map((candidate) => `${candidate.candidateType ?? "unknown"}:${candidate.port ?? "unknown"}`).join(", ");
+      throw new Error(`no TURN relay candidate gathered in ${config.turnRelayMinPort}-${config.turnRelayMaxPort}; observed ${observed || "none"}`);
+    }
+
     const localCandidate = stats.get(selectedPairs[0].localCandidateId);
-    if (!localCandidate || localCandidate.candidateType !== "relay") {
-      throw new Error(`expected forced TURN relay, got ${localCandidate?.candidateType ?? "none"}`);
+    if (!localCandidate) throw new Error("selected ICE pair has no local candidate stats");
+    if (!inRelayRange(localCandidate.port, config.turnRelayMinPort, config.turnRelayMaxPort)) {
+      throw new Error(
+        `selected ICE candidate escaped TURN relay range ${config.turnRelayMinPort}-${config.turnRelayMaxPort}: ` +
+        `${localCandidate.candidateType ?? "unknown"}:${localCandidate.port ?? "unknown"}`,
+      );
+    }
+    if (localCandidate.candidateType !== "relay" && localCandidate.candidateType !== "prflx") {
+      throw new Error(`expected selected TURN relay/prflx candidate, got ${localCandidate.candidateType ?? "none"}`);
     }
 
     const inboundAudio = [...stats.values()].find((report) =>
