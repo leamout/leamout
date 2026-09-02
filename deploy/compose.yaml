@@ -1,3 +1,16 @@
+x-leamout-environment: &leamout-environment
+  APP_ENV: ${APP_ENV:-development}
+  DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
+  REDIS_URL: redis://redis:6379
+  NATS_URL: nats://nats:4222
+  NATS_STREAM_REPLICAS: ${NATS_STREAM_REPLICAS:-1}
+  FREESWITCH_ESL_ADDRESS: freeswitch:8021
+  FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+  CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?CARRIER_CREDENTIAL_ENCRYPTION_KEY is required}
+  TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+  TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+
 services:
   postgres:
     image: postgres:18-alpine
@@ -12,21 +25,37 @@ services:
       test: ["CMD-SHELL", "pg_isready -U leamout -d leamout"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 10
+    networks:
+      - leamout-core
+
+  migrate:
+    image: arigaio/atlas:1.3.0-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - exec /atlas migrate apply --dir file:///migrations --url "$$DATABASE_URL"
+    environment:
+      DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable&search_path=public
+    volumes:
+      - ../server/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - leamout-core
 
   redis:
     image: redis:8-alpine
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      timeout: 5s
-      retries: 20
+      timeout: 3s
+      retries: 10
     networks:
       - leamout-core
 
@@ -38,28 +67,10 @@ services:
       - ./nats/nats-server.conf:/etc/nats/nats-server.conf:ro
       - nats_data:/data
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8222/healthz"]
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
       interval: 5s
-      timeout: 5s
-      retries: 20
-    networks:
-      - leamout-core
-
-  migrate:
-    image: arigaio/atlas:1.3.0-alpine
-    depends_on:
-      postgres:
-        condition: service_healthy
-    working_dir: /workspace
-    volumes:
-      - ../server/db/migrations:/workspace/migrations:ro
-    command:
-      - /bin/sh
-      - -c
-      - >-
-        exec /atlas migrate apply
-        --dir file:///workspace/migrations
-        --url postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
+      timeout: 3s
+      retries: 10
     networks:
       - leamout-core
 
@@ -69,34 +80,83 @@ services:
       context: ../server
       dockerfile: Dockerfile
     restart: unless-stopped
-    environment:
-      DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
-      REDIS_ADDRESS: redis:6379
-      NATS_URL: nats://nats:4222
-      FREESWITCH_ESL_ADDRESS: freeswitch:8021
-      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
-      CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?CARRIER_CREDENTIAL_ENCRYPTION_KEY is required}
-      TURN_REALM: ${TURN_REALM:?TURN_REALM is required}
-      TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
-      TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
+    environment: *leamout-environment
+    ports:
+      - "8080:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
       nats:
         condition: service_healthy
-      migrate:
-        condition: service_completed_successfully
       freeswitch:
         condition: service_started
-    ports:
-      - "8080:8080"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 20
+    networks:
+      - leamout-core
+
+  worker:
+    image: leamout/worker:1.0.0
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    command: ["/leamout/worker"]
+    restart: unless-stopped
+    environment: *leamout-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    networks:
+      - leamout-core
+
+  web:
+    image: leamout/web:1.0.0
+    build:
+      context: ../clients
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - leamout-core
+
+  console:
+    image: leamout/console:1.0.0
+    build:
+      context: ../clients
+      dockerfile: apps/console/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - leamout-core
+
+  waitlist:
+    image: leamout/waitlist:1.0.0
+    build:
+      context: ../clients
+      dockerfile: apps/waitlist/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3002:3000"
+    depends_on:
+      server:
+        condition: service_healthy
     networks:
       - leamout-core
 
@@ -105,6 +165,8 @@ services:
     build:
       context: ./opensips
       dockerfile: Dockerfile
+      args:
+        OPENSIPS_VERSION: 4.0.1
     restart: unless-stopped
     stop_grace_period: 30s
     ports:
@@ -130,7 +192,7 @@ services:
     image: coturn/coturn:4.17.0-r0
     restart: unless-stopped
     command:
-      - -c
+      - --config
       - /etc/coturn/turnserver.conf
       - --realm=${TURN_REALM:?TURN_REALM is required}
       - --static-auth-secret=${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
