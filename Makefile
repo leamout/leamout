@@ -11,6 +11,7 @@ help:
 	@echo "  make certs             Generate self-signed TLS certificates for local/CI use"
 	@echo "  make certs-production  Request/install a Let's Encrypt production certificate"
 	@echo "  make certs-renew       Renew/sync the Let's Encrypt certificate and restart OpenSIPS"
+	@echo "  make certs-auto-renew  Install Certbot deploy hook and enable renewal timer when available"
 	@echo "  make check-certs       Validate required TLS certificate files"
 	@echo "  make up                Build and start the stack"
 	@echo "  make down              Stop the stack"
@@ -31,6 +32,10 @@ certs-production:
 .PHONY: certs-renew
 certs-renew:
 	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/certs/renew-letsencrypt.sh
+
+.PHONY: certs-auto-renew
+certs-auto-renew:
+	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/certs/install-certbot-renewal.sh
 
 .PHONY: check-certs
 check-certs:
