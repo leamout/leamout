@@ -13,7 +13,7 @@ worker controlled through ESL.
 - [x] Normalize answer, hold, resume, and hangup events into durable call state.
 - [x] Publish call domain events through the transactional outbox.
 - [x] Reconcile database calls against active FreeSWITCH channels after restarts.
-- [ ] Add an end-to-end acceptance gate for an inbound parked call controlled
+- [x] Add an end-to-end acceptance gate for an inbound parked call controlled
       through the public answer, media, and hangup APIs.
 
 ## Runtime contract
@@ -32,13 +32,12 @@ worker controlled through ESL.
 FreeSWITCH dialplan actions must not select carriers, infer tenants, or execute a
 default application flow. Those decisions belong to the Leamout control plane.
 
-## Next acceptance slice
+## Acceptance coverage
 
-The first gate should prove that one authenticated carrier INVITE can:
-
-1. receive `180 Ringing` while the FreeSWITCH channel remains unanswered;
-2. appear as a durable inbound Leamout call with the resolved organization and
-   voice application;
-3. be answered and controlled through the public call API;
-4. emit ordered ringing, answered, and completed events; and
-5. leave no active FreeSWITCH channel after API hangup or worker reconciliation.
+`tests/acceptance/voice-v1` now proves the authoritative call lifecycle against
+the real Docker Compose telecom stack. The gate verifies that an authenticated
+carrier INVITE can remain parked while ringing, become a durable inbound call,
+be answered and controlled through the public API, emit normalized lifecycle
+events, and leave no active application channel after hangup. The same suite
+also exercises outbound calling, media controls, recordings, conferences,
+webhooks, health checks, and restart recovery.
