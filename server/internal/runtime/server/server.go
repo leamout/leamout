@@ -8,6 +8,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/entitlements"
+	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
@@ -157,6 +160,11 @@ func NewModules(
 	catalogService := catalog.NewService(catalogRepository)
 	subscriptionsRepository := subscriptions.NewRepository(db)
 	subscriptionsService := subscriptions.NewService(subscriptionsRepository, catalogService)
+	entitlementsRepository := entitlements.NewRepository(db)
+	entitlementsService := entitlements.NewService(entitlementsRepository, subscriptionsService)
+	commercialStateService := commercialstate.NewService(subscriptionsService, entitlementsService)
+	licensingRepository := licensing.NewRepository(db)
+	licensingService := licensing.NewService(licensingRepository, commercialStateService)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -231,6 +239,11 @@ func NewModules(
 			Repository: catalogRepository,
 			Service:    catalogService,
 			Handler:    catalog.NewHandler(catalogService),
+		},
+		Licensing: LicensingModule{
+			Repository: licensingRepository,
+			Service:    licensingService,
+			Handler:    licensing.NewHandler(licensingService),
 		},
 		Subscriptions: SubscriptionsModule{
 			Repository: subscriptionsRepository,

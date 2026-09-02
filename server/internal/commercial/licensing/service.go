@@ -2,7 +2,6 @@ package licensing
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -136,9 +135,5 @@ func (s *Service) DeactivateDeployment(ctx context.Context, organizationID, lice
 	if err != nil {
 		return Deployment{}, err
 	}
-	deployment, err := s.repo.DeactivateDeployment(ctx, organizationID, licenseID, normalized.DeploymentID)
-	if errors.Is(err, ErrDeploymentNotFound) {
-		return Deployment{}, err
-	}
-	return deployment, err
+	return s.repo.DeactivateDeployment(ctx, organizationID, licenseID, normalized.DeploymentID)
 }

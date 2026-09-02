@@ -4,6 +4,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -31,6 +32,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			r,
 			modules.Catalog.Handler,
 			modules.Authn.RequireSession,
+		)
+		licensing.RegisterRoutes(
+			r,
+			modules.Licensing.Handler,
+			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
 		)
 		subscriptions.RegisterRoutes(
 			r,
