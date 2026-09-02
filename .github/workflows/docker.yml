@@ -4,12 +4,18 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "server/**"
+      - "clients/**"
+      - ".env.example"
       - ".github/workflows/docker.yml"
   push:
     branches:
       - main
     paths:
       - "deploy/**"
+      - "server/**"
+      - "clients/**"
+      - ".env.example"
       - ".github/workflows/docker.yml"
 
 permissions:
@@ -44,42 +50,7 @@ jobs:
           test "$options_line" -lt "$drain_line"
           test "$drain_line" -lt "$register_line"
 
-      - name: Validate Compose configuration
-        env:
-          CARRIER_CREDENTIAL_ENCRYPTION_KEY: test-key
-          FREESWITCH_ESL_PASSWORD: test-password
-          RTPENGINE_PUBLIC_IP: 127.0.0.1
-          TURN_AUTH_SECRET: test-turn-secret
-          TURN_EXTERNAL_IP: 127.0.0.1
-          TURN_PUBLIC_URLS: turn:127.0.0.1:3478
-          TURN_REALM: example.test
-        run: docker compose -f deploy/compose.yaml config >/dev/null
-
-  opensips:
-    name: Build OpenSIPS
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Build OpenSIPS image
-        run: |
-          docker build \
-            --file deploy/opensips/Dockerfile \
-            --build-arg OPENSIPS_VERSION=4.0.1 \
-            --tag leamout/opensips:test \
-            deploy/opensips
-
-  freeswitch:
-    name: Build FreeSWITCH
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Build FreeSWITCH image
+      - name: Build FreeSWITCH image for drain helper check
         run: |
           docker build \
             --file deploy/freeswitch/Dockerfile \
@@ -98,56 +69,6 @@ jobs:
           }
           trap cleanup EXIT
 
-          dump_freeswitch_diagnostics() {
-            echo "--- raw fsctl pause_check ---" >&2
-            docker exec freeswitch-drain-test \
-              fs_cli -H 127.0.0.1 -P 8021 -p test-password \
-              -x 'fsctl pause_check' >&2 || true
-            echo "--- raw show channels count ---" >&2
-            docker exec freeswitch-drain-test \
-              fs_cli -H 127.0.0.1 -P 8021 -p test-password \
-              -x 'show channels count' >&2 || true
-          }
-
-          assert_eq() {
-            expected="$1"
-            shift
-
-            if actual="$("$@")"; then
-              :
-            else
-              rc=$?
-              echo "::error::command failed with exit $rc: $*" >&2
-              dump_freeswitch_diagnostics
-              return "$rc"
-            fi
-
-            if [ "$actual" != "$expected" ]; then
-              echo "::error::expected '$expected', got '$actual': $*" >&2
-              dump_freeswitch_diagnostics
-              return 1
-            fi
-          }
-
-          assert_numeric() {
-            if actual="$("$@")"; then
-              :
-            else
-              rc=$?
-              echo "::error::command failed with exit $rc: $*" >&2
-              dump_freeswitch_diagnostics
-              return "$rc"
-            fi
-
-            case "$actual" in
-              ''|*[!0-9]*)
-                echo "::error::expected numeric output, got '$actual': $*" >&2
-                dump_freeswitch_diagnostics
-                return 1
-                ;;
-            esac
-          }
-
           ready=0
           for _ in $(seq 1 60); do
             if docker exec freeswitch-drain-test \
@@ -157,32 +78,123 @@ jobs:
             fi
             sleep 1
           done
+
           if [ "$ready" -ne 1 ]; then
-            echo "::error::FreeSWITCH ESL did not become ready within 60 seconds" >&2
             docker logs freeswitch-drain-test >&2 || true
             exit 1
           fi
 
           drain=(docker exec freeswitch-drain-test /usr/local/bin/leamout-freeswitch-drain)
+          test "$("${drain[@]}" status)" = accepting
+          test "$("${drain[@]}" enable)" = draining
+          test "$("${drain[@]}" status)" = draining
+          "${drain[@]}" channels | grep -Eq '^[0-9]+$'
+          test "$("${drain[@]}" resume)" = accepting
+          test "$("${drain[@]}" status)" = accepting
 
-          assert_eq accepting "${drain[@]}" status
-          assert_eq draining "${drain[@]}" enable
-          assert_eq draining "${drain[@]}" status
-          assert_numeric "${drain[@]}" channels
-          assert_eq accepting "${drain[@]}" resume
-          assert_eq accepting "${drain[@]}" status
-
-  rtpengine:
-    name: Build RTPengine
+  stack:
+    name: Build and start deployment stack
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Build RTPengine image
+      - name: Generate CI TLS certificates
         run: |
-          docker build \
-            --file deploy/rtpengine/Dockerfile \
-            --tag leamout/rtpengine:test \
-            deploy/rtpengine
+          mkdir -p deploy/certs
+          openssl req \
+            -x509 \
+            -newkey rsa:2048 \
+            -nodes \
+            -keyout deploy/certs/privkey.pem \
+            -out deploy/certs/fullchain.pem \
+            -subj '/CN=localhost' \
+            -days 1 \
+            >/dev/null 2>&1
+          cp deploy/certs/fullchain.pem deploy/certs/carrier-ca.pem
+
+      - name: Validate Docker Compose configuration
+        run: docker compose --env-file .env.example -f deploy/compose.yaml config --quiet
+
+      - name: Validate migration checksums and SQL
+        run: |
+          docker run --rm \
+            -v "${PWD}/server/migrations:/migrations:ro" \
+            arigaio/atlas:1.3.0-alpine \
+            migrate validate --dir file:///migrations
+
+      - name: Create CI Compose override
+        run: |
+          cat > /tmp/compose.ci.yaml <<'YAML'
+          services:
+            rtpengine:
+              ports: !reset []
+            coturn:
+              ports: !reset []
+          YAML
+
+      - name: Build production images
+        run: |
+          docker compose \
+            --env-file .env.example \
+            -f deploy/compose.yaml \
+            -f /tmp/compose.ci.yaml \
+            build
+
+      - name: Start deployment stack
+        run: |
+          docker compose \
+            --env-file .env.example \
+            -f deploy/compose.yaml \
+            -f /tmp/compose.ci.yaml \
+            up -d
+
+      - name: Verify deployment stack
+        run: |
+          compose="docker compose --env-file .env.example -f deploy/compose.yaml -f /tmp/compose.ci.yaml"
+
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+
+          $compose ps -a
+          test "$ready" -eq 1
+
+          for service in server worker web console waitlist opensips coturn freeswitch rtpengine postgres redis nats; do
+            container_id="$($compose ps -q "$service")"
+            test -n "$container_id"
+            test "$(docker inspect -f '{{.State.Running}}' "$container_id")" = true
+          done
+
+          migrate_id="$($compose ps -aq migrate)"
+          test -n "$migrate_id"
+          test "$(docker inspect -f '{{.State.ExitCode}}' "$migrate_id")" -eq 0
+
+      - name: Dump deployment logs on failure
+        if: failure()
+        run: |
+          docker compose \
+            --env-file .env.example \
+            -f deploy/compose.yaml \
+            -f /tmp/compose.ci.yaml \
+            ps -a || true
+          docker compose \
+            --env-file .env.example \
+            -f deploy/compose.yaml \
+            -f /tmp/compose.ci.yaml \
+            logs --no-color --tail=300 || true
+
+      - name: Stop deployment stack
+        if: always()
+        run: |
+          docker compose \
+            --env-file .env.example \
+            -f deploy/compose.yaml \
+            -f /tmp/compose.ci.yaml \
+            down -v --remove-orphans || true
