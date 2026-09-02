@@ -33,12 +33,10 @@ if [ ! -f "$live_dir/fullchain.pem" ] || [ ! -f "$live_dir/privkey.pem" ]; then
   exit 1
 fi
 
-mkdir -p "$CERT_DIR"
-install -m 0644 "$live_dir/fullchain.pem" "$CERT_DIR/fullchain.pem"
-install -m 0600 "$live_dir/privkey.pem" "$CERT_DIR/privkey.pem"
-
-CERT_DIR="$CERT_DIR" sh scripts/certs/check-certs.sh
-
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" restart opensips
-
-echo "Let's Encrypt certificate synchronized and OpenSIPS restarted."
+RENEWED_LINEAGE="$live_dir" \
+RENEWED_DOMAINS="$TLS_DOMAIN" \
+TLS_DOMAIN="$TLS_DOMAIN" \
+CERT_DIR="$CERT_DIR" \
+ENV_FILE="$ENV_FILE" \
+COMPOSE_FILE="$COMPOSE_FILE" \
+sh scripts/certs/certbot-deploy-hook.sh
