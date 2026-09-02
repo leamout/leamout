@@ -36,7 +36,7 @@ max.deployments
 pending license
 ```
 
-`max_deployments` is a durable snapshot of the resolved `max.deployments` entitlement at license creation time. A caller cannot choose a larger deployment limit directly.
+`max_deployments` is a durable snapshot of the resolved `max.deployments` entitlement at license creation time. A caller cannot choose a larger deployment limit directly. License creation also copies the complete resolved feature and limit set into license-scoped entitlement rows in the same PostgreSQL transaction as the license row.
 
 Creating a row is not cryptographic issuance. A license starts `pending`; it becomes `active` only after trusted licensing-authority code has associated a signing key and is ready to issue deployment-bound artifacts.
 
@@ -207,7 +207,7 @@ The exact online refresh/grace policy remains a product decision. The cryptograp
 
 Signed feature/limit claims must come from a trusted, durable license entitlement snapshot. They must not be assembled from arbitrary request payloads.
 
-The current license creation flow durably snapshots `max.deployments`, but full feature/limit snapshot persistence is not yet atomic with license creation. Until that transaction boundary is implemented, the signer protocol remains a cryptographic primitive and should not be wired to an endpoint that signs mutable organization state opportunistically.
+The license creation flow durably snapshots `max.deployments` and persists the complete resolved feature/limit set atomically with the license row. If any snapshot row fails, the license row and every snapshot row are rolled back together. The signer must load these license-scoped entitlements rather than sign mutable organization state opportunistically.
 
 The intended issuance flow is:
 

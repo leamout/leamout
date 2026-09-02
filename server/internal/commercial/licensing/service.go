@@ -40,7 +40,17 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, input Cr
 	if !ok || limit <= 0 || limit > int64(^uint32(0)>>1) {
 		return License{}, ErrInvalidDeploymentLimit
 	}
-	return s.repo.Create(ctx, organizationID, *resolved.SubscriptionID, int32(limit), normalized.SigningKeyID, issuedAt, normalized.ExpiresAt)
+	snapshot := entitlementSnapshot{Features: resolved.Features, Limits: resolved.Limits}
+	return s.repo.Create(
+		ctx,
+		organizationID,
+		*resolved.SubscriptionID,
+		int32(limit),
+		normalized.SigningKeyID,
+		issuedAt,
+		normalized.ExpiresAt,
+		snapshot,
+	)
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (License, error) {

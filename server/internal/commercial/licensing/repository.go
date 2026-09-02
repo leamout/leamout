@@ -3,6 +3,8 @@ package licensing
 import (
 	"context"
 	"errors"
+	"fmt"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,9 +27,24 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool, queries: sqlc.New(pool)}
 }
 
-func (r *Repository) Create(ctx context.Context, organizationID, subscriptionID uuid.UUID, maxDeployments int32, signingKeyID *string, issuedAt time.Time, expiresAt *time.Time) (License, error) {
+func (r *Repository) Create(
+	ctx context.Context,
+	organizationID, subscriptionID uuid.UUID,
+	maxDeployments int32,
+	signingKeyID *string,
+	issuedAt time.Time,
+	expiresAt *time.Time,
+	snapshot entitlementSnapshot,
+) (License, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return License{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+
 	status := string(StatusPending)
-	row, err := r.queries.CreateLicense(ctx, sqlc.CreateLicenseParams{
+	row, err := queries.CreateLicense(ctx, sqlc.CreateLicenseParams{
 		SubscriptionID: &subscriptionID,
 		Status:         &status,
 		MaxDeployments: &maxDeployments,
@@ -39,7 +56,61 @@ func (r *Repository) Create(ctx context.Context, organizationID, subscriptionID 
 	if err != nil {
 		return License{}, mapLicenseWriteError(err)
 	}
+	if err := createEntitlementSnapshot(ctx, queries, organizationID, row.ID, snapshot); err != nil {
+		return License{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return License{}, err
+	}
 	return licenseFromRow(row), nil
+}
+
+func createEntitlementSnapshot(
+	ctx context.Context,
+	queries *sqlc.Queries,
+	organizationID, licenseID uuid.UUID,
+	snapshot entitlementSnapshot,
+) error {
+	featureKeys := make([]string, 0, len(snapshot.Features))
+	for key := range snapshot.Features {
+		featureKeys = append(featureKeys, key)
+	}
+	sort.Strings(featureKeys)
+	for _, key := range featureKeys {
+		enabled := snapshot.Features[key]
+		if _, err := queries.CreateLicenseEntitlement(ctx, sqlc.CreateLicenseEntitlementParams{
+			EntitlementKey: key,
+			Kind:           "feature",
+			Enabled:        &enabled,
+			StartsAt:       pgconv.NullableTimestamptz(nil),
+			ExpiresAt:      pgconv.NullableTimestamptz(nil),
+			LicenseID:      licenseID,
+			OrganizationID: organizationID,
+		}); err != nil {
+			return fmt.Errorf("snapshot feature entitlement %q: %w", key, err)
+		}
+	}
+
+	limitKeys := make([]string, 0, len(snapshot.Limits))
+	for key := range snapshot.Limits {
+		limitKeys = append(limitKeys, key)
+	}
+	sort.Strings(limitKeys)
+	for _, key := range limitKeys {
+		limit := snapshot.Limits[key]
+		if _, err := queries.CreateLicenseEntitlement(ctx, sqlc.CreateLicenseEntitlementParams{
+			EntitlementKey: key,
+			Kind:           "limit",
+			LimitValue:     &limit,
+			StartsAt:       pgconv.NullableTimestamptz(nil),
+			ExpiresAt:      pgconv.NullableTimestamptz(nil),
+			LicenseID:      licenseID,
+			OrganizationID: organizationID,
+		}); err != nil {
+			return fmt.Errorf("snapshot limit entitlement %q: %w", key, err)
+		}
+	}
+	return nil
 }
 
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (License, error) {

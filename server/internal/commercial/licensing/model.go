@@ -95,6 +95,11 @@ type CreateInput struct {
 	ExpiresAt    *time.Time
 }
 
+type entitlementSnapshot struct {
+	Features map[string]bool
+	Limits   map[string]int64
+}
+
 // ActivateDeploymentInput identifies a stable installation requesting a license slot.
 type ActivateDeploymentInput struct {
 	DeploymentID string  `json:"deployment_id"`

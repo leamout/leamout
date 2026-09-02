@@ -15,22 +15,8 @@ import (
 )
 
 func TestLicenseRoutesRejectInvalidLicenseIDs(t *testing.T) {
-	router := chi.NewRouter()
 	organizationID := uuid.New()
-	auth := func(next http.Handler) http.Handler {
-		principal := authn.Principal{
-			Subject:        authn.Subject{ID: uuid.New(), Type: authn.SubjectOrganizationToken},
-			Credential:     authn.Credential{ID: uuid.New(), Type: authn.CredentialOrganizationToken},
-			OrganizationID: organizationID,
-		}
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			next.ServeHTTP(w, r.WithContext(authn.WithPrincipal(r.Context(), principal)))
-		})
-	}
-	organizationAuth := middleware.NewOrganizationMiddleware().Require
-	RegisterRoutes(router, NewHandler(&Service{}), func(next http.Handler) http.Handler {
-		return auth(organizationAuth(next))
-	})
+	router := commercialLicenseTestRouter(organizationID)
 
 	requests := []*http.Request{
 		httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/licenses/not-a-uuid", nil),
@@ -55,6 +41,18 @@ func TestLicenseHandlerRequiresOrganizationContext(t *testing.T) {
 
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("expected status 400, got %d", response.Code)
+	}
+}
+
+func TestLicenseRoutesDoNotExposeCustomerCreation(t *testing.T) {
+	organizationID := uuid.New()
+	router := commercialLicenseTestRouter(organizationID)
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/licenses", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status 405, got %d", response.Code)
 	}
 }
 
@@ -88,4 +86,23 @@ func TestLicenseResponsesHideSigningMetadata(t *testing.T) {
 			t.Fatalf("response exposes signing authority metadata: %s", encoded)
 		}
 	}
+}
+
+func commercialLicenseTestRouter(organizationID uuid.UUID) http.Handler {
+	router := chi.NewRouter()
+	auth := func(next http.Handler) http.Handler {
+		principal := authn.Principal{
+			Subject:        authn.Subject{ID: uuid.New(), Type: authn.SubjectOrganizationToken},
+			Credential:     authn.Credential{ID: uuid.New(), Type: authn.CredentialOrganizationToken},
+			OrganizationID: organizationID,
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(authn.WithPrincipal(r.Context(), principal)))
+		})
+	}
+	organizationAuth := middleware.NewOrganizationMiddleware().Require
+	RegisterRoutes(router, NewHandler(&Service{}), func(next http.Handler) http.Handler {
+		return auth(organizationAuth(next))
+	})
+	return router
 }

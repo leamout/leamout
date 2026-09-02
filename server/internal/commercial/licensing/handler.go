@@ -52,20 +52,6 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, newLicenseResponse(license))
 }
 
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	organizationID, err := requestOrganizationID(r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-	license, err := h.service.Create(r.Context(), organizationID, CreateInput{})
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-	httputil.Created(w, newLicenseResponse(license))
-}
-
 func (h *Handler) ListDeployments(w http.ResponseWriter, r *http.Request) {
 	organizationID, licenseID, err := requestLicenseIDs(r)
 	if err != nil {
