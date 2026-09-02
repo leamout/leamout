@@ -6,6 +6,12 @@ const required = (name: string): string => {
   return value;
 };
 
+const requiredPort = (name: string): number => {
+  const value = Number(required(name));
+  if (!Number.isInteger(value) || value < 1 || value > 65535) throw new Error(`${name} must be a valid port`);
+  return value;
+};
+
 const unwrap = (payload: any): any => payload?.success === true && "data" in payload ? payload.data : payload;
 
 test("browser call uses a forced TURN relay through RTPengine", async ({ page, request }) => {
@@ -14,6 +20,9 @@ test("browser call uses a forced TURN relay through RTPengine", async ({ page, r
   const domainName = process.env.LEAMOUT_SIP_DOMAIN ?? "webrtc-v1.local";
   const username = process.env.LEAMOUT_SIP_USERNAME ?? "browser";
   const password = process.env.LEAMOUT_SIP_PASSWORD ?? "webrtc-v1-browser-secret";
+  const turnRelayMinPort = requiredPort("WEBRTC_V1_TURN_MIN_PORT");
+  const turnRelayMaxPort = requiredPort("WEBRTC_V1_TURN_MAX_PORT");
+  if (turnRelayMinPort > turnRelayMaxPort) throw new Error("WEBRTC_V1_TURN_MIN_PORT must be <= WEBRTC_V1_TURN_MAX_PORT");
 
   const headers = { Authorization: `Bearer ${token}` };
 
@@ -51,6 +60,8 @@ test("browser call uses a forced TURN relay through RTPengine", async ({ page, r
         authorizationPassword: environment.password,
         destinationUri: environment.destinationUri,
         iceServers: credentials.ice_servers,
+        turnRelayMinPort: environment.turnRelayMinPort,
+        turnRelayMaxPort: environment.turnRelayMaxPort,
       });
     }, {
       credentials,
@@ -60,6 +71,8 @@ test("browser call uses a forced TURN relay through RTPengine", async ({ page, r
         username,
         password,
         destinationUri: process.env.LEAMOUT_DESTINATION_URI ?? `sip:9196@${domainName}`,
+        turnRelayMinPort,
+        turnRelayMaxPort,
       },
     });
   } finally {
