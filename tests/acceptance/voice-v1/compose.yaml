@@ -19,6 +19,14 @@ services:
       - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/opensips/tls/privkey.pem:ro
       - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
 
+  coturn:
+    volumes:
+      - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-privkey.pem:/etc/coturn/tls/privkey.pem:ro
+    # Voice v1 only needs Coturn healthy for API readiness; it does not use
+    # host TURN allocations, so avoid publishing the production relay range.
+    ports: !reset []
+
   rtpengine:
     # The acceptance carrier and FreeSWITCH instances are on leamout-core, so
     # publishing the production RTP range to the GitHub runner is unnecessary
