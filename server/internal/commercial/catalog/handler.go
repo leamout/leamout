@@ -1,7 +1,6 @@
 package catalog
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -11,20 +10,12 @@ import (
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
-type catalogReader interface {
-	GetProduct(context.Context, uuid.UUID) (Product, error)
-	ListProducts(context.Context, bool) ([]Product, error)
-	GetPlan(context.Context, uuid.UUID) (Plan, error)
-	ListPlans(context.Context, uuid.UUID, bool) ([]Plan, error)
-	ListPrices(context.Context, uuid.UUID, bool) ([]Price, error)
-}
-
 // Handler exposes the customer-facing, read-only commercial catalog.
 type Handler struct {
-	service catalogReader
+	service *Service
 }
 
-func NewHandler(service catalogReader) *Handler {
+func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
