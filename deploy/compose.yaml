@@ -188,7 +188,7 @@ services:
     networks:
       private-control: {}
       public-signaling:
-        ipv4_address: 172.32.0.10
+        ipv4_address: 172.30.0.10
 
   coturn:
     image: coturn/coturn:4.17.0-r0
@@ -230,7 +230,7 @@ services:
       - "8021/tcp"
     networks:
       private-control:
-        ipv4_address: 172.30.0.20
+        ipv4_address: 172.32.0.20
 
   rtpengine:
     image: leamout/rtpengine:dev
@@ -249,7 +249,7 @@ services:
       - "22222/udp"
     networks:
       private-control:
-        ipv4_address: 172.30.0.10
+        ipv4_address: 172.32.0.10
       public-media:
         ipv4_address: 172.31.0.10
 
@@ -264,7 +264,7 @@ networks:
     name: leamout-private-control
     ipam:
       config:
-        - subnet: 172.30.0.0/24
+        - subnet: 172.32.0.0/24
   public-media:
     name: leamout-public-media
     ipam:
@@ -274,4 +274,4 @@ networks:
     name: leamout-public-signaling
     ipam:
       config:
-        - subnet: 172.32.0.0/24
+        - subnet: 172.30.0.0/24
