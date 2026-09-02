@@ -84,6 +84,29 @@ jobs:
             exit 1
           fi
 
+      - name: Reject hosted frontend images
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("release/fixtures/valid-manifest.json")
+          for frontend in ("console", "web", "waitlist"):
+              manifest = json.loads(source.read_text())
+              manifest["images"][frontend] = (
+                  f"ghcr.io/leamout/{frontend}@sha256:" + ("f" * 64)
+              )
+              target = Path(f"/tmp/{frontend}-manifest.json")
+              target.write_text(json.dumps(manifest))
+          PY
+
+          for frontend in console web waitlist; do
+            if python3 scripts/release/validate-manifest.py "/tmp/${frontend}-manifest.json"; then
+              echo "validator unexpectedly accepted hosted frontend image: ${frontend}" >&2
+              exit 1
+            fi
+          done
+
       - name: Exercise CLI artifact format
         run: |
           cat > /tmp/leamout <<'SH'
