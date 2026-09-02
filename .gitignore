@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Generated TLS certificates
+deploy/certs/*.pem
+
 # Go build artifacts
 /bin/
 /dist/
