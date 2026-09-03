@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -29,12 +30,17 @@ type deploymentState struct {
 }
 
 type deploymentSecrets struct {
-	FreeSWITCHESLPassword          string
+	FreeSWITCHESLPassword           string
 	CarrierCredentialEncryptionKey string
-	TURNAuthSecret                 string
+	TURNAuthSecret                  string
 }
 
 func runInit(stdout, stderr io.Writer, cfg Config) int {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		writef(stderr, "unsupported host: %s/%s; Self-Hosted Production v0.1 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
+		return 1
+	}
+
 	if err := ensureDeploymentDirectories(cfg); err != nil {
 		writef(stderr, "initialize Leamout directories: %v\n", err)
 		return 1
@@ -140,9 +146,9 @@ func generateDeploymentSecrets() (deploymentSecrets, error) {
 		return deploymentSecrets{}, err
 	}
 	return deploymentSecrets{
-		FreeSWITCHESLPassword:          freeswitchPassword,
+		FreeSWITCHESLPassword:           freeswitchPassword,
 		CarrierCredentialEncryptionKey: base64.RawURLEncoding.EncodeToString(key),
-		TURNAuthSecret:                 turnSecret,
+		TURNAuthSecret:                  turnSecret,
 	}, nil
 }
 
@@ -241,7 +247,7 @@ func validateRuntimeEnv(path, deploymentID string) error {
 		}
 	}
 	if values["APP_ENV"] != "production" {
-		return fmt.Errorf("APP_ENV must be production")
+		return errors.New("APP_ENV must be production")
 	}
 	if values["LEAMOUT_DEPLOYMENT_MODE"] != deploymentMode {
 		return fmt.Errorf("LEAMOUT_DEPLOYMENT_MODE must be %s", deploymentMode)
