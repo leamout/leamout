@@ -1,0 +1,261 @@
+name: leamout
+
+x-leamout-environment: &leamout-environment
+  APP_ENV: production
+  DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?required}@postgres:5432/leamout?sslmode=disable
+  REDIS_URL: redis://:${REDIS_PASSWORD:?required}@redis:6379
+  NATS_URL: nats://leamout:${NATS_PASSWORD:?required}@nats:4222
+  NATS_STREAM_REPLICAS: "1"
+  FREESWITCH_ESL_ADDRESS: freeswitch:8021
+  FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?required}
+  CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?required}
+  TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?required}
+  TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?required}
+
+services:
+  postgres:
+    image: @@IMAGE_POSTGRES@@
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leamout
+      POSTGRES_USER: leamout
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leamout -d leamout"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - private-control
+
+  migrate:
+    image: @@IMAGE_ATLAS@@
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - exec /atlas migrate apply --dir file:///migrations --url "$$DATABASE_URL"
+    environment:
+      DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?required}@postgres:5432/leamout?sslmode=disable&search_path=public
+    volumes:
+      - /var/lib/leamout/runtime/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - private-control
+
+  redis:
+    image: @@IMAGE_REDIS@@
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?required}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+    networks:
+      - private-control
+
+  nats:
+    image: @@IMAGE_NATS@@
+    restart: unless-stopped
+    command:
+      - --jetstream
+      - --store_dir=/data
+      - --http_port=8222
+      - --user=leamout
+      - --pass=${NATS_PASSWORD:?required}
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - private-control
+
+  server:
+    image: @@IMAGE_SERVER@@
+    restart: unless-stopped
+    environment: *leamout-environment
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      freeswitch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - private-control
+      - control-egress
+
+  worker:
+    image: @@IMAGE_WORKER@@
+    command: ["/leamout/worker"]
+    restart: unless-stopped
+    environment: *leamout-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      freeswitch:
+        condition: service_healthy
+    networks:
+      - private-control
+      - control-egress
+
+  opensips:
+    image: @@IMAGE_OPENSIPS@@
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      OPENSIPS_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/tcp"
+      - "5062:5062/tcp"
+    volumes:
+      - /etc/leamout/certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - /etc/leamout/certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - /etc/leamout/certs/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rtpengine:
+        condition: service_healthy
+      freeswitch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks:
+      private-control: {}
+      public-signaling:
+        ipv4_address: 172.30.0.10
+
+  coturn:
+    image: @@IMAGE_COTURN@@
+    restart: unless-stopped
+    command:
+      - --config
+      - /etc/coturn/turnserver.conf
+      - --realm=${TURN_REALM:?required}
+      - --static-auth-secret=${TURN_AUTH_SECRET:?required}
+      - --external-ip=${TURN_EXTERNAL_IP:?required}
+      - --cert=/etc/coturn/tls/fullchain.pem
+      - --pkey=/etc/coturn/tls/privkey.pem
+    volumes:
+      - /var/lib/leamout/runtime/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - /etc/leamout/certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - /etc/leamout/certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks:
+      - public-media
+
+  freeswitch:
+    image: @@IMAGE_FREESWITCH@@
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?required}
+    volumes:
+      - freeswitch_recordings:/var/lib/freeswitch/recordings
+    expose:
+      - "5060/udp"
+      - "5060/tcp"
+      - "8021/tcp"
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -H 127.0.0.1 -P 8021 -p \"$$FREESWITCH_ESL_PASSWORD\" -x status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    networks:
+      private-control:
+        ipv4_address: 172.32.0.20
+
+  rtpengine:
+    image: @@IMAGE_RTPENGINE@@
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      RTPENGINE_PUBLIC_IP: ${RTPENGINE_PUBLIC_IP:?required}
+    ports:
+      - "23000-32768:23000-32768/udp"
+    expose:
+      - "22222/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks:
+      private-control:
+        ipv4_address: 172.32.0.10
+      public-media:
+        ipv4_address: 172.31.0.10
+
+volumes:
+  postgres_data:
+    name: leamout-postgres-data
+  redis_data:
+    name: leamout-redis-data
+  nats_data:
+    name: leamout-nats-data
+  freeswitch_recordings:
+    name: leamout-recordings
+
+networks:
+  private-control:
+    name: leamout-private-control
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.32.0.0/24
+  control-egress:
+    name: leamout-control-egress
+  public-media:
+    name: leamout-public-media
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+  public-signaling:
+    name: leamout-public-signaling
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

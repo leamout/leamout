@@ -62,7 +62,13 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 	if values["LEAMOUT_DEPLOYMENT_ID"] != state.DeploymentID {
 		t.Fatalf("deployment ID mismatch")
 	}
-	for _, key := range []string{"FREESWITCH_ESL_PASSWORD", "TURN_AUTH_SECRET"} {
+	for _, key := range []string{
+		"FREESWITCH_ESL_PASSWORD",
+		"TURN_AUTH_SECRET",
+		"POSTGRES_PASSWORD",
+		"REDIS_PASSWORD",
+		"NATS_PASSWORD",
+	} {
 		if len(values[key]) != 64 {
 			t.Fatalf("%s length = %d, want 64 hex chars", key, len(values[key]))
 		}
@@ -89,7 +95,17 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 		}
 	}
 
-	if !strings.Contains(stdout.String(), "Deployment identity created") || strings.Contains(stdout.String(), values["TURN_AUTH_SECRET"]) {
+	for _, secret := range []string{
+		values["TURN_AUTH_SECRET"],
+		values["POSTGRES_PASSWORD"],
+		values["REDIS_PASSWORD"],
+		values["NATS_PASSWORD"],
+	} {
+		if strings.Contains(stdout.String(), secret) {
+			t.Fatalf("init output leaked generated secret: %s", stdout.String())
+		}
+	}
+	if !strings.Contains(stdout.String(), "Deployment identity created") {
 		t.Fatalf("unexpected init output: %s", stdout.String())
 	}
 }

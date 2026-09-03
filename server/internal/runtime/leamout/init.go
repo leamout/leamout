@@ -33,6 +33,9 @@ type deploymentSecrets struct {
 	FreeSWITCHESLPassword          string
 	CarrierCredentialEncryptionKey string
 	TURNAuthSecret                 string
+	PostgresPassword               string
+	RedisPassword                  string
+	NATSPassword                   string
 }
 
 func runInit(stdout, stderr io.Writer) int {
@@ -144,6 +147,18 @@ func generateDeploymentSecrets() (deploymentSecrets, error) {
 	if err != nil {
 		return deploymentSecrets{}, err
 	}
+	postgresPassword, err := token.Generate(32)
+	if err != nil {
+		return deploymentSecrets{}, err
+	}
+	redisPassword, err := token.Generate(32)
+	if err != nil {
+		return deploymentSecrets{}, err
+	}
+	natsPassword, err := token.Generate(32)
+	if err != nil {
+		return deploymentSecrets{}, err
+	}
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return deploymentSecrets{}, err
@@ -152,6 +167,9 @@ func generateDeploymentSecrets() (deploymentSecrets, error) {
 		FreeSWITCHESLPassword:          freeswitchPassword,
 		CarrierCredentialEncryptionKey: base64.RawURLEncoding.EncodeToString(key),
 		TURNAuthSecret:                 turnSecret,
+		PostgresPassword:               postgresPassword,
+		RedisPassword:                  redisPassword,
+		NATSPassword:                   natsPassword,
 	}, nil
 }
 
@@ -164,6 +182,9 @@ func renderRuntimeEnv(state deploymentState, secrets deploymentSecrets) []byte {
 		"FREESWITCH_ESL_PASSWORD=" + secrets.FreeSWITCHESLPassword,
 		"CARRIER_CREDENTIAL_ENCRYPTION_KEY=" + secrets.CarrierCredentialEncryptionKey,
 		"TURN_AUTH_SECRET=" + secrets.TURNAuthSecret,
+		"POSTGRES_PASSWORD=" + secrets.PostgresPassword,
+		"REDIS_PASSWORD=" + secrets.RedisPassword,
+		"NATS_PASSWORD=" + secrets.NATSPassword,
 		"",
 	}, "\n"))
 }
@@ -243,6 +264,9 @@ func validateRuntimeEnv(path, deploymentID string) error {
 		"FREESWITCH_ESL_PASSWORD",
 		"CARRIER_CREDENTIAL_ENCRYPTION_KEY",
 		"TURN_AUTH_SECRET",
+		"POSTGRES_PASSWORD",
+		"REDIS_PASSWORD",
+		"NATS_PASSWORD",
 	}
 	for _, name := range required {
 		if values[name] == "" {
@@ -257,6 +281,17 @@ func validateRuntimeEnv(path, deploymentID string) error {
 	}
 	if values["LEAMOUT_DEPLOYMENT_ID"] != deploymentID {
 		return errors.New("deployment ID does not match durable state")
+	}
+	for _, name := range []string{
+		"FREESWITCH_ESL_PASSWORD",
+		"TURN_AUTH_SECRET",
+		"POSTGRES_PASSWORD",
+		"REDIS_PASSWORD",
+		"NATS_PASSWORD",
+	} {
+		if len(values[name]) != 64 {
+			return fmt.Errorf("%s must be a 64-character generated secret", name)
+		}
 	}
 	key, err := base64.RawURLEncoding.DecodeString(values["CARRIER_CREDENTIAL_ENCRYPTION_KEY"])
 	if err != nil || len(key) != 32 {

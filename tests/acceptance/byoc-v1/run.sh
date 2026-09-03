@@ -76,4 +76,27 @@ PY
 done
 [ "$ready" -eq 1 ] || { echo "API did not become ready within 90 seconds" >&2; exit 1; }
 
+required_services="postgres redis nats rtpengine freeswitch opensips server worker byoc-v1-carrier"
+stack_ready=0
+for _ in $(seq 1 45); do
+    running="$($COMPOSE ps --status running --services)"
+    missing=0
+    for service in $required_services; do
+        if ! printf '%s\n' "$running" | grep -qx "$service"; then
+            missing=1
+            break
+        fi
+    done
+    if [ "$missing" -eq 0 ]; then
+        stack_ready=1
+        break
+    fi
+    sleep 1
+done
+[ "$stack_ready" -eq 1 ] || {
+    echo "BYOC stack did not become fully running within 45 seconds" >&2
+    $COMPOSE ps -a >&2 || true
+    exit 1
+}
+
 python3 tests/acceptance/byoc-v1/acceptance.py
