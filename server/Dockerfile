@@ -24,7 +24,12 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/worker \
-        ./cmd/worker
+        ./cmd/worker; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/rotate-carrier-key \
+        ./cmd/rotate-carrier-key
 
 FROM alpine:3.22
 
@@ -38,6 +43,7 @@ RUN apk add --no-cache \
 
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
+COPY --from=build /out/rotate-carrier-key /leamout/rotate-carrier-key
 
 USER leamout
 
