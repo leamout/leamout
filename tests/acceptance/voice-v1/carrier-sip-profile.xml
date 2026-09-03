@@ -18,9 +18,10 @@
     <param name="sip-ip" value="172.30.0.50"/>
     <param name="rtp-ip" value="172.31.0.50"/>
 
-    <param name="inbound-codec-prefs" value="PCMU,PCMA"/>
-    <param name="outbound-codec-prefs" value="PCMU,PCMA"/>
+    <param name="inbound-codec-prefs" value="OPUS,G722,PCMU,PCMA"/>
+    <param name="outbound-codec-prefs" value="OPUS,G722,PCMU,PCMA"/>
     <param name="inbound-codec-negotiation" value="generous"/>
+    <param name="inbound-late-negotiation" value="true"/>
 
     <param name="auth-calls" value="false"/>
     <param name="disable-register" value="true"/>

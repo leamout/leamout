@@ -57,7 +57,7 @@ def fs_cli(service, command):
     return compose(
         "exec", "-T", service,
         "fs_cli",
-        "-H", service,
+        "-H", "127.0.0.1",
         "-P", "8021",
         "-p", ESL_PASSWORD,
         "-x", command,

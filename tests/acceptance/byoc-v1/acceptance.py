@@ -18,7 +18,7 @@ def run(args, check=True):
     return p.stdout.strip()
 
 def compose(*args, check=True): return run(COMPOSE + list(args), check)
-def fs(command): return compose("exec", "-T", "byoc-v1-carrier", "fs_cli", "-H", "byoc-v1-carrier", "-P", "8021", "-p", ESL_PASSWORD, "-x", command)
+def fs(command): return compose("exec", "-T", "byoc-v1-carrier", "fs_cli", "-H", "127.0.0.1", "-P", "8021", "-p", ESL_PASSWORD, "-x", command)
 def psql(sql): return compose("exec", "-T", "postgres", "psql", "-U", "leamout", "-d", "leamout", "-Atc", sql)
 
 def api(method, path, payload=None, expected=(200,), token=TOKEN):

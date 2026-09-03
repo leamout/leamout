@@ -7,7 +7,7 @@ REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
 export GRACEFUL_DRAIN_SUITE_DIR="$SCRIPT_DIR"
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-graceful-drain-esl-secret}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
-export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.30.0.10}"
+export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-graceful-drain-turn-secret-0123456789abcdef}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
@@ -196,6 +196,27 @@ done
 
 if [ "$ready" -ne 1 ]; then
     echo "API did not become ready within 90 seconds" >&2
+    exit 1
+fi
+
+# API readiness only proves the server can reach FreeSWITCH. Inbound call
+# persistence is driven by the worker's ESL event subscription, so do not
+# originate the acceptance call until that subscription is active. Without
+# this gate a fast runner can send the INVITE in the same second the worker
+# subscribes and lose the initial CHANNEL_CREATE event.
+worker_ready=0
+for _ in $(seq 1 60); do
+    if $COMPOSE ps --status running --services | grep -qx 'worker' \
+        && $COMPOSE logs --no-color worker 2>&1 \
+            | grep -Fq 'worker subscribed to FreeSWITCH call and recording lifecycle events'; then
+        worker_ready=1
+        break
+    fi
+    sleep 1
+done
+
+if [ "$worker_ready" -ne 1 ]; then
+    echo "worker did not subscribe to FreeSWITCH lifecycle events within 60 seconds" >&2
     exit 1
 fi
 

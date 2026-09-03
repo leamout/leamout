@@ -22,5 +22,7 @@ services:
       - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/carrier-dialplan.xml:/leamout-config/dialplan/leamout.xml:ro
       - ${GRACEFUL_DRAIN_SUITE_DIR:?GRACEFUL_DRAIN_SUITE_DIR is required}/carrier-sip-profile.xml:/leamout-config/sip_profiles/internal.xml:ro
     networks:
-      leamout-core:
+      public-signaling:
         ipv4_address: 172.30.0.50
+      public-media:
+        ipv4_address: 172.31.0.50
