@@ -2,6 +2,7 @@ package leamout
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,7 +34,7 @@ func validateInstalledRuntimeFiles(runtimeDir string) error {
 		return fmt.Errorf("decode installed runtime metadata: %w", err)
 	}
 	if release.SchemaVersion != 1 || release.ReleaseVersion == "" || release.SourceCommit == "" {
-		return fmt.Errorf("installed runtime metadata is incomplete")
+		return errors.New("installed runtime metadata is incomplete")
 	}
 
 	compose, err := os.ReadFile(filepath.Join(runtimeDir, "compose.yaml"))
@@ -41,7 +42,7 @@ func validateInstalledRuntimeFiles(runtimeDir string) error {
 		return err
 	}
 	if strings.Contains(string(compose), "@@IMAGE_") {
-		return fmt.Errorf("installed runtime contains unresolved image references")
+		return errors.New("installed runtime contains unresolved image references")
 	}
 	return nil
 }
