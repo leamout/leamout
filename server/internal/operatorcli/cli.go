@@ -54,7 +54,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		printHelp(stdout)
 		return 0
 	case "version", "--version", "-v":
-		fmt.Fprintf(stdout, "leamout %s\ncommit: %s\nbuilt: %s\n", build.Version, build.Commit, build.BuiltAt)
+		writef(stdout, "leamout %s\ncommit: %s\nbuilt: %s\n", build.Version, build.Commit, build.BuiltAt)
 		return 0
 	case "init":
 		return runInit(stdout, stderr, cfg)
@@ -71,7 +71,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 	case "doctor":
 		return runDoctor(ctx, stdout, stderr, cfg)
 	default:
-		fmt.Fprintf(stderr, "unknown command: %s\n\n", args[0])
+		writef(stderr, "unknown command: %s\n\n", args[0])
 		printHelp(stderr)
 		return 2
 	}
@@ -79,64 +79,64 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 
 func runInit(stdout, stderr io.Writer, cfg Config) int {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		fmt.Fprintf(stderr, "unsupported host: %s/%s; Phase 2 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
+		writef(stderr, "unsupported host: %s/%s; Phase 2 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
 	}
 
 	for _, dir := range []string{cfg.ConfigDir, cfg.StateDir, cfg.LogDir} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			fmt.Fprintf(stderr, "create %s: %v\n", dir, err)
+			writef(stderr, "create %s: %v\n", dir, err)
 			return 1
 		}
 	}
 
-	fmt.Fprintln(stdout, "✓ Leamout base directories initialized")
-	fmt.Fprintln(stdout, "Phase 2 does not yet generate production secrets, TLS, deployment identity, or commercial activation state.")
+	writeln(stdout, "✓ Leamout base directories initialized")
+	writeln(stdout, "Phase 2 does not yet generate production secrets, TLS, deployment identity, or commercial activation state.")
 
 	root, err := filepath.Abs(cfg.RepoRoot)
 	if err == nil {
 		if _, statErr := os.Stat(filepath.Join(root, cfg.ComposeFile)); statErr == nil {
-			fmt.Fprintf(stdout, "✓ Existing deployment assets detected at %s\n", root)
-			fmt.Fprintln(stdout, "Next: configure the deployment environment, then run `leamout doctor` and `leamout up`.")
+			writef(stdout, "✓ Existing deployment assets detected at %s\n", root)
+			writeln(stdout, "Next: configure the deployment environment, then run `leamout doctor` and `leamout up`.")
 			return 0
 		}
 	}
 
-	fmt.Fprintln(stdout, "Runtime deployment assets are not installed yet; Phase 3 will make clean-host runtime initialization self-contained.")
+	writeln(stdout, "Runtime deployment assets are not installed yet; Phase 3 will make clean-host runtime initialization self-contained.")
 	return 0
 }
 
 func runDoctor(ctx context.Context, stdout, stderr io.Writer, cfg Config) int {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		fmt.Fprintf(stderr, "unsupported host: %s/%s; Phase 2 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
+		writef(stderr, "unsupported host: %s/%s; Phase 2 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
 	}
 
 	for _, name := range []string{"docker", "sh", "curl"} {
 		if _, err := exec.LookPath(name); err != nil {
-			fmt.Fprintf(stderr, "missing prerequisite: %s\n", name)
+			writef(stderr, "missing prerequisite: %s\n", name)
 			return 1
 		}
 	}
-	fmt.Fprintln(stdout, "✓ linux/amd64 host")
-	fmt.Fprintln(stdout, "✓ docker, sh, and curl available")
+	writeln(stdout, "✓ linux/amd64 host")
+	writeln(stdout, "✓ docker, sh, and curl available")
 
 	if code := runScript(ctx, stdout, stderr, cfg, "scripts/deploy/preflight.sh"); code != 0 {
 		return code
 	}
-	fmt.Fprintln(stdout, "Leamout doctor passed.")
+	writeln(stdout, "Leamout doctor passed.")
 	return 0
 }
 
 func runScript(ctx context.Context, stdout, stderr io.Writer, cfg Config, rel string) int {
 	root, err := filepath.Abs(cfg.RepoRoot)
 	if err != nil {
-		fmt.Fprintf(stderr, "resolve Leamout root: %v\n", err)
+		writef(stderr, "resolve Leamout root: %v\n", err)
 		return 1
 	}
 	path := filepath.Join(root, rel)
 	if _, err := os.Stat(path); err != nil {
-		fmt.Fprintf(stderr, "required deployment primitive missing: %s\n", path)
+		writef(stderr, "required deployment primitive missing: %s\n", path)
 		return 1
 	}
 
@@ -158,7 +158,7 @@ func runScript(ctx context.Context, stdout, stderr io.Writer, cfg Config, rel st
 func runCompose(ctx context.Context, stdout, stderr io.Writer, cfg Config, args ...string) int {
 	root, err := filepath.Abs(cfg.RepoRoot)
 	if err != nil {
-		fmt.Fprintf(stderr, "resolve Leamout root: %v\n", err)
+		writef(stderr, "resolve Leamout root: %v\n", err)
 		return 1
 	}
 	base := []string{"compose", "--env-file", cfg.EnvFile, "-f", cfg.ComposeFile}
@@ -180,7 +180,7 @@ func exitCode(err error, stderr io.Writer) int {
 		return ee.ExitCode()
 	}
 	if !strings.Contains(err.Error(), "signal: killed") {
-		fmt.Fprintf(stderr, "%v\n", err)
+		writef(stderr, "%v\n", err)
 	}
 	return 1
 }
@@ -193,7 +193,7 @@ func envOr(name, fallback string) string {
 }
 
 func printHelp(w io.Writer) {
-	fmt.Fprintln(w, `Leamout self-hosted operator CLI
+	writeln(w, `Leamout self-hosted operator CLI
 
 Usage:
   leamout <command>
@@ -216,4 +216,18 @@ Environment overrides:
   LEAMOUT_CONFIG_DIR    local configuration directory (default: /etc/leamout)
   LEAMOUT_STATE_DIR     durable state directory (default: /var/lib/leamout)
   LEAMOUT_LOG_DIR       local log directory (default: /var/log/leamout)`)
+}
+
+// CLI output is best-effort. Commands return lifecycle/process failures; a closed
+// output stream must not replace the underlying operator result with a write error.
+func writef(w io.Writer, format string, args ...any) {
+	if _, err := fmt.Fprintf(w, format, args...); err != nil {
+		return
+	}
+}
+
+func writeln(w io.Writer, args ...any) {
+	if _, err := fmt.Fprintln(w, args...); err != nil {
+		return
+	}
 }
