@@ -205,21 +205,17 @@ jobs:
 
           chmod +x /tmp/installer-tools/*
 
-          PATH="/tmp/installer-tools:$PATH" \
-          LEAMOUT_OS_RELEASE_FILE=/tmp/installer-os-release \
-          LEAMOUT_MINISIGN_PUBLIC_KEY=fixture-public-key \
-          LEAMOUT_INSTALL_DIR=/tmp/installer-root/usr/local/bin \
-          LEAMOUT_CONFIG_DIR=/tmp/installer-root/etc/leamout \
-          LEAMOUT_STATE_DIR=/tmp/installer-root/var/lib/leamout \
-          LEAMOUT_LOG_DIR=/tmp/installer-root/var/log/leamout \
-          sh server/scripts/install.sh \
-            --version 1.0.0-preview.1 \
-            --base-url file:///tmp/installer-release
+          sudo env \
+            PATH="/tmp/installer-tools:$PATH" \
+            LEAMOUT_OS_RELEASE_FILE=/tmp/installer-os-release \
+            LEAMOUT_MINISIGN_PUBLIC_KEY=fixture-public-key \
+            LEAMOUT_RELEASE_BASE_URL=file:///tmp/installer-release \
+            sh server/scripts/install.sh --version 1.0.0-preview.1
 
-          /tmp/installer-root/usr/local/bin/leamout version | grep -q 'leamout 1.0.0-preview.1'
-          test -d /tmp/installer-root/etc/leamout
-          test -d /tmp/installer-root/var/lib/leamout
-          test -d /tmp/installer-root/var/log/leamout
+          /usr/local/bin/leamout version | grep -q 'leamout 1.0.0-preview.1'
+          test -d /etc/leamout
+          test -d /var/lib/leamout
+          test -d /var/log/leamout
 
       - name: Verify deterministic CLI packaging
         run: |
