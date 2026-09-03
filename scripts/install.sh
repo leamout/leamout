@@ -8,6 +8,7 @@ MINISIGN_PUBLIC_KEY="${LEAMOUT_MINISIGN_PUBLIC_KEY:-}"
 CONFIG_DIR="${LEAMOUT_CONFIG_DIR:-/etc/leamout}"
 STATE_DIR="${LEAMOUT_STATE_DIR:-/var/lib/leamout}"
 LOG_DIR="${LEAMOUT_LOG_DIR:-/var/log/leamout}"
+OS_RELEASE_FILE="${LEAMOUT_OS_RELEASE_FILE:-/etc/os-release}"
 
 usage() {
   cat <<'EOF'
@@ -95,13 +96,13 @@ case "$(uname -m)" in
     ;;
 esac
 
-[ -r /etc/os-release ] || {
-  echo "Cannot determine Linux distribution: /etc/os-release is missing" >&2
+[ -r "$OS_RELEASE_FILE" ] || {
+  echo "Cannot determine Linux distribution: $OS_RELEASE_FILE is missing" >&2
   exit 1
 }
 
-# shellcheck disable=SC1091
-. /etc/os-release
+# shellcheck disable=SC1090
+. "$OS_RELEASE_FILE"
 case "${ID:-}:${VERSION_ID:-}" in
   ubuntu:24.04) MIN_KERNEL=6.8 ;;
   debian:13) MIN_KERNEL=6.12 ;;
