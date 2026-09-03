@@ -5,6 +5,12 @@ on:
     paths:
       - "release/**"
       - "scripts/release/**"
+      - "scripts/install.sh"
+      - "server/cmd/leamout/**"
+      - "server/internal/operatorcli/**"
+      - "server/go.mod"
+      - "server/go.sum"
+      - "scripts/deploy/**"
       - "docs/deploy/release-artifacts.md"
       - "docs/deploy/self-hosted-installation.md"
       - "deploy/compose.yaml"
@@ -16,6 +22,12 @@ on:
     paths:
       - "release/**"
       - "scripts/release/**"
+      - "scripts/install.sh"
+      - "server/cmd/leamout/**"
+      - "server/internal/operatorcli/**"
+      - "server/go.mod"
+      - "server/go.sum"
+      - "scripts/deploy/**"
       - "docs/deploy/release-artifacts.md"
       - "docs/deploy/self-hosted-installation.md"
       - "deploy/compose.yaml"
@@ -39,10 +51,33 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Check release tooling syntax
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Check release and installer tooling syntax
         run: |
           sh -n scripts/release/package-cli.sh
+          sh -n scripts/install.sh
+          sh -n scripts/deploy/up.sh
           python3 -m py_compile scripts/release/validate-manifest.py
+
+      - name: Test operator CLI
+        working-directory: server
+        run: go test ./internal/operatorcli
+
+      - name: Build operator CLI
+        working-directory: server
+        run: |
+          go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=1.0.0-preview.1 -X main.commit=${GITHUB_SHA} -X main.builtAt=1970-01-01T00:00:00Z" \
+            -o /tmp/leamout \
+            ./cmd/leamout
+          /tmp/leamout version
+          /tmp/leamout help >/dev/null
 
       - name: Validate manifest schema JSON
         run: python3 -m json.tool release/manifest.schema.json >/dev/null
@@ -107,14 +142,8 @@ jobs:
             fi
           done
 
-      - name: Exercise CLI artifact format
+      - name: Exercise real CLI artifact format
         run: |
-          cat > /tmp/leamout <<'SH'
-          #!/bin/sh
-          echo "Leamout release artifact fixture"
-          SH
-          chmod 0755 /tmp/leamout
-
           VERSION=1.0.0-preview.1 \
           CLI_BINARY=/tmp/leamout \
           OUT_DIR=/tmp/leamout-release \
@@ -133,15 +162,17 @@ jobs:
 
       - name: Verify deterministic CLI packaging
         run: |
-          cat > /tmp/leamout <<'SH'
-          #!/bin/sh
-          echo "Leamout release artifact fixture"
-          SH
-          chmod 0755 /tmp/leamout
-
           VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-a sh scripts/release/package-cli.sh >/dev/null
           VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-b sh scripts/release/package-cli.sh >/dev/null
 
           cmp \
             /tmp/release-a/leamout_1.0.0-preview.1_linux_amd64.tar.gz \
             /tmp/release-b/leamout_1.0.0-preview.1_linux_amd64.tar.gz
+
+      - name: Verify CLI excludes hosted frontend services
+        run: |
+          grep -q 'selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"' server/internal/operatorcli/cli.go
+          if grep -q 'selfHostedDeployServices.*console' server/internal/operatorcli/cli.go; then
+            echo "self-hosted CLI unexpectedly includes hosted console" >&2
+            exit 1
+          fi
