@@ -26,31 +26,31 @@ help:
 
 .PHONY: certs
 certs:
-	CERT_DIR=$(CERT_DIR) sh scripts/certs/generate-self-signed.sh
+	CERT_DIR=$(CERT_DIR) sh server/scripts/certs/generate-self-signed.sh
 
 .PHONY: certs-production
 certs-production:
-	CERT_DIR=$(CERT_DIR) sh scripts/certs/provision-letsencrypt.sh
+	CERT_DIR=$(CERT_DIR) sh server/scripts/certs/provision-letsencrypt.sh
 
 .PHONY: certs-renew
 certs-renew:
-	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/certs/renew-letsencrypt.sh
+	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh server/scripts/certs/renew-letsencrypt.sh
 
 .PHONY: certs-auto-renew
 certs-auto-renew:
-	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/certs/install-certbot-renewal.sh
+	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh server/scripts/certs/install-certbot-renewal.sh
 
 .PHONY: check-certs
 check-certs:
-	CERT_DIR=$(CERT_DIR) sh scripts/certs/check-certs.sh
+	CERT_DIR=$(CERT_DIR) sh server/scripts/certs/check-certs.sh
 
 .PHONY: preflight
 preflight:
-	$(DEPLOY_ENV) sh scripts/deploy/preflight.sh
+	$(DEPLOY_ENV) sh server/scripts/deploy/preflight.sh
 
 .PHONY: up
 up:
-	$(DEPLOY_ENV) sh scripts/deploy/up.sh
+	$(DEPLOY_ENV) sh server/scripts/deploy/up.sh
 
 .PHONY: down
 down:
@@ -58,11 +58,11 @@ down:
 
 .PHONY: deploy
 deploy:
-	$(DEPLOY_ENV) sh scripts/deploy/deploy.sh
+	$(DEPLOY_ENV) sh server/scripts/deploy/deploy.sh
 
 .PHONY: verify
 verify:
-	$(DEPLOY_ENV) sh scripts/deploy/verify.sh
+	$(DEPLOY_ENV) sh server/scripts/deploy/verify.sh
 
 .PHONY: logs
 logs:
@@ -78,4 +78,4 @@ migrate:
 
 .PHONY: restart
 restart:
-	$(DEPLOY_ENV) sh scripts/deploy/restart.sh
+	$(DEPLOY_ENV) sh server/scripts/deploy/restart.sh
