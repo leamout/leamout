@@ -104,7 +104,7 @@ received. This prevents host or server-reflexive fallback from satisfying the te
 - [x] Include Redis in API readiness and fail closed when quota state is unavailable.
 - [x] Mark credential responses as non-cacheable.
 - [x] Add graceful drain controls for OpenSIPS, RTPengine, and FreeSWITCH nodes.
-- [ ] Separate public signaling, public media, and private control networks.
+- [x] Separate public signaling, public media, and private control networks.
 - [ ] Add certificate and shared-secret rotation runbooks and automation.
 
 ## MVP exit criteria
