@@ -3,6 +3,26 @@ set -eu
 
 config=${OPENSIPS_CONFIG:-/etc/opensips/opensips.cfg}
 advertised_address=${OPENSIPS_ADVERTISED_ADDRESS:-}
+database_password=${OPENSIPS_DATABASE_PASSWORD:-}
+
+[ -n "$database_password" ] || {
+  echo "OPENSIPS_DATABASE_PASSWORD is required" >&2
+  exit 1
+}
+case "$database_password" in
+  *[!A-Za-z0-9]*)
+    echo "OPENSIPS_DATABASE_PASSWORD must be alphanumeric" >&2
+    exit 1
+    ;;
+esac
+
+# The source configuration keeps the contributor credential solely so the
+# image can be syntax-checked during build. Replace it before OpenSIPS starts;
+# production always supplies a deployment-owned generated credential.
+tmp=$(mktemp)
+sed "s#postgres://leamout:leamout@postgres:5432/leamout#postgres://leamout:${database_password}@postgres:5432/leamout#g" "$config" > "$tmp"
+cat "$tmp" > "$config"
+rm -f "$tmp"
 
 if [ -n "$advertised_address" ]; then
   case "$advertised_address" in
@@ -45,10 +65,10 @@ if [ -n "$advertised_address" ]; then
   }
   cat "$tmp" > "$config"
   rm -f "$tmp"
-
-  # Fail before the daemon starts if the runtime-advertised route set is not a
-  # valid OpenSIPS configuration. This address is what peers use for ACK/BYE.
-  opensips -C -f "$config"
 fi
+
+# Always validate the fully materialized runtime configuration before the
+# daemon starts so credential or advertised-address rendering fails closed.
+opensips -C -f "$config"
 
 exec "$@"
