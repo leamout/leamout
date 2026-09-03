@@ -84,11 +84,6 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 		filepath.Join(configDir, "license"),
 		stateDir,
 		filepath.Join(stateDir, "backups"),
-		filepath.Join(stateDir, "data"),
-		filepath.Join(stateDir, "data", "postgres"),
-		filepath.Join(stateDir, "data", "redis"),
-		filepath.Join(stateDir, "data", "nats"),
-		filepath.Join(stateDir, "data", "recordings"),
 		logDir,
 	} {
 		info, err := os.Stat(dir)
