@@ -35,19 +35,23 @@ type deploymentSecrets struct {
 	TURNAuthSecret                  string
 }
 
-func runInit(stdout, stderr io.Writer, cfg Config) int {
+func runInit(stdout, stderr io.Writer) int {
+	return runInitAt(stdout, stderr, "/etc/leamout", "/var/lib/leamout", "/var/log/leamout")
+}
+
+func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir string) int {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		writef(stderr, "unsupported host: %s/%s; Self-Hosted Production v0.1 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
 	}
 
-	if err := ensureDeploymentDirectories(cfg); err != nil {
+	if err := ensureDeploymentDirectories(configDir, stateDir, logDir); err != nil {
 		writef(stderr, "initialize Leamout directories: %v\n", err)
 		return 1
 	}
 
-	statePath := filepath.Join(cfg.StateDir, "deployment.json")
-	envPath := filepath.Join(cfg.ConfigDir, "leamout.env")
+	statePath := filepath.Join(stateDir, "deployment.json")
+	envPath := filepath.Join(configDir, "leamout.env")
 
 	stateExists, err := pathExists(statePath)
 	if err != nil {
@@ -112,16 +116,15 @@ func runInit(stdout, stderr io.Writer, cfg Config) int {
 	return 0
 }
 
-func ensureDeploymentDirectories(cfg Config) error {
-	dirs := []string{
-		cfg.ConfigDir,
-		filepath.Join(cfg.ConfigDir, "certs"),
-		filepath.Join(cfg.ConfigDir, "license"),
-		cfg.StateDir,
-		filepath.Join(cfg.StateDir, "backups"),
-		cfg.LogDir,
-	}
-	for _, dir := range dirs {
+func ensureDeploymentDirectories(configDir, stateDir, logDir string) error {
+	for _, dir := range []string{
+		configDir,
+		filepath.Join(configDir, "certs"),
+		filepath.Join(configDir, "license"),
+		stateDir,
+		filepath.Join(stateDir, "backups"),
+		logDir,
+	} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			return fmt.Errorf("create %s: %w", dir, err)
 		}
