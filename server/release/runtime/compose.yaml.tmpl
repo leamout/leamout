@@ -130,6 +130,8 @@ services:
     image: @@IMAGE_OPENSIPS@@
     restart: unless-stopped
     stop_grace_period: 30s
+    environment:
+      OPENSIPS_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?required}
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
