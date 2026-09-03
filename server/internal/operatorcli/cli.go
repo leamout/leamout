@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+const (
+	selfHostedBuildServices  = "server worker opensips freeswitch rtpengine"
+	selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"
+)
+
 type BuildInfo struct {
 	Version string
 	Commit  string
@@ -23,6 +28,9 @@ type Config struct {
 	EnvFile     string
 	ComposeFile string
 	CertDir     string
+	ConfigDir   string
+	StateDir    string
+	LogDir      string
 }
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build BuildInfo) int {
@@ -31,6 +39,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		EnvFile:     envOr("LEAMOUT_ENV_FILE", ".env"),
 		ComposeFile: envOr("LEAMOUT_COMPOSE_FILE", "deploy/compose.yaml"),
 		CertDir:     envOr("LEAMOUT_CERT_DIR", "deploy/certs"),
+		ConfigDir:   envOr("LEAMOUT_CONFIG_DIR", "/etc/leamout"),
+		StateDir:    envOr("LEAMOUT_STATE_DIR", "/var/lib/leamout"),
+		LogDir:      envOr("LEAMOUT_LOG_DIR", "/var/log/leamout"),
 	}
 
 	if len(args) == 0 {
@@ -72,19 +83,26 @@ func runInit(stdout, stderr io.Writer, cfg Config) int {
 		return 1
 	}
 
-	root, err := filepath.Abs(cfg.RepoRoot)
-	if err != nil {
-		fmt.Fprintf(stderr, "resolve Leamout root: %v\n", err)
-		return 1
-	}
-	if _, err := os.Stat(filepath.Join(root, cfg.ComposeFile)); err != nil {
-		fmt.Fprintf(stderr, "Leamout deployment assets not found under %s: %v\n", root, err)
-		return 1
+	for _, dir := range []string{cfg.ConfigDir, cfg.StateDir, cfg.LogDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			fmt.Fprintf(stderr, "create %s: %v\n", dir, err)
+			return 1
+		}
 	}
 
-	fmt.Fprintf(stdout, "Leamout CLI initialized for deployment assets at %s\n", root)
-	fmt.Fprintln(stdout, "Phase 2 does not yet generate production secrets, TLS, or commercial activation state.")
-	fmt.Fprintln(stdout, "Next: configure the existing deployment environment, then run `leamout doctor` and `leamout up`.")
+	fmt.Fprintln(stdout, "✓ Leamout base directories initialized")
+	fmt.Fprintln(stdout, "Phase 2 does not yet generate production secrets, TLS, deployment identity, or commercial activation state.")
+
+	root, err := filepath.Abs(cfg.RepoRoot)
+	if err == nil {
+		if _, statErr := os.Stat(filepath.Join(root, cfg.ComposeFile)); statErr == nil {
+			fmt.Fprintf(stdout, "✓ Existing deployment assets detected at %s\n", root)
+			fmt.Fprintln(stdout, "Next: configure the deployment environment, then run `leamout doctor` and `leamout up`.")
+			return 0
+		}
+	}
+
+	fmt.Fprintln(stdout, "Runtime deployment assets are not installed yet; Phase 3 will make clean-host runtime initialization self-contained.")
 	return 0
 }
 
@@ -131,6 +149,8 @@ func runScript(ctx context.Context, stdout, stderr io.Writer, cfg Config, rel st
 		"ENV_FILE="+cfg.EnvFile,
 		"COMPOSE_FILE="+cfg.ComposeFile,
 		"CERT_DIR="+cfg.CertDir,
+		"BUILD_SERVICES="+selfHostedBuildServices,
+		"DEPLOY_SERVICES="+selfHostedDeployServices,
 	)
 	return exitCode(cmd.Run(), stderr)
 }
@@ -179,8 +199,8 @@ Usage:
   leamout <command>
 
 Commands:
-  init       Validate the Phase 2 installation foundation
-  up         Start the existing Leamout deployment stack
+  init       Initialize the Phase 2 local CLI foundation
+  up         Start self-hosted runtime services through existing deployment primitives
   down       Stop the existing Leamout deployment stack
   status     Show deployment service status
   logs       Follow deployment logs
@@ -192,5 +212,8 @@ Environment overrides:
   LEAMOUT_ROOT          deployment asset root (default: .)
   LEAMOUT_ENV_FILE      environment file (default: .env)
   LEAMOUT_COMPOSE_FILE  compose file (default: deploy/compose.yaml)
-  LEAMOUT_CERT_DIR      certificate directory (default: deploy/certs)`)
+  LEAMOUT_CERT_DIR      certificate directory (default: deploy/certs)
+  LEAMOUT_CONFIG_DIR    local configuration directory (default: /etc/leamout)
+  LEAMOUT_STATE_DIR     durable state directory (default: /var/lib/leamout)
+  LEAMOUT_LOG_DIR       local log directory (default: /var/log/leamout)`)
 }
