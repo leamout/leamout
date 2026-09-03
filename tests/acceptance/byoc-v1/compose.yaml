@@ -23,5 +23,7 @@ services:
       - ${BYOC_V1_SUITE_DIR:?BYOC_V1_SUITE_DIR is required}/carrier-sip-profile.xml:/leamout-config/sip_profiles/internal.xml:ro
       - ${BYOC_V1_SUITE_DIR:?BYOC_V1_SUITE_DIR is required}/carrier-directory.xml:/etc/freeswitch/directory/default.xml:ro
     networks:
-      leamout-core:
+      public-signaling:
         ipv4_address: 172.30.0.50
+      public-media:
+        ipv4_address: 172.31.0.50

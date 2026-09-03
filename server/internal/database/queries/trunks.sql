@@ -217,7 +217,7 @@ SET consecutive_failures = consecutive_failures + 1,
     last_latency_ms = sqlc.arg(latency_ms),
     last_error = sqlc.arg(last_error),
     cooldown_until = CASE
-        WHEN consecutive_failures + 1 >= sqlc.arg(failure_threshold) THEN sqlc.arg(cooldown_until)
+        WHEN consecutive_failures + 1 >= sqlc.arg(failure_threshold) THEN sqlc.arg(cooldown_until)::TIMESTAMPTZ
         ELSE NULL
     END
 WHERE id = sqlc.arg(id)

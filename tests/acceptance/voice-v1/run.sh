@@ -13,7 +13,7 @@ export TURN_REALM="${TURN_REALM:-voice-v1.local}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-voice-v1-turn-secret-0123456789abcdef}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
-export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.30.0.10}"
+export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/voice-v1/compose.yaml"
 
@@ -117,15 +117,15 @@ until $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status >/d
     sleep 1
 done
 
-printf '%s\n' "Waiting for FreeSWITCH ESL from the Compose network..."
+printf '%s\n' "Waiting for private FreeSWITCH ESL..."
 i=0
-until $COMPOSE exec -T voice-v1-carrier sh -c '
-    fs_cli -H freeswitch -P 8021 \
+until $COMPOSE exec -T freeswitch sh -c '
+    fs_cli -H 127.0.0.1 -P 8021 \
         -p "$FREESWITCH_ESL_PASSWORD" \
         -x status >/dev/null 2>&1
 '; do
     i=$((i + 1))
-    [ "$i" -lt 60 ] || { echo "FreeSWITCH ESL did not become ready/authenticated from the Compose network" >&2; exit 1; }
+    [ "$i" -lt 60 ] || { echo "FreeSWITCH ESL did not become ready/authenticated" >&2; exit 1; }
     sleep 1
 done
 

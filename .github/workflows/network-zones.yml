@@ -1,0 +1,67 @@
+name: Network zones
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "tests/acceptance/**/compose.yaml"
+      - "tests/acceptance/**/carrier-sip-profile.xml"
+      - "tests/acceptance/**/run.sh"
+      - ".github/workflows/network-zones.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "deploy/**"
+      - "tests/acceptance/**/compose.yaml"
+      - "tests/acceptance/**/carrier-sip-profile.xml"
+      - "tests/acceptance/**/run.sh"
+      - ".github/workflows/network-zones.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  topology:
+    name: Validate signaling, media, and control isolation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Validate Compose network topology
+        env:
+          CARRIER_CREDENTIAL_ENCRYPTION_KEY: test-key
+          FREESWITCH_ESL_PASSWORD: test-password
+          RTPENGINE_PUBLIC_IP: 127.0.0.1
+          TURN_AUTH_SECRET: test-turn-secret
+          TURN_EXTERNAL_IP: 127.0.0.1
+          TURN_PUBLIC_URLS: turn:127.0.0.1:3478
+          TURN_REALM: example.test
+        run: |
+          docker compose -f deploy/compose.yaml config --format json \
+            | python3 deploy/check-network-zones.py
+
+      - name: Validate acceptance overlays resolve the separated networks
+        env:
+          CARRIER_CREDENTIAL_ENCRYPTION_KEY: test-key
+          FREESWITCH_ESL_PASSWORD: test-password
+          RTPENGINE_PUBLIC_IP: 172.31.0.10
+          TURN_AUTH_SECRET: test-turn-secret
+          TURN_EXTERNAL_IP: 127.0.0.1
+          TURN_PUBLIC_URLS: turn:127.0.0.1:3478
+          TURN_REALM: example.test
+          BYOC_V1_CERT_DIR: /tmp/byoc-certs
+          BYOC_V1_SUITE_DIR: /tmp/byoc-suite
+          VOICE_V1_CERT_DIR: /tmp/voice-certs
+          VOICE_V1_SUITE_DIR: ${{ github.workspace }}/tests/acceptance/voice-v1
+          GRACEFUL_DRAIN_SUITE_DIR: ${{ github.workspace }}/tests/acceptance/graceful-drain
+          WEBRTC_V1_CERT_DIR: /tmp/webrtc-certs
+          WEBRTC_V1_TURN_MIN_PORT: "62000"
+          WEBRTC_V1_TURN_MAX_PORT: "62007"
+        run: |
+          docker compose -f deploy/compose.yaml -f tests/acceptance/byoc-v1/compose.yaml config --quiet
+          docker compose -f deploy/compose.yaml -f tests/acceptance/voice-v1/compose.yaml config --quiet
+          docker compose -f deploy/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml config --quiet
+          docker compose -f deploy/compose.yaml -f tests/acceptance/webrtc-v1/compose.yaml config --quiet

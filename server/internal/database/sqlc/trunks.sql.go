@@ -635,7 +635,7 @@ SET consecutive_failures = consecutive_failures + 1,
     last_latency_ms = $3,
     last_error = $4,
     cooldown_until = CASE
-        WHEN consecutive_failures + 1 >= $1 THEN $5
+        WHEN consecutive_failures + 1 >= $1 THEN $5::TIMESTAMPTZ
         ELSE NULL
     END
 WHERE id = $6

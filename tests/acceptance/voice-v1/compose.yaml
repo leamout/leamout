@@ -20,9 +20,8 @@ services:
       - ${VOICE_V1_CERT_DIR:?VOICE_V1_CERT_DIR is required}/opensips-carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
 
   rtpengine:
-    # The acceptance carrier and FreeSWITCH instances are on leamout-core, so
-    # publishing the production RTP range to the GitHub runner is unnecessary
-    # and makes Docker create thousands of host UDP port mappings.
+    # The acceptance carrier reaches RTPengine on public-media, so publishing
+    # the production RTP range to the GitHub runner is unnecessary.
     ports: !reset []
 
   voice-v1-carrier:
@@ -35,13 +34,16 @@ services:
       FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
     volumes:
       - ${VOICE_V1_SUITE_DIR:?VOICE_V1_SUITE_DIR is required}/carrier-dialplan.xml:/leamout-config/dialplan/leamout.xml:ro
+      - ${VOICE_V1_SUITE_DIR:?VOICE_V1_SUITE_DIR is required}/carrier-sip-profile.xml:/leamout-config/sip_profiles/internal.xml:ro
     expose:
       - "5060/udp"
       - "5060/tcp"
       - "8021/tcp"
     networks:
-      leamout-core:
+      public-signaling:
         ipv4_address: 172.30.0.50
+      public-media:
+        ipv4_address: 172.31.0.50
 
   voice-v1-webhook:
     image: python:3.13-alpine
@@ -62,4 +64,4 @@ services:
     ports:
       - "18443:8443"
     networks:
-      - leamout-core
+      - private-control
