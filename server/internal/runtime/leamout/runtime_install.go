@@ -96,7 +96,7 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 	if err != nil {
 		return fmt.Errorf("create runtime staging directory: %w", err)
 	}
-	defer os.RemoveAll(workdir)
+	defer func() { _ = os.RemoveAll(workdir) }()
 	if err := os.Chmod(workdir, 0o750); err != nil {
 		return fmt.Errorf("secure runtime staging directory: %w", err)
 	}
@@ -131,7 +131,13 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 	if err := os.Rename(stagedRuntime, runtimeDir); err != nil {
 		return fmt.Errorf("install production runtime: %w", err)
 	}
-	return validateInstalledRuntime(runtimeDir, manifest, expectedSHA, manifestSHA)
+	if err := validateInstalledRuntime(runtimeDir, manifest, expectedSHA, manifestSHA); err != nil {
+		if removeErr := os.RemoveAll(runtimeDir); removeErr != nil {
+			return fmt.Errorf("validate installed runtime: %w; rollback runtime: %w", err, removeErr)
+		}
+		return fmt.Errorf("validate installed runtime: %w", err)
+	}
+	return nil
 }
 
 func loadReleaseManifest(path, version string) (releaseManifest, string, error) {
@@ -203,7 +209,7 @@ func hashFile(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil {
 		return "", err
@@ -216,12 +222,12 @@ func extractRuntimeArchive(archivePath, destination string) error {
 	if err != nil {
 		return fmt.Errorf("open staged runtime bundle: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
 		return fmt.Errorf("open staged runtime bundle gzip stream: %w", err)
 	}
-	defer gzipReader.Close()
+	defer func() { _ = gzipReader.Close() }()
 
 	tarReader := tar.NewReader(gzipReader)
 	for {
