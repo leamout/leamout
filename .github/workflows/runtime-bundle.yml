@@ -1,0 +1,135 @@
+name: Runtime Bundle
+
+on:
+  pull_request:
+    paths:
+      - "server/release/runtime/**"
+      - "server/release/fixtures/valid-manifest.json"
+      - "server/scripts/release/package-runtime.sh"
+      - "server/scripts/release/render-runtime.py"
+      - "server/migrations/**"
+      - ".github/workflows/runtime-bundle.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/release/runtime/**"
+      - "server/release/fixtures/valid-manifest.json"
+      - "server/scripts/release/package-runtime.sh"
+      - "server/scripts/release/render-runtime.py"
+      - "server/migrations/**"
+      - ".github/workflows/runtime-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check tooling syntax
+        run: |
+          sh -n server/scripts/release/package-runtime.sh
+          python3 -m py_compile server/scripts/release/render-runtime.py
+
+      - name: Package runtime bundle
+        run: |
+          VERSION=1.0.0-preview.1 OUT_DIR=/tmp/runtime-a sh server/scripts/release/package-runtime.sh
+          VERSION=1.0.0-preview.1 OUT_DIR=/tmp/runtime-b sh server/scripts/release/package-runtime.sh
+
+          cmp \
+            /tmp/runtime-a/leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz \
+            /tmp/runtime-b/leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz
+
+          (
+            cd /tmp/runtime-a
+            sha256sum --check leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz.sha256
+          )
+
+          tar -tzf /tmp/runtime-a/leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz > /tmp/runtime-files.txt
+          grep -qx 'runtime/compose.yaml.tmpl' /tmp/runtime-files.txt
+          grep -qx 'runtime/coturn/turnserver.conf' /tmp/runtime-files.txt
+          grep -qx 'runtime/migrations/atlas.sum' /tmp/runtime-files.txt
+          grep -qx 'runtime/migrations/039_create_idempotency.sql' /tmp/runtime-files.txt
+
+      - name: Render manifest-pinned runtime
+        run: |
+          python3 server/scripts/release/validate-manifest.py server/release/fixtures/valid-manifest.json
+          python3 server/scripts/release/render-runtime.py \
+            server/release/fixtures/valid-manifest.json \
+            server/release/runtime/compose.yaml.tmpl \
+            /tmp/leamout-runtime.yaml
+
+          if grep -q '@@IMAGE_' /tmp/leamout-runtime.yaml; then
+            echo "runtime contains unresolved image tokens" >&2
+            exit 1
+          fi
+          if grep -Eq '^[[:space:]]*build:' /tmp/leamout-runtime.yaml; then
+            echo "production runtime unexpectedly contains build directives" >&2
+            exit 1
+          fi
+
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = Path('/tmp/leamout-runtime.yaml').read_text()
+          images = re.findall(r'^\s+image:\s+(\S+)\s*$', text, re.MULTILINE)
+          if len(images) != 10:
+              raise SystemExit(f'expected 10 runtime images, found {len(images)}')
+          invalid = [image for image in images if not re.search(r'@sha256:[0-9a-f]{64}$', image)]
+          if invalid:
+              raise SystemExit(f'non-immutable runtime images: {invalid}')
+          PY
+
+      - name: Validate production topology
+        run: |
+          cat > /tmp/leamout-runtime.env <<'EOF'
+          POSTGRES_PASSWORD=1111111111111111111111111111111111111111111111111111111111111111
+          REDIS_PASSWORD=2222222222222222222222222222222222222222222222222222222222222222
+          NATS_PASSWORD=3333333333333333333333333333333333333333333333333333333333333333
+          FREESWITCH_ESL_PASSWORD=4444444444444444444444444444444444444444444444444444444444444444
+          CARRIER_CREDENTIAL_ENCRYPTION_KEY=ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY
+          TURN_AUTH_SECRET=5555555555555555555555555555555555555555555555555555555555555555
+          TURN_PUBLIC_URLS=turn:turn.example.test:3478?transport=udp
+          TURN_REALM=turn.example.test
+          TURN_EXTERNAL_IP=203.0.113.10
+          RTPENGINE_PUBLIC_IP=203.0.113.10
+          EOF
+
+          docker compose --env-file /tmp/leamout-runtime.env -f /tmp/leamout-runtime.yaml config >/tmp/runtime-config.yaml
+          docker compose --env-file /tmp/leamout-runtime.env -f /tmp/leamout-runtime.yaml config --services | sort > /tmp/runtime-services.txt
+
+          cat > /tmp/expected-services.txt <<'EOF'
+          coturn
+          freeswitch
+          migrate
+          nats
+          opensips
+          postgres
+          redis
+          rtpengine
+          server
+          worker
+          EOF
+          diff -u /tmp/expected-services.txt /tmp/runtime-services.txt
+
+          grep -q '/var/lib/leamout/data/postgres' /tmp/runtime-config.yaml
+          grep -q '/var/lib/leamout/data/redis' /tmp/runtime-config.yaml
+          grep -q '/var/lib/leamout/data/nats' /tmp/runtime-config.yaml
+          grep -q '/var/lib/leamout/data/recordings' /tmp/runtime-config.yaml
+          grep -q '/etc/leamout/certs' /tmp/runtime-config.yaml
+
+          if grep -Eq '(^|[[:space:]])(web|console|waitlist)(:|[[:space:]]|$)' /tmp/runtime-services.txt; then
+            echo "hosted frontend leaked into production runtime" >&2
+            exit 1
+          fi
