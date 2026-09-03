@@ -2,6 +2,9 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_root=$(CDPATH= cd -- "$script_dir/.." && pwd)
+ENV_FILE="${ENV_FILE:-.env}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/compose.yaml}"
 timeout_seconds=${LEAMOUT_DRAIN_TIMEOUT_SECONDS:-300}
 poll_seconds=${LEAMOUT_DRAIN_POLL_SECONDS:-2}
 
@@ -14,7 +17,7 @@ esac
 [ "$poll_seconds" -gt 0 ] || { echo "LEAMOUT_DRAIN_POLL_SECONDS must be greater than zero" >&2; exit 2; }
 
 run_compose() {
-  (cd "$script_dir" && docker compose "$@")
+  (cd "$repo_root" && docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@")
 }
 
 opensips_control() {
