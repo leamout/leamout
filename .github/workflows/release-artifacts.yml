@@ -7,7 +7,7 @@ on:
       - "server/scripts/release/**"
       - "server/scripts/install.sh"
       - "server/cmd/leamout/**"
-      - "server/internal/operatorcli/**"
+      - "server/internal/runtime/leamout/**"
       - "server/go.mod"
       - "server/go.sum"
       - "server/scripts/deploy/**"
@@ -24,7 +24,7 @@ on:
       - "server/scripts/release/**"
       - "server/scripts/install.sh"
       - "server/cmd/leamout/**"
-      - "server/internal/operatorcli/**"
+      - "server/internal/runtime/leamout/**"
       - "server/go.mod"
       - "server/go.sum"
       - "server/scripts/deploy/**"
@@ -66,7 +66,7 @@ jobs:
 
       - name: Test operator CLI
         working-directory: server
-        run: go test ./internal/operatorcli
+        run: go test ./internal/runtime/leamout
 
       - name: Build operator CLI
         working-directory: server
@@ -232,8 +232,8 @@ jobs:
 
       - name: Verify CLI excludes hosted frontend services
         run: |
-          grep -q 'selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"' server/internal/operatorcli/cli.go
-          if grep -q 'selfHostedDeployServices.*console' server/internal/operatorcli/cli.go; then
+          grep -q 'selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"' server/internal/runtime/leamout/cli.go
+          if grep -q 'selfHostedDeployServices.*console' server/internal/runtime/leamout/cli.go; then
             echo "self-hosted CLI unexpectedly includes hosted console" >&2
             exit 1
           fi
