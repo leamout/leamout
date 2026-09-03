@@ -150,7 +150,7 @@ The repository's Phase 1 tooling can create deterministic archives and checksums
 
 ## Release manifest
 
-Every self-hosted production release is described by one `release-manifest.json` document conforming to `release/manifest.schema.json` and the stricter repository validator.
+Every self-hosted production release is described by one `release-manifest.json` document conforming to `server/release/manifest.schema.json` and the stricter repository validator.
 
 The manifest carries:
 
@@ -272,20 +272,23 @@ Changes that alter required fields, validation semantics, or compatibility behav
 Phase 1 owns the following release paths:
 
 ```text
-release/
+server/release/
   manifest.schema.json
   fixtures/
     valid-manifest.json
 
-scripts/release/
+server/scripts/release/
   package-cli.sh
   validate-manifest.py
+
+server/scripts/
+  install.sh
 
 .github/workflows/
   release-artifacts.yml
 ```
 
-`release/fixtures/valid-manifest.json` is synthetic CI data. It is not a Leamout release and must never be published as one.
+`server/release/fixtures/valid-manifest.json` is synthetic CI data. It is not a Leamout release and must never be published as one.
 
 Real release manifests should be generated from an actual release build and attached to the corresponding release publication rather than hand-authored with guessed image digests.
 
