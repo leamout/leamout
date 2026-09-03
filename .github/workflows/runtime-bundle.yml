@@ -8,6 +8,9 @@ on:
       - "server/scripts/release/package-runtime.sh"
       - "server/scripts/release/render-runtime.py"
       - "server/migrations/**"
+      - "server/internal/runtime/leamout/**"
+      - "deploy/opensips/**"
+      - "deploy/compose.yaml"
       - ".github/workflows/runtime-bundle.yml"
   push:
     branches:
@@ -18,6 +21,9 @@ on:
       - "server/scripts/release/package-runtime.sh"
       - "server/scripts/release/render-runtime.py"
       - "server/migrations/**"
+      - "server/internal/runtime/leamout/**"
+      - "deploy/opensips/**"
+      - "deploy/compose.yaml"
       - ".github/workflows/runtime-bundle.yml"
   workflow_dispatch:
 
@@ -39,6 +45,7 @@ jobs:
       - name: Check tooling syntax
         run: |
           sh -n server/scripts/release/package-runtime.sh
+          sh -n deploy/opensips/entrypoint.sh
           python3 -m py_compile server/scripts/release/render-runtime.py
 
       - name: Package runtime bundle
@@ -123,11 +130,13 @@ jobs:
           EOF
           diff -u /tmp/expected-services.txt /tmp/runtime-services.txt
 
-          grep -q '/var/lib/leamout/data/postgres' /tmp/runtime-config.yaml
-          grep -q '/var/lib/leamout/data/redis' /tmp/runtime-config.yaml
-          grep -q '/var/lib/leamout/data/nats' /tmp/runtime-config.yaml
-          grep -q '/var/lib/leamout/data/recordings' /tmp/runtime-config.yaml
+          for volume in leamout-postgres-data leamout-redis-data leamout-nats-data leamout-recordings; do
+            grep -q "$volume" /tmp/runtime-config.yaml
+          done
+          grep -q '/var/lib/leamout/runtime/migrations' /tmp/runtime-config.yaml
           grep -q '/etc/leamout/certs' /tmp/runtime-config.yaml
+          grep -q 'leamout-private-control' /tmp/runtime-config.yaml
+          grep -q 'leamout-control-egress' /tmp/runtime-config.yaml
 
           if grep -Eq '(^|[[:space:]])(web|console|waitlist)(:|[[:space:]]|$)' /tmp/runtime-services.txt; then
             echo "hosted frontend leaked into production runtime" >&2
