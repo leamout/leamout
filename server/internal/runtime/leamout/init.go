@@ -30,9 +30,9 @@ type deploymentState struct {
 }
 
 type deploymentSecrets struct {
-	FreeSWITCHESLPassword           string
+	FreeSWITCHESLPassword          string
 	CarrierCredentialEncryptionKey string
-	TURNAuthSecret                  string
+	TURNAuthSecret                 string
 }
 
 func runInit(stdout, stderr io.Writer) int {
@@ -149,9 +149,9 @@ func generateDeploymentSecrets() (deploymentSecrets, error) {
 		return deploymentSecrets{}, err
 	}
 	return deploymentSecrets{
-		FreeSWITCHESLPassword:           freeswitchPassword,
+		FreeSWITCHESLPassword:          freeswitchPassword,
 		CarrierCredentialEncryptionKey: base64.RawURLEncoding.EncodeToString(key),
-		TURNAuthSecret:                  turnSecret,
+		TURNAuthSecret:                 turnSecret,
 	}, nil
 }
 
