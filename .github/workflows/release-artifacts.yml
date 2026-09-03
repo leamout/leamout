@@ -1,0 +1,147 @@
+name: Release Artifacts
+
+on:
+  pull_request:
+    paths:
+      - "release/**"
+      - "scripts/release/**"
+      - "docs/deploy/release-artifacts.md"
+      - "docs/deploy/self-hosted-installation.md"
+      - "deploy/compose.yaml"
+      - "LICENSE"
+      - ".github/workflows/release-artifacts.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "release/**"
+      - "scripts/release/**"
+      - "docs/deploy/release-artifacts.md"
+      - "docs/deploy/self-hosted-installation.md"
+      - "deploy/compose.yaml"
+      - "LICENSE"
+      - ".github/workflows/release-artifacts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate release contract
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check release tooling syntax
+        run: |
+          sh -n scripts/release/package-cli.sh
+          python3 -m py_compile scripts/release/validate-manifest.py
+
+      - name: Validate manifest schema JSON
+        run: python3 -m json.tool release/manifest.schema.json >/dev/null
+
+      - name: Validate known-good manifest
+        run: python3 scripts/release/validate-manifest.py release/fixtures/valid-manifest.json
+
+      - name: Reject mutable image references
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("release/fixtures/valid-manifest.json")
+          manifest = json.loads(source.read_text())
+          manifest["images"]["rtpengine"] = "ghcr.io/leamout/rtpengine:dev"
+          Path("/tmp/mutable-manifest.json").write_text(json.dumps(manifest))
+          PY
+
+          if python3 scripts/release/validate-manifest.py /tmp/mutable-manifest.json; then
+            echo "validator unexpectedly accepted a mutable image reference" >&2
+            exit 1
+          fi
+
+      - name: Reject placeholder image digests
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("release/fixtures/valid-manifest.json")
+          manifest = json.loads(source.read_text())
+          manifest["images"]["server"] = "ghcr.io/leamout/server@sha256:" + ("0" * 64)
+          Path("/tmp/placeholder-manifest.json").write_text(json.dumps(manifest))
+          PY
+
+          if python3 scripts/release/validate-manifest.py /tmp/placeholder-manifest.json; then
+            echo "validator unexpectedly accepted an all-zero image digest" >&2
+            exit 1
+          fi
+
+      - name: Reject hosted frontend images
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("release/fixtures/valid-manifest.json")
+          for frontend in ("console", "web", "waitlist"):
+              manifest = json.loads(source.read_text())
+              manifest["images"][frontend] = (
+                  f"ghcr.io/leamout/{frontend}@sha256:" + ("f" * 64)
+              )
+              target = Path(f"/tmp/{frontend}-manifest.json")
+              target.write_text(json.dumps(manifest))
+          PY
+
+          for frontend in console web waitlist; do
+            if python3 scripts/release/validate-manifest.py "/tmp/${frontend}-manifest.json"; then
+              echo "validator unexpectedly accepted hosted frontend image: ${frontend}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Exercise CLI artifact format
+        run: |
+          cat > /tmp/leamout <<'SH'
+          #!/bin/sh
+          echo "Leamout release artifact fixture"
+          SH
+          chmod 0755 /tmp/leamout
+
+          VERSION=1.0.0-preview.1 \
+          CLI_BINARY=/tmp/leamout \
+          OUT_DIR=/tmp/leamout-release \
+          sh scripts/release/package-cli.sh
+
+          test -f /tmp/leamout-release/leamout_1.0.0-preview.1_linux_amd64.tar.gz
+          test -f /tmp/leamout-release/checksums.txt
+
+          tar -tzf /tmp/leamout-release/leamout_1.0.0-preview.1_linux_amd64.tar.gz > /tmp/archive-files.txt
+          diff -u <(printf 'LICENSE\nleamout\n') /tmp/archive-files.txt
+
+          (
+            cd /tmp/leamout-release
+            sha256sum --check checksums.txt
+          )
+
+      - name: Verify deterministic CLI packaging
+        run: |
+          cat > /tmp/leamout <<'SH'
+          #!/bin/sh
+          echo "Leamout release artifact fixture"
+          SH
+          chmod 0755 /tmp/leamout
+
+          VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-a sh scripts/release/package-cli.sh >/dev/null
+          VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-b sh scripts/release/package-cli.sh >/dev/null
+
+          cmp \
+            /tmp/release-a/leamout_1.0.0-preview.1_linux_amd64.tar.gz \
+            /tmp/release-b/leamout_1.0.0-preview.1_linux_amd64.tar.gz
