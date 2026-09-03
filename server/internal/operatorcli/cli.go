@@ -59,7 +59,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 	case "init":
 		return runInit(stdout, stderr, cfg)
 	case "up":
-		return runScript(ctx, stdout, stderr, cfg, "scripts/deploy/up.sh")
+		return runScript(ctx, stdout, stderr, cfg, "server/scripts/deploy/up.sh")
 	case "down":
 		return runCompose(ctx, stdout, stderr, cfg, "down")
 	case "status":
@@ -121,7 +121,7 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer, cfg Config) int {
 	writeln(stdout, "✓ linux/amd64 host")
 	writeln(stdout, "✓ docker, sh, and curl available")
 
-	if code := runScript(ctx, stdout, stderr, cfg, "scripts/deploy/preflight.sh"); code != 0 {
+	if code := runScript(ctx, stdout, stderr, cfg, "server/scripts/deploy/preflight.sh"); code != 0 {
 		return code
 	}
 	writeln(stdout, "Leamout doctor passed.")
