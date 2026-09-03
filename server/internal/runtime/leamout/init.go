@@ -126,11 +126,6 @@ func ensureDeploymentDirectories(configDir, stateDir, logDir string) error {
 		filepath.Join(configDir, "license"),
 		stateDir,
 		filepath.Join(stateDir, "backups"),
-		filepath.Join(stateDir, "data"),
-		filepath.Join(stateDir, "data", "postgres"),
-		filepath.Join(stateDir, "data", "redis"),
-		filepath.Join(stateDir, "data", "nats"),
-		filepath.Join(stateDir, "data", "recordings"),
 		logDir,
 	} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {
