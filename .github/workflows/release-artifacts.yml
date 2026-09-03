@@ -3,14 +3,14 @@ name: Release Artifacts
 on:
   pull_request:
     paths:
-      - "release/**"
-      - "scripts/release/**"
-      - "scripts/install.sh"
+      - "server/release/**"
+      - "server/scripts/release/**"
+      - "server/scripts/install.sh"
       - "server/cmd/leamout/**"
       - "server/internal/operatorcli/**"
       - "server/go.mod"
       - "server/go.sum"
-      - "scripts/deploy/**"
+      - "server/scripts/deploy/**"
       - "docs/deploy/release-artifacts.md"
       - "docs/deploy/self-hosted-installation.md"
       - "deploy/compose.yaml"
@@ -20,14 +20,14 @@ on:
     branches:
       - main
     paths:
-      - "release/**"
-      - "scripts/release/**"
-      - "scripts/install.sh"
+      - "server/release/**"
+      - "server/scripts/release/**"
+      - "server/scripts/install.sh"
       - "server/cmd/leamout/**"
       - "server/internal/operatorcli/**"
       - "server/go.mod"
       - "server/go.sum"
-      - "scripts/deploy/**"
+      - "server/scripts/deploy/**"
       - "docs/deploy/release-artifacts.md"
       - "docs/deploy/self-hosted-installation.md"
       - "deploy/compose.yaml"
@@ -59,10 +59,10 @@ jobs:
 
       - name: Check release and installer tooling syntax
         run: |
-          sh -n scripts/release/package-cli.sh
-          sh -n scripts/install.sh
-          sh -n scripts/deploy/up.sh
-          python3 -m py_compile scripts/release/validate-manifest.py
+          sh -n server/scripts/release/package-cli.sh
+          sh -n server/scripts/install.sh
+          sh -n server/scripts/deploy/up.sh
+          python3 -m py_compile server/scripts/release/validate-manifest.py
 
       - name: Test operator CLI
         working-directory: server
@@ -80,10 +80,10 @@ jobs:
           /tmp/leamout help >/dev/null
 
       - name: Validate manifest schema JSON
-        run: python3 -m json.tool release/manifest.schema.json >/dev/null
+        run: python3 -m json.tool server/release/manifest.schema.json >/dev/null
 
       - name: Validate known-good manifest
-        run: python3 scripts/release/validate-manifest.py release/fixtures/valid-manifest.json
+        run: python3 server/scripts/release/validate-manifest.py server/release/fixtures/valid-manifest.json
 
       - name: Reject mutable image references
         run: |
@@ -91,13 +91,13 @@ jobs:
           import json
           from pathlib import Path
 
-          source = Path("release/fixtures/valid-manifest.json")
+          source = Path("server/release/fixtures/valid-manifest.json")
           manifest = json.loads(source.read_text())
           manifest["images"]["rtpengine"] = "ghcr.io/leamout/rtpengine:dev"
           Path("/tmp/mutable-manifest.json").write_text(json.dumps(manifest))
           PY
 
-          if python3 scripts/release/validate-manifest.py /tmp/mutable-manifest.json; then
+          if python3 server/scripts/release/validate-manifest.py /tmp/mutable-manifest.json; then
             echo "validator unexpectedly accepted a mutable image reference" >&2
             exit 1
           fi
@@ -108,13 +108,13 @@ jobs:
           import json
           from pathlib import Path
 
-          source = Path("release/fixtures/valid-manifest.json")
+          source = Path("server/release/fixtures/valid-manifest.json")
           manifest = json.loads(source.read_text())
           manifest["images"]["server"] = "ghcr.io/leamout/server@sha256:" + ("0" * 64)
           Path("/tmp/placeholder-manifest.json").write_text(json.dumps(manifest))
           PY
 
-          if python3 scripts/release/validate-manifest.py /tmp/placeholder-manifest.json; then
+          if python3 server/scripts/release/validate-manifest.py /tmp/placeholder-manifest.json; then
             echo "validator unexpectedly accepted an all-zero image digest" >&2
             exit 1
           fi
@@ -125,7 +125,7 @@ jobs:
           import json
           from pathlib import Path
 
-          source = Path("release/fixtures/valid-manifest.json")
+          source = Path("server/release/fixtures/valid-manifest.json")
           for frontend in ("console", "web", "waitlist"):
               manifest = json.loads(source.read_text())
               manifest["images"][frontend] = (
@@ -136,7 +136,7 @@ jobs:
           PY
 
           for frontend in console web waitlist; do
-            if python3 scripts/release/validate-manifest.py "/tmp/${frontend}-manifest.json"; then
+            if python3 server/scripts/release/validate-manifest.py "/tmp/${frontend}-manifest.json"; then
               echo "validator unexpectedly accepted hosted frontend image: ${frontend}" >&2
               exit 1
             fi
@@ -147,7 +147,7 @@ jobs:
           VERSION=1.0.0-preview.1 \
           CLI_BINARY=/tmp/leamout \
           OUT_DIR=/tmp/leamout-release \
-          sh scripts/release/package-cli.sh
+          sh server/scripts/release/package-cli.sh
 
           test -f /tmp/leamout-release/leamout_1.0.0-preview.1_linux_amd64.tar.gz
           test -f /tmp/leamout-release/checksums.txt
@@ -212,7 +212,7 @@ jobs:
           LEAMOUT_CONFIG_DIR=/tmp/installer-root/etc/leamout \
           LEAMOUT_STATE_DIR=/tmp/installer-root/var/lib/leamout \
           LEAMOUT_LOG_DIR=/tmp/installer-root/var/log/leamout \
-          sh scripts/install.sh \
+          sh server/scripts/install.sh \
             --version 1.0.0-preview.1 \
             --base-url file:///tmp/installer-release
 
@@ -223,8 +223,8 @@ jobs:
 
       - name: Verify deterministic CLI packaging
         run: |
-          VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-a sh scripts/release/package-cli.sh >/dev/null
-          VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-b sh scripts/release/package-cli.sh >/dev/null
+          VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-a sh server/scripts/release/package-cli.sh >/dev/null
+          VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-b sh server/scripts/release/package-cli.sh >/dev/null
 
           cmp \
             /tmp/release-a/leamout_1.0.0-preview.1_linux_amd64.tar.gz \
