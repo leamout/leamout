@@ -193,8 +193,13 @@ services:
   coturn:
     image: coturn/coturn:4.17.0-r0
     restart: unless-stopped
+    environment:
+      TURN_AUTH_SECRET_PREVIOUS: ${TURN_AUTH_SECRET_PREVIOUS:-}
+    entrypoint:
+      - /bin/sh
+      - /etc/coturn/leamout-entrypoint.sh
     command:
-      - --config
+      - -c
       - /etc/coturn/turnserver.conf
       - --realm=${TURN_REALM:?TURN_REALM is required}
       - --static-auth-secret=${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
@@ -202,6 +207,7 @@ services:
       - --cert=/etc/coturn/tls/fullchain.pem
       - --pkey=/etc/coturn/tls/privkey.pem
     volumes:
+      - ./coturn/entrypoint.sh:/etc/coturn/leamout-entrypoint.sh:ro
       - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
       - ./certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
