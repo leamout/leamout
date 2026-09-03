@@ -13,7 +13,7 @@ test -f "$ENV_FILE" || {
   exit 1
 }
 
-CERT_DIR="$CERT_DIR" sh scripts/certs/check-certs.sh
+CERT_DIR="$CERT_DIR" sh server/scripts/certs/check-certs.sh
 compose config --quiet
 
 echo "Deployment preflight passed."

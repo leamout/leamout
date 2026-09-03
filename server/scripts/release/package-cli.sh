@@ -5,7 +5,7 @@ set -eu
 : "${CLI_BINARY:?CLI_BINARY is required}"
 
 OUT_DIR="${OUT_DIR:-dist}"
-REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/../../.." && pwd)"
 LICENSE_FILE="${LICENSE_FILE:-$REPO_ROOT/LICENSE}"
 ARCH="${ARCH:-amd64}"
 OS="${OS:-linux}"
