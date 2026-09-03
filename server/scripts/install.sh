@@ -136,7 +136,8 @@ case "$VERSION" in
     ;;
 esac
 
-artifact="leamout_${VERSION}_linux_${ARCH}.tar.gz"
+cli_artifact="leamout_${VERSION}_linux_${ARCH}.tar.gz"
+runtime_artifact="leamout_runtime_${VERSION}_linux_${ARCH}.tar.gz"
 release_url="$BASE_URL/$VERSION"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT HUP INT TERM
@@ -145,34 +146,52 @@ printf '✓ Host supported\n'
 printf '✓ Host requirements satisfied\n'
 printf 'Installing Leamout %s\n' "$VERSION"
 
-curl -fsSL "$release_url/$artifact" -o "$workdir/$artifact"
-curl -fsSL "$release_url/checksums.txt" -o "$workdir/checksums.txt"
+for file in \
+  "$cli_artifact" \
+  "$runtime_artifact" \
+  checksums.txt \
+  checksums.txt.minisig \
+  release-manifest.json \
+  release-manifest.json.minisig; do
+  curl -fsSL "$release_url/$file" -o "$workdir/$file"
+done
 
-if [ -n "$MINISIGN_PUBLIC_KEY" ]; then
-  if ! command -v minisign >/dev/null 2>&1; then
-    echo "Leamout release verification support is unavailable" >&2
-    exit 1
-  fi
-  curl -fsSL "$release_url/checksums.txt.minisig" -o "$workdir/checksums.txt.minisig"
-  minisign -Vm "$workdir/checksums.txt" -P "$MINISIGN_PUBLIC_KEY" -x "$workdir/checksums.txt.minisig" >/dev/null
-else
+if [ -z "$MINISIGN_PUBLIC_KEY" ]; then
   echo "Leamout release trust is not configured; refusing installation" >&2
   exit 1
 fi
-
-expected="$(grep "  $artifact\$" "$workdir/checksums.txt" | sed -n '1{s/[[:space:]].*$//;p;}')"
-[ -n "$expected" ] || {
-  echo "Leamout release verification failed" >&2
+if ! command -v minisign >/dev/null 2>&1; then
+  echo "Leamout release verification support is unavailable" >&2
   exit 1
+fi
+minisign -Vm "$workdir/checksums.txt" -P "$MINISIGN_PUBLIC_KEY" -x "$workdir/checksums.txt.minisig" >/dev/null
+minisign -Vm "$workdir/release-manifest.json" -P "$MINISIGN_PUBLIC_KEY" -x "$workdir/release-manifest.json.minisig" >/dev/null
+
+verify_artifact() {
+  artifact="$1"
+  expected="$(grep "  $artifact\$" "$workdir/checksums.txt" | sed -n '1{s/[[:space:]].*$//;p;}')"
+  [ -n "$expected" ] || {
+    echo "Leamout release verification failed" >&2
+    exit 1
+  }
+  actual="$(cd "$workdir" && $SHA256 "$artifact" | sed 's/[[:space:]].*$//')"
+  [ "$actual" = "$expected" ] || {
+    echo "Leamout release verification failed" >&2
+    exit 1
+  }
 }
-actual="$(cd "$workdir" && $SHA256 "$artifact" | sed 's/[[:space:]].*$//')"
-[ "$actual" = "$expected" ] || {
-  echo "Leamout release verification failed" >&2
+
+verify_artifact "$cli_artifact"
+verify_artifact "$runtime_artifact"
+
+manifest_version="$(sed -n 's/^[[:space:]]*"release_version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$workdir/release-manifest.json" | sed -n '1p')"
+[ "$manifest_version" = "$VERSION" ] || {
+  echo "Leamout release manifest does not match requested version" >&2
   exit 1
 }
 
 mkdir -p "$workdir/extract"
-tar -xzf "$workdir/$artifact" -C "$workdir/extract"
+tar -xzf "$workdir/$cli_artifact" -C "$workdir/extract"
 [ -x "$workdir/extract/leamout" ] || {
   echo "Leamout release is incomplete" >&2
   exit 1
@@ -182,7 +201,12 @@ printf '✓ Leamout release verified\n'
 
 install -d -m 0755 /usr/local/bin
 install -m 0755 "$workdir/extract/leamout" /usr/local/bin/leamout
-install -d -m 0750 /etc/leamout /var/lib/leamout /var/log/leamout
+install -d -m 0750 /etc/leamout /var/lib/leamout /var/lib/leamout/releases /var/log/leamout
+install -d -m 0750 "/var/lib/leamout/releases/$VERSION"
+install -m 0640 "$workdir/release-manifest.json" "/var/lib/leamout/releases/$VERSION/release-manifest.json"
+install -m 0640 "$workdir/checksums.txt" "/var/lib/leamout/releases/$VERSION/checksums.txt"
+install -m 0640 "$workdir/$runtime_artifact" "/var/lib/leamout/releases/$VERSION/$runtime_artifact"
 
 printf '✓ Leamout %s installed\n' "$VERSION"
+printf '✓ Production runtime release staged\n'
 printf 'Run: sudo leamout init\n'
