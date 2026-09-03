@@ -35,7 +35,7 @@ For local development and CI, generate a self-signed certificate:
 make certs
 ```
 
-This runs `scripts/certs/generate-self-signed.sh` and creates the required files under `deploy/certs/`.
+This runs `server/scripts/certs/generate-self-signed.sh` and creates the required files under `deploy/certs/`.
 
 The self-signed generator refuses to overwrite an existing certificate set unless replacement is explicitly requested with `CERT_FORCE=1`:
 
@@ -119,7 +119,7 @@ sudo TLS_DOMAIN=sip.example.com \
 
 `TLS_DOMAIN` is required and must be the public SIP hostname. `TLS_EMAIL` is required for the Let's Encrypt account registration and certificate notifications.
 
-The command runs `scripts/certs/provision-letsencrypt.sh`. The script verifies Certbot, requests a standalone-mode certificate when necessary, reads the Certbot-managed certificate from `/etc/letsencrypt/live/<domain>/`, copies `fullchain.pem` and `privkey.pem` into `deploy/certs/`, installs a carrier CA bundle when needed, and validates the resulting runtime certificate set.
+The command runs `server/scripts/certs/provision-letsencrypt.sh`. The script verifies Certbot, requests a standalone-mode certificate when necessary, reads the Certbot-managed certificate from `/etc/letsencrypt/live/<domain>/`, copies `fullchain.pem` and `privkey.pem` into `deploy/certs/`, installs a carrier CA bundle when needed, and validates the resulting runtime certificate set.
 
 Certbot remains the source of truth for the Let's Encrypt certificate. The files under `deploy/certs/` are runtime copies mounted into OpenSIPS.
 
@@ -137,7 +137,7 @@ This command installs:
 /etc/letsencrypt/renewal-hooks/deploy/leamout-opensips
 ```
 
-The installed hook points back to the current Leamout repository and runs `scripts/certs/certbot-deploy-hook.sh` after Certbot successfully renews the configured domain.
+The installed hook points back to the current Leamout repository and runs `server/scripts/certs/certbot-deploy-hook.sh` after Certbot successfully renews the configured domain.
 
 On systems where `certbot.timer` exists, the installer also enables and starts it with systemd. If the Certbot package uses another scheduling mechanism, the deploy hook is still installed and Certbot can invoke it whenever renewal runs.
 
@@ -201,7 +201,7 @@ If a carrier supplies its own CA certificate or private CA bundle, install that 
 
 ```bash
 sudo CARRIER_CA_FILE=/path/to/carrier-ca.pem \
-  sh scripts/certs/install-system-ca.sh
+  sh server/scripts/certs/install-system-ca.sh
 ```
 
 The installer does not overwrite an existing `deploy/certs/carrier-ca.pem`. Remove or replace that file deliberately when changing the carrier trust configuration.
