@@ -16,7 +16,8 @@ def main() -> int:
     key = sys.argv[2]
     source_name = sys.argv[3]
     value = os.environ.get(source_name)
-    if value is None or value == "":
+    allow_empty = os.environ.get("ALLOW_EMPTY_ENV_VALUE") == "1"
+    if value is None or (value == "" and not allow_empty):
         print(f"{source_name} is required", file=sys.stderr)
         return 2
     if "\n" in value or "\r" in value:
