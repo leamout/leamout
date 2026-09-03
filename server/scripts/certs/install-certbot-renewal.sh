@@ -20,7 +20,7 @@ if [ "$(id -u)" -ne 0 ]; then
   exit 1
 fi
 
-if [ ! -f "$REPO_DIR/scripts/certs/certbot-deploy-hook.sh" ]; then
+if [ ! -f "$REPO_DIR/server/scripts/certs/certbot-deploy-hook.sh" ]; then
   echo "Leamout Certbot deploy hook is missing under: $REPO_DIR" >&2
   exit 1
 fi
@@ -40,7 +40,7 @@ TLS_DOMAIN='$TLS_DOMAIN' \
 CERT_DIR='$CERT_DIR' \
 ENV_FILE='$ENV_FILE' \
 COMPOSE_FILE='$COMPOSE_FILE' \
-sh scripts/certs/certbot-deploy-hook.sh
+sh server/scripts/certs/certbot-deploy-hook.sh
 EOF
 chmod 0755 "$HOOK_PATH"
 

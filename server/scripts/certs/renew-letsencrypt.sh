@@ -39,4 +39,4 @@ TLS_DOMAIN="$TLS_DOMAIN" \
 CERT_DIR="$CERT_DIR" \
 ENV_FILE="$ENV_FILE" \
 COMPOSE_FILE="$COMPOSE_FILE" \
-sh scripts/certs/certbot-deploy-hook.sh
+sh server/scripts/certs/certbot-deploy-hook.sh

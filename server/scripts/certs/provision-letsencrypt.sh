@@ -53,8 +53,8 @@ fi
 
 sync_certificates
 
-CERT_DIR="$CERT_DIR" sh scripts/certs/install-system-ca.sh
-CERT_DIR="$CERT_DIR" sh scripts/certs/check-certs.sh
+CERT_DIR="$CERT_DIR" sh server/scripts/certs/install-system-ca.sh
+CERT_DIR="$CERT_DIR" sh server/scripts/certs/check-certs.sh
 
 cat <<EOF
 Production TLS certificate installed in $CERT_DIR.

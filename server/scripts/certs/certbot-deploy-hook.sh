@@ -38,7 +38,7 @@ mkdir -p "$CERT_DIR"
 install -m 0644 "$lineage/fullchain.pem" "$CERT_DIR/fullchain.pem"
 install -m 0600 "$lineage/privkey.pem" "$CERT_DIR/privkey.pem"
 
-CERT_DIR="$CERT_DIR" sh scripts/certs/check-certs.sh
+CERT_DIR="$CERT_DIR" sh server/scripts/certs/check-certs.sh
 
 case "$RESTART_OPENSIPS" in
   0)
