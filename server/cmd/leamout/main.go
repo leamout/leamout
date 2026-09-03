@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/leamout/leamout/internal/operatorcli"
+	"github.com/leamout/leamout/internal/runtime/leamout"
 )
 
 var (
@@ -14,7 +14,7 @@ var (
 )
 
 func main() {
-	os.Exit(operatorcli.Run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, operatorcli.BuildInfo{
+	os.Exit(leamout.Run(context.Background(), os.Args[1:], os.Stdout, os.Stderr, leamout.BuildInfo{
 		Version: version,
 		Commit:  commit,
 		BuiltAt: builtAt,

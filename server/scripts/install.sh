@@ -3,30 +3,17 @@ set -eu
 
 VERSION="${LEAMOUT_VERSION:-}"
 BASE_URL="${LEAMOUT_RELEASE_BASE_URL:-https://get.leamout.com/releases}"
-INSTALL_DIR="${LEAMOUT_INSTALL_DIR:-/usr/local/bin}"
 MINISIGN_PUBLIC_KEY="${LEAMOUT_MINISIGN_PUBLIC_KEY:-}"
-CONFIG_DIR="${LEAMOUT_CONFIG_DIR:-/etc/leamout}"
-STATE_DIR="${LEAMOUT_STATE_DIR:-/var/lib/leamout}"
-LOG_DIR="${LEAMOUT_LOG_DIR:-/var/log/leamout}"
 OS_RELEASE_FILE="${LEAMOUT_OS_RELEASE_FILE:-/etc/os-release}"
 
 usage() {
   cat <<'EOF'
-Install the Leamout self-hosted operator CLI.
+Install Leamout Self-Hosted.
 
 Usage:
-  install.sh [--version <version>] [--base-url <url>] [--install-dir <dir>]
+  install.sh [--version <version>]
 
-Environment:
-  LEAMOUT_VERSION              exact CLI version to install
-  LEAMOUT_RELEASE_BASE_URL     release root (default: https://get.leamout.com/releases)
-  LEAMOUT_INSTALL_DIR          binary destination directory (default: /usr/local/bin)
-  LEAMOUT_MINISIGN_PUBLIC_KEY  trusted Minisign public key for release verification
-  LEAMOUT_CONFIG_DIR           base configuration directory (default: /etc/leamout)
-  LEAMOUT_STATE_DIR            base state directory (default: /var/lib/leamout)
-  LEAMOUT_LOG_DIR              base log directory (default: /var/log/leamout)
-
-If no version is supplied, the installer resolves BASE_URL/stable.txt.
+If no version is supplied, the current stable release is installed.
 EOF
 }
 
@@ -35,16 +22,6 @@ while [ "$#" -gt 0 ]; do
     --version)
       [ "$#" -ge 2 ] || { echo "--version requires a value" >&2; exit 2; }
       VERSION="$2"
-      shift 2
-      ;;
-    --base-url)
-      [ "$#" -ge 2 ] || { echo "--base-url requires a value" >&2; exit 2; }
-      BASE_URL="$2"
-      shift 2
-      ;;
-    --install-dir)
-      [ "$#" -ge 2 ] || { echo "--install-dir requires a value" >&2; exit 2; }
-      INSTALL_DIR="$2"
       shift 2
       ;;
     -h|--help)
@@ -61,7 +38,7 @@ done
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || {
-    echo "Required command not found: $1" >&2
+    echo "Required installation tool not found: $1" >&2
     exit 1
   }
 }
@@ -70,7 +47,7 @@ version_ge() {
   [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | tail -n 1)" = "$1" ]
 }
 
-for command in uname sed grep curl tar mktemp install sort tail docker systemctl; do
+for command in uname sed grep curl tar mktemp install sort tail; do
   require_command "$command"
 done
 
@@ -79,25 +56,25 @@ if command -v sha256sum >/dev/null 2>&1; then
 elif command -v shasum >/dev/null 2>&1; then
   SHA256="shasum -a 256"
 else
-  echo "Required SHA-256 tool not found (sha256sum or shasum)" >&2
+  echo "Required installation tool for release verification is unavailable" >&2
   exit 1
 fi
 
 [ "$(uname -s)" = "Linux" ] || {
-  echo "Unsupported operating system: $(uname -s). Leamout Phase 2 supports Linux only." >&2
+  echo "Unsupported operating system: $(uname -s). Leamout Self-Hosted supports Linux only." >&2
   exit 1
 }
 
 case "$(uname -m)" in
   x86_64|amd64) ARCH=amd64 ;;
   *)
-    echo "Unsupported architecture: $(uname -m). Leamout Phase 2 supports amd64 only." >&2
+    echo "Unsupported architecture: $(uname -m). Leamout Self-Hosted supports amd64 only." >&2
     exit 1
     ;;
 esac
 
 [ -r "$OS_RELEASE_FILE" ] || {
-  echo "Cannot determine Linux distribution: $OS_RELEASE_FILE is missing" >&2
+  echo "Cannot determine Linux distribution" >&2
   exit 1
 }
 
@@ -118,28 +95,33 @@ version_ge "$kernel" "$MIN_KERNEL" || {
   exit 1
 }
 
-systemctl --version >/dev/null 2>&1 || {
-  echo "systemd is required by the supported host contract" >&2
+if ! command -v systemctl >/dev/null 2>&1 || ! systemctl --version >/dev/null 2>&1; then
+  echo "This host does not satisfy Leamout runtime requirements" >&2
   exit 1
-}
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "This host does not satisfy Leamout runtime requirements" >&2
+  exit 1
+fi
 
 docker_version="$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)"
 [ -n "$docker_version" ] || {
-  echo "Docker Engine is required and its daemon must be reachable" >&2
+  echo "This host does not satisfy Leamout runtime requirements" >&2
   exit 1
 }
 version_ge "$docker_version" "27.0" || {
-  echo "Docker Engine >= 27.0 is required; found $docker_version" >&2
+  echo "This host does not satisfy Leamout runtime requirements" >&2
   exit 1
 }
 
 compose_version="$(docker compose version --short 2>/dev/null | sed 's/^v//' || true)"
 [ -n "$compose_version" ] || {
-  echo "Docker Compose plugin >= 2.30 is required" >&2
+  echo "This host does not satisfy Leamout runtime requirements" >&2
   exit 1
 }
 version_ge "$compose_version" "2.30" || {
-  echo "Docker Compose plugin >= 2.30 is required; found $compose_version" >&2
+  echo "This host does not satisfy Leamout runtime requirements" >&2
   exit 1
 }
 
@@ -159,45 +141,48 @@ release_url="$BASE_URL/$VERSION"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT HUP INT TERM
 
-printf '✓ Supported %s %s linux/%s host\n' "$ID" "$VERSION_ID" "$ARCH"
-printf '✓ Docker Engine %s and Compose %s\n' "$docker_version" "$compose_version"
-printf 'Installing Leamout CLI %s\n' "$VERSION"
+printf '✓ Host supported\n'
+printf '✓ Host requirements satisfied\n'
+printf 'Installing Leamout %s\n' "$VERSION"
 
 curl -fsSL "$release_url/$artifact" -o "$workdir/$artifact"
 curl -fsSL "$release_url/checksums.txt" -o "$workdir/checksums.txt"
 
 if [ -n "$MINISIGN_PUBLIC_KEY" ]; then
-  require_command minisign
+  if ! command -v minisign >/dev/null 2>&1; then
+    echo "Leamout release verification support is unavailable" >&2
+    exit 1
+  fi
   curl -fsSL "$release_url/checksums.txt.minisig" -o "$workdir/checksums.txt.minisig"
   minisign -Vm "$workdir/checksums.txt" -P "$MINISIGN_PUBLIC_KEY" -x "$workdir/checksums.txt.minisig" >/dev/null
 else
-  echo "Refusing unsigned production installation: LEAMOUT_MINISIGN_PUBLIC_KEY is not configured." >&2
-  echo "A Leamout release trust root must be pinned before get.leamout.com is published." >&2
+  echo "Leamout release trust is not configured; refusing installation" >&2
   exit 1
 fi
 
 expected="$(grep "  $artifact\$" "$workdir/checksums.txt" | sed -n '1{s/[[:space:]].*$//;p;}')"
 [ -n "$expected" ] || {
-  echo "Artifact checksum is missing from checksums.txt: $artifact" >&2
+  echo "Leamout release verification failed" >&2
   exit 1
 }
 actual="$(cd "$workdir" && $SHA256 "$artifact" | sed 's/[[:space:]].*$//')"
 [ "$actual" = "$expected" ] || {
-  echo "SHA-256 verification failed for $artifact" >&2
+  echo "Leamout release verification failed" >&2
   exit 1
 }
 
 mkdir -p "$workdir/extract"
 tar -xzf "$workdir/$artifact" -C "$workdir/extract"
 [ -x "$workdir/extract/leamout" ] || {
-  echo "Release archive does not contain an executable leamout binary" >&2
+  echo "Leamout release is incomplete" >&2
   exit 1
 }
 
-install -d -m 0755 "$INSTALL_DIR"
-install -m 0755 "$workdir/extract/leamout" "$INSTALL_DIR/leamout"
-install -d -m 0755 "$CONFIG_DIR" "$STATE_DIR" "$LOG_DIR"
+printf '✓ Leamout release verified\n'
 
-printf '✓ Leamout CLI %s installed at %s/leamout\n' "$VERSION" "$INSTALL_DIR"
-printf '✓ Base directories initialized\n'
+install -d -m 0755 /usr/local/bin
+install -m 0755 "$workdir/extract/leamout" /usr/local/bin/leamout
+install -d -m 0750 /etc/leamout /var/lib/leamout /var/log/leamout
+
+printf '✓ Leamout %s installed\n' "$VERSION"
 printf 'Run: sudo leamout init\n'
