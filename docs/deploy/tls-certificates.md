@@ -1,8 +1,8 @@
 # TLS certificates
 
-Leamout uses TLS certificates for SIP TLS in OpenSIPS.
+Leamout uses the same deployment-managed server certificate for OpenSIPS SIP TLS/WSS and Coturn TURN TLS. Outbound SIP carrier TLS also uses the deployment-managed carrier CA bundle.
 
-The deployment expects certificate material under:
+Runtime material lives under:
 
 ```text
 deploy/certs/
@@ -11,344 +11,186 @@ deploy/certs/
 └── carrier-ca.pem
 ```
 
-These files are mounted into the OpenSIPS container by `deploy/compose.yaml`.
+Do not commit private keys or production certificate material. `deploy/certs/*.pem` is ignored by Git.
 
-Do not commit certificate private keys or production certificate material to the repository. `deploy/certs/*.pem` is ignored by Git.
-
-## Certificate roles
-
-The three files have different responsibilities:
-
-| File | Purpose | Production source |
+| File | Purpose | Typical production source |
 | --- | --- | --- |
-| `fullchain.pem` | OpenSIPS server certificate and certificate chain | Let's Encrypt / Certbot |
-| `privkey.pem` | Private key for `fullchain.pem` | Let's Encrypt / Certbot |
-| `carrier-ca.pem` | CA trust bundle used to validate outbound SIP carrier TLS peers | System CA bundle or carrier-provided CA bundle |
+| `fullchain.pem` | OpenSIPS and Coturn server certificate/chain | Let's Encrypt / Certbot |
+| `privkey.pem` | private key for `fullchain.pem` | Let's Encrypt / Certbot |
+| `carrier-ca.pem` | trust bundle for outbound SIP carrier TLS | system CA or carrier-provided CA |
 
-`carrier-ca.pem` is not the Leamout server certificate. It is used by the OpenSIPS outbound carrier TLS client configuration to verify the remote carrier certificate chain.
+## Development and CI
 
-## Local development and CI
+Generate a self-signed set:
 
-For local development and CI, generate a self-signed certificate:
-
-```bash
+```sh
 make certs
 ```
 
-This runs `scripts/certs/generate-self-signed.sh` and creates the required files under `deploy/certs/`.
+The generator refuses to overwrite an existing set unless replacement is explicit:
 
-The self-signed generator refuses to overwrite an existing certificate set unless replacement is explicitly requested with `CERT_FORCE=1`:
-
-```bash
+```sh
 CERT_FORCE=1 make certs
 ```
 
-Self-signed certificates are intended for development, automated tests, and controlled private environments. Use a publicly trusted certificate for an Internet-facing production deployment.
+Validate runtime material with:
 
-Validate the current certificate set with:
-
-```bash
+```sh
 make check-certs
 ```
 
-The validation checks that all required files exist, the server certificate and private key are readable, the certificate and key match, the server certificate has not expired, and the carrier CA contains readable certificate material.
-
-Both `make up` and `make deploy` run the certificate validation before starting the stack.
+Validation checks required files, certificate/private-key matching, expiry, and readable CA material. `make up` and `make deploy` run certificate validation before starting the stack.
 
 ## Production with Let's Encrypt
 
-Leamout supports production certificate provisioning with Certbot and Let's Encrypt.
+Choose a public SIP/TURN hostname, for example `sip.example.com`, and point DNS to the Leamout host. The current provisioning path uses Certbot's standalone HTTP challenge, so TCP port 80 must be reachable when Certbot performs the challenge.
 
-### 1. Choose a SIP TLS hostname
+Install Certbot using the host operating system, configure `.env`, then request/install the certificate:
 
-Use a hostname dedicated to the SIP endpoint, for example:
-
-```text
-sip.example.com
-```
-
-Create a DNS `A` and/or `AAAA` record that points the hostname to the public IP address of the Leamout VPS. The hostname used for SIP TLS must match the hostname on the Let's Encrypt certificate.
-
-### 2. Allow the ACME HTTP challenge
-
-The production provisioning script uses Certbot's standalone HTTP challenge.
-
-Before requesting the certificate:
-
-- DNS for the hostname must resolve to the VPS;
-- inbound TCP port `80` must be allowed by the VPS firewall and cloud/provider firewall; and
-- no other process may occupy TCP port `80` while Certbot performs the challenge.
-
-SIP TLS itself continues to use the SIP TLS listener configured by Leamout. Port `80` is needed for the HTTP ACME challenge used by this Certbot configuration.
-
-### 3. Install Certbot
-
-Install Certbot using the package supported by the VPS operating system. For example, on Debian/Ubuntu where the package is available:
-
-```bash
-sudo apt update
-sudo apt install certbot
-```
-
-Verify it is available:
-
-```bash
-certbot --version
-```
-
-### 4. Configure Leamout
-
-Create the production environment file before deployment:
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Replace all development placeholders and secrets with production values. Production intentionally uses `.env`; `.env.example` is only a template.
-
-### 5. Request the production certificate
-
-Run:
-
-```bash
+```sh
 sudo TLS_DOMAIN=sip.example.com \
   TLS_EMAIL=admin@example.com \
   make certs-production
 ```
 
-`TLS_DOMAIN` is required and must be the public SIP hostname. `TLS_EMAIL` is required for the Let's Encrypt account registration and certificate notifications.
+Certbot remains the source of truth under `/etc/letsencrypt/live/<domain>/`; `deploy/certs/` contains runtime copies mounted into Leamout services.
 
-The command runs `scripts/certs/provision-letsencrypt.sh`. The script verifies Certbot, requests a standalone-mode certificate when necessary, reads the Certbot-managed certificate from `/etc/letsencrypt/live/<domain>/`, copies `fullchain.pem` and `privkey.pem` into `deploy/certs/`, installs a carrier CA bundle when needed, and validates the resulting runtime certificate set.
+Install automatic renewal:
 
-Certbot remains the source of truth for the Let's Encrypt certificate. The files under `deploy/certs/` are runtime copies mounted into OpenSIPS.
-
-### 6. Install automatic renewal
-
-After the initial certificate exists and `.env` is configured, install Leamout's Certbot deploy hook:
-
-```bash
+```sh
 sudo TLS_DOMAIN=sip.example.com make certs-auto-renew
 ```
 
-This command installs:
+This installs the Leamout deploy hook under Certbot's renewal hooks and enables `certbot.timer` when the host package provides it.
 
-```text
-/etc/letsencrypt/renewal-hooks/deploy/leamout-opensips
+## Safe activation after renewal
+
+Certificate renewal and certificate activation are separate steps. Leamout's deploy hook routes renewed material through `scripts/certs/activate-runtime.sh` instead of blindly replacing files and restarting one service.
+
+Activation:
+
+1. stages the candidate certificate/key and current or replacement carrier CA;
+2. validates the staged set before touching runtime files;
+3. gracefully drains current calls;
+4. backs up the active runtime files;
+5. overwrites the existing bind-mounted files in place;
+6. validates the activated runtime set;
+7. sends `SIGUSR2` to Coturn to reload its TLS context; and
+8. starts/resumes RTPengine, FreeSWITCH, and OpenSIPS, causing OpenSIPS' script-defined TLS domains to load the new files.
+
+OpenSIPS' `tls_mgm:reload` reloads database-defined TLS domains; Leamout currently defines its TLS domains in `opensips.cfg`, so certificate-file replacement requires OpenSIPS process startup/restart rather than relying on that MI command.
+
+Manual renewal uses the same activation path:
+
+```sh
+sudo TLS_DOMAIN=sip.example.com make certs-renew
 ```
 
-The installed hook points back to the current Leamout repository and runs `scripts/certs/certbot-deploy-hook.sh` after Certbot successfully renews the configured domain.
+For a certificate supplied outside Certbot, stage it in another directory and activate it directly:
 
-On systems where `certbot.timer` exists, the installer also enables and starts it with systemd. If the Certbot package uses another scheduling mechanism, the deploy hook is still installed and Certbot can invoke it whenever renewal runs.
-
-After a successful renewal, the deploy hook:
-
-1. receives the renewed Certbot lineage;
-2. ignores renewals for unrelated domains;
-3. copies the renewed `fullchain.pem` and `privkey.pem` into `deploy/certs/`;
-4. validates the complete Leamout certificate set; and
-5. restarts the OpenSIPS container so the new certificate is loaded.
-
-The installer records absolute repository, `.env`, Compose, and certificate paths in the generated system hook. If the repository is later moved to another directory, run `make certs-auto-renew` again from the new location.
-
-You can inspect the timer with:
-
-```bash
-systemctl status certbot.timer
-systemctl list-timers --all | grep certbot
+```sh
+sudo SOURCE_CERT_DIR=/secure/new-leamout-certs make rotate-certs
 ```
 
-### 7. Deploy
-
-After certificate provisioning and automatic renewal setup succeed:
-
-```bash
-make deploy
-```
-
-A typical first production deployment is:
-
-```bash
-git clone https://github.com/leamout/leamout.git
-cd leamout
-
-cp .env.example .env
-nano .env
-
-sudo apt update
-sudo apt install certbot
-
-sudo TLS_DOMAIN=sip.example.com \
-  TLS_EMAIL=admin@example.com \
-  make certs-production
-
-sudo TLS_DOMAIN=sip.example.com make certs-auto-renew
-
-make deploy
-```
+See `docs/deploy/credential-rotation.md` for rollback behavior, secret rotation, and incident-response procedures.
 
 ## Carrier CA trust
 
-Outbound SIP carrier TLS is configured to verify the carrier certificate against:
+`carrier-ca.pem` validates outbound SIP carrier certificates. It is not Leamout's server certificate.
 
-```text
-deploy/certs/carrier-ca.pem
-```
+When `make certs-production` runs and no carrier CA exists, Leamout can install a supported system CA bundle. If a carrier supplies a private CA bundle, install it deliberately:
 
-When `make certs-production` runs and `carrier-ca.pem` does not already exist, Leamout copies a supported system CA bundle from the VPS. This is appropriate when the SIP carrier presents a certificate issued by a normal publicly trusted CA.
-
-If a carrier supplies its own CA certificate or private CA bundle, install that instead:
-
-```bash
+```sh
 sudo CARRIER_CA_FILE=/path/to/carrier-ca.pem \
   sh scripts/certs/install-system-ca.sh
 ```
 
-The installer does not overwrite an existing `deploy/certs/carrier-ca.pem`. Remove or replace that file deliberately when changing the carrier trust configuration.
-
-After changing carrier trust material:
-
-```bash
-make check-certs
-docker compose --env-file .env -f deploy/compose.yaml restart opensips
-```
-
-## Manual renewal
-
-Automatic renewal is the recommended production path, but Leamout retains a manual command for testing or recovery:
-
-```bash
-sudo TLS_DOMAIN=sip.example.com make certs-renew
-```
-
-This runs Certbot renewal and then invokes the same deploy-hook logic used by automatic renewal to synchronize the runtime certificate and restart OpenSIPS.
-
-The renewal command uses the ACME challenge method saved by Certbot. With the current standalone configuration, TCP port `80` must remain usable when Certbot actually performs a renewal challenge.
+To rotate the carrier CA with the server certificate, include `carrier-ca.pem` in `SOURCE_CERT_DIR` before running `make rotate-certs`. If the staging directory omits it, activation retains the current carrier CA bundle.
 
 ## Testing renewal
 
-Certbot can test the configured renewal process without waiting for certificate expiry:
+Verify Certbot's ACME renewal configuration separately:
 
-```bash
+```sh
 sudo certbot renew --dry-run
 ```
 
-A successful dry run verifies the ACME renewal configuration. When testing Leamout's post-renew behavior separately, the deployment scripts are also exercised by Docker CI.
+Inspect scheduling:
 
-After installing automatic renewal, confirm that the system hook exists:
-
-```bash
-sudo ls -l /etc/letsencrypt/renewal-hooks/deploy/leamout-opensips
+```sh
+systemctl status certbot.timer
+systemctl list-timers --all | grep certbot
 ```
+
+After a real or staged activation:
+
+```sh
+make check-certs
+make verify
+```
+
+Also test SIP TLS/WSS and TURN TLS from an external client when those listeners are public.
 
 ## Custom certificate directory
 
-The default runtime directory is:
+Scripts support `CERT_DIR`:
 
-```text
-deploy/certs
-```
-
-The certificate scripts and Makefile support overriding it with `CERT_DIR`:
-
-```bash
+```sh
 make CERT_DIR=/srv/leamout/certs check-certs
 ```
 
-If the Docker Compose mounts are not also changed to use the same directory, OpenSIPS will continue to mount `deploy/certs`. For the standard deployment, keep the default directory.
+The standard Compose file still mounts `deploy/certs`. If `CERT_DIR` is changed for a production deployment, the Compose mounts must point to the same runtime directory.
 
 ## Troubleshooting
 
 ### `TLS_DOMAIN is required`
 
-Provide the public SIP hostname:
+Supply the public hostname:
 
-```bash
+```sh
 sudo TLS_DOMAIN=sip.example.com \
   TLS_EMAIL=admin@example.com \
   make certs-production
 ```
 
-### Certbot cannot complete the HTTP challenge
+### ACME HTTP challenge fails
 
-Check that the hostname resolves to the correct VPS public IP, TCP port `80` is open in all firewalls/security groups, NAT forwards port `80` to the VPS when applicable, and another service is not listening on port `80` during the standalone challenge.
-
-### `Missing required certificate file`
-
-Inspect:
-
-```bash
-ls -la deploy/certs
-```
-
-For development/CI:
-
-```bash
-make certs
-```
-
-For production:
-
-```bash
-sudo TLS_DOMAIN=sip.example.com \
-  TLS_EMAIL=admin@example.com \
-  make certs-production
-```
+Confirm DNS points to the correct host, TCP 80 is open through all firewalls/NAT layers, and no other process occupies port 80 while standalone Certbot is performing a challenge.
 
 ### Certificate and private key do not match
 
-Do not mix certificate files from different Certbot certificate names or certificate issuances. Re-sync the correct Certbot-managed certificate with:
+Do not mix files from different issuances. Re-sync the correct Certbot lineage or stage a matching pair, then run `make check-certs` before activation.
 
-```bash
-sudo TLS_DOMAIN=sip.example.com \
-  TLS_EMAIL=admin@example.com \
-  make certs-production
-```
+### Rotation drains but does not resume
 
-### Automatic renewal hook is not running
+The activation workflow intentionally leaves a failed deployment in a conservative state. Inspect `docker compose --env-file .env -f deploy/compose.yaml ps`, validate certificates, correct the problem, and run:
 
-Check the installed hook and Certbot scheduler:
-
-```bash
-sudo ls -l /etc/letsencrypt/renewal-hooks/deploy/leamout-opensips
-systemctl status certbot.timer
-```
-
-If `certbot.timer` does not exist, inspect how the installed Certbot package schedules `certbot renew`. The Leamout deploy hook will still run when Certbot performs a successful renewal.
-
-If the Leamout repository was moved, reinstall the hook from the current repository directory:
-
-```bash
-sudo TLS_DOMAIN=sip.example.com make certs-auto-renew
+```sh
+ENV_FILE=.env COMPOSE_FILE=deploy/compose.yaml sh deploy/resume.sh
 ```
 
 ### Carrier TLS verification fails
 
-Verify whether the carrier uses a publicly trusted CA or supplies a carrier-specific CA bundle. If a carrier-specific bundle is required, install the carrier-provided CA as `deploy/certs/carrier-ca.pem`, run `make check-certs`, and restart OpenSIPS.
+Determine whether the carrier uses a public CA or a private carrier-specific CA. Validate the correct bundle as `carrier-ca.pem` and activate it through the certificate rotation workflow.
 
 ## Command reference
 
 ```text
 make certs
-    Generate self-signed certificates for development and CI.
+    Generate self-signed development/CI certificates.
 
 make certs-production
-    Request or install the Let's Encrypt production server certificate.
-    Requires TLS_DOMAIN and TLS_EMAIL and must run as root.
+    Request/install the initial Let's Encrypt certificate.
 
 make certs-auto-renew
-    Install the Leamout Certbot deploy hook and enable certbot.timer when
-    the timer is supplied by the host's Certbot package. Requires TLS_DOMAIN
-    and root.
+    Install the Certbot deploy hook and renewal timer integration.
 
 make certs-renew
-    Manually run Certbot renewal, synchronize the current certificate into
-    deploy/certs, validate it, and restart OpenSIPS. Requires TLS_DOMAIN and root.
+    Run Certbot renewal and safely activate the resulting certificate.
+
+make rotate-certs
+    Validate and activate SOURCE_CERT_DIR through graceful drain/reload.
 
 make check-certs
-    Validate the runtime certificate files.
-
-make deploy
-    Validate certificates, pull the latest main branch, build/start the
-    production Compose stack, and show service status.
+    Validate the current runtime certificate set.
 ```
