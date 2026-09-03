@@ -2,7 +2,6 @@ package leamout
 
 import (
 	"bytes"
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -18,15 +17,12 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	configDir := filepath.Join(root, "etc")
-	stateDir := filepath.Join(root, "state")
-	logDir := filepath.Join(root, "log")
-	t.Setenv("LEAMOUT_CONFIG_DIR", configDir)
-	t.Setenv("LEAMOUT_STATE_DIR", stateDir)
-	t.Setenv("LEAMOUT_LOG_DIR", logDir)
+	configDir := filepath.Join(root, "etc", "leamout")
+	stateDir := filepath.Join(root, "var", "lib", "leamout")
+	logDir := filepath.Join(root, "var", "log", "leamout")
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"init"}, &stdout, &stderr, BuildInfo{})
+	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir)
 	if code != 0 {
 		t.Fatalf("init returned %d: %s", code, stderr.String())
 	}
@@ -104,18 +100,16 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	configDir := filepath.Join(root, "etc")
-	stateDir := filepath.Join(root, "state")
-	t.Setenv("LEAMOUT_CONFIG_DIR", configDir)
-	t.Setenv("LEAMOUT_STATE_DIR", stateDir)
-	t.Setenv("LEAMOUT_LOG_DIR", filepath.Join(root, "log"))
+	configDir := filepath.Join(root, "etc", "leamout")
+	stateDir := filepath.Join(root, "var", "lib", "leamout")
+	logDir := filepath.Join(root, "var", "log", "leamout")
 
-	run := func() (string, string) {
+	run := func() string {
 		var stdout, stderr bytes.Buffer
-		if code := Run(context.Background(), []string{"init"}, &stdout, &stderr, BuildInfo{}); code != 0 {
+		if code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir); code != 0 {
 			t.Fatalf("init returned %d: %s", code, stderr.String())
 		}
-		return stdout.String(), stderr.String()
+		return stdout.String()
 	}
 
 	run()
@@ -130,7 +124,7 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stdout, _ := run()
+	stdout := run()
 	stateAfter, _ := os.ReadFile(statePath)
 	envAfter, _ := os.ReadFile(envPath)
 	if !bytes.Equal(stateBefore, stateAfter) {
@@ -150,20 +144,18 @@ func TestInitRejectsPartialInitialization(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	configDir := filepath.Join(root, "etc")
-	stateDir := filepath.Join(root, "state")
+	configDir := filepath.Join(root, "etc", "leamout")
+	stateDir := filepath.Join(root, "var", "lib", "leamout")
+	logDir := filepath.Join(root, "var", "log", "leamout")
 	if err := os.MkdirAll(stateDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(stateDir, "deployment.json"), []byte("{}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("LEAMOUT_CONFIG_DIR", configDir)
-	t.Setenv("LEAMOUT_STATE_DIR", stateDir)
-	t.Setenv("LEAMOUT_LOG_DIR", filepath.Join(root, "log"))
 
 	var stdout, stderr bytes.Buffer
-	code := Run(context.Background(), []string{"init"}, &stdout, &stderr, BuildInfo{})
+	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir)
 	if code == 0 {
 		t.Fatalf("init unexpectedly succeeded: %s", stdout.String())
 	}
