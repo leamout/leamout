@@ -169,6 +169,8 @@ services:
         OPENSIPS_VERSION: 4.0.1
     restart: unless-stopped
     stop_grace_period: 30s
+    environment:
+      OPENSIPS_DATABASE_PASSWORD: leamout
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
