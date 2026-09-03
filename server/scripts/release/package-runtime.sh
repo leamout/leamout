@@ -43,7 +43,7 @@ TZ=UTC tar \
   -cf - runtime \
   | gzip -n > "$OUT_DIR/$ARCHIVE"
 
-checksum="$((cd "$OUT_DIR" && sha256sum "$ARCHIVE") | sed -n '1p')"
+checksum="$(cd "$OUT_DIR" && sha256sum "$ARCHIVE")"
 checksums="$OUT_DIR/checksums.txt"
 tmp="$OUT_DIR/.checksums.tmp"
 if [ -f "$checksums" ]; then
