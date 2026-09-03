@@ -23,27 +23,7 @@ type BuildInfo struct {
 	BuiltAt string
 }
 
-type Config struct {
-	RepoRoot    string
-	EnvFile     string
-	ComposeFile string
-	CertDir     string
-	ConfigDir   string
-	StateDir    string
-	LogDir      string
-}
-
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build BuildInfo) int {
-	cfg := Config{
-		RepoRoot:    envOr("LEAMOUT_ROOT", "."),
-		EnvFile:     envOr("LEAMOUT_ENV_FILE", ".env"),
-		ComposeFile: envOr("LEAMOUT_COMPOSE_FILE", "deploy/compose.yaml"),
-		CertDir:     envOr("LEAMOUT_CERT_DIR", "deploy/certs"),
-		ConfigDir:   envOr("LEAMOUT_CONFIG_DIR", "/etc/leamout"),
-		StateDir:    envOr("LEAMOUT_STATE_DIR", "/var/lib/leamout"),
-		LogDir:      envOr("LEAMOUT_LOG_DIR", "/var/log/leamout"),
-	}
-
 	if len(args) == 0 {
 		printHelp(stdout)
 		return 0
@@ -57,19 +37,19 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		writef(stdout, "leamout %s\ncommit: %s\nbuilt: %s\n", build.Version, build.Commit, build.BuiltAt)
 		return 0
 	case "init":
-		return runInit(stdout, stderr, cfg)
+		return runInit(stdout, stderr)
 	case "up":
-		return runScript(ctx, stdout, stderr, cfg, "server/scripts/deploy/up.sh")
+		return runScript(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "deploy/certs", "server/scripts/deploy/up.sh")
 	case "down":
-		return runCompose(ctx, stdout, stderr, cfg, "down")
+		return runCompose(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "down")
 	case "status":
-		return runCompose(ctx, stdout, stderr, cfg, "ps")
+		return runCompose(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "ps")
 	case "logs":
 		composeArgs := []string{"logs", "-f", "--tail=200"}
 		composeArgs = append(composeArgs, args[1:]...)
-		return runCompose(ctx, stdout, stderr, cfg, composeArgs...)
+		return runCompose(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", composeArgs...)
 	case "doctor":
-		return runDoctor(ctx, stdout, stderr, cfg)
+		return runDoctor(ctx, stdout, stderr)
 	default:
 		writef(stderr, "unknown command: %s\n\n", args[0])
 		printHelp(stderr)
@@ -77,7 +57,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 	}
 }
 
-func runDoctor(ctx context.Context, stdout, stderr io.Writer, cfg Config) int {
+func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		writef(stderr, "unsupported host: %s/%s; Self-Hosted Production v0.1 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
@@ -92,15 +72,15 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer, cfg Config) int {
 	writeln(stdout, "✓ linux/amd64 host")
 	writeln(stdout, "✓ docker, sh, and curl available")
 
-	if code := runScript(ctx, stdout, stderr, cfg, "server/scripts/deploy/preflight.sh"); code != 0 {
+	if code := runScript(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "deploy/certs", "server/scripts/deploy/preflight.sh"); code != 0 {
 		return code
 	}
 	writeln(stdout, "Leamout doctor passed.")
 	return 0
 }
 
-func runScript(ctx context.Context, stdout, stderr io.Writer, cfg Config, rel string) int {
-	root, err := filepath.Abs(cfg.RepoRoot)
+func runScript(ctx context.Context, stdout, stderr io.Writer, rootPath, envFile, composeFile, certDir, rel string) int {
+	root, err := filepath.Abs(rootPath)
 	if err != nil {
 		writef(stderr, "resolve Leamout root: %v\n", err)
 		return 1
@@ -117,22 +97,22 @@ func runScript(ctx context.Context, stdout, stderr io.Writer, cfg Config, rel st
 	cmd.Stderr = stderr
 	cmd.Stdin = os.Stdin
 	cmd.Env = append(os.Environ(),
-		"ENV_FILE="+cfg.EnvFile,
-		"COMPOSE_FILE="+cfg.ComposeFile,
-		"CERT_DIR="+cfg.CertDir,
+		"ENV_FILE="+envFile,
+		"COMPOSE_FILE="+composeFile,
+		"CERT_DIR="+certDir,
 		"BUILD_SERVICES="+selfHostedBuildServices,
 		"DEPLOY_SERVICES="+selfHostedDeployServices,
 	)
 	return exitCode(cmd.Run(), stderr)
 }
 
-func runCompose(ctx context.Context, stdout, stderr io.Writer, cfg Config, args ...string) int {
-	root, err := filepath.Abs(cfg.RepoRoot)
+func runCompose(ctx context.Context, stdout, stderr io.Writer, rootPath, envFile, composeFile string, args ...string) int {
+	root, err := filepath.Abs(rootPath)
 	if err != nil {
 		writef(stderr, "resolve Leamout root: %v\n", err)
 		return 1
 	}
-	base := []string{"compose", "--env-file", cfg.EnvFile, "-f", cfg.ComposeFile}
+	base := []string{"compose", "--env-file", envFile, "-f", composeFile}
 	base = append(base, args...)
 	cmd := exec.CommandContext(ctx, "docker", base...)
 	cmd.Dir = root
@@ -156,13 +136,6 @@ func exitCode(err error, stderr io.Writer) int {
 	return 1
 }
 
-func envOr(name, fallback string) string {
-	if value := os.Getenv(name); value != "" {
-		return value
-	}
-	return fallback
-}
-
 func printHelp(w io.Writer) {
 	writeln(w, `Leamout self-hosted operator CLI
 
@@ -177,16 +150,7 @@ Commands:
   logs       Follow deployment logs
   doctor     Validate host prerequisites and deployment preflight
   version    Print CLI build information
-  help       Show this help
-
-Environment overrides:
-  LEAMOUT_ROOT          deployment asset root (default: .)
-  LEAMOUT_ENV_FILE      environment file (default: .env)
-  LEAMOUT_COMPOSE_FILE  compose file (default: deploy/compose.yaml)
-  LEAMOUT_CERT_DIR      certificate directory (default: deploy/certs)
-  LEAMOUT_CONFIG_DIR    local configuration directory (default: /etc/leamout)
-  LEAMOUT_STATE_DIR     durable state directory (default: /var/lib/leamout)
-  LEAMOUT_LOG_DIR       local log directory (default: /var/log/leamout)`)
+  help       Show this help`)
 }
 
 // CLI output is best-effort. Commands return lifecycle/process failures; a closed
