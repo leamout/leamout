@@ -1,16 +1,15 @@
 package main
 
 import (
-	"strings"
+	"bytes"
+	"encoding/base64"
 	"testing"
 
 	"github.com/leamout/leamout/internal/security/secrets"
 )
 
 func testKey(seed byte) string {
-	// 32-byte raw-url-safe base64 without padding.
-	alphabet := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
-	return strings.Repeat(string(alphabet[int(seed)%len(alphabet)]), 43)
+	return base64.RawURLEncoding.EncodeToString(bytes.Repeat([]byte{seed}, 32))
 }
 
 func TestRotateValueReencryptsOldCiphertext(t *testing.T) {
