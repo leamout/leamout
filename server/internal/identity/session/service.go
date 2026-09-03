@@ -9,7 +9,10 @@ import (
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/internal/security/token"
 )
+
+const sessionTokenBytes = 32
 
 type Service struct {
 	repo *Repository
@@ -31,7 +34,7 @@ func (s *Service) Create(
 		return "", sqlc.Session{}, err
 	}
 
-	token, err := generateToken()
+	value, err := token.Generate(sessionTokenBytes)
 	if err != nil {
 		return "", sqlc.Session{}, err
 	}
@@ -42,7 +45,7 @@ func (s *Service) Create(
 		ctx,
 		sqlc.CreateSessionParams{
 			UserID:    userID,
-			TokenHash: hashToken(token),
+			TokenHash: token.Hash(value),
 			IpAddress: parseIP(ipAddress),
 			UserAgent: userAgent,
 			ExpiresAt: pgconv.NullableTimestamptz(&expiresAt),
@@ -52,20 +55,20 @@ func (s *Service) Create(
 		return "", sqlc.Session{}, err
 	}
 
-	return token, session, nil
+	return value, session, nil
 }
 
 func (s *Service) Get(
 	ctx context.Context,
-	token string,
+	value string,
 ) (sqlc.Session, error) {
-	if err := validateToken(token); err != nil {
+	if err := validateToken(value); err != nil {
 		return sqlc.Session{}, ErrInvalidSession
 	}
 
 	session, err := s.repo.GetByTokenHash(
 		ctx,
-		hashToken(token),
+		token.Hash(value),
 	)
 	if err != nil {
 		return sqlc.Session{}, ErrInvalidSession
@@ -81,9 +84,9 @@ func (s *Service) Get(
 // ResolveSession resolves a session token for the authentication layer.
 func (s *Service) ResolveSession(
 	ctx context.Context,
-	token string,
+	value string,
 ) (authn.Session, error) {
-	session, err := s.Get(ctx, token)
+	session, err := s.Get(ctx, value)
 	if err != nil {
 		return authn.Session{}, err
 	}

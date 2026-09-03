@@ -8,6 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/security/otp"
+	"github.com/leamout/leamout/internal/security/password"
+	"github.com/leamout/leamout/internal/security/token"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
@@ -45,7 +48,7 @@ func (s *Service) Start(ctx context.Context, email string) (sqlc.AuthTransaction
 
 // LoginWithPassword authenticates a user using the password associated with
 // the authentication transaction.
-func (s *Service) LoginWithPassword(ctx context.Context, transactionID uuid.UUID, password string) (sqlc.User, error) {
+func (s *Service) LoginWithPassword(ctx context.Context, transactionID uuid.UUID, value string) (sqlc.User, error) {
 	transaction, err := s.getValidTransaction(ctx, transactionID)
 	if err != nil {
 		return sqlc.User{}, err
@@ -68,7 +71,7 @@ func (s *Service) LoginWithPassword(ctx context.Context, transactionID uuid.UUID
 		return sqlc.User{}, apperror.NewBadRequest("password is not enrolled")
 	}
 
-	if !verifyPassword(password, *user.PasswordHash) {
+	if !password.Verify(value, *user.PasswordHash) {
 		return sqlc.User{}, apperror.NewUnauthorized("invalid credentials")
 	}
 
@@ -79,14 +82,14 @@ func (s *Service) LoginWithPassword(ctx context.Context, transactionID uuid.UUID
 	return user, nil
 }
 
-func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, password string) (sqlc.User, error) {
+func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, value string) (sqlc.User, error) {
 	if userID == uuid.Nil {
 		return sqlc.User{}, apperror.NewUnauthorized("authentication required")
 	}
 
-	hash, err := hashPassword(password)
+	hash, err := password.Hash(value)
 	if err != nil {
-		return sqlc.User{}, err
+		return sqlc.User{}, apperror.NewInternal("failed to hash password", err)
 	}
 
 	return s.repo.SetUserPassword(ctx, sqlc.SetUserPasswordParams{
@@ -101,7 +104,7 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 		return "", err
 	}
 
-	code, err := generateOTP()
+	code, err := otp.GenerateNumeric(6)
 	if err != nil {
 		return "", apperror.NewInternal("failed to generate authentication code", err)
 	}
@@ -109,7 +112,7 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 	expiresAt := time.Now().Add(10 * time.Minute)
 	_, err = s.repo.CreateAuthChallenge(ctx, sqlc.CreateAuthChallengeParams{
 		Identifier:        transaction.Identifier,
-		SecretHash:        hashToken(code),
+		SecretHash:        token.Hash(code),
 		ExpiresAt:         pgconv.NullableTimestamptz(&expiresAt),
 		Purpose:           "otp",
 		AuthTransactionID: &transactionID,
@@ -150,8 +153,7 @@ func (s *Service) VerifyOTP(ctx context.Context, transactionID uuid.UUID, code s
 		return sqlc.User{}, apperror.NewUnauthorized("too many authentication attempts")
 	}
 
-	expectedHash := hashToken(code)
-	if !subtleCompare(expectedHash, challenge.SecretHash) {
+	if !token.Verify(code, challenge.SecretHash) {
 		_, _ = s.repo.IncrementAuthChallengeAttempts(ctx, challenge.ID)
 		return sqlc.User{}, apperror.NewUnauthorized("invalid authentication code")
 	}
