@@ -5,6 +5,9 @@ VERSION="${LEAMOUT_VERSION:-}"
 BASE_URL="${LEAMOUT_RELEASE_BASE_URL:-https://get.leamout.com/releases}"
 INSTALL_DIR="${LEAMOUT_INSTALL_DIR:-/usr/local/bin}"
 MINISIGN_PUBLIC_KEY="${LEAMOUT_MINISIGN_PUBLIC_KEY:-}"
+CONFIG_DIR="${LEAMOUT_CONFIG_DIR:-/etc/leamout}"
+STATE_DIR="${LEAMOUT_STATE_DIR:-/var/lib/leamout}"
+LOG_DIR="${LEAMOUT_LOG_DIR:-/var/log/leamout}"
 
 usage() {
   cat <<'EOF'
@@ -18,6 +21,9 @@ Environment:
   LEAMOUT_RELEASE_BASE_URL     release root (default: https://get.leamout.com/releases)
   LEAMOUT_INSTALL_DIR          binary destination directory (default: /usr/local/bin)
   LEAMOUT_MINISIGN_PUBLIC_KEY  trusted Minisign public key for release verification
+  LEAMOUT_CONFIG_DIR           base configuration directory (default: /etc/leamout)
+  LEAMOUT_STATE_DIR            base state directory (default: /var/lib/leamout)
+  LEAMOUT_LOG_DIR              base log directory (default: /var/log/leamout)
 
 If no version is supplied, the installer resolves BASE_URL/stable.txt.
 EOF
@@ -59,13 +65,13 @@ require_command() {
   }
 }
 
-require_command uname
-require_command sed
-require_command grep
-require_command curl
-require_command tar
-require_command mktemp
-require_command install
+version_ge() {
+  [ "$1" = "$2" ] || [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | tail -n 1)" = "$1" ]
+}
+
+for command in uname sed grep curl tar mktemp install sort tail docker systemctl; do
+  require_command "$command"
+done
 
 if command -v sha256sum >/dev/null 2>&1; then
   SHA256="sha256sum"
@@ -97,12 +103,44 @@ esac
 # shellcheck disable=SC1091
 . /etc/os-release
 case "${ID:-}:${VERSION_ID:-}" in
-  ubuntu:24.04|debian:13) ;;
+  ubuntu:24.04) MIN_KERNEL=6.8 ;;
+  debian:13) MIN_KERNEL=6.12 ;;
   *)
     echo "Unsupported host: ${ID:-unknown} ${VERSION_ID:-unknown}. Supported: Ubuntu 24.04, Debian 13." >&2
     exit 1
     ;;
 esac
+
+kernel="$(uname -r | sed 's/-.*//')"
+version_ge "$kernel" "$MIN_KERNEL" || {
+  echo "Unsupported kernel: $kernel; ${ID} ${VERSION_ID} requires >= $MIN_KERNEL" >&2
+  exit 1
+}
+
+systemctl --version >/dev/null 2>&1 || {
+  echo "systemd is required by the supported host contract" >&2
+  exit 1
+}
+
+docker_version="$(docker version --format '{{.Server.Version}}' 2>/dev/null || true)"
+[ -n "$docker_version" ] || {
+  echo "Docker Engine is required and its daemon must be reachable" >&2
+  exit 1
+}
+version_ge "$docker_version" "27.0" || {
+  echo "Docker Engine >= 27.0 is required; found $docker_version" >&2
+  exit 1
+}
+
+compose_version="$(docker compose version --short 2>/dev/null | sed 's/^v//' || true)"
+[ -n "$compose_version" ] || {
+  echo "Docker Compose plugin >= 2.30 is required" >&2
+  exit 1
+}
+version_ge "$compose_version" "2.30" || {
+  echo "Docker Compose plugin >= 2.30 is required; found $compose_version" >&2
+  exit 1
+}
 
 if [ -z "$VERSION" ]; then
   VERSION="$(curl -fsSL "$BASE_URL/stable.txt" | sed -n '1p')"
@@ -120,7 +158,9 @@ release_url="$BASE_URL/$VERSION"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT HUP INT TERM
 
-printf 'Installing Leamout CLI %s for linux/%s\n' "$VERSION" "$ARCH"
+printf '✓ Supported %s %s linux/%s host\n' "$ID" "$VERSION_ID" "$ARCH"
+printf '✓ Docker Engine %s and Compose %s\n' "$docker_version" "$compose_version"
+printf 'Installing Leamout CLI %s\n' "$VERSION"
 
 curl -fsSL "$release_url/$artifact" -o "$workdir/$artifact"
 curl -fsSL "$release_url/checksums.txt" -o "$workdir/checksums.txt"
@@ -155,6 +195,8 @@ tar -xzf "$workdir/$artifact" -C "$workdir/extract"
 
 install -d -m 0755 "$INSTALL_DIR"
 install -m 0755 "$workdir/extract/leamout" "$INSTALL_DIR/leamout"
+install -d -m 0755 "$CONFIG_DIR" "$STATE_DIR" "$LOG_DIR"
 
 printf '✓ Leamout CLI %s installed at %s/leamout\n' "$VERSION" "$INSTALL_DIR"
+printf '✓ Base directories initialized\n'
 printf 'Run: sudo leamout init\n'
