@@ -4,8 +4,15 @@ on:
   pull_request:
     paths:
       - "deploy/compose.yaml"
+      - "deploy/coturn/**"
+      - "deploy/drain.sh"
+      - "deploy/resume.sh"
       - "scripts/deploy/**"
       - "scripts/certs/**"
+      - "scripts/secrets/**"
+      - "server/cmd/rotate-carrier-key/**"
+      - "server/Dockerfile"
+      - "docs/deploy/**"
       - ".env.example"
       - "Makefile"
       - ".github/workflows/deployment.yml"
@@ -14,8 +21,15 @@ on:
       - main
     paths:
       - "deploy/compose.yaml"
+      - "deploy/coturn/**"
+      - "deploy/drain.sh"
+      - "deploy/resume.sh"
       - "scripts/deploy/**"
       - "scripts/certs/**"
+      - "scripts/secrets/**"
+      - "server/cmd/rotate-carrier-key/**"
+      - "server/Dockerfile"
+      - "docs/deploy/**"
       - ".env.example"
       - "Makefile"
       - ".github/workflows/deployment.yml"
@@ -43,8 +57,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Check shell syntax
+      - name: Check script syntax
         run: |
+          sh -n deploy/drain.sh
+          sh -n deploy/resume.sh
+          sh -n deploy/coturn/entrypoint.sh
           sh -n scripts/deploy/lib.sh
           sh -n scripts/deploy/preflight.sh
           sh -n scripts/deploy/build.sh
@@ -59,6 +76,11 @@ jobs:
           sh -n scripts/certs/renew-letsencrypt.sh
           sh -n scripts/certs/certbot-deploy-hook.sh
           sh -n scripts/certs/install-certbot-renewal.sh
+          sh -n scripts/certs/activate-runtime.sh
+          sh -n scripts/secrets/rotate-carrier-key.sh
+          sh -n scripts/secrets/rotate-esl-password.sh
+          sh -n scripts/secrets/rotate-turn-secret.sh
+          python3 -m py_compile scripts/secrets/set-env.py
 
       - name: Exercise certificate helpers
         run: |
@@ -71,19 +93,41 @@ jobs:
           fi
 
           CERT_DIR=/tmp/leamout-production-certs sh scripts/certs/install-system-ca.sh
-          mkdir -p /tmp/leamout-lineage /tmp/leamout-hook-certs
+          mkdir -p /tmp/leamout-lineage /tmp/leamout-hook-certs /tmp/leamout-fake-bin
           cp /tmp/leamout-certs/fullchain.pem /tmp/leamout-lineage/fullchain.pem
           cp /tmp/leamout-certs/privkey.pem /tmp/leamout-lineage/privkey.pem
           cp /tmp/leamout-production-certs/carrier-ca.pem /tmp/leamout-hook-certs/carrier-ca.pem
 
+          cat > /tmp/leamout-fake-bin/docker <<'SH'
+          #!/bin/sh
+          case "$*" in
+            *"leamout-opensips-drain dialogs"*) echo 0 ;;
+            *"leamout-freeswitch-drain channels"*) echo 0 ;;
+            *"ps --status running --services"*) : ;;
+          esac
+          exit 0
+          SH
+          chmod +x /tmp/leamout-fake-bin/docker
+
+          PATH="/tmp/leamout-fake-bin:$PATH" \
           RENEWED_LINEAGE=/tmp/leamout-lineage \
           RENEWED_DOMAINS=sip.example.com \
           TLS_DOMAIN=sip.example.com \
           CERT_DIR=/tmp/leamout-hook-certs \
-          RESTART_OPENSIPS=0 \
           sh scripts/certs/certbot-deploy-hook.sh
 
           CERT_DIR=/tmp/leamout-hook-certs sh scripts/certs/check-certs.sh
+
+      - name: Exercise atomic env updater
+        run: |
+          cp .env.example /tmp/leamout.env
+          TEST_SECRET=new-secret-value \
+            python3 scripts/secrets/set-env.py /tmp/leamout.env FREESWITCH_ESL_PASSWORD TEST_SECRET
+          grep -qx 'FREESWITCH_ESL_PASSWORD=new-secret-value' /tmp/leamout.env
+
+          EMPTY_VALUE='' ALLOW_EMPTY_ENV_VALUE=1 \
+            python3 scripts/secrets/set-env.py /tmp/leamout.env TURN_AUTH_SECRET_PREVIOUS EMPTY_VALUE
+          grep -qx 'TURN_AUTH_SECRET_PREVIOUS=' /tmp/leamout.env
 
   compose:
     name: Compose configuration
