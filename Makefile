@@ -11,8 +11,13 @@ help:
 	@echo "Leamout deployment commands:"
 	@echo "  make certs             Generate self-signed TLS certificates for local/CI use"
 	@echo "  make certs-production  Request/install a Let's Encrypt production certificate"
-	@echo "  make certs-renew       Renew/sync the Let's Encrypt certificate and restart OpenSIPS"
+	@echo "  make certs-renew       Renew/sync the Let's Encrypt certificate through safe activation"
 	@echo "  make certs-auto-renew  Install Certbot deploy hook and enable renewal timer when available"
+	@echo "  make rotate-certs      Activate SOURCE_CERT_DIR after validation and graceful drain"
+	@echo "  make rotate-turn-secret     Begin old/new TURN shared-secret overlap"
+	@echo "  make finalize-turn-secret   Remove the previous TURN secret after the overlap window"
+	@echo "  make rotate-esl-password    Rotate FreeSWITCH ESL password after graceful drain"
+	@echo "  make rotate-carrier-key     Transactionally re-encrypt stored carrier credentials"
 	@echo "  make check-certs       Validate required TLS certificate files"
 	@echo "  make preflight         Validate environment, certificates, and Compose configuration"
 	@echo "  make up                Build and start the stack"
@@ -39,6 +44,26 @@ certs-renew:
 .PHONY: certs-auto-renew
 certs-auto-renew:
 	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/certs/install-certbot-renewal.sh
+
+.PHONY: rotate-certs
+rotate-certs:
+	CERT_DIR=$(CERT_DIR) ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/certs/activate-runtime.sh
+
+.PHONY: rotate-turn-secret
+rotate-turn-secret:
+	ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/secrets/rotate-turn-secret.sh begin
+
+.PHONY: finalize-turn-secret
+finalize-turn-secret:
+	ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/secrets/rotate-turn-secret.sh finalize
+
+.PHONY: rotate-esl-password
+rotate-esl-password:
+	ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/secrets/rotate-esl-password.sh
+
+.PHONY: rotate-carrier-key
+rotate-carrier-key:
+	ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) sh scripts/secrets/rotate-carrier-key.sh
 
 .PHONY: check-certs
 check-certs:
