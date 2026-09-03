@@ -34,3 +34,14 @@ func TestUnknownCommand(t *testing.T) {
 		t.Fatalf("unexpected stderr: %s", stderr.String())
 	}
 }
+
+func TestHelpDoesNotExposeFilesystemOverrides(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"help"}, &stdout, &stderr, BuildInfo{})
+	if code != 0 {
+		t.Fatalf("Run returned %d: %s", code, stderr.String())
+	}
+	if strings.Contains(stdout.String(), "LEAMOUT_") || strings.Contains(stdout.String(), "Environment overrides") {
+		t.Fatalf("help exposes production filesystem overrides: %s", stdout.String())
+	}
+}
