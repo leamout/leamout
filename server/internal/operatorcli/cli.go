@@ -77,38 +77,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 	}
 }
 
-func runInit(stdout, stderr io.Writer, cfg Config) int {
-	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		writef(stderr, "unsupported host: %s/%s; Phase 2 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
-		return 1
-	}
-
-	for _, dir := range []string{cfg.ConfigDir, cfg.StateDir, cfg.LogDir} {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			writef(stderr, "create %s: %v\n", dir, err)
-			return 1
-		}
-	}
-
-	writeln(stdout, "✓ Leamout base directories initialized")
-	writeln(stdout, "Phase 2 does not yet generate production secrets, TLS, deployment identity, or commercial activation state.")
-
-	root, err := filepath.Abs(cfg.RepoRoot)
-	if err == nil {
-		if _, statErr := os.Stat(filepath.Join(root, cfg.ComposeFile)); statErr == nil {
-			writef(stdout, "✓ Existing deployment assets detected at %s\n", root)
-			writeln(stdout, "Next: configure the deployment environment, then run `leamout doctor` and `leamout up`.")
-			return 0
-		}
-	}
-
-	writeln(stdout, "Runtime deployment assets are not installed yet; Phase 3 will make clean-host runtime initialization self-contained.")
-	return 0
-}
-
 func runDoctor(ctx context.Context, stdout, stderr io.Writer, cfg Config) int {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
-		writef(stderr, "unsupported host: %s/%s; Phase 2 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
+		writef(stderr, "unsupported host: %s/%s; Self-Hosted Production v0.1 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
 	}
 
@@ -199,7 +170,7 @@ Usage:
   leamout <command>
 
 Commands:
-  init       Initialize the Phase 2 local CLI foundation
+  init       Initialize durable self-hosted deployment identity, secrets, and configuration
   up         Start self-hosted runtime services through existing deployment primitives
   down       Stop the existing Leamout deployment stack
   status     Show deployment service status
