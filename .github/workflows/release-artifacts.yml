@@ -160,6 +160,67 @@ jobs:
             sha256sum --check checksums.txt
           )
 
+      - name: Exercise bootstrap installer
+        run: |
+          mkdir -p /tmp/installer-release/1.0.0-preview.1 /tmp/installer-tools
+          cp /tmp/leamout-release/leamout_1.0.0-preview.1_linux_amd64.tar.gz /tmp/installer-release/1.0.0-preview.1/
+          cp /tmp/leamout-release/checksums.txt /tmp/installer-release/1.0.0-preview.1/
+          : > /tmp/installer-release/1.0.0-preview.1/checksums.txt.minisig
+
+          cat > /tmp/installer-os-release <<'EOF'
+          ID=ubuntu
+          VERSION_ID=24.04
+          EOF
+
+          cat > /tmp/installer-tools/uname <<'EOF'
+          #!/bin/sh
+          case "$1" in
+            -s) echo Linux ;;
+            -m) echo x86_64 ;;
+            -r) echo 6.8.0 ;;
+            *) exit 1 ;;
+          esac
+          EOF
+
+          cat > /tmp/installer-tools/docker <<'EOF'
+          #!/bin/sh
+          if [ "$1" = version ]; then
+            echo 27.5.1
+          elif [ "$1" = compose ] && [ "$2" = version ]; then
+            echo 2.32.4
+          else
+            exit 1
+          fi
+          EOF
+
+          cat > /tmp/installer-tools/systemctl <<'EOF'
+          #!/bin/sh
+          echo 'systemd 255'
+          EOF
+
+          cat > /tmp/installer-tools/minisign <<'EOF'
+          #!/bin/sh
+          exit 0
+          EOF
+
+          chmod +x /tmp/installer-tools/*
+
+          PATH="/tmp/installer-tools:$PATH" \
+          LEAMOUT_OS_RELEASE_FILE=/tmp/installer-os-release \
+          LEAMOUT_MINISIGN_PUBLIC_KEY=fixture-public-key \
+          LEAMOUT_INSTALL_DIR=/tmp/installer-root/usr/local/bin \
+          LEAMOUT_CONFIG_DIR=/tmp/installer-root/etc/leamout \
+          LEAMOUT_STATE_DIR=/tmp/installer-root/var/lib/leamout \
+          LEAMOUT_LOG_DIR=/tmp/installer-root/var/log/leamout \
+          sh scripts/install.sh \
+            --version 1.0.0-preview.1 \
+            --base-url file:///tmp/installer-release
+
+          /tmp/installer-root/usr/local/bin/leamout version | grep -q 'leamout 1.0.0-preview.1'
+          test -d /tmp/installer-root/etc/leamout
+          test -d /tmp/installer-root/var/lib/leamout
+          test -d /tmp/installer-root/var/log/leamout
+
       - name: Verify deterministic CLI packaging
         run: |
           VERSION=1.0.0-preview.1 CLI_BINARY=/tmp/leamout OUT_DIR=/tmp/release-a sh scripts/release/package-cli.sh >/dev/null
