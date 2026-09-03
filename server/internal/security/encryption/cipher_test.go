@@ -1,4 +1,4 @@
-package secrets
+package encryption
 
 import "testing"
 
@@ -24,5 +24,26 @@ func TestCipherRoundTrip(t *testing.T) {
 	}
 	if plaintext != "carrier-secret" {
 		t.Fatalf("Decrypt() = %q", plaintext)
+	}
+}
+
+func TestCipherRejectsTampering(t *testing.T) {
+	cipher, err := New("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	encrypted, err := cipher.Encrypt("carrier-secret")
+	if err != nil {
+		t.Fatalf("Encrypt() error = %v", err)
+	}
+
+	last := encrypted[len(encrypted)-1]
+	replacement := byte('A')
+	if last == replacement {
+		replacement = 'B'
+	}
+	tampered := encrypted[:len(encrypted)-1] + string(replacement)
+	if _, err := cipher.Decrypt(tampered); err == nil {
+		t.Fatal("Decrypt() accepted tampered ciphertext")
 	}
 }

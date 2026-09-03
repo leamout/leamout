@@ -26,7 +26,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
-	"github.com/leamout/leamout/internal/security/secrets"
+	"github.com/leamout/leamout/internal/security/encryption"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
@@ -96,7 +96,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	logger := logging.New()
 	metricsRegistry := metrics.New(redisClient)
 
-	credentialCipher, err := secrets.New(cfg.CarrierCredentialKey)
+	credentialCipher, err := encryption.New(cfg.CarrierCredentialKey)
 	if err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
@@ -152,7 +152,7 @@ func NewModules(
 	db *pgxpool.Pool,
 	callsController calls.Controller,
 	conferenceController conferences.Controller,
-	credentialCipher *secrets.Cipher,
+	credentialCipher *encryption.Cipher,
 	turnService *realtime.Service,
 	redisClient *redisintegration.Client,
 ) (Modules, error) {

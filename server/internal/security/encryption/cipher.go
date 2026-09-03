@@ -1,4 +1,5 @@
-package secrets
+// Package encryption provides authenticated encryption for persisted secrets.
+package encryption
 
 import (
 	"crypto/aes"
