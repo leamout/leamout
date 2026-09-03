@@ -4,8 +4,8 @@ on:
   pull_request:
     paths:
       - "deploy/compose.yaml"
-      - "scripts/deploy/**"
-      - "scripts/certs/**"
+      - "server/scripts/deploy/**"
+      - "server/scripts/certs/**"
       - ".env.example"
       - "Makefile"
       - ".github/workflows/deployment.yml"
@@ -14,8 +14,8 @@ on:
       - main
     paths:
       - "deploy/compose.yaml"
-      - "scripts/deploy/**"
-      - "scripts/certs/**"
+      - "server/scripts/deploy/**"
+      - "server/scripts/certs/**"
       - ".env.example"
       - "Makefile"
       - ".github/workflows/deployment.yml"
@@ -45,32 +45,32 @@ jobs:
 
       - name: Check shell syntax
         run: |
-          sh -n scripts/deploy/lib.sh
-          sh -n scripts/deploy/preflight.sh
-          sh -n scripts/deploy/build.sh
-          sh -n scripts/deploy/up.sh
-          sh -n scripts/deploy/deploy.sh
-          sh -n scripts/deploy/restart.sh
-          sh -n scripts/deploy/verify.sh
-          sh -n scripts/certs/generate-self-signed.sh
-          sh -n scripts/certs/check-certs.sh
-          sh -n scripts/certs/install-system-ca.sh
-          sh -n scripts/certs/provision-letsencrypt.sh
-          sh -n scripts/certs/renew-letsencrypt.sh
-          sh -n scripts/certs/certbot-deploy-hook.sh
-          sh -n scripts/certs/install-certbot-renewal.sh
+          sh -n server/scripts/deploy/lib.sh
+          sh -n server/scripts/deploy/preflight.sh
+          sh -n server/scripts/deploy/build.sh
+          sh -n server/scripts/deploy/up.sh
+          sh -n server/scripts/deploy/deploy.sh
+          sh -n server/scripts/deploy/restart.sh
+          sh -n server/scripts/deploy/verify.sh
+          sh -n server/scripts/certs/generate-self-signed.sh
+          sh -n server/scripts/certs/check-certs.sh
+          sh -n server/scripts/certs/install-system-ca.sh
+          sh -n server/scripts/certs/provision-letsencrypt.sh
+          sh -n server/scripts/certs/renew-letsencrypt.sh
+          sh -n server/scripts/certs/certbot-deploy-hook.sh
+          sh -n server/scripts/certs/install-certbot-renewal.sh
 
       - name: Exercise certificate helpers
         run: |
-          CERT_DIR=/tmp/leamout-certs CERT_DAYS=1 sh scripts/certs/generate-self-signed.sh
-          CERT_DIR=/tmp/leamout-certs sh scripts/certs/check-certs.sh
+          CERT_DIR=/tmp/leamout-certs CERT_DAYS=1 sh server/scripts/certs/generate-self-signed.sh
+          CERT_DIR=/tmp/leamout-certs sh server/scripts/certs/check-certs.sh
 
-          if CERT_DIR=/tmp/leamout-certs sh scripts/certs/generate-self-signed.sh; then
+          if CERT_DIR=/tmp/leamout-certs sh server/scripts/certs/generate-self-signed.sh; then
             echo "certificate generator unexpectedly overwrote existing files" >&2
             exit 1
           fi
 
-          CERT_DIR=/tmp/leamout-production-certs sh scripts/certs/install-system-ca.sh
+          CERT_DIR=/tmp/leamout-production-certs sh server/scripts/certs/install-system-ca.sh
           mkdir -p /tmp/leamout-lineage /tmp/leamout-hook-certs
           cp /tmp/leamout-certs/fullchain.pem /tmp/leamout-lineage/fullchain.pem
           cp /tmp/leamout-certs/privkey.pem /tmp/leamout-lineage/privkey.pem
@@ -81,9 +81,9 @@ jobs:
           TLS_DOMAIN=sip.example.com \
           CERT_DIR=/tmp/leamout-hook-certs \
           RESTART_OPENSIPS=0 \
-          sh scripts/certs/certbot-deploy-hook.sh
+          sh server/scripts/certs/certbot-deploy-hook.sh
 
-          CERT_DIR=/tmp/leamout-hook-certs sh scripts/certs/check-certs.sh
+          CERT_DIR=/tmp/leamout-hook-certs sh server/scripts/certs/check-certs.sh
 
   compose:
     name: Compose configuration
@@ -107,7 +107,7 @@ jobs:
           YAML
 
       - name: Run deployment preflight
-        run: sh scripts/deploy/preflight.sh
+        run: sh server/scripts/deploy/preflight.sh
 
   stack:
     name: Full-stack smoke
@@ -131,22 +131,22 @@ jobs:
           YAML
 
       - name: Preflight
-        run: sh scripts/deploy/preflight.sh
+        run: sh server/scripts/deploy/preflight.sh
 
       - name: Build backend images
         env:
           BUILD_SERVICES: server worker
-        run: sh scripts/deploy/build.sh
+        run: sh server/scripts/deploy/build.sh
 
       - name: Build frontend images
         env:
           BUILD_SERVICES: web console waitlist
-        run: sh scripts/deploy/build.sh
+        run: sh server/scripts/deploy/build.sh
 
       - name: Build telecom images
         env:
           BUILD_SERVICES: opensips freeswitch rtpengine
-        run: sh scripts/deploy/build.sh
+        run: sh server/scripts/deploy/build.sh
 
       - name: Start stack
         run: |
@@ -157,7 +157,7 @@ jobs:
             up -d --no-build
 
       - name: Verify stack
-        run: sh scripts/deploy/verify.sh
+        run: sh server/scripts/deploy/verify.sh
 
       - name: Dump logs on failure
         if: failure()
