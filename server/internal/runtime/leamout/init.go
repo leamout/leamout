@@ -174,7 +174,7 @@ func writeInitializationFiles(statePath string, state []byte, envPath string, en
 	}
 	if err := writeExclusiveFile(envPath, env, 0o600); err != nil {
 		if removeErr := os.Remove(statePath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			return fmt.Errorf("write runtime configuration: %w; rollback deployment state: %v", err, removeErr)
+			return fmt.Errorf("write runtime configuration: %w; rollback deployment state: %w", err, removeErr)
 		}
 		return err
 	}
