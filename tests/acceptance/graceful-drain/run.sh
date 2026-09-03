@@ -199,4 +199,25 @@ if [ "$ready" -ne 1 ]; then
     exit 1
 fi
 
+# API readiness only proves the server can reach FreeSWITCH. Inbound call
+# persistence is driven by the worker's ESL event subscription, so do not
+# originate the acceptance call until that subscription is active. Without
+# this gate a fast runner can send the INVITE in the same second the worker
+# subscribes and lose the initial CHANNEL_CREATE event.
+worker_ready=0
+for _ in $(seq 1 60); do
+    if $COMPOSE ps --status running --services | grep -qx 'worker' \
+        && $COMPOSE logs --no-color worker 2>&1 \
+            | grep -Fq 'worker subscribed to FreeSWITCH call and recording lifecycle events'; then
+        worker_ready=1
+        break
+    fi
+    sleep 1
+done
+
+if [ "$worker_ready" -ne 1 ]; then
+    echo "worker did not subscribe to FreeSWITCH lifecycle events within 60 seconds" >&2
+    exit 1
+fi
+
 python3 tests/acceptance/graceful-drain/acceptance.py
