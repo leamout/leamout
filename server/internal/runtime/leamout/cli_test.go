@@ -1,4 +1,4 @@
-package operatorcli
+package leamout
 
 import (
 	"bytes"
