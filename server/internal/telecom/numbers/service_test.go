@@ -10,13 +10,13 @@ import (
 )
 
 type fakeNumberRepository struct {
-	createdBYOC      BYOCCreateRequest
-	createdManaged   ManagedCreateRequest
-	getNumber        sqlc.PhoneNumber
-	getForRelease    sqlc.PhoneNumber
-	getReleaseCalls  int
-	releaseCalls     int
-	setCarrierCalls  int
+	createdBYOC     BYOCCreateRequest
+	createdManaged  ManagedCreateRequest
+	getNumber       sqlc.PhoneNumber
+	getForRelease   sqlc.PhoneNumber
+	getReleaseCalls int
+	releaseCalls    int
+	setCarrierCalls int
 }
 
 func (f *fakeNumberRepository) CreateBYOC(_ context.Context, _ uuid.UUID, req BYOCCreateRequest) (sqlc.PhoneNumber, error) {
