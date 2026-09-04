@@ -10,10 +10,10 @@ import (
 )
 
 type fakeRepository struct {
-	created       CreateInput
-	order         sqlc.NumberOrder
-	markError     error
-	failed        Failure
+	created        CreateInput
+	order          sqlc.NumberOrder
+	markError      error
+	failed         Failure
 	failedExpected Status
 }
 

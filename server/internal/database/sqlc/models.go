@@ -288,6 +288,25 @@ type Meter struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type NumberOrder struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ProviderID          uuid.UUID          `db:"provider_id" json:"provider_id"`
+	ProviderInventoryID string             `db:"provider_inventory_id" json:"provider_inventory_id"`
+	ProviderProductID   string             `db:"provider_product_id" json:"provider_product_id"`
+	Number              string             `db:"number" json:"number"`
+	CountryCode         string             `db:"country_code" json:"country_code"`
+	Status              string             `db:"status" json:"status"`
+	ProviderOrderID     *string            `db:"provider_order_id" json:"provider_order_id"`
+	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
+	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
+	FailedStage         *string            `db:"failed_stage" json:"failed_stage"`
+	ErrorCode           *string            `db:"error_code" json:"error_code"`
+	ErrorMessage        *string            `db:"error_message" json:"error_message"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type OpensipsCarrierDigestCredential struct {
 	CarrierConnectionID uuid.UUID   `db:"carrier_connection_id" json:"carrier_connection_id"`
 	OrganizationID      uuid.UUID   `db:"organization_id" json:"organization_id"`
