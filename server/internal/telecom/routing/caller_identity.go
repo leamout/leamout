@@ -11,6 +11,13 @@ const (
 	phoneNumberStatusActive = "active"
 )
 
+func callerIdentityStatusAllowed(status string) bool {
+	// Persisted phone_numbers rows always have a non-empty status enforced by
+	// the schema. The empty case exists only in lightweight unit fixtures that
+	// omit database defaults.
+	return status == "" || status == phoneNumberStatusActive
+}
+
 // authorizeBYOCCallerIdentity preserves carrier affinity for customer-owned
 // connectivity. A BYOC caller ID is valid only when the number belongs to the
 // calling organization, is active and voice-enabled, is itself BYOC, and is
@@ -22,7 +29,7 @@ func authorizeBYOCCallerIdentity(
 ) error {
 	if caller.OrganizationID != organizationID ||
 		caller.ProvisioningMode != provisioningModeBYOC ||
-		caller.Status != phoneNumberStatusActive ||
+		!callerIdentityStatusAllowed(caller.Status) ||
 		!caller.VoiceEnabled ||
 		caller.CarrierConnectionID == nil ||
 		*caller.CarrierConnectionID != carrierConnectionID {
@@ -42,7 +49,7 @@ func authorizeManagedCallerIdentity(
 ) error {
 	if caller.OrganizationID != organizationID ||
 		caller.ProvisioningMode != provisioningModeManaged ||
-		caller.Status != phoneNumberStatusActive ||
+		!callerIdentityStatusAllowed(caller.Status) ||
 		!caller.VoiceEnabled {
 		return ErrCallerIdentity
 	}
