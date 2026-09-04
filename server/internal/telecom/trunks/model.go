@@ -62,19 +62,19 @@ type Event struct {
 }
 
 type Response struct {
-	ID                  uuid.UUID `json:"id"`
-	OrganizationID      uuid.UUID `json:"organization_id"`
-	CarrierConnectionID uuid.UUID `json:"carrier_connection_id"`
-	Name                string    `json:"name"`
-	Direction           string    `json:"direction"`
-	Status              string    `json:"status"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	ID                  uuid.UUID  `json:"id"`
+	OrganizationID      *uuid.UUID `json:"organization_id,omitempty"`
+	CarrierConnectionID uuid.UUID  `json:"carrier_connection_id"`
+	Name                string     `json:"name"`
+	Direction           string     `json:"direction"`
+	Status              string     `json:"status"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
 type EndpointResponse struct {
 	ID                  uuid.UUID  `json:"id"`
-	OrganizationID      uuid.UUID  `json:"organization_id"`
+	OrganizationID      *uuid.UUID `json:"organization_id,omitempty"`
 	TrunkID             uuid.UUID  `json:"trunk_id"`
 	Host                string     `json:"host"`
 	Port                int32      `json:"port"`
