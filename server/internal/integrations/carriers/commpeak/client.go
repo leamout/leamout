@@ -65,7 +65,7 @@ func (c *Client) get(ctx context.Context, path string, query url.Values) ([]byte
 	if err != nil {
 		return nil, fmt.Errorf("commpeak: execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	payload, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
