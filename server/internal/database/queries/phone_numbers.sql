@@ -1,4 +1,4 @@
--- name: CreatePhoneNumber :one
+-- name: CreateBYOCPhoneNumber :one
 INSERT INTO phone_numbers (
     organization_id,
     number,
@@ -65,6 +65,7 @@ LEFT JOIN carrier_connections AS cc
   ON cc.id = sqlc.narg(carrier_connection_id)::UUID
  AND cc.scope = 'platform'
  AND cc.organization_id IS NULL
+ AND cc.provider_id = cp.id
  AND cc.status = 'active'
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
@@ -116,7 +117,6 @@ ORDER BY pn.number ASC;
 -- name: UpdatePhoneNumber :one
 UPDATE phone_numbers AS pn
 SET
-    country_code = COALESCE(sqlc.narg(country_code), pn.country_code),
     voice_enabled = COALESCE(sqlc.narg(voice_enabled), pn.voice_enabled),
     sms_enabled = COALESCE(sqlc.narg(sms_enabled), pn.sms_enabled),
     updated_at = NOW()
@@ -151,38 +151,24 @@ WHERE pn.id = sqlc.arg(id)
   AND pn.organization_id = sqlc.arg(organization_id)
   AND pn.provisioning_mode = 'managed'
   AND pn.status = 'active'
+  AND pn.provider_id IS NOT NULL
   AND cc.id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
+  AND cc.provider_id = pn.provider_id
   AND cc.status = 'active'
 RETURNING pn.*;
 
--- name: DisablePhoneNumber :exec
-UPDATE phone_numbers
-SET
-    status = 'disabled',
-    updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
-  AND status = 'active';
-
--- name: EnablePhoneNumber :exec
-UPDATE phone_numbers
-SET
-    status = 'active',
-    updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
-  AND status = 'disabled';
-
--- name: ReleasePhoneNumber :exec
+-- name: ReleaseBYOCPhoneNumber :one
 UPDATE phone_numbers
 SET
     status = 'released',
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND status IN ('active', 'disabled');
+  AND provisioning_mode = 'byoc'
+  AND status IN ('active', 'disabled')
+RETURNING *;
 
 -- name: GetVoiceBindingByNumber :one
 SELECT
