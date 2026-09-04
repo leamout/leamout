@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "email dev --dir ./src",
-    "export": "email export --pretty --dir ./src --outDir ../templates",
-    "lint": "biome check",
-    "format": "biome format --write"
+    "dev": "email dev --dir ./src/templates",
+    "export:html": "email export --pretty --dir ./src/templates --outDir ../../../server/internal/modules/notifications/templates/html",
+    "export:text": "email export --plainText --dir ./src/templates --outDir ../../../server/internal/modules/notifications/templates/text",
+    "export": "bun run export:html && bun run export:text",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.11",
