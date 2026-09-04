@@ -43,19 +43,19 @@ type availableDIDAttributes struct {
 }
 
 type DID struct {
-	ID                      string
-	Number                  string
-	Blocked                 bool
-	AwaitingRegistration    bool
-	PendingRemoval          bool
-	Terminated              bool
-	CapacityLimit           int
-	ChannelsIncludedCount   int
-	DedicatedChannelsCount  int
-	BillingCyclesCount      *int
-	ExpiresAt               *time.Time
-	CreatedAt               time.Time
-	VoiceInTrunkID          string
+	ID                     string
+	Number                 string
+	Blocked                bool
+	AwaitingRegistration   bool
+	PendingRemoval         bool
+	Terminated             bool
+	CapacityLimit          int
+	ChannelsIncludedCount  int
+	DedicatedChannelsCount int
+	BillingCyclesCount     *int
+	ExpiresAt              *time.Time
+	CreatedAt              time.Time
+	VoiceInTrunkID         string
 }
 
 type didAttributes struct {
@@ -83,11 +83,11 @@ type Order struct {
 }
 
 type orderAttributes struct {
-	Reference           string  `json:"reference"`
-	ExternalReferenceID *string `json:"external_reference_id"`
-	Amount              string  `json:"amount"`
-	Status              string  `json:"status"`
-	Description         string  `json:"description"`
+	Reference           string    `json:"reference"`
+	ExternalReferenceID *string   `json:"external_reference_id"`
+	Amount              string    `json:"amount"`
+	Status              string    `json:"status"`
+	Description         string    `json:"description"`
 	CreatedAt           time.Time `json:"created_at"`
 }
 
@@ -114,8 +114,8 @@ type orderRequestItem struct {
 }
 
 type orderRequestItemAttributes struct {
-	SKUID             string `json:"sku_id"`
-	AvailableDIDID    string `json:"available_did_id,omitempty"`
+	SKUID              string `json:"sku_id"`
+	AvailableDIDID     string `json:"available_did_id,omitempty"`
 	BillingCyclesCount *int   `json:"billing_cycles_count,omitempty"`
 }
 

@@ -20,9 +20,9 @@ type SearchNumbersRequest struct {
 }
 
 type OrderNumberRequest struct {
-	AvailableDIDID     string
-	SKUID              string
-	BillingCyclesCount *int
+	AvailableDIDID      string
+	SKUID               string
+	BillingCyclesCount  *int
 	ExternalReferenceID string
 	CallbackURL         string
 	CallbackMethod      string
@@ -106,10 +106,10 @@ func (c *Client) OrderNumber(ctx context.Context, request OrderNumberRequest) (O
 		Data: orderRequestData{
 			Type: "orders",
 			Attributes: orderRequestAttributes{
-				AllowBackOrdering:    false,
+				AllowBackOrdering:   false,
 				ExternalReferenceID: strings.TrimSpace(request.ExternalReferenceID),
-				CallbackURL:          strings.TrimSpace(request.CallbackURL),
-				CallbackMethod:       callbackMethod,
+				CallbackURL:         strings.TrimSpace(request.CallbackURL),
+				CallbackMethod:      callbackMethod,
 				Items: []orderRequestItem{{
 					Type: "did_order_items",
 					Attributes: orderRequestItemAttributes{
