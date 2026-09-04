@@ -14,7 +14,7 @@ export default function OrganizationInviteEmail({
   organizationName = "{{.OrganizationName}}",
   roleName = "{{.RoleName}}",
   acceptUrl = "{{.AcceptURL}}",
-  expiresDays = "{{.ExpiresDays}}"
+  expiresDays = "{{.ExpiresDays}}",
 }: OrganizationInviteEmailProps) {
   return (
     <EmailLayout preview={`You're invited to ${organizationName}`}>
@@ -23,7 +23,8 @@ export default function OrganizationInviteEmail({
           You&apos;re invited
         </Text>
         <Text className="m-0 mt-[18px] max-w-[470px] font-sans text-[14px] leading-[21px] text-fg-2">
-          {inviterName} invited you to join {organizationName} on Leamout as {roleName}.
+          {inviterName} invited you to join {organizationName} on Leamout as{" "}
+          {roleName}.
         </Text>
         <Button
           href={acceptUrl}
@@ -32,7 +33,8 @@ export default function OrganizationInviteEmail({
           Accept invitation
         </Button>
         <Text className="m-0 mt-12 max-w-[350px] font-sans text-[11px] leading-[17px] text-fg-3">
-          This invitation expires in {expiresDays} days. If you weren&apos;t expecting it, you can ignore this email.
+          This invitation expires in {expiresDays} days. If you weren&apos;t
+          expecting it, you can ignore this email.
         </Text>
       </Section>
     </EmailLayout>
@@ -44,5 +46,5 @@ OrganizationInviteEmail.PreviewProps = {
   organizationName: "Acme Voice",
   roleName: "Admin",
   acceptUrl: "https://console.leamout.com/invitations/preview",
-  expiresDays: "7"
+  expiresDays: "7",
 } satisfies OrganizationInviteEmailProps;

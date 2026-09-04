@@ -5,7 +5,9 @@ type VerifyEmailProps = {
   verifyUrl?: string;
 };
 
-export default function VerifyEmail({ verifyUrl = "{{.VerifyURL}}" }: VerifyEmailProps) {
+export default function VerifyEmail({
+  verifyUrl = "{{.VerifyURL}}",
+}: VerifyEmailProps) {
   return (
     <EmailLayout preview="Confirm your Leamout email address">
       <Section className="px-6 pt-8 pb-10 sm:px-10 sm:pt-10 sm:pb-12">
@@ -13,7 +15,8 @@ export default function VerifyEmail({ verifyUrl = "{{.VerifyURL}}" }: VerifyEmai
           Almost there
         </Text>
         <Text className="m-0 mt-[18px] max-w-[460px] font-sans text-[14px] leading-[21px] text-fg-2">
-          Thanks for creating your Leamout account. Confirm your email address to finish setting it up.
+          Thanks for creating your Leamout account. Confirm your email address
+          to finish setting it up.
         </Text>
         <Button
           href={verifyUrl}
@@ -22,7 +25,8 @@ export default function VerifyEmail({ verifyUrl = "{{.VerifyURL}}" }: VerifyEmai
           Confirm email
         </Button>
         <Text className="m-0 mt-12 max-w-[340px] font-sans text-[11px] leading-[17px] text-fg-3">
-          If you didn&apos;t create a Leamout account, you can safely ignore this email.
+          If you didn&apos;t create a Leamout account, you can safely ignore
+          this email.
         </Text>
       </Section>
     </EmailLayout>
@@ -30,5 +34,5 @@ export default function VerifyEmail({ verifyUrl = "{{.VerifyURL}}" }: VerifyEmai
 }
 
 VerifyEmail.PreviewProps = {
-  verifyUrl: "https://console.leamout.com/auth/verify?token=preview"
+  verifyUrl: "https://console.leamout.com/auth/verify?token=preview",
 } satisfies VerifyEmailProps;

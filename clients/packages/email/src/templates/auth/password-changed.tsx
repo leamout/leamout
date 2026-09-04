@@ -8,7 +8,7 @@ type PasswordChangedEmailProps = {
 
 export default function PasswordChangedEmail({
   changedAt = "{{.ChangedAt}}",
-  securityUrl = "{{.SecurityURL}}"
+  securityUrl = "{{.SecurityURL}}",
 }: PasswordChangedEmailProps) {
   return (
     <EmailLayout preview="Your Leamout password was changed">
@@ -20,7 +20,8 @@ export default function PasswordChangedEmail({
           Your Leamout account password was changed at {changedAt}.
         </Text>
         <Text className="m-0 mt-[18px] max-w-[470px] font-sans text-[14px] leading-[21px] text-fg-2">
-          If you made this change, no action is required. If you didn&apos;t, review your account security immediately.
+          If you made this change, no action is required. If you didn&apos;t,
+          review your account security immediately.
         </Text>
         <Button
           href={securityUrl}
@@ -35,5 +36,5 @@ export default function PasswordChangedEmail({
 
 PasswordChangedEmail.PreviewProps = {
   changedAt: "September 4, 2026 at 1:30 PM UTC",
-  securityUrl: "https://console.leamout.com/settings/security"
+  securityUrl: "https://console.leamout.com/settings/security",
 } satisfies PasswordChangedEmailProps;

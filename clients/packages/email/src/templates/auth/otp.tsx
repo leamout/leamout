@@ -8,7 +8,7 @@ type AuthOTPEmailProps = {
 
 export default function AuthOTPEmail({
   code = "{{.Code}}",
-  expiresMinutes = "{{.ExpiresMinutes}}"
+  expiresMinutes = "{{.ExpiresMinutes}}",
 }: AuthOTPEmailProps) {
   return (
     <EmailLayout preview="Your Leamout verification code">
@@ -25,7 +25,8 @@ export default function AuthOTPEmail({
           </Text>
         </Section>
         <Text className="m-0 font-sans text-[13px] leading-[20px] text-fg-3">
-          This code expires in {expiresMinutes} minutes. If you didn&apos;t request it, you can safely ignore this email.
+          This code expires in {expiresMinutes} minutes. If you didn&apos;t
+          request it, you can safely ignore this email.
         </Text>
       </Section>
     </EmailLayout>
@@ -34,5 +35,5 @@ export default function AuthOTPEmail({
 
 AuthOTPEmail.PreviewProps = {
   code: "482913",
-  expiresMinutes: "10"
+  expiresMinutes: "10",
 } satisfies AuthOTPEmailProps;

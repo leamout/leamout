@@ -22,7 +22,7 @@ export default function SubscriptionConfirmationEmail({
   subtotal = "{{.Subtotal}}",
   tax = "{{.Tax}}",
   total = "{{.Total}}",
-  manageUrl = "{{.ManageURL}}"
+  manageUrl = "{{.ManageURL}}",
 }: SubscriptionConfirmationEmailProps) {
   return (
     <EmailLayout preview={`Your Leamout ${planName} subscription is active`}>
@@ -31,25 +31,47 @@ export default function SubscriptionConfirmationEmail({
           Subscription confirmed
         </Text>
         <Text className="m-0 mt-[18px] max-w-[480px] font-sans text-[14px] leading-[21px] text-fg-2">
-          Hi {userName}, your Leamout {planName} subscription is active. You&apos;re billed {planPrice} per {cycleLabel}; your next charge is on {nextBillingDate}.
+          Hi {userName}, your Leamout {planName} subscription is active.
+          You&apos;re billed {planPrice} per {cycleLabel}; your next charge is
+          on {nextBillingDate}.
         </Text>
         <Section className="mt-9">
           <Section className="mb-[3px] bg-bg-muted p-3">
             <Row>
-              <Column><Text className="m-0 font-sans text-[14px] text-fg">Subtotal</Text></Column>
-              <Column align="right"><Text className="m-0 font-sans text-[14px] text-fg">{subtotal}</Text></Column>
+              <Column>
+                <Text className="m-0 font-sans text-[14px] text-fg">
+                  Subtotal
+                </Text>
+              </Column>
+              <Column align="right">
+                <Text className="m-0 font-sans text-[14px] text-fg">
+                  {subtotal}
+                </Text>
+              </Column>
             </Row>
           </Section>
           <Section className="mb-[3px] bg-bg-muted p-3">
             <Row>
-              <Column><Text className="m-0 font-sans text-[14px] text-fg">Tax</Text></Column>
-              <Column align="right"><Text className="m-0 font-sans text-[14px] text-fg">{tax}</Text></Column>
+              <Column>
+                <Text className="m-0 font-sans text-[14px] text-fg">Tax</Text>
+              </Column>
+              <Column align="right">
+                <Text className="m-0 font-sans text-[14px] text-fg">{tax}</Text>
+              </Column>
             </Row>
           </Section>
           <Section className="bg-[#DDE7D8] p-3">
             <Row>
-              <Column><Text className="m-0 font-sans text-[14px] font-medium text-fg">Total</Text></Column>
-              <Column align="right"><Text className="m-0 font-sans text-[14px] font-medium text-fg">{total}</Text></Column>
+              <Column>
+                <Text className="m-0 font-sans text-[14px] font-medium text-fg">
+                  Total
+                </Text>
+              </Column>
+              <Column align="right">
+                <Text className="m-0 font-sans text-[14px] font-medium text-fg">
+                  {total}
+                </Text>
+              </Column>
             </Row>
           </Section>
         </Section>
@@ -73,5 +95,5 @@ SubscriptionConfirmationEmail.PreviewProps = {
   subtotal: "$29.00",
   tax: "$0.00",
   total: "$29.00",
-  manageUrl: "https://console.leamout.com/settings/billing"
+  manageUrl: "https://console.leamout.com/settings/billing",
 } satisfies SubscriptionConfirmationEmailProps;

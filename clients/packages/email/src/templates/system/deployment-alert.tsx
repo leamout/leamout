@@ -14,7 +14,7 @@ export default function DeploymentAlertEmail({
   alertTitle = "{{.AlertTitle}}",
   alertMessage = "{{.AlertMessage}}",
   occurredAt = "{{.OccurredAt}}",
-  deploymentUrl = "{{.DeploymentURL}}"
+  deploymentUrl = "{{.DeploymentURL}}",
 }: DeploymentAlertEmailProps) {
   return (
     <EmailLayout preview={`${alertTitle} on ${deploymentName}`}>
@@ -44,7 +44,8 @@ export default function DeploymentAlertEmail({
 DeploymentAlertEmail.PreviewProps = {
   deploymentName: "production-voice",
   alertTitle: "Worker health degraded",
-  alertMessage: "One or more worker supervisors have been unhealthy for five minutes.",
+  alertMessage:
+    "One or more worker supervisors have been unhealthy for five minutes.",
   occurredAt: "September 4, 2026 at 13:42 UTC",
-  deploymentUrl: "https://console.leamout.com/deployments/production-voice"
+  deploymentUrl: "https://console.leamout.com/deployments/production-voice",
 } satisfies DeploymentAlertEmailProps;

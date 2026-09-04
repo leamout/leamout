@@ -12,7 +12,7 @@ export default function CarrierDegradedEmail({
   carrierName = "{{.CarrierName}}",
   connectionName = "{{.ConnectionName}}",
   detectedAt = "{{.DetectedAt}}",
-  connectionUrl = "{{.ConnectionURL}}"
+  connectionUrl = "{{.ConnectionURL}}",
 }: CarrierDegradedEmailProps) {
   return (
     <EmailLayout preview={`${carrierName} connection degraded`}>
@@ -21,10 +21,12 @@ export default function CarrierDegradedEmail({
           Carrier connection degraded
         </Text>
         <Text className="m-0 mt-[18px] max-w-[470px] font-sans text-[14px] leading-[21px] text-fg-2">
-          Leamout detected degraded health for {connectionName} on {carrierName} at {detectedAt}.
+          Leamout detected degraded health for {connectionName} on {carrierName}{" "}
+          at {detectedAt}.
         </Text>
         <Text className="m-0 mt-[18px] max-w-[470px] font-sans text-[14px] leading-[21px] text-fg-2">
-          Calls may fail over to another configured endpoint while the connection recovers.
+          Calls may fail over to another configured endpoint while the
+          connection recovers.
         </Text>
         <Button
           href={connectionUrl}
@@ -41,5 +43,5 @@ CarrierDegradedEmail.PreviewProps = {
   carrierName: "DIDWW",
   connectionName: "didww-primary",
   detectedAt: "September 4, 2026 at 13:45 UTC",
-  connectionUrl: "https://console.leamout.com/carriers/didww-primary"
+  connectionUrl: "https://console.leamout.com/carriers/didww-primary",
 } satisfies CarrierDegradedEmailProps;

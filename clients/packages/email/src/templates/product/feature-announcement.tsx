@@ -12,7 +12,7 @@ export default function FeatureAnnouncementEmail({
   featureName = "{{.FeatureName}}",
   summary = "{{.Summary}}",
   url = "{{.URL}}",
-  unsubscribeUrl = "{{.UnsubscribeURL}}"
+  unsubscribeUrl = "{{.UnsubscribeURL}}",
 }: FeatureAnnouncementEmailProps) {
   return (
     <EmailLayout preview={`${featureName} is now available in Leamout`}>
@@ -42,7 +42,8 @@ export default function FeatureAnnouncementEmail({
 
 FeatureAnnouncementEmail.PreviewProps = {
   featureName: "Carrier health",
-  summary: "See carrier connection health and endpoint failover state in one place, with clearer signals when your voice path needs attention.",
+  summary:
+    "See carrier connection health and endpoint failover state in one place, with clearer signals when your voice path needs attention.",
   url: "https://leamout.com/updates/carrier-health",
-  unsubscribeUrl: "https://leamout.com/email/preferences"
+  unsubscribeUrl: "https://leamout.com/email/preferences",
 } satisfies FeatureAnnouncementEmailProps;

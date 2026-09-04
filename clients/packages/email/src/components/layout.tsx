@@ -1,5 +1,13 @@
 import type { ReactNode } from "react";
-import { Body, Container, Head, Html, Preview, Section, Tailwind } from "react-email";
+import {
+  Body,
+  Container,
+  Head,
+  Html,
+  Preview,
+  Section,
+  Tailwind,
+} from "react-email";
 import { leamoutTailwindConfig } from "../theme";
 import { EmailFooter } from "./footer";
 import { LeamoutFonts } from "./fonts";

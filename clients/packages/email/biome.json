@@ -5,6 +5,11 @@
   "files": {
     "includes": ["src/**"]
   },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "linter": {
     "domains": {
       "react": "recommended"

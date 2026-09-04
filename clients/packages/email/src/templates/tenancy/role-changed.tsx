@@ -12,7 +12,7 @@ export default function RoleChangedEmail({
   organizationName = "{{.OrganizationName}}",
   roleName = "{{.RoleName}}",
   changedByName = "{{.ChangedByName}}",
-  organizationUrl = "{{.OrganizationURL}}"
+  organizationUrl = "{{.OrganizationURL}}",
 }: RoleChangedEmailProps) {
   return (
     <EmailLayout preview={`Your role in ${organizationName} changed`}>
@@ -38,5 +38,5 @@ RoleChangedEmail.PreviewProps = {
   organizationName: "Acme Voice",
   roleName: "Developer",
   changedByName: "Jordan",
-  organizationUrl: "https://console.leamout.com/org/acme"
+  organizationUrl: "https://console.leamout.com/org/acme",
 } satisfies RoleChangedEmailProps;
