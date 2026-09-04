@@ -3,6 +3,7 @@ package didww
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -93,10 +94,12 @@ func TestConfigureRoutingAssignsVoiceInTrunk(t *testing.T) {
 		if r.Method != http.MethodPatch || r.URL.Path != "/v3/dids/did-1" {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
-		body := new(strings.Builder)
-		_, _ = body.ReadFrom(r.Body)
-		if !strings.Contains(body.String(), `"voice_in_trunk":{"data":{"id":"trunk-1","type":"voice_in_trunks"}}`) {
-			t.Fatalf("body = %s", body.String())
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(body), `"voice_in_trunk":{"data":{"id":"trunk-1","type":"voice_in_trunks"}}`) {
+			t.Fatalf("body = %s", body)
 		}
 		w.Header().Set("Content-Type", jsonAPIMediaType)
 		_, _ = w.Write([]byte(`{"data":{"id":"did-1","type":"dids","attributes":{"number":"12124727600"},"relationships":{"voice_in_trunk":{"data":{"id":"trunk-1","type":"voice_in_trunks"}}}}}`))
