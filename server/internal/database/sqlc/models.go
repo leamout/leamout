@@ -88,8 +88,9 @@ type CallParticipant struct {
 
 type CarrierConnection struct {
 	ID                      uuid.UUID          `db:"id" json:"id"`
-	OrganizationID          uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationID          *uuid.UUID         `db:"organization_id" json:"organization_id"`
 	ProviderID              uuid.UUID          `db:"provider_id" json:"provider_id"`
+	Scope                   string             `db:"scope" json:"scope"`
 	Name                    string             `db:"name" json:"name"`
 	Status                  string             `db:"status" json:"status"`
 	OutboundAuthMethod      string             `db:"outbound_auth_method" json:"outbound_auth_method"`
@@ -111,7 +112,7 @@ type CarrierConnection struct {
 
 type CarrierConnectionSourceIp struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
 	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
 	Cidr                netip.Prefix       `db:"cidr" json:"cidr"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -400,7 +401,9 @@ type PhoneNumber struct {
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Number              string             `db:"number" json:"number"`
 	CountryCode         string             `db:"country_code" json:"country_code"`
+	ProvisioningMode    string             `db:"provisioning_mode" json:"provisioning_mode"`
 	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderID          *uuid.UUID         `db:"provider_id" json:"provider_id"`
 	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
 	VoiceEnabled        bool               `db:"voice_enabled" json:"voice_enabled"`
 	SmsEnabled          bool               `db:"sms_enabled" json:"sms_enabled"`
@@ -520,18 +523,19 @@ type Subscription struct {
 
 type Trunk struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
 	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
 	Name                string             `db:"name" json:"name"`
 	Direction           string             `db:"direction" json:"direction"`
 	Status              string             `db:"status" json:"status"`
+	ManagedDefault      bool               `db:"managed_default" json:"managed_default"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type TrunkEndpoint struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
 	TrunkID             uuid.UUID          `db:"trunk_id" json:"trunk_id"`
 	Host                string             `db:"host" json:"host"`
 	Port                int32              `db:"port" json:"port"`
