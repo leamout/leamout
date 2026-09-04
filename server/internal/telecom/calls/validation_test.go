@@ -15,14 +15,15 @@ func TestValidateCreateRequest(t *testing.T) {
 		req  CreateCallRequest
 		want bool
 	}{
-		{name: "valid request", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001"}, want: true},
-		{name: "missing originator", req: CreateCallRequest{TrunkID: trunkID, To: "1001"}},
-		{name: "missing trunk", req: CreateCallRequest{From: "1000", To: "1001"}},
-		{name: "nil application rejected", req: CreateCallRequest{ApplicationID: ptr(uuid.Nil), TrunkID: trunkID, From: "1000", To: "1001"}},
-		{name: "invalid DTMF mode", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", DTMFMode: "inband"}},
-		{name: "unsupported codec", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", Codecs: []string{"G729"}}},
-		{name: "duplicate codec", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", Codecs: []string{"PCMU", "pcmu"}}},
-		{name: "invalid media encryption", req: CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001", MediaEncryption: "dtls"}},
+		{name: "valid BYOC request", req: CreateCallRequest{TrunkID: ptr(trunkID), From: "1000", To: "1001"}, want: true},
+		{name: "valid managed request", req: CreateCallRequest{From: "1000", To: "1001"}, want: true},
+		{name: "missing originator", req: CreateCallRequest{TrunkID: ptr(trunkID), To: "1001"}},
+		{name: "nil trunk rejected", req: CreateCallRequest{TrunkID: ptr(uuid.Nil), From: "1000", To: "1001"}},
+		{name: "nil application rejected", req: CreateCallRequest{ApplicationID: ptr(uuid.Nil), TrunkID: ptr(trunkID), From: "1000", To: "1001"}},
+		{name: "invalid DTMF mode", req: CreateCallRequest{TrunkID: ptr(trunkID), From: "1000", To: "1001", DTMFMode: "inband"}},
+		{name: "unsupported codec", req: CreateCallRequest{TrunkID: ptr(trunkID), From: "1000", To: "1001", Codecs: []string{"G729"}}},
+		{name: "duplicate codec", req: CreateCallRequest{TrunkID: ptr(trunkID), From: "1000", To: "1001", Codecs: []string{"PCMU", "pcmu"}}},
+		{name: "invalid media encryption", req: CreateCallRequest{TrunkID: ptr(trunkID), From: "1000", To: "1001", MediaEncryption: "dtls"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -31,7 +32,7 @@ func TestValidateCreateRequest(t *testing.T) {
 			}
 		})
 	}
-	request := CreateCallRequest{TrunkID: trunkID, From: "1000", To: "1001"}
+	request := CreateCallRequest{TrunkID: ptr(trunkID), From: "1000", To: "1001"}
 	if err := validateCreateRequest(&request); err != nil {
 		t.Fatalf("validate defaults: %v", err)
 	}
