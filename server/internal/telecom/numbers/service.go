@@ -18,6 +18,7 @@ type numberRepository interface {
 	CreateManaged(context.Context, uuid.UUID, ManagedCreateRequest) (sqlc.PhoneNumber, error)
 	List(context.Context, uuid.UUID) ([]sqlc.PhoneNumber, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
+	GetForRelease(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
 	Update(context.Context, uuid.UUID, uuid.UUID, UpdateRequest) (sqlc.PhoneNumber, error)
 	ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
 	SetCarrierConnection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, audit.Event) (sqlc.PhoneNumber, error)
@@ -149,9 +150,13 @@ func (s *Service) ReleaseBYOC(
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) error {
-	current, err := s.Get(ctx, organizationID, id)
-	if err != nil {
+	if err := validIDs(organizationID, id); err != nil {
 		return err
+	}
+
+	current, err := s.repo.GetForRelease(ctx, organizationID, id)
+	if err != nil {
+		return readError(err, "phone number not found")
 	}
 	if current.ProvisioningMode != string(ProvisioningModeBYOC) {
 		return apperror.NewConflict("managed phone numbers must be released through the managed provisioning workflow")
