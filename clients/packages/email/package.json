@@ -1,0 +1,28 @@
+{
+  "name": "@leamout/email",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "dev": "email dev --dir ./src/templates",
+    "export": "email export --pretty --dir ./src/templates --outDir ./out",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.11",
+    "@react-email/ui": "6.9.3",
+    "@types/node": "^24",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "css-tree": "3.2.1",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-email": "6.9.3"
+  },
+  "packageManager": "bun@1.3.14"
+}
