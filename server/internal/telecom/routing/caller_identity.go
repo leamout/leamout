@@ -8,12 +8,13 @@ import (
 const (
 	provisioningModeBYOC    = "byoc"
 	provisioningModeManaged = "managed"
+	phoneNumberStatusActive = "active"
 )
 
 // authorizeBYOCCallerIdentity preserves carrier affinity for customer-owned
 // connectivity. A BYOC caller ID is valid only when the number belongs to the
-// calling organization, is voice-enabled, is itself BYOC, and is assigned to
-// the exact carrier connection selected by the requested trunk.
+// calling organization, is active and voice-enabled, is itself BYOC, and is
+// assigned to the exact carrier connection selected by the requested trunk.
 func authorizeBYOCCallerIdentity(
 	caller sqlc.PhoneNumber,
 	organizationID uuid.UUID,
@@ -21,6 +22,7 @@ func authorizeBYOCCallerIdentity(
 ) error {
 	if caller.OrganizationID != organizationID ||
 		caller.ProvisioningMode != provisioningModeBYOC ||
+		caller.Status != phoneNumberStatusActive ||
 		!caller.VoiceEnabled ||
 		caller.CarrierConnectionID == nil ||
 		*caller.CarrierConnectionID != carrierConnectionID {
@@ -40,6 +42,7 @@ func authorizeManagedCallerIdentity(
 ) error {
 	if caller.OrganizationID != organizationID ||
 		caller.ProvisioningMode != provisioningModeManaged ||
+		caller.Status != phoneNumberStatusActive ||
 		!caller.VoiceEnabled {
 		return ErrCallerIdentity
 	}
