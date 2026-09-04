@@ -38,12 +38,12 @@ func (r *Repository) GetTrunk(
 ) (sqlc.Trunk, error) {
 	return r.queries.GetTrunkByID(ctx, sqlc.GetTrunkByIDParams{
 		ID:             trunkID,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
 
 func (r *Repository) GetCarrierConnection(ctx context.Context, organizationID, id uuid.UUID) (sqlc.CarrierConnection, error) {
-	row, err := r.queries.GetCarrierConnectionByID(ctx, sqlc.GetCarrierConnectionByIDParams{ID: id, OrganizationID: organizationID})
+	row, err := r.queries.GetCarrierConnectionByID(ctx, sqlc.GetCarrierConnectionByIDParams{ID: id, OrganizationID: &organizationID})
 	if err != nil {
 		return sqlc.CarrierConnection{}, err
 	}
@@ -61,7 +61,7 @@ func (r *Repository) ListOutboundEndpoints(
 ) ([]sqlc.TrunkEndpoint, error) {
 	return r.queries.ListActiveOutboundTrunkEndpoints(ctx, sqlc.ListActiveOutboundTrunkEndpointsParams{
 		TrunkID:        trunkID,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
 
@@ -114,7 +114,7 @@ func (r *Repository) ResolveInboundPhoneNumber(
 	number string,
 ) (sqlc.PhoneNumber, error) {
 	return r.queries.ResolveInboundPhoneNumber(ctx, sqlc.ResolveInboundPhoneNumberParams{
-		CarrierConnectionID: carrierConnectionID,
+		CarrierConnectionID: &carrierConnectionID,
 		Number:              number,
 	})
 }
