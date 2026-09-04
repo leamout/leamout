@@ -85,16 +85,32 @@ func (q *Queries) ListPlatformCarrierConnectionSourceIPs(ctx context.Context, ca
 }
 
 const resolveCarrierConnectionBySourceIPAnyScope = `-- name: ResolveCarrierConnectionBySourceIPAnyScope :one
+WITH matches AS (
+    SELECT
+        cc.id,
+        masklen(src.cidr) AS specificity
+    FROM carrier_connection_source_ips AS src
+    JOIN carrier_connections AS cc
+      ON cc.id = src.carrier_connection_id
+     AND cc.organization_id IS NOT DISTINCT FROM src.organization_id
+    WHERE $1::INET <<= src.cidr
+      AND cc.status = 'active'
+      AND cc.inbound_enabled = true
+      AND cc.inbound_auth_method = 'ip'
+),
+best AS (
+    SELECT max(specificity) AS specificity
+    FROM matches
+),
+resolved AS (
+    SELECT matches.id
+    FROM matches
+    JOIN best USING (specificity)
+)
 SELECT cc.id, cc.organization_id, cc.provider_id, cc.scope, cc.name, cc.status, cc.outbound_auth_method, cc.auth_username, cc.auth_secret_ciphertext, cc.inbound_enabled, cc.inbound_auth_method, cc.inbound_username, cc.inbound_secret_ciphertext, cc.max_cps, cc.max_concurrent_calls, cc.max_daily_minutes, cc.codecs, cc.supports_video, cc.supports_fax, cc.created_at, cc.updated_at
-FROM carrier_connection_source_ips AS src
-JOIN carrier_connections AS cc
-  ON cc.id = src.carrier_connection_id
- AND cc.organization_id IS NOT DISTINCT FROM src.organization_id
-WHERE $1::INET <<= src.cidr
-  AND cc.status = 'active'
-  AND cc.inbound_enabled = true
-  AND cc.inbound_auth_method = 'ip'
-ORDER BY masklen(src.cidr) DESC
+FROM resolved
+JOIN carrier_connections AS cc ON cc.id = resolved.id
+WHERE (SELECT count(*) FROM resolved) = 1
 LIMIT 1
 `
 
@@ -130,11 +146,26 @@ func (q *Queries) ResolveCarrierConnectionBySourceIPAnyScope(ctx context.Context
 const resolveInboundPhoneNumber = `-- name: ResolveInboundPhoneNumber :one
 SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provisioning_mode, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
+JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id
 JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.number = $1
   AND pn.carrier_connection_id = $2
   AND pn.status = 'active'
   AND pn.voice_enabled = true
+  AND cc.status = 'active'
+  AND cc.inbound_enabled = true
+  AND (
+      (
+          cc.scope = 'organization'
+          AND cc.organization_id = pn.organization_id
+          AND pn.provisioning_mode = 'byoc'
+      )
+      OR (
+          cc.scope = 'platform'
+          AND cc.organization_id IS NULL
+          AND pn.provisioning_mode = 'managed'
+      )
+  )
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 LIMIT 1
