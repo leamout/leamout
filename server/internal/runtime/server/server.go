@@ -235,7 +235,7 @@ func NewModules(
 	)
 
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)
-	organizationMiddleware := middleware.NewOrganizationMiddleware()
+	organizationMiddleware := middleware.NewOrganizationMiddleware(queries)
 
 	return Modules{
 		Catalog: CatalogModule{

@@ -5,19 +5,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/internal/security/authz"
 )
 
 const (
 	maxNameLength        = 100
 	maxDescriptionLength = 500
 )
-
-var allowedScopes = map[string]struct{}{
-	"organization:read": {},
-	"members:read":      {},
-	"members:write":     {},
-	"credentials:read":  {},
-}
 
 func ValidateCreate(input CreateInput) error {
 	if input.OrganizationID == uuid.Nil {
@@ -62,7 +56,7 @@ func ValidateScopes(scopes []string) error {
 	seen := make(map[string]struct{}, len(scopes))
 	for _, scope := range scopes {
 		scope = strings.TrimSpace(scope)
-		if _, ok := allowedScopes[scope]; !ok {
+		if !authz.Scope(scope).IsValid() {
 			return fmt.Errorf("invalid credential scope %q", scope)
 		}
 		if _, ok := seen[scope]; ok {

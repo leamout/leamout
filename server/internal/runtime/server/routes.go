@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
@@ -28,6 +30,30 @@ import (
 )
 
 func RegisterRoutes(r *chi.Mux, modules Modules) {
+	organizationAccess := func(resource string) func(http.Handler) http.Handler {
+		return func(next http.Handler) http.Handler {
+			return modules.OrganizationsContext.RequireAuthenticated(modules.Authn)(
+				modules.OrganizationsContext.RequireAccess(resource)(next),
+			)
+		}
+	}
+	sessionOrganizationAccess := func(resource string) func(http.Handler) http.Handler {
+		return func(next http.Handler) http.Handler {
+			return modules.Authn.RequireSession(
+				modules.OrganizationsContext.Require(
+					modules.OrganizationsContext.RequireAccess(resource)(next),
+				),
+			)
+		}
+	}
+	organizationContextAccess := func(resource string) func(http.Handler) http.Handler {
+		return func(next http.Handler) http.Handler {
+			return modules.OrganizationsContext.Require(
+				modules.OrganizationsContext.RequireAccess(resource)(next),
+			)
+		}
+	}
+
 	r.Route("/v1", func(r chi.Router) {
 		catalog.RegisterRoutes(
 			r,
@@ -37,18 +63,18 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		licensing.RegisterRoutes(
 			r,
 			modules.Licensing.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("licensing"),
 			modules.Idempotency.Middleware.Handle,
 		)
 		commercialstate.RegisterRoutes(
 			r,
 			modules.CommercialState.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("commercial-state"),
 		)
 		subscriptions.RegisterRoutes(
 			r,
 			modules.Subscriptions.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("subscriptions"),
 			modules.Idempotency.Middleware.Handle,
 		)
 		auth.RegisterRoutes(
@@ -70,76 +96,77 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			r,
 			modules.Organizations.Handler,
 			modules.Authn.RequireSession,
+			organizationContextAccess("organization"),
 		)
 		members.RegisterRoutes(
 			r,
 			modules.Members.Handler,
-			modules.Authn.RequireSession,
+			sessionOrganizationAccess("members"),
 		)
 		credentials.RegisterRoutes(
 			r,
 			modules.Credentials.Handler,
-			modules.Authn.RequireSession,
+			sessionOrganizationAccess("credentials"),
 		)
 		voice.RegisterRoutes(
 			r,
 			modules.Voice.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("voice-applications"),
 		)
 		calls.RegisterRoutes(
 			r,
 			modules.Calls.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("calls"),
 		)
 		recordings.RegisterRoutes(
 			r,
 			modules.Recordings.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("recordings"),
 		)
 		subscribers.RegisterRoutes(
 			r,
 			modules.Subscribers.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("subscribers"),
 		)
 		numbers.RegisterRoutes(
 			r,
 			modules.Numbers.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("numbers"),
 		)
 		sip_domains.RegisterRoutes(
 			r,
 			modules.SIPDomains.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("sip-domains"),
 		)
 		trunks.RegisterRoutes(
 			r,
 			modules.Trunks.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("trunks"),
 		)
 		carriers.RegisterRoutes(
 			r,
 			modules.Carriers.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("carriers"),
 		)
 		webhooks.RegisterRoutes(
 			r,
 			modules.Webhooks.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("webhooks"),
 		)
 		audit.RegisterRoutes(
 			r,
 			modules.Audit.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("audit"),
 		)
 		conferences.RegisterRoutes(
 			r,
 			modules.Conferences.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("conferences"),
 		)
 		realtime.RegisterRoutes(
 			r,
 			modules.Realtime.Handler,
-			modules.OrganizationsContext.RequireAuthenticated(modules.Authn),
+			organizationAccess("realtime"),
 		)
 	})
 }
