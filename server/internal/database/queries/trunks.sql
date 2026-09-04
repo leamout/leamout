@@ -8,12 +8,12 @@ INSERT INTO trunks (
     managed_default
 )
 SELECT
-    cc.organization_id,
-    cc.id,
-    sqlc.arg(name),
-    COALESCE(sqlc.narg(direction), 'bidirectional'),
-    COALESCE(sqlc.narg(status), 'active'),
-    false
+    cc.organization_id AS organization_id,
+    cc.id AS carrier_connection_id,
+    sqlc.arg(name) AS name,
+    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
+    COALESCE(sqlc.narg(status), 'active') AS status,
+    false AS managed_default
 FROM carrier_connections AS cc
 WHERE cc.id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'organization'
@@ -31,12 +31,12 @@ INSERT INTO trunks (
     managed_default
 )
 SELECT
-    NULL::UUID,
-    cc.id,
-    sqlc.arg(name),
-    COALESCE(sqlc.narg(direction), 'bidirectional'),
-    COALESCE(sqlc.narg(status), 'active'),
-    COALESCE(sqlc.narg(managed_default), false)
+    NULL::UUID AS organization_id,
+    cc.id AS carrier_connection_id,
+    sqlc.arg(name) AS name,
+    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
+    COALESCE(sqlc.narg(status), 'active') AS status,
+    COALESCE(sqlc.narg(managed_default), false) AS managed_default
 FROM carrier_connections AS cc
 WHERE cc.id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'platform'
@@ -163,15 +163,15 @@ INSERT INTO trunk_endpoints (
     enabled
 )
 SELECT
-    t.organization_id,
-    t.id,
-    sqlc.arg(host),
-    COALESCE(sqlc.narg(port), 5060),
-    COALESCE(sqlc.narg(transport), 'udp'),
-    COALESCE(sqlc.narg(direction), 'bidirectional'),
-    COALESCE(sqlc.narg(priority), 10),
-    COALESCE(sqlc.narg(weight), 100),
-    COALESCE(sqlc.narg(enabled), true)
+    t.organization_id AS organization_id,
+    t.id AS trunk_id,
+    sqlc.arg(host) AS host,
+    COALESCE(sqlc.narg(port), 5060) AS port,
+    COALESCE(sqlc.narg(transport), 'udp') AS transport,
+    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
+    COALESCE(sqlc.narg(priority), 10) AS priority,
+    COALESCE(sqlc.narg(weight), 100) AS weight,
+    COALESCE(sqlc.narg(enabled), true) AS enabled
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(trunk_id)
@@ -193,15 +193,15 @@ INSERT INTO trunk_endpoints (
     enabled
 )
 SELECT
-    NULL::UUID,
-    t.id,
-    sqlc.arg(host),
-    COALESCE(sqlc.narg(port), 5060),
-    COALESCE(sqlc.narg(transport), 'udp'),
-    COALESCE(sqlc.narg(direction), 'bidirectional'),
-    COALESCE(sqlc.narg(priority), 10),
-    COALESCE(sqlc.narg(weight), 100),
-    COALESCE(sqlc.narg(enabled), true)
+    NULL::UUID AS organization_id,
+    t.id AS trunk_id,
+    sqlc.arg(host) AS host,
+    COALESCE(sqlc.narg(port), 5060) AS port,
+    COALESCE(sqlc.narg(transport), 'udp') AS transport,
+    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
+    COALESCE(sqlc.narg(priority), 10) AS priority,
+    COALESCE(sqlc.narg(weight), 100) AS weight,
+    COALESCE(sqlc.narg(enabled), true) AS enabled
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(trunk_id)
