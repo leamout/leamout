@@ -17,6 +17,7 @@ type routeStore interface {
 	GetTrunk(context.Context, uuid.UUID, uuid.UUID) (sqlc.Trunk, error)
 	GetCarrierConnection(context.Context, uuid.UUID, uuid.UUID) (sqlc.CarrierConnection, error)
 	ListOutboundEndpoints(context.Context, uuid.UUID, uuid.UUID) ([]sqlc.TrunkEndpoint, error)
+	ListManagedOutboundRoutes(context.Context) ([]managedRouteCandidate, error)
 	ResolveInboundCarrier(context.Context, netip.Addr) (sqlc.CarrierConnection, error)
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error)
@@ -44,7 +45,18 @@ func (r *Resolver) resolveOutbound(
 	ctx context.Context,
 	req OutboundRequest,
 ) (OutboundDecision, error) {
-	trunk, err := r.repo.GetTrunk(ctx, req.OrganizationID, req.TrunkID)
+	if req.TrunkID != nil {
+		return r.resolveBYOCOutbound(ctx, req, *req.TrunkID)
+	}
+	return r.resolveManagedOutbound(ctx, req)
+}
+
+func (r *Resolver) resolveBYOCOutbound(
+	ctx context.Context,
+	req OutboundRequest,
+	trunkID uuid.UUID,
+) (OutboundDecision, error) {
+	trunk, err := r.repo.GetTrunk(ctx, req.OrganizationID, trunkID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return OutboundDecision{}, ErrNoRoute
@@ -69,7 +81,7 @@ func (r *Resolver) resolveOutbound(
 		return OutboundDecision{}, ErrCallerIdentity
 	}
 
-	endpoints, err := r.repo.ListOutboundEndpoints(ctx, req.OrganizationID, req.TrunkID)
+	endpoints, err := r.repo.ListOutboundEndpoints(ctx, req.OrganizationID, trunkID)
 	if err != nil {
 		return OutboundDecision{}, err
 	}
@@ -81,10 +93,7 @@ func (r *Resolver) resolveOutbound(
 	if err != nil {
 		return OutboundDecision{}, err
 	}
-	if r.metrics != nil {
-		failover := len(endpoints) > 0 && endpoint.Priority > endpoints[0].Priority
-		r.metrics.EndpointSelection(ctx, trunk.CarrierConnectionID, trunk.ID, endpoint.ID, failover)
-	}
+	r.recordEndpointSelection(ctx, trunk.CarrierConnectionID, trunk.ID, endpoint, endpoints)
 	return OutboundDecision{
 		OrganizationID:      req.OrganizationID,
 		CarrierConnectionID: trunk.CarrierConnectionID,
@@ -99,6 +108,90 @@ func (r *Resolver) resolveOutbound(
 		MaxConcurrentCalls:  connection.MaxConcurrentCalls,
 		MaxDailyMinutes:     connection.MaxDailyMinutes,
 	}, nil
+}
+
+func (r *Resolver) resolveManagedOutbound(
+	ctx context.Context,
+	req OutboundRequest,
+) (OutboundDecision, error) {
+	caller, err := r.repo.GetPhoneNumber(ctx, req.OrganizationID, req.From)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return OutboundDecision{}, ErrCallerIdentity
+		}
+		return OutboundDecision{}, err
+	}
+	if !caller.VoiceEnabled {
+		return OutboundDecision{}, ErrCallerIdentity
+	}
+
+	candidates, err := r.repo.ListManagedOutboundRoutes(ctx)
+	if err != nil {
+		return OutboundDecision{}, err
+	}
+	if len(candidates) == 0 {
+		return OutboundDecision{}, ErrNoRoute
+	}
+
+	endpoints := make([]sqlc.TrunkEndpoint, 0, len(candidates))
+	for _, candidate := range candidates {
+		endpoints = append(endpoints, sqlc.TrunkEndpoint{
+			ID:           candidate.EndpointID,
+			TrunkID:      candidate.TrunkID,
+			Host:         candidate.Host,
+			Port:         candidate.Port,
+			Transport:    candidate.Transport,
+			Priority:     candidate.Priority,
+			Weight:       candidate.Weight,
+			HealthStatus: candidate.HealthStatus,
+		})
+	}
+
+	endpoint, err := r.selectOutboundEndpoint(endpoints)
+	if err != nil {
+		return OutboundDecision{}, err
+	}
+
+	var selected *managedRouteCandidate
+	for i := range candidates {
+		if candidates[i].EndpointID == endpoint.ID {
+			selected = &candidates[i]
+			break
+		}
+	}
+	if selected == nil {
+		return OutboundDecision{}, ErrNoRoute
+	}
+
+	r.recordEndpointSelection(ctx, selected.CarrierConnectionID, selected.TrunkID, endpoint, endpoints)
+	return OutboundDecision{
+		OrganizationID:      req.OrganizationID,
+		CarrierConnectionID: selected.CarrierConnectionID,
+		TrunkID:             selected.TrunkID,
+		EndpointID:          selected.EndpointID,
+		Host:                selected.Host,
+		Port:                selected.Port,
+		Transport:           selected.Transport,
+		From:                req.From,
+		To:                  req.To,
+		MaxCPS:              selected.MaxCPS,
+		MaxConcurrentCalls:  selected.MaxConcurrentCalls,
+		MaxDailyMinutes:     selected.MaxDailyMinutes,
+	}, nil
+}
+
+func (r *Resolver) recordEndpointSelection(
+	ctx context.Context,
+	connectionID uuid.UUID,
+	trunkID uuid.UUID,
+	endpoint sqlc.TrunkEndpoint,
+	endpoints []sqlc.TrunkEndpoint,
+) {
+	if r.metrics == nil {
+		return
+	}
+	failover := len(endpoints) > 0 && endpoint.Priority > endpoints[0].Priority
+	r.metrics.EndpointSelection(ctx, connectionID, trunkID, endpoint.ID, failover)
 }
 
 // selectOutboundEndpoint restricts routing to the best available priority and
@@ -180,8 +273,12 @@ func (r *Resolver) resolveInbound(
 		}
 		return InboundDecision{}, err
 	}
+	if connection.OrganizationID == nil {
+		return InboundDecision{}, ErrTenantMismatch
+	}
+	organizationID := *connection.OrganizationID
 
-	phoneNumber, err := r.repo.GetPhoneNumber(ctx, connection.OrganizationID, req.CalledNumber)
+	phoneNumber, err := r.repo.GetPhoneNumber(ctx, organizationID, req.CalledNumber)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return InboundDecision{}, ErrNoRoute
@@ -200,12 +297,12 @@ func (r *Resolver) resolveInbound(
 		}
 		return InboundDecision{}, err
 	}
-	if binding.OrganizationID != connection.OrganizationID {
+	if binding.OrganizationID != organizationID {
 		return InboundDecision{}, ErrTenantMismatch
 	}
 
 	return InboundDecision{
-		OrganizationID:      connection.OrganizationID,
+		OrganizationID:      organizationID,
 		CarrierConnectionID: connection.ID,
 		PhoneNumberID:       phoneNumber.ID,
 		VoiceApplicationID:  binding.VoiceApplicationID,
