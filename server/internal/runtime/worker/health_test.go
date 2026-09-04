@@ -22,7 +22,7 @@ func TestHealthHandlerReadinessIncludesDependenciesAndComponents(t *testing.T) {
 	handler := healthHandler(stubDependency{}, stubDependency{}, stubDependency{}, stubMedia{}, state)
 
 	res := httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	handler.ServeHTTP(res, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil))
 	if res.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected starting components to make readiness %d, got %d", http.StatusServiceUnavailable, res.Code)
 	}
@@ -30,14 +30,14 @@ func TestHealthHandlerReadinessIncludesDependenciesAndComponents(t *testing.T) {
 	state.setRunning("outbox-publisher")
 	state.setRunning("webhook-consumer")
 	res = httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	handler.ServeHTTP(res, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil))
 	if res.Code != http.StatusNoContent {
 		t.Fatalf("expected ready status %d, got %d: %s", http.StatusNoContent, res.Code, res.Body.String())
 	}
 
 	state.setStopped("webhook-consumer", errors.New("subscription lost"))
 	res = httptest.NewRecorder()
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	handler.ServeHTTP(res, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil))
 	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), "subscription lost") {
 		t.Fatalf("expected failed component in readiness response, got %d: %s", res.Code, res.Body.String())
 	}
@@ -49,7 +49,7 @@ func TestHealthHandlerRejectsUnavailableDependency(t *testing.T) {
 	handler := healthHandler(stubDependency{}, stubDependency{err: errors.New("nats down")}, stubDependency{}, stubMedia{}, state)
 	res := httptest.NewRecorder()
 
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	handler.ServeHTTP(res, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/readyz", nil))
 
 	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), `"nats":"unavailable"`) {
 		t.Fatalf("expected NATS readiness failure, got %d: %s", res.Code, res.Body.String())
@@ -62,7 +62,7 @@ func TestHealthHandlerExposesComponentMetrics(t *testing.T) {
 	handler := healthHandler(stubDependency{}, stubDependency{}, stubDependency{}, stubMedia{}, state)
 	res := httptest.NewRecorder()
 
-	handler.ServeHTTP(res, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	handler.ServeHTTP(res, httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/metrics", nil))
 
 	body := res.Body.String()
 	if !strings.Contains(body, `leamout_worker_component_up{component="outbox-publisher"} 1`) ||

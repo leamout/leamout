@@ -164,7 +164,7 @@ func TestAuthenticatedOrganizationRejectsSessionFromAnotherOrganization(t *testi
 	handler := authnMiddleware.RequireAuthenticated(organizationMiddleware.Require(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		t.Fatal("handler should not be called")
 	})))
-	req := httptest.NewRequest(http.MethodGet, "/v1/numbers", nil)
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/numbers", nil)
 	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session-token"})
 	req.Header.Set(organizationIDHeader, requestedOrganizationID.String())
 	res := httptest.NewRecorder()
@@ -205,7 +205,7 @@ func TestOrganizationAccessEnforcesSessionRoleAndTokenScope(t *testing.T) {
 			handler := middleware.Require(middleware.RequireAccess(resource)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(http.StatusNoContent)
 			})))
-			req := httptest.NewRequest(tt.method, "/v1/numbers", nil)
+			req := httptest.NewRequestWithContext(context.Background(), tt.method, "/v1/numbers", nil)
 			req.Header.Set(organizationIDHeader, organizationID.String())
 			req = req.WithContext(authn.WithPrincipal(req.Context(), tt.principal))
 			res := httptest.NewRecorder()
