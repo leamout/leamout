@@ -32,6 +32,25 @@ func (r *Repository) Create(
 	})
 }
 
+func (r *Repository) CreateManaged(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req ManagedCreateRequest,
+) (sqlc.PhoneNumber, error) {
+	providerID := req.ProviderID
+	providerResourceID := req.ProviderResourceID
+	return r.queries.CreateManagedPhoneNumber(ctx, sqlc.CreateManagedPhoneNumberParams{
+		OrganizationID:      organizationID,
+		Number:              req.Number,
+		CountryCode:         req.CountryCode,
+		CarrierConnectionID: req.CarrierConnectionID,
+		ProviderID:          &providerID,
+		ProviderResourceID:  &providerResourceID,
+		VoiceEnabled:        req.VoiceEnabled,
+		SmsEnabled:          req.SMSEnabled,
+	})
+}
+
 func (r *Repository) List(
 	ctx context.Context,
 	organizationID uuid.UUID,
