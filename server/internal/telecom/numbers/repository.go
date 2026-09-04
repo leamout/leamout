@@ -69,6 +69,17 @@ func (r *Repository) Get(
 	})
 }
 
+func (r *Repository) GetForRelease(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.PhoneNumber, error) {
+	return r.queries.GetPhoneNumberForRelease(ctx, sqlc.GetPhoneNumberForReleaseParams{
+		ID:             id,
+		OrganizationID: organizationID,
+	})
+}
+
 func (r *Repository) Update(
 	ctx context.Context,
 	organizationID uuid.UUID,
