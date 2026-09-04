@@ -82,7 +82,12 @@ func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, i
 		return sqlc.PhoneNumber{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	number, err := r.queries.WithTx(tx).UpdatePhoneNumber(ctx, sqlc.UpdatePhoneNumberParams{ID: id, OrganizationID: organizationID, CarrierConnectionID: &connectionID})
+
+	number, err := r.queries.WithTx(tx).SetBYOCPhoneNumberCarrierConnection(ctx, sqlc.SetBYOCPhoneNumberCarrierConnectionParams{
+		ID:                  id,
+		OrganizationID:      organizationID,
+		CarrierConnectionID: connectionID,
+	})
 	if err != nil {
 		return sqlc.PhoneNumber{}, err
 	}
