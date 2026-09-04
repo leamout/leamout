@@ -100,16 +100,12 @@ CREATE INDEX IF NOT EXISTS idx_carrier_connections_provider_id
 
 CREATE TABLE IF NOT EXISTS carrier_connection_source_ips (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL,
-    carrier_connection_id UUID NOT NULL,
+    organization_id UUID,
+    carrier_connection_id UUID NOT NULL REFERENCES carrier_connections(id) ON DELETE CASCADE,
     cidr CIDR NOT NULL,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_carrier_connection_source_ips_connection_org
-        FOREIGN KEY (carrier_connection_id, organization_id)
-        REFERENCES carrier_connections(id, organization_id)
-        ON DELETE CASCADE,
     CONSTRAINT uq_carrier_connection_source_ips_connection_cidr
         UNIQUE (carrier_connection_id, cidr)
 );
@@ -119,6 +115,24 @@ CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_organization_id
 
 CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_cidr
     ON carrier_connection_source_ips USING gist (cidr inet_ops);
+
+CREATE FUNCTION derive_carrier_source_ip_organization_id()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    SELECT organization_id
+    INTO NEW.organization_id
+    FROM carrier_connections
+    WHERE id = NEW.carrier_connection_id;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER derive_carrier_source_ip_organization_id
+BEFORE INSERT OR UPDATE OF carrier_connection_id ON carrier_connection_source_ips
+FOR EACH ROW
+EXECUTE FUNCTION derive_carrier_source_ip_organization_id();
 
 CREATE TRIGGER set_carrier_connections_updated_at
 BEFORE UPDATE ON carrier_connections
