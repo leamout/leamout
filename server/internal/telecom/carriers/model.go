@@ -80,31 +80,31 @@ type ValidationResponse struct {
 }
 
 type Response struct {
-	ID                     uuid.UUID `json:"id"`
-	OrganizationID         uuid.UUID `json:"organization_id"`
-	ProviderID             uuid.UUID `json:"provider_id"`
-	Name                   string    `json:"name"`
-	Status                 string    `json:"status"`
-	OutboundAuthMethod     string    `json:"outbound_auth_method"`
-	AuthUsername           *string   `json:"auth_username,omitempty"`
-	HasOutboundCredentials bool      `json:"has_outbound_credentials"`
-	InboundEnabled         bool      `json:"inbound_enabled"`
-	InboundAuthMethod      string    `json:"inbound_auth_method"`
-	InboundUsername        *string   `json:"inbound_username,omitempty"`
-	HasInboundCredentials  bool      `json:"has_inbound_credentials"`
-	MaxCPS                 int32     `json:"max_cps"`
-	MaxConcurrentCalls     int32     `json:"max_concurrent_calls"`
-	MaxDailyMinutes        *int64    `json:"max_daily_minutes,omitempty"`
-	Codecs                 []string  `json:"codecs"`
-	SupportsVideo          bool      `json:"supports_video"`
-	SupportsFax            bool      `json:"supports_fax"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                     uuid.UUID  `json:"id"`
+	OrganizationID         *uuid.UUID `json:"organization_id,omitempty"`
+	ProviderID             uuid.UUID  `json:"provider_id"`
+	Name                   string     `json:"name"`
+	Status                 string     `json:"status"`
+	OutboundAuthMethod     string     `json:"outbound_auth_method"`
+	AuthUsername           *string    `json:"auth_username,omitempty"`
+	HasOutboundCredentials bool       `json:"has_outbound_credentials"`
+	InboundEnabled         bool       `json:"inbound_enabled"`
+	InboundAuthMethod      string     `json:"inbound_auth_method"`
+	InboundUsername        *string    `json:"inbound_username,omitempty"`
+	HasInboundCredentials  bool       `json:"has_inbound_credentials"`
+	MaxCPS                 int32      `json:"max_cps"`
+	MaxConcurrentCalls     int32      `json:"max_concurrent_calls"`
+	MaxDailyMinutes        *int64     `json:"max_daily_minutes,omitempty"`
+	Codecs                 []string   `json:"codecs"`
+	SupportsVideo          bool       `json:"supports_video"`
+	SupportsFax            bool       `json:"supports_fax"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
 }
 
 type SourceIPResponse struct {
 	ID                  uuid.UUID    `json:"id"`
-	OrganizationID      uuid.UUID    `json:"organization_id"`
+	OrganizationID      *uuid.UUID   `json:"organization_id,omitempty"`
 	CarrierConnectionID uuid.UUID    `json:"carrier_connection_id"`
 	CIDR                netip.Prefix `json:"cidr"`
 	CreatedAt           time.Time    `json:"created_at"`

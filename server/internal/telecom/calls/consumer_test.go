@@ -72,6 +72,7 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 	organizationID := uuid.New()
 	applicationID := uuid.New()
 	carrierConnectionID := uuid.New()
+	phoneNumberID := uuid.New()
 
 	err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
 		Name: "CHANNEL_HANGUP_COMPLETE",
@@ -80,6 +81,7 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 			"variable_sip_h_X-Leamout-Organization-ID":       organizationID.String(),
 			"variable_sip_h_X-Leamout-Voice-Application-ID":  applicationID.String(),
 			"variable_sip_h_X-Leamout-Carrier-Connection-ID": carrierConnectionID.String(),
+			"variable_sip_h_X-Leamout-Phone-Number-ID":       phoneNumberID.String(),
 			"Caller-Caller-ID-Number":                        "+233201234567",
 			"Caller-Destination-Number":                      "+233301234567",
 			"Hangup-Cause":                                   "NORMAL_CLEARING",
@@ -101,11 +103,36 @@ func TestConsumerMapsTrustedInboundHangup(t *testing.T) {
 	if service.last.CarrierConnectionID != carrierConnectionID {
 		t.Fatalf("carrier connection = %s, want %s", service.last.CarrierConnectionID, carrierConnectionID)
 	}
+	if service.last.PhoneNumberID != phoneNumberID {
+		t.Fatalf("phone number = %s, want %s", service.last.PhoneNumberID, phoneNumberID)
+	}
 	if service.last.ChannelID != "channel-2" {
 		t.Fatalf("channel = %q, want channel-2", service.last.ChannelID)
 	}
 	if !service.last.WasAnswered {
 		t.Fatal("WasAnswered = false, want true")
+	}
+}
+
+func TestConsumerRejectsTrustedInboundWithoutPhoneNumberID(t *testing.T) {
+	service := &fakeLifecycleService{}
+	consumer := &Consumer{service: service}
+
+	err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
+		Name: "CHANNEL_CREATE",
+		Headers: map[string]string{
+			"Unique-ID": "channel-missing-number",
+			"variable_sip_h_X-Leamout-Organization-ID":       uuid.NewString(),
+			"variable_sip_h_X-Leamout-Voice-Application-ID":  uuid.NewString(),
+			"variable_sip_h_X-Leamout-Carrier-Connection-ID": uuid.NewString(),
+			"Caller-Destination-Number":                      "+233301234567",
+		},
+	})
+	if err == nil {
+		t.Fatal("expected missing phone number attribution to fail")
+	}
+	if service.ensure != 0 {
+		t.Fatalf("EnsureInbound calls = %d, want 0", service.ensure)
 	}
 }
 

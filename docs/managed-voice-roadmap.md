@@ -89,6 +89,18 @@ Rules:
 
 ## Phase 3 — routing behavior
 
+Implementation status on this branch:
+
+- [x] Make `trunk_id` optional for outbound calls.
+- [x] Route an explicit `trunk_id` only through the caller organization's BYOC resources.
+- [x] Route a call without `trunk_id` only through the platform `managed_default` trunk.
+- [x] Preserve the BYOC same-carrier caller-identity rule.
+- [x] Allow managed numbering and managed termination providers to differ.
+- [x] Derive managed inbound tenancy from the called DID instead of the platform carrier connection.
+- [x] Fail closed when the best source-IP match is ambiguous across carrier connections.
+- [x] Enforce BYOC/managed provisioning-mode ownership at both SQL and resolver boundaries.
+- [x] Prove explicit BYOC failure never falls back to managed routing and managed routing never reads a tenant trunk.
+
 ### Outbound
 
 Today an outbound call requires an organization-owned `trunk_id`.
@@ -123,6 +135,8 @@ For a managed outbound route, caller identity is authorized when the number:
 - belongs to the calling organization;
 - is active and voice-enabled;
 - is allowed for outbound caller identity by Leamout policy.
+
+For the first managed route, the policy is intentionally narrow: an active, voice-enabled number owned by the calling organization is eligible. Provider-specific caller-ID rules belong in later policy/provider validation, not in the generic route selector.
 
 This permits:
 

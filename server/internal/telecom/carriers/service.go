@@ -283,7 +283,7 @@ func (s *Service) Create(
 		return Response{}, err
 	}
 	item, err := s.repo.Create(ctx, sqlc.CreateCarrierConnectionParams{
-		OrganizationID:     organizationID,
+		OrganizationID:     &organizationID,
 		ProviderID:         req.ProviderID,
 		Name:               name,
 		Status:             req.Status,
@@ -389,7 +389,7 @@ func (s *Service) Update(
 		SupportsVideo:      req.SupportsVideo,
 		SupportsFax:        req.SupportsFax,
 		ID:                 id,
-		OrganizationID:     organizationID,
+		OrganizationID:     &organizationID,
 	})
 	if err != nil {
 		return Response{}, writeError(err, "carrier connection", "carrier connection not found")

@@ -1,19 +1,16 @@
 CREATE TABLE IF NOT EXISTS trunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL,
-    carrier_connection_id UUID NOT NULL,
+    organization_id UUID,
+    carrier_connection_id UUID NOT NULL REFERENCES carrier_connections(id) ON DELETE RESTRICT,
 
     name TEXT NOT NULL,
     direction TEXT NOT NULL DEFAULT 'bidirectional',
     status TEXT NOT NULL DEFAULT 'active',
+    managed_default BOOLEAN NOT NULL DEFAULT false,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_trunks_connection_org
-        FOREIGN KEY (carrier_connection_id, organization_id)
-        REFERENCES carrier_connections(id, organization_id)
-        ON DELETE RESTRICT,
     CONSTRAINT uq_trunks_org_name UNIQUE (organization_id, name),
     CONSTRAINT uq_trunks_id_org UNIQUE (id, organization_id),
     CONSTRAINT chk_trunks_name CHECK (
@@ -27,6 +24,14 @@ CREATE TABLE IF NOT EXISTS trunks (
     )
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_trunks_platform_name
+    ON trunks (name)
+    WHERE organization_id IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_trunks_managed_default
+    ON trunks (managed_default)
+    WHERE organization_id IS NULL AND managed_default = true;
+
 CREATE INDEX IF NOT EXISTS idx_trunks_organization_status
     ON trunks (organization_id, status);
 
@@ -35,8 +40,8 @@ CREATE INDEX IF NOT EXISTS idx_trunks_connection_id
 
 CREATE TABLE IF NOT EXISTS trunk_endpoints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL,
-    trunk_id UUID NOT NULL,
+    organization_id UUID,
+    trunk_id UUID NOT NULL REFERENCES trunks(id) ON DELETE CASCADE,
 
     host TEXT NOT NULL,
     port INTEGER NOT NULL DEFAULT 5060,
@@ -56,10 +61,6 @@ CREATE TABLE IF NOT EXISTS trunk_endpoints (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_trunk_endpoints_trunk_org
-        FOREIGN KEY (trunk_id, organization_id)
-        REFERENCES trunks(id, organization_id)
-        ON DELETE CASCADE,
     CONSTRAINT uq_trunk_endpoints_target
         UNIQUE (trunk_id, host, port, transport, direction),
     CONSTRAINT uq_trunk_endpoints_id_org UNIQUE (id, organization_id),
@@ -105,6 +106,45 @@ CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_organization_id
 CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_health_probe
     ON trunk_endpoints (health_status, cooldown_until, last_checked_at)
     WHERE enabled = true;
+
+-- Trunks and endpoints inherit organization ownership from their carrier
+-- connection. Platform-owned connections therefore produce NULL organization
+-- IDs on their managed trunks/endpoints.
+CREATE FUNCTION derive_trunk_organization_id()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    SELECT organization_id
+    INTO NEW.organization_id
+    FROM carrier_connections
+    WHERE id = NEW.carrier_connection_id;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER derive_trunk_organization_id
+BEFORE INSERT OR UPDATE OF carrier_connection_id ON trunks
+FOR EACH ROW
+EXECUTE FUNCTION derive_trunk_organization_id();
+
+CREATE FUNCTION derive_trunk_endpoint_organization_id()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    SELECT organization_id
+    INTO NEW.organization_id
+    FROM trunks
+    WHERE id = NEW.trunk_id;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER derive_trunk_endpoint_organization_id
+BEFORE INSERT OR UPDATE OF trunk_id ON trunk_endpoints
+FOR EACH ROW
+EXECUTE FUNCTION derive_trunk_endpoint_organization_id();
 
 CREATE TRIGGER set_trunks_updated_at
 BEFORE UPDATE ON trunks

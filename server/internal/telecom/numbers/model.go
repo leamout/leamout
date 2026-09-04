@@ -8,6 +8,13 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
+type ProvisioningMode string
+
+const (
+	ProvisioningModeBYOC    ProvisioningMode = "byoc"
+	ProvisioningModeManaged ProvisioningMode = "managed"
+)
+
 type CreateRequest struct {
 	Number       string `json:"number"`
 	CountryCode  string `json:"country_code"`
@@ -31,7 +38,6 @@ type Response struct {
 	Number              string     `json:"number"`
 	CountryCode         string     `json:"country_code"`
 	CarrierConnectionID *uuid.UUID `json:"carrier_connection_id,omitempty"`
-	ProviderResourceID  *string    `json:"provider_resource_id,omitempty"`
 	VoiceEnabled        bool       `json:"voice_enabled"`
 	SMSEnabled          bool       `json:"sms_enabled"`
 	Status              string     `json:"status"`
@@ -46,7 +52,6 @@ func response(number sqlc.PhoneNumber) Response {
 		Number:              number.Number,
 		CountryCode:         number.CountryCode,
 		CarrierConnectionID: number.CarrierConnectionID,
-		ProviderResourceID:  number.ProviderResourceID,
 		VoiceEnabled:        number.VoiceEnabled,
 		SMSEnabled:          number.SmsEnabled,
 		Status:              number.Status,

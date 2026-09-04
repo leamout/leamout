@@ -11,7 +11,7 @@ import (
 // CreateCallRequest contains the public routing intent for an outbound call.
 type CreateCallRequest struct {
 	ApplicationID   *uuid.UUID        `json:"application_id,omitempty"`
-	TrunkID         uuid.UUID         `json:"trunk_id"`
+	TrunkID         *uuid.UUID        `json:"trunk_id,omitempty"`
 	From            string            `json:"from"`
 	To              string            `json:"to"`
 	Variables       map[string]string `json:"variables,omitempty"`
@@ -47,6 +47,7 @@ type OriginateRequest struct {
 type InboundCallEvent struct {
 	OrganizationID      uuid.UUID
 	CarrierConnectionID uuid.UUID
+	PhoneNumberID       uuid.UUID
 	ApplicationID       uuid.UUID
 	ChannelID           string
 	From                string

@@ -157,10 +157,27 @@ WHERE carrier_connection_id = $1
 	return seconds, err
 }
 
-func (r *Repository) CarrierCallLimits(ctx context.Context, organizationID, carrierID uuid.UUID) (CallLimits, error) {
-	limits := CallLimits{CarrierConnectionID: carrierID}
-	err := r.db.QueryRow(ctx, `SELECT max_cps, max_concurrent_calls, max_daily_minutes FROM carrier_connections WHERE id=$1 AND organization_id=$2 AND status='active'`, carrierID, organizationID).Scan(&limits.MaxCPS, &limits.MaxConcurrent, &limits.MaxDailyMinutes)
-	return limits, err
+// InboundCallLimits revalidates the trusted SIP metadata against the current
+// number/application/carrier relationship and returns limits from the resolved
+// carrier connection. Platform connections are intentionally not required to
+// belong to the call's organization; managed ingress tenancy comes from the DID.
+func (r *Repository) InboundCallLimits(ctx context.Context, event InboundCallEvent) (CallLimits, error) {
+	row, err := r.queries.GetInboundCallContext(ctx, sqlc.GetInboundCallContextParams{
+		PhoneNumberID:       event.PhoneNumberID,
+		OrganizationID:      event.OrganizationID,
+		CalledNumber:        event.To,
+		CarrierConnectionID: &event.CarrierConnectionID,
+		ApplicationID:       event.ApplicationID,
+	})
+	if err != nil {
+		return CallLimits{}, err
+	}
+	return CallLimits{
+		CarrierConnectionID: event.CarrierConnectionID,
+		MaxCPS:              row.MaxCps,
+		MaxConcurrent:       row.MaxConcurrentCalls,
+		MaxDailyMinutes:     row.MaxDailyMinutes,
+	}, nil
 }
 
 func (r *Repository) MarkRinging(
