@@ -146,20 +146,6 @@ services:
     networks:
       - private-control
 
-  waitlist:
-    image: leamout/waitlist:1.0.0
-    build:
-      context: ../clients
-      dockerfile: apps/waitlist/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "3002:3000"
-    depends_on:
-      server:
-        condition: service_healthy
-    networks:
-      - private-control
-
   opensips:
     image: leamout/opensips:4.0.1
     build:
