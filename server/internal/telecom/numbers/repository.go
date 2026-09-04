@@ -86,7 +86,7 @@ func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, i
 	number, err := r.queries.WithTx(tx).SetBYOCPhoneNumberCarrierConnection(ctx, sqlc.SetBYOCPhoneNumberCarrierConnectionParams{
 		ID:                  id,
 		OrganizationID:      organizationID,
-		CarrierConnectionID: connectionID,
+		CarrierConnectionID: &connectionID,
 	})
 	if err != nil {
 		return sqlc.PhoneNumber{}, err
