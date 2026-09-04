@@ -1,151 +1,257 @@
-# CommPeak Integration
+# CommPeak provider
 
-CommPeak is Leamout's primary wholesale provider for **SIP voice termination (outbound)** and **origination (inbound)**.
+CommPeak is the initial managed provider for SIP termination and origination.
 
-CommPeak exposes standards-based SIP connectivity for call routing, while provider-side rate and CDR data can be used by Leamout for reconciliation and wholesale cost tracking. CommPeak currently advertises SIP trunking from approximately `$0.0009/min`, but actual rates vary by route, pricing group, destination, billing increment, account tier, and negotiated terms and must not be hard-coded into Leamout.
+This document records how CommPeak should plug into the existing Leamout carrier model. It is an implementation note, not a provider overview.
 
-## 1. Strategic Role in Leamout
+## Phase 1 scope
 
-- **Primary use case**: Terminate outbound calls from Leamout customers to the global PSTN.
-- **Secondary use case**: Receive inbound PSTN traffic through CommPeak origination where CommPeak-managed DIDs or inbound routes are used.
-- **Why CommPeak**: Wholesale-oriented SIP termination, broad international routing, standards-based SIP interoperability, and provider CDR/rate data suitable for cost reconciliation.
+Phase 1 needs to support:
 
-## 2. Integration Architecture
+- outbound PSTN termination through a CommPeak trunk;
+- inbound CommPeak SIP traffic where origination is enabled;
+- SIP authentication and source-IP attribution;
+- endpoint health/failover through the existing trunk model;
+- call attribution to carrier connection, trunk, endpoint, and SIP call ID;
+- provider CDR ingestion for wholesale reconciliation.
 
-CommPeak call signaling integrates with Leamout through SIP. Operational and billing data such as rates and CDRs may be retrieved separately from CommPeak's portal or APIs, but Leamout does not depend on a proprietary REST call-control API to originate or receive calls.
+Not in the first integration:
 
-### A. Outbound Termination
+- multi-carrier LCR;
+- wholesale-rate-driven route selection;
+- provider-specific customer pricing.
 
-1. `calls.Service` receives an outbound call request.
-2. The telecom routing layer resolves the requested trunk, its `carrier_connection`, and an eligible outbound `trunk_endpoint`.
-3. Admission control enforces the carrier connection's CPS, concurrent-call, and optional daily-minute limits.
-4. The media/signaling controller originates the call toward the selected CommPeak SIP endpoint.
-5. Outbound SIP authentication is applied according to the CommPeak account configuration, typically SIP Digest or provider-authorized source IP.
-6. CommPeak terminates the call to the PSTN.
+## Existing Leamout model
 
-The current routing resolver performs endpoint selection within the requested trunk using endpoint priority, health, and weight. Least Cost Routing (LCR) across multiple carriers is a future routing capability and should not be documented as present until a provider-cost routing model exists.
+Use the existing SIP carrier primitives.
 
-### B. Inbound Origination
+| Leamout object | CommPeak use |
+| --- | --- |
+| `carrier_providers` | Built-in CommPeak provider definition. |
+| `carrier_connections` | Organization-scoped SIP auth, limits, codecs, and ingress mode. |
+| `carrier_connection_source_ips` | CommPeak source networks accepted for inbound traffic. |
+| `trunks` | Logical CommPeak trunk. |
+| `trunk_endpoints` | CommPeak SIP proxy targets. |
+| `calls` | Persists carrier/trunk/endpoint attribution and `sip_call_id`. |
 
-1. A PSTN call reaches a CommPeak DID or origination route configured for Leamout.
-2. CommPeak sends a SIP INVITE to Leamout's public SIP ingress.
-3. OpenSIPS resolves the source IP against `carrier_connection_source_ips` and attributes the INVITE to the corresponding organization-scoped `carrier_connection`.
-4. The routing layer verifies that the called `phone_numbers` record belongs to the same carrier connection.
-5. The number is resolved through `voice_bindings` to the target voice application.
+CommPeak is standards-based SIP. Use the existing SIP adapter convention unless provider-specific control-plane behavior later requires a separate adapter.
 
-Inbound source authentication should use the actual CommPeak source networks assigned to the account rather than a static global allow list embedded in OpenSIPS configuration.
+## Outbound path
 
-## 3. Leamout Data Model Mapping
+Current outbound routing is trunk-scoped. Do not describe it as LCR.
 
-| Leamout entity | CommPeak concept | Notes |
-| :--- | :--- | :--- |
-| `carrier_providers` | CommPeak platform | Add a provider such as `slug: "commpeak"`. The current standards-based carrier adapter convention is `adapter: "sip"`. |
-| `carrier_connections` | SIP account / carrier relationship | Stores organization-scoped SIP auth configuration, inbound mode, traffic limits, codecs, and provider relationship. For password auth use `outbound_auth_method: "digest"`, `auth_username`, and encrypted `auth_secret_ciphertext`. |
-| `carrier_connection_source_ips` | Authorized CommPeak ingress networks | Stores CIDRs used to identify and authorize inbound SIP traffic. |
-| `trunks` | CommPeak trunk | Represents the logical inbound, outbound, or bidirectional trunk attached to the CommPeak carrier connection. |
-| `trunk_endpoints` | CommPeak SIP proxy / ingress target | Stores `host`, `port`, `transport`, direction, priority, weight, enabled state, and endpoint health information. |
-| `calls` | Provider-routed call | Stores `carrier_connection_id`, `trunk_id`, `trunk_endpoint_id`, and `sip_call_id`, providing the internal attribution needed for later CDR reconciliation. |
-| `carrier_rates` | Customer-facing billable rate | The current table is **not** the CommPeak wholesale rate table. It represents what Leamout charges customers and must not be overloaded with upstream carrier cost. |
+Expected path:
 
-### Wholesale cost model
+```text
+calls.Service
+    ↓
+routing.ResolveOutbound
+    ↓
+trunk
+    ↓
+carrier_connection
+    ↓
+trunk_endpoints
+    ↓
+priority / health / weight selection
+    ↓
+FreeSWITCH / OpenSIPS
+    ↓ SIP INVITE
+CommPeak
+    ↓
+PSTN
+```
 
-Leamout does not currently have a dedicated upstream carrier-cost model. CommPeak termination rates therefore require a separate future model rather than reusing `carrier_rates`.
+`calls.Service` already enforces carrier connection admission before origination. Keep CommPeak inside that path; do not add a provider-specific bypass around routing or admission control.
 
-A provider-cost model should eventually support at least:
+The selected route must persist:
 
-- carrier provider or carrier connection
-- destination prefix
-- country and network
-- route or pricing group / technical prefix
-- currency
-- wholesale unit cost
-- billing minimum and increment, such as `1/1`, `60/1`, or `60/60`
-- effective start and end times
-- source/version of the imported rate deck
+```text
+carrier_connection_id
+trunk_id
+trunk_endpoint_id
+sip_call_id
+```
 
-This model can later feed LCR and margin analysis while remaining independent from customer pricing.
+Those fields are required later for debugging and CDR reconciliation.
 
-## 4. Billing and CDR Reconciliation
+## SIP authentication
 
-CommPeak provides call-detail reporting for termination and origination. Leamout should use provider CDR data to reconcile actual upstream billed duration and cost after the call completes.
+Use the existing `carrier_connections` authentication fields.
 
-### Preferred ingestion path
+For digest auth:
 
-Use a background worker to pull CDRs from the provider's supported API or another account-approved export mechanism.
+```text
+outbound_auth_method = digest
+auth_username
+auth_secret_ciphertext
+```
 
-A possible integration location is:
+Leamout already materializes realm-bound HA1 runtime state for OpenSIPS. CommPeak credential rotation must use that path rather than introducing provider-specific plaintext configuration.
+
+If the CommPeak account uses source-IP authentication instead, configure that explicitly. Do not assume password or IP auth globally for the provider.
+
+## Endpoints
+
+Represent every CommPeak target as a `trunk_endpoints` row.
+
+Use the provider-assigned values for:
+
+```text
+host
+port
+transport
+direction
+priority
+weight
+```
+
+Do not hard-code a sample CommPeak proxy hostname into production bootstrap data unless it is a provider-documented stable endpoint for all accounts.
+
+The existing endpoint health logic is responsible for OPTIONS probes, cooldowns, priority failover, and weighted selection. CommPeak does not need its own health subsystem.
+
+## Inbound path
+
+Where CommPeak origination is used:
+
+```text
+CommPeak
+  ↓ SIP INVITE
+OpenSIPS
+  ↓ source-IP carrier resolution
+carrier_connection
+  ↓ called number
+phone_numbers
+  ↓
+voice_bindings
+  ↓
+voice application
+```
+
+Store authorized CommPeak ingress CIDRs in `carrier_connection_source_ips`.
+
+Do not maintain a separate static CommPeak allow list in `opensips.cfg`. Source-IP changes should remain live through the existing database-backed ingress lookup.
+
+Inbound routing must fail closed when:
+
+- the source IP is unknown;
+- the source matches more than one carrier connection ambiguously;
+- the called number is assigned to another carrier connection;
+- the organization does not match;
+- no voice binding exists.
+
+## Caller identity
+
+Outbound caller identity must stay inside the existing ownership checks.
+
+A number used as `From` must be voice-enabled and assigned to the same carrier connection as the selected trunk. Do not special-case CommPeak to allow arbitrary caller IDs through the API.
+
+Provider-specific CLI restrictions can be added later as validation on top of the existing ownership rule.
+
+## Codecs
+
+Configure the connection with codecs supported by the active CommPeak account and by Leamout media services.
+
+Prefer avoiding transcoding where possible. Codec policy belongs on the carrier connection / call policy path, not in a CommPeak-specific FreeSWITCH profile.
+
+## Wholesale rates
+
+`carrier_rates` is customer-facing billing data. Do not store CommPeak wholesale termination rates there.
+
+Before cost-aware routing or margin accounting is implemented, add a separate upstream cost model.
+
+It needs to handle at least:
+
+```text
+provider / carrier connection
+destination prefix
+country / network
+route or pricing group
+currency
+unit cost
+minimum / increment
+effective period
+rate deck version
+```
+
+Only after that model has deterministic precedence and effective dating should routing consider cost across multiple carriers.
+
+## CDR ingestion
+
+Provider CDRs are asynchronous reconciliation data. They must not be part of the synchronous call-control path.
+
+Planned provider package:
 
 ```text
 server/internal/integrations/carriers/commpeak/
 ```
 
-with CDR reconciliation kept in a reusable carrier workflow rather than coupling it directly to call control.
+The CommPeak client should expose only the operations needed to fetch termination/origination records and any rate data Leamout actually consumes.
 
-The worker should:
+A worker should:
 
-1. Maintain a durable provider cursor or overlapping time window so delayed CDRs are not lost.
-2. Pull termination and origination records incrementally.
-3. Normalize provider fields such as source, destination, status, duration, billed duration, route/pricing group, rate, and cost.
-4. Correlate the CDR to the internal `calls` record using a deterministic provider identifier or SIP identifier where the provider exposes one.
-5. Make reconciliation idempotent so reprocessing the same provider CDR cannot double-count cost.
-6. Persist provider-reported wholesale cost separately from customer-facing rated charges.
-7. Record unmatched and conflicting CDRs for operational review instead of silently discarding them.
+1. fetch CDRs incrementally;
+2. use a durable cursor or overlapping time window;
+3. normalize provider records;
+4. match them to internal calls;
+5. persist wholesale duration/cost separately from customer billing;
+6. record unmatched or conflicting records;
+7. be safe to rerun without double-counting.
 
-The existing `calls.sip_call_id` is unique and should participate in reconciliation when CommPeak exposes a compatible SIP call identifier. Do not assume a custom header such as `X-Leamout-Call-ID` will be returned in CommPeak CDRs until that behavior is verified with the production SIP account.
+Use `calls.sip_call_id` for reconciliation only if the provider exposes a compatible call identifier. Verify that behavior against the production account before depending on it.
 
-### Portal exports and SFTP
+Do not assume a custom SIP header will appear in CommPeak CDRs unless this has been tested end to end.
 
-CommPeak supports CDR viewing and CSV export through its portal, and current CommPeak documentation exposes API endpoints for termination and origination call records. If a specific Leamout account is provisioned with SFTP delivery, it may be supported as an additional ingestion transport, but the integration should not depend on SFTP as a universal CommPeak capability.
+## CDR storage
 
-## 5. Operational Requirements
+The current `calls` table does not own upstream billed cost fields.
 
-1. **SIP authentication**: Obtain the CommPeak SIP account configuration. Store password credentials encrypted at rest when using digest authentication; use IP authentication only when explicitly configured on the provider account.
-2. **Inbound source validation**: Populate `carrier_connection_source_ips` with the CommPeak ingress networks assigned or documented for the account.
-3. **Endpoint configuration**: Represent each CommPeak SIP target as a `trunk_endpoints` row with the actual host, port, transport, direction, priority, and weight provided for the account.
-4. **Codec negotiation**: Prefer codecs supported by both Leamout and the active CommPeak SIP service. CommPeak documents support for G.711 u-law/A-law and G.729a among other codecs. Avoid unnecessary transcoding when possible.
-5. **Admission and fraud controls**: Enforce `max_cps`, `max_concurrent_calls`, and optional `max_daily_minutes` before an outbound call reaches the provider.
-6. **Caller identity**: Ensure outbound caller IDs are authorized for the selected carrier connection and comply with CommPeak account and destination requirements.
-7. **Rate synchronization**: Treat provider rate decks as versioned wholesale inputs. Do not assume the advertised starting price applies to every destination.
-8. **CDR reconciliation**: Monitor ingestion lag, unmatched CDRs, duplicates, provider/API failures, and differences between expected and actual wholesale cost.
-9. **Endpoint health**: Use Leamout's endpoint health state and priority/weight routing to fail over between configured CommPeak targets without routing to known unhealthy endpoints.
+Do not start adding provider-specific columns directly to `calls` for every carrier. Define a provider-neutral reconciliation model when implementation starts.
 
-## 6. Implementation Checklist
+It will likely need:
 
-- [ ] Create the built-in CommPeak entry in `carrier_providers` using the standards-based SIP adapter.
-- [ ] Obtain the production CommPeak SIP account configuration and approved authentication method.
-- [ ] Create the organization-scoped CommPeak `carrier_connection` with appropriate traffic limits and codecs.
-- [ ] Create outbound/bidirectional `trunks` and CommPeak `trunk_endpoints` using provider-assigned hosts, ports, and transports.
-- [ ] Verify outbound SIP Digest or IP authentication according to the CommPeak account configuration.
-- [ ] Populate `carrier_connection_source_ips` for authorized CommPeak inbound source networks.
-- [ ] Verify OpenSIPS attributes inbound CommPeak INVITEs to the correct organization and carrier connection.
-- [ ] Add acceptance coverage for outbound CommPeak termination and endpoint failover.
-- [ ] Add acceptance coverage for inbound CommPeak origination where a CommPeak DID/route is used.
-- [ ] Implement a CommPeak CDR client for incremental termination/origination record retrieval.
-- [ ] Define a dedicated upstream provider-cost schema instead of storing CommPeak wholesale costs in `carrier_rates`.
-- [ ] Implement idempotent CDR-to-call reconciliation and unmatched-CDR handling.
-- [ ] Add provider rate-deck import/versioning before enabling cost-aware LCR.
-- [ ] Add LCR across carrier connections only after wholesale rates, precedence, effective dating, and failover policy are explicitly modeled and tested.
+```text
+provider
+provider CDR ID
+call_id
+billed seconds
+wholesale amount
+currency
+provider status
+raw/normalized timestamps
+reconciled_at
+```
 
-## 7. Phase 1 Definition of Done
+The provider CDR ID must be unique enough to make ingestion idempotent.
 
-The CommPeak integration is ready for Phase 1 when Leamout can:
+## Implementation checklist
 
-1. Represent CommPeak as a built-in SIP carrier provider.
-2. Configure a CommPeak carrier connection and one or more SIP endpoints.
-3. Originate an outbound call through `calls.Service` and the existing routing/media controller path.
-4. Authenticate successfully to CommPeak using the configured production method.
-5. Attribute the persisted `calls` record to the selected carrier connection, trunk, endpoint, and SIP call ID.
-6. Enforce carrier-level CPS, concurrency, and daily-minute controls before origination.
-7. Accept and attribute inbound CommPeak traffic by source IP when origination is enabled.
-8. Resolve inbound numbers to the correct voice application without cross-organization routing.
-9. Retrieve provider CDRs and reconcile billed duration and wholesale cost idempotently.
-10. Surface reconciliation failures without modifying customer-facing billing data incorrectly.
+- [ ] Add the built-in `commpeak` carrier provider.
+- [ ] Obtain the production SIP authentication mode and endpoint list.
+- [ ] Create an organization-scoped CommPeak `carrier_connection`.
+- [ ] Configure outbound auth through the existing encrypted credential path.
+- [ ] Create the required trunk and `trunk_endpoints` rows.
+- [ ] Verify OPTIONS health checks against CommPeak targets.
+- [ ] Complete a real outbound call through the normal `calls.Service` path.
+- [ ] Verify carrier connection, trunk, endpoint, and SIP call ID attribution.
+- [ ] Rotate outbound credentials without restarting OpenSIPS.
+- [ ] Populate `carrier_connection_source_ips` when inbound origination is enabled.
+- [ ] Complete a real inbound CommPeak call through the existing number/binding path.
+- [ ] Implement the CommPeak CDR client.
+- [ ] Define provider-neutral wholesale reconciliation storage.
+- [ ] Reconcile provider CDRs idempotently.
+- [ ] Add acceptance coverage for outbound termination, auth rotation, endpoint failover, and inbound origination.
 
-## 8. Provider References
+## Phase 1 exit criteria
 
-- CommPeak pricing: https://www.commpeak.com/pricing
-- CommPeak SIP origination and termination overview: https://docs.commpeak.com/docs/what-is-sip-origination-sip-termination
-- CommPeak supported codecs: https://docs.commpeak.com/docs/what-are-the-supported-codecs
-- CommPeak termination CDR API: https://docs.commpeak.com/reference/termination_call_records
-- CommPeak origination CDR API: https://docs.commpeak.com/reference/origination_call_records
-- CommPeak CDR portal/export documentation: https://docs.commpeak.com/docs/call-records-cdr
+CommPeak Phase 1 is complete when a test can:
+
+1. provision the CommPeak carrier connection and endpoints;
+2. originate a real PSTN call through CommPeak;
+3. enforce CPS/concurrency/daily-minute admission on that call;
+4. persist the selected connection, trunk, endpoint, and SIP call ID;
+5. rotate credentials without an OpenSIPS restart;
+6. fail over from an unhealthy primary endpoint;
+7. accept and attribute a real inbound CommPeak INVITE when origination is enabled;
+8. fetch the provider CDR for the call;
+9. reconcile it exactly once to the internal call record / reconciliation record.
