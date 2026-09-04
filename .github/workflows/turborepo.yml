@@ -30,7 +30,6 @@ jobs:
         app:
           - web
           - console
-          - waitlist
 
     steps:
       - name: Checkout
