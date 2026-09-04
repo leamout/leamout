@@ -1,0 +1,158 @@
+name: Runtime Installation
+
+on:
+  pull_request:
+    paths:
+      - "server/cmd/leamout/**"
+      - "server/internal/runtime/leamout/**"
+      - "server/scripts/install.sh"
+      - "server/scripts/release/package-cli.sh"
+      - "server/scripts/release/package-runtime.sh"
+      - "server/release/**"
+      - "server/migrations/**"
+      - "LICENSE"
+      - ".github/workflows/runtime-installation.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/cmd/leamout/**"
+      - "server/internal/runtime/leamout/**"
+      - "server/scripts/install.sh"
+      - "server/scripts/release/package-cli.sh"
+      - "server/scripts/release/package-runtime.sh"
+      - "server/release/**"
+      - "server/migrations/**"
+      - "LICENSE"
+      - ".github/workflows/runtime-installation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-installation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-host:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Test runtime installer
+        working-directory: server
+        run: go test ./internal/runtime/leamout
+
+      - name: Build release fixture
+        run: |
+          VERSION=1.0.0-preview.1
+          mkdir -p "/tmp/self-hosted-release/$VERSION"
+
+          (
+            cd server
+            go build \
+              -trimpath \
+              -ldflags "-s -w -X main.version=$VERSION -X main.commit=${GITHUB_SHA} -X main.builtAt=1970-01-01T00:00:00Z" \
+              -o /tmp/leamout \
+              ./cmd/leamout
+          )
+
+          VERSION="$VERSION" \
+          CLI_BINARY=/tmp/leamout \
+          OUT_DIR="/tmp/self-hosted-release/$VERSION" \
+          sh server/scripts/release/package-cli.sh >/dev/null
+
+          VERSION="$VERSION" \
+          OUT_DIR="/tmp/self-hosted-release/$VERSION" \
+          sh server/scripts/release/package-runtime.sh >/dev/null
+
+          cp server/release/fixtures/valid-manifest.json "/tmp/self-hosted-release/$VERSION/release-manifest.json"
+          : > "/tmp/self-hosted-release/$VERSION/checksums.txt.minisig"
+          : > "/tmp/self-hosted-release/$VERSION/release-manifest.json.minisig"
+
+          test "$(wc -l < "/tmp/self-hosted-release/$VERSION/checksums.txt")" -eq 2
+          (
+            cd "/tmp/self-hosted-release/$VERSION"
+            sha256sum --check checksums.txt
+          )
+
+      - name: Exercise bootstrap and init without repository deployment assets
+        run: |
+          VERSION=1.0.0-preview.1
+          mkdir -p /tmp/installer-tools
+
+          cat > /tmp/installer-os-release <<'EOF'
+          ID=ubuntu
+          VERSION_ID=24.04
+          EOF
+
+          cat > /tmp/installer-tools/uname <<'EOF'
+          #!/bin/sh
+          case "$1" in
+            -s) echo Linux ;;
+            -m) echo x86_64 ;;
+            -r) echo 6.8.0 ;;
+            *) exit 1 ;;
+          esac
+          EOF
+
+          cat > /tmp/installer-tools/docker <<'EOF'
+          #!/bin/sh
+          if [ "$1" = version ]; then
+            echo 27.5.1
+          elif [ "$1" = compose ] && [ "$2" = version ]; then
+            echo 2.32.4
+          else
+            exit 1
+          fi
+          EOF
+
+          cat > /tmp/installer-tools/systemctl <<'EOF'
+          #!/bin/sh
+          echo 'systemd 255'
+          EOF
+
+          cat > /tmp/installer-tools/minisign <<'EOF'
+          #!/bin/sh
+          exit 0
+          EOF
+
+          chmod +x /tmp/installer-tools/*
+
+          sudo rm -rf /etc/leamout /var/lib/leamout /var/log/leamout /usr/local/bin/leamout
+          sudo env \
+            PATH="/tmp/installer-tools:$PATH" \
+            LEAMOUT_OS_RELEASE_FILE=/tmp/installer-os-release \
+            LEAMOUT_MINISIGN_PUBLIC_KEY=fixture-public-key \
+            LEAMOUT_RELEASE_BASE_URL=file:///tmp/self-hosted-release \
+            sh server/scripts/install.sh --version "$VERSION"
+
+          cd /tmp
+          sudo /usr/local/bin/leamout init
+
+          sudo test -f /etc/leamout/leamout.env
+          sudo test -f /var/lib/leamout/deployment.json
+          sudo test -f /var/lib/leamout/runtime/compose.yaml
+          sudo test -f /var/lib/leamout/runtime/release.json
+          sudo test -f /var/lib/leamout/runtime/migrations/039_create_idempotency.sql
+          sudo test ! -e /var/lib/leamout/runtime/compose.yaml.tmpl
+          ! sudo grep -q '@@IMAGE_' /var/lib/leamout/runtime/compose.yaml
+          ! sudo grep -Eq '^[[:space:]]*build:' /var/lib/leamout/runtime/compose.yaml
+
+          sudo cp /etc/leamout/leamout.env /tmp/leamout-env-before
+          sudo cp /var/lib/leamout/deployment.json /tmp/deployment-before
+          sudo /usr/local/bin/leamout init
+          sudo cmp /tmp/leamout-env-before /etc/leamout/leamout.env
+          sudo cmp /tmp/deployment-before /var/lib/leamout/deployment.json
+
+          cd /tmp
+          ! grep -q 'deploy/compose.yaml' < <(/usr/local/bin/leamout help)

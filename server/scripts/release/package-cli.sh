@@ -22,7 +22,7 @@ if [ "$OS" != "linux" ] || [ "$ARCH" != "amd64" ]; then
   exit 1
 fi
 
-for command in tar chmod mkdir cp mktemp; do
+for command in tar chmod mkdir cp mktemp sort grep; do
   if ! command -v "$command" >/dev/null 2>&1; then
     echo "Required command not found: $command" >&2
     exit 1
@@ -59,8 +59,6 @@ chmod 0755 "$workdir/leamout"
 cp "$LICENSE_FILE" "$workdir/LICENSE"
 chmod 0644 "$workdir/LICENSE"
 
-# GNU tar options make the archive stable across repeated release builds.
-# Release CI runs on Linux/GNU tar; Phase 2 installers only consume the archive.
 tar \
   --sort=name \
   --mtime='UTC 1970-01-01' \
@@ -71,10 +69,17 @@ tar \
   -czf "$OUT_DIR/$artifact" \
   LICENSE leamout
 
-(
-  cd "$OUT_DIR"
-  $checksum_command "$artifact" > checksums.txt
-)
+checksum="$(cd "$OUT_DIR" && $checksum_command "$artifact")"
+checksums="$OUT_DIR/checksums.txt"
+tmp="$OUT_DIR/.checksums.tmp"
+if [ -f "$checksums" ]; then
+  grep -v "  $artifact\$" "$checksums" > "$tmp" || true
+else
+  : > "$tmp"
+fi
+printf '%s\n' "$checksum" >> "$tmp"
+sort -k2 "$tmp" > "$checksums"
+rm -f "$tmp"
 
 printf '%s\n' "$OUT_DIR/$artifact"
-printf '%s\n' "$OUT_DIR/checksums.txt"
+printf '%s\n' "$checksums"

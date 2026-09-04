@@ -7,14 +7,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strings"
-)
-
-const (
-	selfHostedBuildServices  = "server worker opensips freeswitch rtpengine"
-	selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"
 )
 
 type BuildInfo struct {
@@ -37,17 +31,17 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		writef(stdout, "leamout %s\ncommit: %s\nbuilt: %s\n", build.Version, build.Commit, build.BuiltAt)
 		return 0
 	case "init":
-		return runInit(stdout, stderr)
+		return runInit(stdout, stderr, build.Version)
 	case "up":
-		return runScript(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "deploy/certs", "server/scripts/deploy/up.sh")
+		return runInstalledCompose(ctx, stdout, stderr, "up", "-d")
 	case "down":
-		return runCompose(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "down")
+		return runInstalledCompose(ctx, stdout, stderr, "down")
 	case "status":
-		return runCompose(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "ps")
+		return runInstalledCompose(ctx, stdout, stderr, "ps")
 	case "logs":
 		composeArgs := []string{"logs", "-f", "--tail=200"}
 		composeArgs = append(composeArgs, args[1:]...)
-		return runCompose(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", composeArgs...)
+		return runInstalledCompose(ctx, stdout, stderr, composeArgs...)
 	case "doctor":
 		return runDoctor(ctx, stdout, stderr)
 	default:
@@ -62,60 +56,53 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 		writef(stderr, "unsupported host: %s/%s; Self-Hosted Production v0.1 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
 	}
-
-	for _, name := range []string{"docker", "sh", "curl"} {
-		if _, err := exec.LookPath(name); err != nil {
-			writef(stderr, "missing prerequisite: %s\n", name)
-			return 1
-		}
+	if _, err := exec.LookPath("docker"); err != nil {
+		writeln(stderr, "Leamout runtime prerequisite is unavailable")
+		return 1
 	}
-	writeln(stdout, "✓ linux/amd64 host")
-	writeln(stdout, "✓ docker, sh, and curl available")
 
-	if code := runScript(ctx, stdout, stderr, ".", ".env", "deploy/compose.yaml", "deploy/certs", "server/scripts/deploy/preflight.sh"); code != 0 {
+	state, err := loadDeploymentState("/var/lib/leamout/deployment.json")
+	if err != nil {
+		writef(stderr, "deployment identity: %v\n", err)
+		return 1
+	}
+	if err := validateRuntimeEnv("/etc/leamout/leamout.env", state.DeploymentID); err != nil {
+		writef(stderr, "deployment configuration: %v\n", err)
+		return 1
+	}
+	if err := validateInstalledRuntimeFiles("/var/lib/leamout/runtime"); err != nil {
+		writef(stderr, "production runtime: %v\n", err)
+		return 1
+	}
+
+	cmd := exec.CommandContext(ctx, "docker", "compose", "--env-file", "/etc/leamout/leamout.env", "-f", "/var/lib/leamout/runtime/compose.yaml", "config", "--quiet")
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	if code := exitCode(cmd.Run(), stderr); code != 0 {
 		return code
 	}
+
+	writeln(stdout, "✓ Supported host")
+	writeln(stdout, "✓ Deployment identity and secrets valid")
+	writeln(stdout, "✓ Production runtime installed")
+	writeln(stdout, "✓ Runtime configuration valid")
 	writeln(stdout, "Leamout doctor passed.")
 	return 0
 }
 
-func runScript(ctx context.Context, stdout, stderr io.Writer, rootPath, envFile, composeFile, certDir, rel string) int {
-	root, err := filepath.Abs(rootPath)
-	if err != nil {
-		writef(stderr, "resolve Leamout root: %v\n", err)
+func runInstalledCompose(ctx context.Context, stdout, stderr io.Writer, args ...string) int {
+	if err := validateInstalledRuntimeFiles("/var/lib/leamout/runtime"); err != nil {
+		writef(stderr, "production runtime is not initialized: %v\nRun: sudo leamout init\n", err)
 		return 1
 	}
-	path := filepath.Join(root, rel)
-	if _, err := os.Stat(path); err != nil {
-		writef(stderr, "required deployment primitive missing: %s\n", path)
+	if _, err := os.Stat("/etc/leamout/leamout.env"); err != nil {
+		writef(stderr, "production configuration is not initialized: %v\nRun: sudo leamout init\n", err)
 		return 1
 	}
 
-	cmd := exec.CommandContext(ctx, "sh", path)
-	cmd.Dir = root
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	cmd.Stdin = os.Stdin
-	cmd.Env = append(os.Environ(),
-		"ENV_FILE="+envFile,
-		"COMPOSE_FILE="+composeFile,
-		"CERT_DIR="+certDir,
-		"BUILD_SERVICES="+selfHostedBuildServices,
-		"DEPLOY_SERVICES="+selfHostedDeployServices,
-	)
-	return exitCode(cmd.Run(), stderr)
-}
-
-func runCompose(ctx context.Context, stdout, stderr io.Writer, rootPath, envFile, composeFile string, args ...string) int {
-	root, err := filepath.Abs(rootPath)
-	if err != nil {
-		writef(stderr, "resolve Leamout root: %v\n", err)
-		return 1
-	}
-	base := []string{"compose", "--env-file", envFile, "-f", composeFile}
+	base := []string{"compose", "--env-file", "/etc/leamout/leamout.env", "-f", "/var/lib/leamout/runtime/compose.yaml"}
 	base = append(base, args...)
 	cmd := exec.CommandContext(ctx, "docker", base...)
-	cmd.Dir = root
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
 	cmd.Stdin = os.Stdin
@@ -143,12 +130,12 @@ Usage:
   leamout <command>
 
 Commands:
-  init       Initialize durable self-hosted deployment identity, secrets, and configuration
-  up         Start self-hosted runtime services through existing deployment primitives
-  down       Stop the existing Leamout deployment stack
-  status     Show deployment service status
-  logs       Follow deployment logs
-  doctor     Validate host prerequisites and deployment preflight
+  init       Initialize deployment identity, secrets, configuration, and production runtime
+  up         Start the installed Leamout runtime
+  down       Stop the installed Leamout runtime
+  status     Show installed runtime service status
+  logs       Follow installed runtime logs
+  doctor     Validate the local Leamout deployment
   version    Print CLI build information
   help       Show this help`)
 }

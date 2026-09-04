@@ -59,7 +59,7 @@ jobs:
 
           (
             cd /tmp/runtime-a
-            sha256sum --check leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz.sha256
+            grep '  leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz$' checksums.txt | sha256sum --check
           )
 
           tar -tzf /tmp/runtime-a/leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz > /tmp/runtime-files.txt

@@ -38,11 +38,11 @@ type deploymentSecrets struct {
 	NATSPassword                   string
 }
 
-func runInit(stdout, stderr io.Writer) int {
-	return runInitAt(stdout, stderr, "/etc/leamout", "/var/lib/leamout", "/var/log/leamout")
+func runInit(stdout, stderr io.Writer, version string) int {
+	return runInitAt(stdout, stderr, "/etc/leamout", "/var/lib/leamout", "/var/log/leamout", version)
 }
 
-func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir string) int {
+func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version string) int {
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		writef(stderr, "unsupported host: %s/%s; Self-Hosted Production v0.1 supports linux/amd64\n", runtime.GOOS, runtime.GOARCH)
 		return 1
@@ -81,8 +81,17 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir string) int
 			writef(stderr, "validate deployment configuration: %v\n", err)
 			return 1
 		}
+		if err := installRuntimeBundle(
+			filepath.Join(stateDir, "releases", version),
+			filepath.Join(stateDir, "runtime"),
+			version,
+		); err != nil {
+			writef(stderr, "install production runtime: %v\n", err)
+			return 1
+		}
 		writef(stdout, "✓ Deployment already initialized: %s\n", state.DeploymentID)
 		writeln(stdout, "✓ Existing deployment identity and secrets preserved")
+		writeln(stdout, "✓ Production runtime verified")
 		return 0
 	}
 
@@ -111,12 +120,37 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir string) int
 		return 1
 	}
 
+	if err := installRuntimeBundle(
+		filepath.Join(stateDir, "releases", version),
+		filepath.Join(stateDir, "runtime"),
+		version,
+	); err != nil {
+		if rollbackErr := rollbackInitialization(statePath, envPath); rollbackErr != nil {
+			writef(stderr, "install production runtime: %v; rollback initialization: %v\n", err, rollbackErr)
+		} else {
+			writef(stderr, "install production runtime: %v\n", err)
+		}
+		return 1
+	}
+
 	writeln(stdout, "✓ Deployment identity created")
 	writeln(stdout, "✓ Deployment-owned secrets generated")
 	writeln(stdout, "✓ Production configuration written")
+	writeln(stdout, "✓ Production runtime installed and verified")
 	writef(stdout, "Deployment ID: %s\n", state.DeploymentID)
-	writeln(stdout, "Runtime bundle installation, TLS/network validation, and activation remain pending Self-Hosted Production v0.1 work.")
+	writeln(stdout, "TLS/network validation and activation remain pending Self-Hosted Production v0.1 work.")
+	writeln(stdout, "Run: sudo leamout doctor")
 	return 0
+}
+
+func rollbackInitialization(paths ...string) error {
+	var errs []error
+	for _, path := range paths {
+		if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+			errs = append(errs, fmt.Errorf("remove %s: %w", path, err))
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func ensureDeploymentDirectories(configDir, stateDir, logDir string) error {
@@ -126,6 +160,7 @@ func ensureDeploymentDirectories(configDir, stateDir, logDir string) error {
 		filepath.Join(configDir, "license"),
 		stateDir,
 		filepath.Join(stateDir, "backups"),
+		filepath.Join(stateDir, "releases"),
 		logDir,
 	} {
 		if err := os.MkdirAll(dir, 0o750); err != nil {

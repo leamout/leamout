@@ -20,9 +20,11 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 	configDir := filepath.Join(root, "etc", "leamout")
 	stateDir := filepath.Join(root, "var", "lib", "leamout")
 	logDir := filepath.Join(root, "var", "log", "leamout")
+	version := "1.0.0-preview.1"
+	stageRuntimeRelease(t, stateDir, version)
 
 	var stdout, stderr bytes.Buffer
-	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir)
+	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir, version)
 	if code != 0 {
 		t.Fatalf("init returned %d: %s", code, stderr.String())
 	}
@@ -84,6 +86,7 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 		filepath.Join(configDir, "license"),
 		stateDir,
 		filepath.Join(stateDir, "backups"),
+		filepath.Join(stateDir, "releases"),
 		logDir,
 	} {
 		info, err := os.Stat(dir)
@@ -93,6 +96,9 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 		if got := info.Mode().Perm(); got != 0o750 {
 			t.Fatalf("%s mode = %o, want 750", dir, got)
 		}
+	}
+	if err := validateInstalledRuntimeFiles(filepath.Join(stateDir, "runtime")); err != nil {
+		t.Fatalf("installed runtime invalid: %v", err)
 	}
 
 	for _, secret := range []string{
@@ -105,7 +111,7 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 			t.Fatalf("init output leaked generated secret: %s", stdout.String())
 		}
 	}
-	if !strings.Contains(stdout.String(), "Deployment identity created") {
+	if !strings.Contains(stdout.String(), "Production runtime installed and verified") {
 		t.Fatalf("unexpected init output: %s", stdout.String())
 	}
 }
@@ -119,10 +125,12 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 	configDir := filepath.Join(root, "etc", "leamout")
 	stateDir := filepath.Join(root, "var", "lib", "leamout")
 	logDir := filepath.Join(root, "var", "log", "leamout")
+	version := "1.0.0-preview.1"
+	stageRuntimeRelease(t, stateDir, version)
 
 	run := func() string {
 		var stdout, stderr bytes.Buffer
-		if code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir); code != 0 {
+		if code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir, version); code != 0 {
 			t.Fatalf("init returned %d: %s", code, stderr.String())
 		}
 		return stdout.String()
@@ -149,7 +157,7 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 	if !bytes.Equal(envBefore, envAfter) {
 		t.Fatal("deployment secrets changed on repeated init")
 	}
-	if !strings.Contains(stdout, "Existing deployment identity and secrets preserved") {
+	if !strings.Contains(stdout, "Existing deployment identity and secrets preserved") || !strings.Contains(stdout, "Production runtime verified") {
 		t.Fatalf("unexpected repeat init output: %s", stdout)
 	}
 }
@@ -171,11 +179,33 @@ func TestInitRejectsPartialInitialization(t *testing.T) {
 	}
 
 	var stdout, stderr bytes.Buffer
-	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir)
+	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir, "1.0.0-preview.1")
 	if code == 0 {
 		t.Fatalf("init unexpectedly succeeded: %s", stdout.String())
 	}
 	if !strings.Contains(stderr.String(), "incomplete Leamout initialization") {
 		t.Fatalf("unexpected stderr: %s", stderr.String())
+	}
+}
+
+func TestInitRollsBackIdentityWhenRuntimeInstallationFails(t *testing.T) {
+	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
+		t.Skip("Self-Hosted Production v0.1 host contract is linux/amd64")
+	}
+
+	root := t.TempDir()
+	configDir := filepath.Join(root, "etc", "leamout")
+	stateDir := filepath.Join(root, "var", "lib", "leamout")
+	logDir := filepath.Join(root, "var", "log", "leamout")
+
+	var stdout, stderr bytes.Buffer
+	code := runInitAt(&stdout, &stderr, configDir, stateDir, logDir, "1.0.0-preview.1")
+	if code == 0 {
+		t.Fatalf("init unexpectedly succeeded: %s", stdout.String())
+	}
+	for _, path := range []string{filepath.Join(stateDir, "deployment.json"), filepath.Join(configDir, "leamout.env")} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Fatalf("partial initialization left behind %s: %v", path, err)
+		}
 	}
 }

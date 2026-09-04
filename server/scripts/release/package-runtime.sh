@@ -23,6 +23,7 @@ for path in \
 done
 
 mkdir -p "$OUT_DIR"
+OUT_DIR="$(CDPATH= cd -- "$OUT_DIR" && pwd)"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT HUP INT TERM
 mkdir -p "$workdir/runtime/coturn" "$workdir/runtime/migrations"
@@ -42,9 +43,17 @@ TZ=UTC tar \
   -cf - runtime \
   | gzip -n > "$OUT_DIR/$ARCHIVE"
 
-(
-  cd "$OUT_DIR"
-  sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
-)
+checksum="$(cd "$OUT_DIR" && sha256sum "$ARCHIVE")"
+checksums="$OUT_DIR/checksums.txt"
+tmp="$OUT_DIR/.checksums.tmp"
+if [ -f "$checksums" ]; then
+  grep -v "  $ARCHIVE\$" "$checksums" > "$tmp" || true
+else
+  : > "$tmp"
+fi
+printf '%s\n' "$checksum" >> "$tmp"
+sort -k2 "$tmp" > "$checksums"
+rm -f "$tmp"
 
 printf '%s\n' "$OUT_DIR/$ARCHIVE"
+printf '%s\n' "$checksums"
