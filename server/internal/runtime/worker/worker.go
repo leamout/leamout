@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,9 +40,10 @@ type Worker struct {
 	webhookDelivery         *webhooks.DeliveryJob
 	idempotencyCleanup      *idempotency.CleanupJob
 	health                  *healthState
-	healthAddress           string
 	logger                  *logging.Logger
 }
+
+const workerHealthAddress = ":8081"
 
 var componentNames = []string{
 	"freeswitch-events",
@@ -57,9 +57,6 @@ var componentNames = []string{
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
-	if strings.TrimSpace(cfg.WorkerHealthAddress) == "" {
-		cfg.WorkerHealthAddress = ":8081"
-	}
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect worker database: %w", err)
@@ -223,7 +220,6 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		webhookDelivery:         webhookDelivery,
 		idempotencyCleanup:      idempotencyCleanup,
 		health:                  newHealthState(componentNames...),
-		healthAddress:           cfg.WorkerHealthAddress,
 		logger:                  logging.New(),
 	}, nil
 }
@@ -261,7 +257,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	w.logger.Info(ctx, "worker subscribed to FreeSWITCH lifecycle events")
 
 	healthServer := &http.Server{
-		Addr:              w.healthAddress,
+		Addr:              workerHealthAddress,
 		Handler:           healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       5 * time.Second,
@@ -276,7 +272,7 @@ func (w *Worker) Run(ctx context.Context) error {
 
 	errCh := make(chan error, len(componentNames)+1)
 	go func() {
-		w.logger.Info(ctx, "worker health server started", "address", w.healthAddress)
+		w.logger.Info(ctx, "worker health server started", "address", workerHealthAddress)
 		if err := healthServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("run health server: %w", err)
 		}
