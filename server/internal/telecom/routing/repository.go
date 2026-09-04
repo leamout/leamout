@@ -94,7 +94,7 @@ func (r *Repository) ResolveInboundCarrier(
 	ctx context.Context,
 	sourceIP netip.Addr,
 ) (sqlc.CarrierConnection, error) {
-	return r.queries.ResolveCarrierConnectionBySourceIP(ctx, sourceIP)
+	return r.queries.ResolveCarrierConnectionBySourceIPAnyScope(ctx, sourceIP)
 }
 
 func (r *Repository) GetPhoneNumber(
@@ -105,6 +105,17 @@ func (r *Repository) GetPhoneNumber(
 	return r.queries.GetPhoneNumberByNumber(ctx, sqlc.GetPhoneNumberByNumberParams{
 		Number:         number,
 		OrganizationID: organizationID,
+	})
+}
+
+func (r *Repository) ResolveInboundPhoneNumber(
+	ctx context.Context,
+	carrierConnectionID uuid.UUID,
+	number string,
+) (sqlc.PhoneNumber, error) {
+	return r.queries.ResolveInboundPhoneNumber(ctx, sqlc.ResolveInboundPhoneNumberParams{
+		CarrierConnectionID: carrierConnectionID,
+		Number:              number,
 	})
 }
 
