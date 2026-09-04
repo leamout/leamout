@@ -256,6 +256,12 @@ func extractRuntimeArchive(archivePath, destination string) error {
 	}
 	defer func() { _ = gzipReader.Close() }()
 
+	root, err := os.OpenRoot(destination)
+	if err != nil {
+		return fmt.Errorf("open runtime staging root: %w", err)
+	}
+	defer func() { _ = root.Close() }()
+
 	tarReader := tar.NewReader(gzipReader)
 	for {
 		header, err := tarReader.Next()
@@ -267,30 +273,29 @@ func extractRuntimeArchive(archivePath, destination string) error {
 		}
 
 		clean := filepath.Clean(filepath.FromSlash(header.Name))
-		if clean == "." || filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
+		if clean == "." || !filepath.IsLocal(clean) {
 			return fmt.Errorf("runtime bundle contains unsafe path %q", header.Name)
 		}
 		if clean != "runtime" && !strings.HasPrefix(clean, "runtime"+string(os.PathSeparator)) {
 			return fmt.Errorf("runtime bundle contains unexpected top-level path %q", header.Name)
 		}
-		target := filepath.Join(destination, clean)
-		if !pathWithin(destination, target) {
-			return fmt.Errorf("runtime bundle path escapes staging directory: %q", header.Name)
-		}
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, 0o750); err != nil {
+			if err := root.MkdirAll(clean, 0o750); err != nil {
 				return fmt.Errorf("create runtime directory %s: %w", clean, err)
 			}
 		case tar.TypeReg:
 			if header.Size < 0 || header.Size > 128<<20 {
 				return fmt.Errorf("runtime bundle file %q has unsupported size %d", header.Name, header.Size)
 			}
-			if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
-				return fmt.Errorf("create runtime file parent %s: %w", clean, err)
+			parent := filepath.Dir(clean)
+			if parent != "." {
+				if err := root.MkdirAll(parent, 0o750); err != nil {
+					return fmt.Errorf("create runtime file parent %s: %w", clean, err)
+				}
 			}
-			output, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
+			output, err := root.OpenFile(clean, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
 			if err != nil {
 				return fmt.Errorf("create runtime file %s: %w", clean, err)
 			}
@@ -307,14 +312,6 @@ func extractRuntimeArchive(archivePath, destination string) error {
 		}
 	}
 	return nil
-}
-
-func pathWithin(base, target string) bool {
-	rel, err := filepath.Rel(base, target)
-	if err != nil {
-		return false
-	}
-	return rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator))
 }
 
 func renderRuntimeCompose(runtimeDir string, images map[string]string) error {
