@@ -98,7 +98,7 @@ func (c *Client) do(
 	if err != nil {
 		return fmt.Errorf("didww: execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	payload, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
 	if err != nil {
