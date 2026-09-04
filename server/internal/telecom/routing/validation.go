@@ -12,8 +12,8 @@ func validateOutboundRequest(req OutboundRequest) error {
 	if req.OrganizationID == uuid.Nil {
 		return fmt.Errorf("organization_id is required")
 	}
-	if req.TrunkID == uuid.Nil {
-		return fmt.Errorf("trunk_id is required")
+	if req.TrunkID != nil && *req.TrunkID == uuid.Nil {
+		return fmt.Errorf("trunk_id is invalid")
 	}
 	if strings.TrimSpace(req.From) == "" {
 		return fmt.Errorf("from is required")
