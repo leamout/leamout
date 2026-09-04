@@ -233,10 +233,12 @@ jobs:
             /tmp/release-a/leamout_1.0.0-preview.1_linux_amd64.tar.gz \
             /tmp/release-b/leamout_1.0.0-preview.1_linux_amd64.tar.gz
 
-      - name: Verify CLI excludes hosted frontend services
+      - name: Verify self-hosted runtime service boundary
         run: |
-          grep -q 'selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"' server/internal/runtime/leamout/cli.go
-          if grep -Eq 'selfHostedDeployServices.*(console|web)' server/internal/runtime/leamout/cli.go; then
-            echo "self-hosted CLI unexpectedly includes hosted console" >&2
+          for service in server worker opensips coturn freeswitch rtpengine postgres redis nats migrate; do
+            grep -q "^  ${service}:$" server/release/runtime/compose.yaml.tmpl
+          done
+          if grep -Eq '^  (console|web|waitlist):$' server/release/runtime/compose.yaml.tmpl; then
+            echo "self-hosted runtime unexpectedly includes a hosted frontend service" >&2
             exit 1
           fi
