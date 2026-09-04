@@ -152,14 +152,6 @@ func resolveOrganizationID(r *http.Request, principal authn.Principal) (uuid.UUI
 		if principal.OrganizationID == uuid.Nil {
 			return uuid.Nil, false
 		}
-
-		if value := r.Header.Get(organizationIDHeader); value != "" {
-			id, err := uuid.Parse(value)
-			if err != nil || id != principal.OrganizationID {
-				return uuid.Nil, false
-			}
-		}
-
 		return principal.OrganizationID, true
 	}
 

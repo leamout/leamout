@@ -126,6 +126,35 @@ func TestAuthenticatedOrganizationAllowsBearerOrganizationToken(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedOrganizationTokenIgnoresOrganizationHeader(t *testing.T) {
+	organizationID := uuid.New()
+	principal := tokenPrincipal(organizationID, "organization:read")
+	organizationMiddleware := NewOrganizationMiddleware()
+
+	var gotOrganizationID uuid.UUID
+	handler := organizationMiddleware.Require(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var ok bool
+		gotOrganizationID, ok = OrganizationIDFromContext(r.Context())
+		if !ok {
+			t.Fatal("expected organization in request context")
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/example", nil)
+	req.Header.Set(organizationIDHeader, uuid.NewString())
+	req = req.WithContext(authn.WithPrincipal(req.Context(), principal))
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("expected %d, got %d", http.StatusNoContent, res.Code)
+	}
+	if gotOrganizationID != organizationID {
+		t.Fatalf("expected token organization %s, got %s", organizationID, gotOrganizationID)
+	}
+}
+
 func TestAuthenticatedOrganizationRequiresOrganizationHeaderForSession(t *testing.T) {
 	userID := uuid.New()
 	authnMiddleware := NewAuthnMiddleware(authn.NewResolver(
