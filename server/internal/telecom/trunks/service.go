@@ -65,7 +65,7 @@ func (s *Service) Create(
 
 	item, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
 		return repo.Create(ctx, sqlc.CreateTrunkParams{
-			OrganizationID:      organizationID,
+			OrganizationID:      &organizationID,
 			CarrierConnectionID: req.CarrierConnectionID,
 			Name:                name,
 			Direction:           req.Direction,
@@ -142,7 +142,7 @@ func (s *Service) Update(
 			Direction:      req.Direction,
 			Status:         req.Status,
 			ID:             id,
-			OrganizationID: organizationID,
+			OrganizationID: &organizationID,
 		})
 	})
 	return item, writeError(err, "trunk", "trunk not found")
@@ -216,7 +216,7 @@ func (s *Service) CreateEndpoint(
 		EventTrunkEndpointCreated,
 		func(repo *Repository) (sqlc.TrunkEndpoint, error) {
 			return repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{
-				OrganizationID: organizationID,
+				OrganizationID: &organizationID,
 				TrunkID:        trunkID,
 				Host:           host,
 				Port:           req.Port,
@@ -339,7 +339,7 @@ func (s *Service) UpdateEndpoint(
 				Enabled:        req.Enabled,
 				ID:             id,
 				TrunkID:        trunkID,
-				OrganizationID: organizationID,
+				OrganizationID: &organizationID,
 			})
 		},
 	)
@@ -385,6 +385,10 @@ func (s *Service) mutateTrunk(
 	if err != nil {
 		return sqlc.Trunk{}, err
 	}
+	if item.OrganizationID == nil {
+		return sqlc.Trunk{}, fmt.Errorf("tenant trunk missing organization ownership")
+	}
+	organizationID := *item.OrganizationID
 
 	occurredAt := time.Now().UTC()
 	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
@@ -393,12 +397,12 @@ func (s *Service) mutateTrunk(
 		AggregateID:   item.ID,
 		Payload: Event{
 			EventType:      eventType,
-			OrganizationID: item.OrganizationID,
+			OrganizationID: organizationID,
 			TrunkID:        item.ID,
 			Resource:       response(item),
 			OccurredAt:     occurredAt,
 		},
-		Headers: eventHeaders(eventType, item.OrganizationID),
+		Headers: eventHeaders(eventType, organizationID),
 	}); err != nil {
 		return sqlc.Trunk{}, fmt.Errorf("insert trunk outbox event: %w", err)
 	}
@@ -428,6 +432,10 @@ func (s *Service) mutateEndpoint(
 	if err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
+	if item.OrganizationID == nil {
+		return sqlc.TrunkEndpoint{}, fmt.Errorf("tenant trunk endpoint missing organization ownership")
+	}
+	organizationID := *item.OrganizationID
 
 	occurredAt := time.Now().UTC()
 	endpointID := item.ID
@@ -437,13 +445,13 @@ func (s *Service) mutateEndpoint(
 		AggregateID:   item.ID,
 		Payload: Event{
 			EventType:      eventType,
-			OrganizationID: item.OrganizationID,
+			OrganizationID: organizationID,
 			TrunkID:        item.TrunkID,
 			EndpointID:     &endpointID,
 			Resource:       endpointResponse(item),
 			OccurredAt:     occurredAt,
 		},
-		Headers: eventHeaders(eventType, item.OrganizationID),
+		Headers: eventHeaders(eventType, organizationID),
 	}); err != nil {
 		return sqlc.TrunkEndpoint{}, fmt.Errorf("insert trunk endpoint outbox event: %w", err)
 	}
