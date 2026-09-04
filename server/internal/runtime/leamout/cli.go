@@ -44,6 +44,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		return runInstalledCompose(ctx, stdout, stderr, composeArgs...)
 	case "doctor":
 		return runDoctor(ctx, stdout, stderr)
+	case "license":
+		return runLicense(stdout, stderr, args[1:])
+	case "backup":
+		return runBackup(ctx, stdout, stderr, args[1:])
+	case "restore":
+		return runRestore(ctx, stdout, stderr, args[1:])
+	case "update":
+		return runUpdate(ctx, stdout, stderr, args[1:], build.Version)
 	default:
 		writef(stderr, "unknown command: %s\n\n", args[0])
 		printHelp(stderr)
@@ -136,6 +144,10 @@ Commands:
   status     Show installed runtime service status
   logs       Follow installed runtime logs
   doctor     Validate the local Leamout deployment
+  license    Install or verify a signed offline license
+  backup     Create a portable deployment backup
+  restore    Restore a deployment backup
+  update     Install and start the runtime staged for this CLI version
   version    Print CLI build information
   help       Show this help`)
 }

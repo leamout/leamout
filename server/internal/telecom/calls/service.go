@@ -11,6 +11,11 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
+var (
+	ErrManagedVoiceDisabled = errors.New("managed voice is not enabled")
+	ErrManagedSpendLimit    = errors.New("managed voice spend limit reached")
+)
+
 // Controller is the media-server contract used by the call API.
 type Controller interface {
 	Originate(context.Context, OriginateRequest) (string, error)
@@ -34,12 +39,19 @@ type TelecomMetrics interface {
 	LimitRejection(context.Context, string, uuid.UUID)
 }
 
+// ManagedOutboundPolicy authorizes tenant use of platform-owned termination
+// before any carrier capacity is consumed.
+type ManagedOutboundPolicy interface {
+	AuthorizeManagedOutbound(context.Context, uuid.UUID) error
+}
+
 type Service struct {
-	repo       *Repository
-	controller Controller
-	routes     RouteResolver
-	admission  *AdmissionController
-	metrics    TelecomMetrics
+	repo          *Repository
+	controller    Controller
+	routes        RouteResolver
+	admission     *AdmissionController
+	metrics       TelecomMetrics
+	managedPolicy ManagedOutboundPolicy
 }
 
 func NewService(repo *Repository, controller Controller, routes RouteResolver, admission ...*AdmissionController) *Service {
@@ -62,6 +74,18 @@ func NewService(repo *Repository, controller Controller, routes RouteResolver, a
 
 func (s *Service) SetMetrics(metrics TelecomMetrics) { s.metrics = metrics }
 
+func (s *Service) SetManagedOutboundPolicy(policy ManagedOutboundPolicy) { s.managedPolicy = policy }
+
+func managedPolicyError(err error) error {
+	if errors.Is(err, ErrManagedVoiceDisabled) {
+		return apperror.NewForbidden("managed voice is not enabled for this organization")
+	}
+	if errors.Is(err, ErrManagedSpendLimit) {
+		return apperror.NewPaymentRequired("managed voice spend limit reached")
+	}
+	return apperror.NewServiceUnavailable("managed voice admission is unavailable", err)
+}
+
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateCallRequest) (sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return sqlc.Call{}, err
@@ -79,6 +103,14 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	})
 	if err != nil {
 		return sqlc.Call{}, routeError(err)
+	}
+	if route.Managed {
+		if s.managedPolicy == nil {
+			return sqlc.Call{}, apperror.NewServiceUnavailable("managed voice admission is unavailable", nil)
+		}
+		if err := s.managedPolicy.AuthorizeManagedOutbound(ctx, organizationID); err != nil {
+			return sqlc.Call{}, managedPolicyError(err)
+		}
 	}
 	s.recordCall(ctx, "attempted", route.CarrierConnectionID, route.TrunkID, route.EndpointID)
 	leaseID := ""

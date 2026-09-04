@@ -271,11 +271,22 @@ leamout restart
 leamout update
 leamout backup
 leamout restore
-leamout license status
-leamout license activate
+leamout license verify --artifact license.json --keyring keyring.json
+leamout license install --artifact license.json --keyring keyring.json
 ```
 
+The keyring passed to these commands is trust material, not an ordinary input.
+Operators must obtain it through the signed release channel or another authenticated
+out-of-band channel; accepting a keyring from the same untrusted source as a license
+artifact does not establish license authenticity.
+
 The local CLI remains available even when the hosted console is unavailable.
+
+The current release-candidate CLI implements `init`, runtime lifecycle commands,
+local diagnostics, staged runtime updates, PostgreSQL/configuration backups and
+restores, and offline signed-license installation/verification. Hosted activation,
+certificate backup, recording backup, and automatic pre-update backup/drain remain
+separate completion work.
 
 ### `leamout init`
 
@@ -488,7 +499,11 @@ sudo leamout update
 
 An update is a controlled release transition, not `git pull && docker compose up`.
 
-A future implementation should resolve and verify the target release, validate compatibility and disk space, coordinate backup/drain/migrations, pull artifacts before disruption, restart services safely, wait for readiness, verify the runtime, and record the installed version.
+The release-candidate command installs the runtime artifact already staged and
+verified by the bootstrap installer for the CLI's exact version, pulls its
+digest-pinned images, and converges the Compose deployment. Compatibility and disk
+space validation, automatic backup/drain, readiness waiting, and rollback still
+need to be added before general availability.
 
 ## Restart behavior
 
@@ -499,6 +514,13 @@ A future implementation should resolve and verify the target release, validate c
 A production-ready self-hosted deployment requires documented backup and restore behavior.
 
 Backups should coordinate PostgreSQL, deployment configuration, signed local license material, certificates where appropriate, NATS durable state when required, and customer-owned recordings when selected.
+
+The release-candidate `backup` command writes a mode-`0600` archive containing a
+logical PostgreSQL dump, deployment identity, generated runtime environment, and
+installed signed-license/keyring files. `restore --force` validates the archive and
+deployment identity, stops the runtime, restores configuration and PostgreSQL, and
+then starts the runtime. Certificates, recordings, and NATS stream state are not
+yet included and must be preserved separately.
 
 Secrets must only be included through an explicitly protected backup path.
 
@@ -639,13 +661,13 @@ The hosted console can then show the registered deployment without becoming part
 - [ ] Publish `https://get.leamout.com/install.sh`.
 - [ ] Implement OS/architecture detection and prerequisite validation.
 - [ ] Install and verify a pinned `leamout` CLI artifact.
-- [ ] Add `leamout init`, `up`, `down`, `status`, `logs`, and `doctor`.
+- [x] Add `leamout init`, `up`, `down`, `status`, `logs`, and `doctor`.
 - [ ] Wrap existing deployment primitives rather than duplicating their logic.
 
 ### Phase 3 — production configuration
 
-- [ ] Generate deployment-owned secrets securely.
-- [ ] Adopt separated signaling/media/control network topology.
+- [x] Generate deployment-owned secrets securely.
+- [x] Adopt separated signaling/media/control network topology.
 - [ ] Integrate production TLS provisioning and renewal.
 - [ ] Define persistent filesystem/volume ownership.
 - [ ] Add host/network/port preflight checks.
@@ -655,7 +677,7 @@ The hosted console can then show the registered deployment without becoming part
 - [ ] Generate durable deployment IDs and deployment key material.
 - [ ] Create deployment/activation-token flow in `console.leamout.com`.
 - [ ] Define the signed license document format.
-- [ ] Add Leamout public-key verification to the self-hosted runtime.
+- [x] Add Leamout public-key verification to the self-hosted runtime.
 - [ ] Exchange short-lived activation tokens for signed local licenses.
 - [ ] Register deployment ownership with Leamout Cloud.
 - [ ] Add outbound authenticated deployment check-in.
@@ -667,7 +689,7 @@ The hosted console can then show the registered deployment without becoming part
 
 - [ ] Add `leamout update` with release compatibility checks.
 - [ ] Integrate graceful drain into restart/update paths.
-- [ ] Add `leamout backup` and `leamout restore`.
+- [x] Add `leamout backup` and `leamout restore`.
 - [ ] Add support-bundle generation and deterministic redaction.
 - [ ] Add non-interactive initialization.
 - [ ] Add uninstall/purge behavior.
