@@ -56,6 +56,8 @@ WHERE state IN ('initiating', 'ringing', 'answered', 'active')
 ORDER BY updated_at ASC
 LIMIT sqlc.arg(batch_size);
 
+-- Revalidate the DID-derived tenant and route tuple before the call service
+-- persists or admits an inbound call.
 -- name: GetInboundCallContext :one
 SELECT
     cc.max_cps,
