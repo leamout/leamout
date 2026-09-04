@@ -89,6 +89,10 @@ func inboundCallEvent(event freeswitch.Event) (InboundCallEvent, bool, error) {
 	if err != nil {
 		return InboundCallEvent{}, true, fmt.Errorf("parse inbound carrier connection id: %w", err)
 	}
+	phoneNumberID, err := uuid.Parse(strings.TrimSpace(event.Header("variable_sip_h_X-Leamout-Phone-Number-ID")))
+	if err != nil {
+		return InboundCallEvent{}, true, fmt.Errorf("parse inbound phone number id: %w", err)
+	}
 
 	channelID := strings.TrimSpace(event.Header("Unique-ID"))
 	if channelID == "" {
@@ -113,6 +117,7 @@ func inboundCallEvent(event freeswitch.Event) (InboundCallEvent, bool, error) {
 	return InboundCallEvent{
 		OrganizationID:      organizationID,
 		CarrierConnectionID: carrierConnectionID,
+		PhoneNumberID:       phoneNumberID,
 		ApplicationID:       applicationID,
 		ChannelID:           channelID,
 		From:                from,
