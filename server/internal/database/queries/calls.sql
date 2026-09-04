@@ -56,6 +56,47 @@ WHERE state IN ('initiating', 'ringing', 'answered', 'active')
 ORDER BY updated_at ASC
 LIMIT sqlc.arg(batch_size);
 
+-- name: GetInboundCallContext :one
+SELECT
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    cc.max_daily_minutes
+FROM phone_numbers AS pn
+JOIN carrier_connections AS cc
+  ON cc.id = pn.carrier_connection_id
+JOIN voice_bindings AS vb
+  ON vb.phone_number_id = pn.id
+JOIN voice_applications AS va
+  ON va.id = vb.voice_application_id
+JOIN organizations AS o
+  ON o.id = pn.organization_id
+WHERE pn.id = sqlc.arg(phone_number_id)
+  AND pn.organization_id = sqlc.arg(organization_id)
+  AND pn.number = sqlc.arg(called_number)
+  AND pn.carrier_connection_id = sqlc.arg(carrier_connection_id)
+  AND pn.status = 'active'
+  AND pn.voice_enabled = true
+  AND cc.status = 'active'
+  AND cc.inbound_enabled = true
+  AND (
+      (
+          cc.scope = 'organization'
+          AND cc.organization_id = pn.organization_id
+          AND pn.provisioning_mode = 'byoc'
+      )
+      OR (
+          cc.scope = 'platform'
+          AND cc.organization_id IS NULL
+          AND pn.provisioning_mode = 'managed'
+      )
+  )
+  AND va.id = sqlc.arg(application_id)
+  AND va.organization_id = pn.organization_id
+  AND va.status = 'active'
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+LIMIT 1;
+
 -- name: SetCallRouteAttribution :one
 UPDATE calls
 SET
