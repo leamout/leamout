@@ -20,6 +20,7 @@ type routeStore interface {
 	ListManagedOutboundRoutes(context.Context) ([]managedRouteCandidate, error)
 	ResolveInboundCarrier(context.Context, netip.Addr) (sqlc.CarrierConnection, error)
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
+	ResolveInboundPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error)
 }
 
@@ -273,21 +274,27 @@ func (r *Resolver) resolveInbound(
 		}
 		return InboundDecision{}, err
 	}
-	if connection.OrganizationID == nil {
-		return InboundDecision{}, ErrTenantMismatch
-	}
-	organizationID := *connection.OrganizationID
 
-	phoneNumber, err := r.repo.GetPhoneNumber(ctx, organizationID, req.CalledNumber)
+	phoneNumber, err := r.repo.ResolveInboundPhoneNumber(ctx, connection.ID, req.CalledNumber)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return InboundDecision{}, ErrNoRoute
 		}
 		return InboundDecision{}, err
 	}
+	organizationID := phoneNumber.OrganizationID
 
-	if phoneNumber.CarrierConnectionID == nil || *phoneNumber.CarrierConnectionID != connection.ID {
-		return InboundDecision{}, ErrCarrierMismatch
+	switch connection.Scope {
+	case "organization":
+		if connection.OrganizationID == nil || *connection.OrganizationID != organizationID {
+			return InboundDecision{}, ErrTenantMismatch
+		}
+	case "platform":
+		if connection.OrganizationID != nil {
+			return InboundDecision{}, ErrTenantMismatch
+		}
+	default:
+		return InboundDecision{}, ErrTenantMismatch
 	}
 
 	binding, err := r.repo.GetVoiceBinding(ctx, req.CalledNumber)
