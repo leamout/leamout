@@ -246,6 +246,47 @@ func (q *Queries) GetPhoneNumberByNumber(ctx context.Context, arg GetPhoneNumber
 	return i, err
 }
 
+const getPhoneNumberForRelease = `-- name: GetPhoneNumberForRelease :one
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provisioning_mode, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.created_at, pn.updated_at
+FROM phone_numbers AS pn
+JOIN organizations AS o ON o.id = pn.organization_id
+WHERE pn.id = $1
+  AND pn.organization_id = $2
+  AND pn.status IN ('active', 'disabled')
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+LIMIT 1
+`
+
+type GetPhoneNumberForReleaseParams struct {
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+// Release lifecycle lookup deliberately includes disabled ownership. Normal
+// reads remain active-only, but a customer must still be able to end ownership
+// after temporarily disabling a BYOC number.
+func (q *Queries) GetPhoneNumberForRelease(ctx context.Context, arg GetPhoneNumberForReleaseParams) (PhoneNumber, error) {
+	row := q.db.QueryRow(ctx, getPhoneNumberForRelease, arg.ID, arg.OrganizationID)
+	var i PhoneNumber
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Number,
+		&i.CountryCode,
+		&i.ProvisioningMode,
+		&i.CarrierConnectionID,
+		&i.ProviderID,
+		&i.ProviderResourceID,
+		&i.VoiceEnabled,
+		&i.SmsEnabled,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getVoiceBindingByNumber = `-- name: GetVoiceBindingByNumber :one
 SELECT
     vb.id AS binding_id,
