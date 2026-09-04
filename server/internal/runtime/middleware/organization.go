@@ -157,15 +157,18 @@ func resolveOrganizationID(r *http.Request, principal authn.Principal) (uuid.UUI
 
 	value := r.Header.Get(organizationIDHeader)
 	if value == "" {
-		value = chi.URLParam(r, "organization_id")
-		if value == "" {
-			return uuid.Nil, false
-		}
+		return uuid.Nil, false
 	}
 
 	id, err := uuid.Parse(value)
 	if err != nil {
 		return uuid.Nil, false
+	}
+	if pathValue := chi.URLParam(r, "organization_id"); pathValue != "" {
+		pathID, err := uuid.Parse(pathValue)
+		if err != nil || pathID != id {
+			return uuid.Nil, false
+		}
 	}
 
 	return id, true

@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -172,6 +173,34 @@ func TestAuthenticatedOrganizationRequiresOrganizationHeaderForSession(t *testin
 	res := httptest.NewRecorder()
 
 	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected %d, got %d", http.StatusBadRequest, res.Code)
+	}
+}
+
+func TestAuthenticatedOrganizationRejectsPathHeaderMismatch(t *testing.T) {
+	organizationID := uuid.New()
+	userID := uuid.New()
+	organizationMiddleware := NewOrganizationMiddleware(stubMembershipReader{
+		organizationID: organizationID,
+		userID:         userID,
+		role:           "owner",
+	})
+
+	router := chi.NewRouter()
+	router.With(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			next.ServeHTTP(w, r.WithContext(authn.WithPrincipal(r.Context(), sessionPrincipal(userID))))
+		})
+	}, organizationMiddleware.Require).Get("/v1/organizations/{organization_id}/credentials", func(http.ResponseWriter, *http.Request) {
+		t.Fatal("handler should not be called")
+	})
+	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/organizations/"+uuid.NewString()+"/credentials", nil)
+	req.Header.Set(organizationIDHeader, organizationID.String())
+	res := httptest.NewRecorder()
+
+	router.ServeHTTP(res, req)
 
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf("expected %d, got %d", http.StatusBadRequest, res.Code)
