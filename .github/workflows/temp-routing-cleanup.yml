@@ -1,0 +1,214 @@
+name: Temporary Managed Routing Cleanup
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/temp-routing-cleanup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Apply managed routing cleanup
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def replace(path, old, new, minimum=1):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count < minimum:
+                  raise SystemExit(f"{path}: expected at least {minimum} occurrence(s) of {old!r}, found {count}")
+              p.write_text(text.replace(old, new))
+
+          # SQLC now models organization ownership as nullable on carrier,
+          # trunk, endpoint and source-IP rows. Tenant-facing services still
+          # receive concrete UUIDs and pass pointers only at the SQLC boundary.
+          replace(
+              "server/internal/telecom/routing/repository.go",
+              "OrganizationID: organizationID,",
+              "OrganizationID: &organizationID,",
+              2,
+          )
+          replace(
+              "server/internal/telecom/routing/repository.go",
+              "OrganizationID: organizationID})",
+              "OrganizationID: &organizationID})",
+          )
+          replace(
+              "server/internal/telecom/routing/repository.go",
+              "CarrierConnectionID: carrierConnectionID,",
+              "CarrierConnectionID: &carrierConnectionID,",
+          )
+          replace(
+              "server/internal/telecom/numbers/repository.go",
+              "CarrierConnectionID: connectionID,",
+              "CarrierConnectionID: &connectionID,",
+          )
+
+          p = Path("server/internal/telecom/trunks/repository.go")
+          text = p.read_text()
+          text = text.replace(
+              "ListTrunksByOrganizationID(ctx, organizationID)",
+              "ListTrunksByOrganizationID(ctx, &organizationID)",
+          )
+          text = text.replace("OrganizationID: organizationID,", "OrganizationID: &organizationID,")
+          p.write_text(text)
+
+          p = Path("server/internal/telecom/carriers/repository.go")
+          text = p.read_text()
+          text = text.replace(
+              "ListCarrierConnectionsByOrganizationID(ctx, organizationID)",
+              "ListCarrierConnectionsByOrganizationID(ctx, &organizationID)",
+          )
+          text = text.replace("OrganizationID: organizationID,", "OrganizationID: &organizationID,")
+          text = text.replace("OrganizationID: org", "OrganizationID: &org")
+          p.write_text(text)
+
+          p = Path("server/internal/telecom/carriers/service.go")
+          text = p.read_text()
+          text = text.replace("OrganizationID:     organizationID,", "OrganizationID:     &organizationID,")
+          p.write_text(text)
+
+          p = Path("server/internal/telecom/trunks/service.go")
+          text = p.read_text()
+          for type_name in (
+              "CreateTrunkParams",
+              "UpdateTrunkParams",
+              "CreateTrunkEndpointParams",
+              "UpdateTrunkEndpointParams",
+          ):
+              pattern = rf"(sqlc\.{type_name}\{{.*?OrganizationID:\s*)organizationID"
+              text, count = re.subn(pattern, r"\1&organizationID", text, count=1, flags=re.S)
+              if count != 1:
+                  raise SystemExit(f"trunks/service.go: failed to update {type_name}")
+
+          trunk_marker = """\titem, err := mutation(s.repo.WithTx(tx))
+\tif err != nil {
+\t\treturn sqlc.Trunk{}, err
+\t}
+
+\toccurredAt := time.Now().UTC()
+"""
+          trunk_replacement = """\titem, err := mutation(s.repo.WithTx(tx))
+\tif err != nil {
+\t\treturn sqlc.Trunk{}, err
+\t}
+\tif item.OrganizationID == nil {
+\t\treturn sqlc.Trunk{}, fmt.Errorf(\"tenant trunk missing organization ownership\")
+\t}
+\torganizationID := *item.OrganizationID
+
+\toccurredAt := time.Now().UTC()
+"""
+          if trunk_marker not in text:
+              raise SystemExit("trunks/service.go: mutateTrunk marker not found")
+          text = text.replace(trunk_marker, trunk_replacement, 1)
+
+          endpoint_marker = """\titem, err := mutation(s.repo.WithTx(tx))
+\tif err != nil {
+\t\treturn sqlc.TrunkEndpoint{}, err
+\t}
+
+\toccurredAt := time.Now().UTC()
+"""
+          endpoint_replacement = """\titem, err := mutation(s.repo.WithTx(tx))
+\tif err != nil {
+\t\treturn sqlc.TrunkEndpoint{}, err
+\t}
+\tif item.OrganizationID == nil {
+\t\treturn sqlc.TrunkEndpoint{}, fmt.Errorf(\"tenant trunk endpoint missing organization ownership\")
+\t}
+\torganizationID := *item.OrganizationID
+
+\toccurredAt := time.Now().UTC()
+"""
+          if endpoint_marker not in text:
+              raise SystemExit("trunks/service.go: mutateEndpoint marker not found")
+          text = text.replace(endpoint_marker, endpoint_replacement, 1)
+          text = text.replace("OrganizationID: item.OrganizationID,", "OrganizationID: organizationID,")
+          text = text.replace("eventHeaders(eventType, item.OrganizationID)", "eventHeaders(eventType, organizationID)")
+          p.write_text(text)
+
+          # At the SIP edge, the carrier connection authenticates ingress while
+          # the called DID supplies the tenant. This is the same algorithm for
+          # organization-owned BYOC and platform-owned managed ingress.
+          p = Path("deploy/opensips/opensips.cfg")
+          text = p.read_text()
+
+          ip_pattern = re.compile(
+              r'                "WITH matches AS \(SELECT cc\.organization_id, cc\.id, max\(masklen\(src\.cidr\)\) AS specificity .*? LIMIT 1",\n'
+              r'                "\$avp\(carrier_org_id\);\$avp\(carrier_connection_id\)"'
+          )
+          ip_replacement = '''                "WITH matches AS (SELECT cc.id, max(masklen(src.cidr)) AS specificity FROM carrier_connection_source_ips AS src JOIN carrier_connections AS cc ON cc.id = src.carrier_connection_id WHERE '$si'::INET <<= src.cidr AND src.organization_id IS NOT DISTINCT FROM cc.organization_id AND cc.status = 'active' AND cc.inbound_enabled = true AND cc.inbound_auth_method = 'ip' GROUP BY cc.id), best AS (SELECT max(specificity) AS specificity FROM matches), resolved AS (SELECT matches.id FROM matches JOIN best USING (specificity)) SELECT id::text FROM resolved WHERE (SELECT count(*) FROM resolved) = 1 LIMIT 1",
+                "$avp(carrier_connection_id)"'''
+          text, count = ip_pattern.subn(ip_replacement, text, count=1)
+          if count != 1:
+              raise SystemExit("opensips.cfg: source-IP carrier resolution pattern not found")
+
+          digest_old = '''                    "SELECT organization_id::text, carrier_connection_id::text FROM opensips_inbound_carrier_credentials WHERE username = '$(au{s.escape.common})' AND domain = '$(ar{s.escape.common})' LIMIT 1",
+                    "$avp(carrier_org_id);$avp(carrier_connection_id)"'''
+          digest_new = '''                    "SELECT carrier_connection_id::text FROM opensips_inbound_carrier_credentials WHERE username = '$(au{s.escape.common})' AND domain = '$(ar{s.escape.common})' LIMIT 1",
+                    "$avp(carrier_connection_id)"'''
+          if digest_old not in text:
+              raise SystemExit("opensips.cfg: digest carrier resolution pattern not found")
+          text = text.replace(digest_old, digest_new, 1)
+
+          ingress_old = '''            "SELECT pn.id::text, vb.id::text, va.id::text, va.ring_timeout_seconds::text FROM phone_numbers AS pn JOIN voice_bindings AS vb ON vb.phone_number_id = pn.id JOIN voice_applications AS va ON va.id = vb.voice_application_id JOIN organizations AS o ON o.id = pn.organization_id WHERE pn.number = '$rU' AND pn.organization_id = '$avp(carrier_org_id)'::UUID AND pn.carrier_connection_id = '$avp(carrier_connection_id)'::UUID AND pn.status = 'active' AND pn.voice_enabled = true AND va.organization_id = pn.organization_id AND va.status = 'active' AND o.status = 'active' AND o.deleted_at IS NULL LIMIT 1",
+            "$avp(phone_number_id);$avp(voice_binding_id);$avp(voice_application_id);$avp(ring_timeout_seconds)"'''
+          ingress_new = '''            "SELECT pn.organization_id::text, pn.id::text, vb.id::text, va.id::text, va.ring_timeout_seconds::text FROM phone_numbers AS pn JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id JOIN voice_bindings AS vb ON vb.phone_number_id = pn.id JOIN voice_applications AS va ON va.id = vb.voice_application_id JOIN organizations AS o ON o.id = pn.organization_id WHERE pn.number = '$rU' AND pn.carrier_connection_id = '$avp(carrier_connection_id)'::UUID AND pn.status = 'active' AND pn.voice_enabled = true AND cc.status = 'active' AND cc.inbound_enabled = true AND ((cc.scope = 'organization' AND pn.provisioning_mode = 'byoc' AND cc.organization_id = pn.organization_id) OR (cc.scope = 'platform' AND pn.provisioning_mode = 'managed' AND cc.organization_id IS NULL)) AND va.organization_id = pn.organization_id AND va.status = 'active' AND o.status = 'active' AND o.deleted_at IS NULL LIMIT 1",
+            "$avp(carrier_org_id);$avp(phone_number_id);$avp(voice_binding_id);$avp(voice_application_id);$avp(ring_timeout_seconds)"'''
+          if ingress_old not in text:
+              raise SystemExit("opensips.cfg: carrier ingress DID resolution pattern not found")
+          text = text.replace(ingress_old, ingress_new, 1)
+          text = text.replace(
+              "    # Resolve DID -> voice binding -> active application, constrained by the\n    # carrier identity established from source-IP authentication above.\n",
+              "    # The carrier connection authenticates ingress; the called DID supplies\n    # the tenant. BYOC additionally requires the connection owner to match the\n    # DID owner, while managed platform ingress derives tenancy from the DID.\n",
+              1,
+          )
+          p.write_text(text)
+          PY
+
+      - name: Format Go sources
+        run: |
+          find server/internal/telecom/carriers \
+               server/internal/telecom/numbers \
+               server/internal/telecom/routing \
+               server/internal/telecom/trunks \
+               -name '*.go' -print0 | xargs -0 gofmt -w
+
+      - name: Test server
+        working-directory: server
+        run: go test ./...
+
+      - name: Vet server
+        working-directory: server
+        run: go vet ./...
+
+      - name: Commit cleanup
+        run: |
+          rm .github/workflows/temp-routing-cleanup.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "feat: complete managed routing ownership cleanup"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          fi
