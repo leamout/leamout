@@ -13,18 +13,29 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type Service struct {
-	repo *Repository
+type numberRepository interface {
+	CreateBYOC(context.Context, uuid.UUID, BYOCCreateRequest) (sqlc.PhoneNumber, error)
+	CreateManaged(context.Context, uuid.UUID, ManagedCreateRequest) (sqlc.PhoneNumber, error)
+	List(context.Context, uuid.UUID) ([]sqlc.PhoneNumber, error)
+	Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
+	GetForRelease(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
+	Update(context.Context, uuid.UUID, uuid.UUID, UpdateRequest) (sqlc.PhoneNumber, error)
+	ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
+	SetCarrierConnection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, audit.Event) (sqlc.PhoneNumber, error)
 }
 
-func NewService(repo *Repository) *Service {
+type Service struct {
+	repo numberRepository
+}
+
+func NewService(repo numberRepository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) Create(
+func (s *Service) CreateBYOC(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	req CreateRequest,
+	req BYOCCreateRequest,
 ) (sqlc.PhoneNumber, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return sqlc.PhoneNumber{}, err
@@ -41,8 +52,8 @@ func (s *Service) Create(
 		return sqlc.PhoneNumber{}, err
 	}
 
-	result, err := s.repo.Create(ctx, organizationID, req)
-	return result, writeError(err, "create phone number")
+	result, err := s.repo.CreateBYOC(ctx, organizationID, req)
+	return result, writeError(err, "create BYOC phone number")
 }
 
 // CreateManaged persists an already-provisioned upstream number. Only trusted
@@ -79,7 +90,7 @@ func (s *Service) CreateManaged(
 
 	result, err := s.repo.CreateManaged(ctx, organizationID, req)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlc.PhoneNumber{}, apperror.NewNotFound("active organization, provider, or platform carrier connection not found")
+		return sqlc.PhoneNumber{}, apperror.NewNotFound("active organization, provider, or matching platform carrier connection not found")
 	}
 	return result, writeError(err, "create managed phone number")
 }
@@ -123,32 +134,36 @@ func (s *Service) Update(
 		return sqlc.PhoneNumber{}, err
 	}
 
-	if req.CountryCode == nil && req.VoiceEnabled == nil && req.SMSEnabled == nil {
+	if req.VoiceEnabled == nil && req.SMSEnabled == nil {
 		return sqlc.PhoneNumber{}, apperror.NewBadRequest("at least one field is required")
-	}
-
-	if req.CountryCode != nil {
-		countryCode, err := normalizeCountryCode(*req.CountryCode)
-		if err != nil {
-			return sqlc.PhoneNumber{}, err
-		}
-		req.CountryCode = &countryCode
 	}
 
 	result, err := s.repo.Update(ctx, organizationID, id, req)
 	return result, writeError(err, "phone number not found")
 }
 
-func (s *Service) Delete(
+// ReleaseBYOC ends customer ownership of a BYOC number. Managed numbers cannot
+// be released through this path because the upstream provider must be released
+// first by the managed provisioning workflow.
+func (s *Service) ReleaseBYOC(
 	ctx context.Context,
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) error {
-	if _, err := s.Get(ctx, organizationID, id); err != nil {
+	if err := validIDs(organizationID, id); err != nil {
 		return err
 	}
 
-	return writeError(s.repo.Disable(ctx, organizationID, id), "disable phone number")
+	current, err := s.repo.GetForRelease(ctx, organizationID, id)
+	if err != nil {
+		return readError(err, "phone number not found")
+	}
+	if current.ProvisioningMode != string(ProvisioningModeBYOC) {
+		return apperror.NewConflict("managed phone numbers must be released through the managed provisioning workflow")
+	}
+
+	_, err = s.repo.ReleaseBYOC(ctx, organizationID, id)
+	return writeError(err, "release BYOC phone number")
 }
 
 func (s *Service) SetCarrierConnection(ctx context.Context, organizationID, id uuid.UUID, req CarrierConnectionRequest) (sqlc.PhoneNumber, error) {
@@ -161,6 +176,9 @@ func (s *Service) SetCarrierConnection(ctx context.Context, organizationID, id u
 	current, err := s.Get(ctx, organizationID, id)
 	if err != nil {
 		return sqlc.PhoneNumber{}, err
+	}
+	if current.ProvisioningMode != string(ProvisioningModeBYOC) {
+		return sqlc.PhoneNumber{}, apperror.NewConflict("managed phone number carrier connections are platform-managed")
 	}
 	actor, err := audit.ActorFromContext(ctx)
 	if err != nil {

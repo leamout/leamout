@@ -15,7 +15,10 @@ const (
 	ProvisioningModeManaged ProvisioningMode = "managed"
 )
 
-type CreateRequest struct {
+// BYOCCreateRequest registers a number whose carrier relationship is owned by
+// the organization. Provider metadata is intentionally absent from this public
+// API input.
+type BYOCCreateRequest struct {
 	Number       string `json:"number"`
 	CountryCode  string `json:"country_code"`
 	VoiceEnabled *bool  `json:"voice_enabled,omitempty"`
@@ -35,10 +38,11 @@ type ManagedCreateRequest struct {
 	SMSEnabled          *bool
 }
 
+// UpdateRequest contains mutable customer-facing capabilities. Number identity
+// and country are immutable after registration/provisioning.
 type UpdateRequest struct {
-	CountryCode  *string `json:"country_code,omitempty"`
-	VoiceEnabled *bool   `json:"voice_enabled,omitempty"`
-	SMSEnabled   *bool   `json:"sms_enabled,omitempty"`
+	VoiceEnabled *bool `json:"voice_enabled,omitempty"`
+	SMSEnabled   *bool `json:"sms_enabled,omitempty"`
 }
 
 type CarrierConnectionRequest struct {
@@ -46,29 +50,38 @@ type CarrierConnectionRequest struct {
 }
 
 type Response struct {
-	ID                  uuid.UUID  `json:"id"`
-	OrganizationID      uuid.UUID  `json:"organization_id"`
-	Number              string     `json:"number"`
-	CountryCode         string     `json:"country_code"`
-	CarrierConnectionID *uuid.UUID `json:"carrier_connection_id,omitempty"`
-	VoiceEnabled        bool       `json:"voice_enabled"`
-	SMSEnabled          bool       `json:"sms_enabled"`
-	Status              string     `json:"status"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  uuid.UUID        `json:"id"`
+	OrganizationID      uuid.UUID        `json:"organization_id"`
+	Number              string           `json:"number"`
+	CountryCode         string           `json:"country_code"`
+	ProvisioningMode    ProvisioningMode `json:"provisioning_mode"`
+	CarrierConnectionID *uuid.UUID       `json:"carrier_connection_id,omitempty"`
+	VoiceEnabled        bool             `json:"voice_enabled"`
+	SMSEnabled          bool             `json:"sms_enabled"`
+	Status              string           `json:"status"`
+	CreatedAt           time.Time        `json:"created_at"`
+	UpdatedAt           time.Time        `json:"updated_at"`
 }
 
 func response(number sqlc.PhoneNumber) Response {
-	return Response{
-		ID:                  number.ID,
-		OrganizationID:      number.OrganizationID,
-		Number:              number.Number,
-		CountryCode:         number.CountryCode,
-		CarrierConnectionID: number.CarrierConnectionID,
-		VoiceEnabled:        number.VoiceEnabled,
-		SMSEnabled:          number.SmsEnabled,
-		Status:              number.Status,
-		CreatedAt:           pgconv.TimestamptzToTime(number.CreatedAt),
-		UpdatedAt:           pgconv.TimestamptzToTime(number.UpdatedAt),
+	result := Response{
+		ID:               number.ID,
+		OrganizationID:   number.OrganizationID,
+		Number:           number.Number,
+		CountryCode:      number.CountryCode,
+		ProvisioningMode: ProvisioningMode(number.ProvisioningMode),
+		VoiceEnabled:     number.VoiceEnabled,
+		SMSEnabled:       number.SmsEnabled,
+		Status:           number.Status,
+		CreatedAt:        pgconv.TimestamptzToTime(number.CreatedAt),
+		UpdatedAt:        pgconv.TimestamptzToTime(number.UpdatedAt),
 	}
+
+	// Managed carrier connections are Leamout platform implementation details.
+	// BYOC callers may need their organization-owned connection identifier.
+	if number.ProvisioningMode == string(ProvisioningModeBYOC) {
+		result.CarrierConnectionID = number.CarrierConnectionID
+	}
+
+	return result
 }

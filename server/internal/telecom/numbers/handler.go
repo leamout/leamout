@@ -26,13 +26,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req, err := helper.DecodeJSON[CreateRequest](r)
+	req, err := helper.DecodeJSON[BYOCCreateRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
-	number, err := h.service.Create(r.Context(), organizationID, req)
+	number, err := h.service.CreateBYOC(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -107,7 +107,7 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.service.Delete(r.Context(), organizationID, id); err != nil {
+	if err := h.service.ReleaseBYOC(r.Context(), organizationID, id); err != nil {
 		httputil.Error(w, err)
 		return
 	}
