@@ -120,28 +120,6 @@ CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_organization_id
 CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_cidr
     ON carrier_connection_source_ips USING gist (cidr inet_ops);
 
--- Ownership is immutable. Moving an existing connection between an
--- organization and the platform would make historical attribution ambiguous;
--- create a new connection instead.
-CREATE FUNCTION prevent_carrier_connection_owner_change()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF OLD.scope IS DISTINCT FROM NEW.scope
-       OR OLD.organization_id IS DISTINCT FROM NEW.organization_id THEN
-        RAISE EXCEPTION 'carrier connection ownership is immutable'
-            USING ERRCODE = '23514';
-    END IF;
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER prevent_carrier_connection_owner_change
-BEFORE UPDATE OF scope, organization_id ON carrier_connections
-FOR EACH ROW
-EXECUTE FUNCTION prevent_carrier_connection_owner_change();
-
 CREATE TRIGGER set_carrier_connections_updated_at
 BEFORE UPDATE ON carrier_connections
 FOR EACH ROW
