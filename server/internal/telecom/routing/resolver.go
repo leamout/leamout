@@ -86,12 +86,8 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if caller.OrganizationID != req.OrganizationID ||
-		caller.ProvisioningMode != "byoc" ||
-		!caller.VoiceEnabled ||
-		caller.CarrierConnectionID == nil ||
-		*caller.CarrierConnectionID != trunk.CarrierConnectionID {
-		return OutboundDecision{}, ErrCallerIdentity
+	if err := authorizeBYOCCallerIdentity(caller, req.OrganizationID, trunk.CarrierConnectionID); err != nil {
+		return OutboundDecision{}, err
 	}
 
 	endpoints, err := r.repo.ListOutboundEndpoints(ctx, req.OrganizationID, trunkID)
@@ -134,8 +130,8 @@ func (r *Resolver) resolveManagedOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if caller.OrganizationID != req.OrganizationID || !caller.VoiceEnabled {
-		return OutboundDecision{}, ErrCallerIdentity
+	if err := authorizeManagedCallerIdentity(caller, req.OrganizationID); err != nil {
+		return OutboundDecision{}, err
 	}
 
 	candidates, err := r.repo.ListManagedOutboundRoutes(ctx)
@@ -300,11 +296,11 @@ func (r *Resolver) resolveInbound(
 	case "organization":
 		if connection.OrganizationID == nil ||
 			*connection.OrganizationID != organizationID ||
-			phoneNumber.ProvisioningMode != "byoc" {
+			phoneNumber.ProvisioningMode != provisioningModeBYOC {
 			return InboundDecision{}, ErrTenantMismatch
 		}
 	case "platform":
-		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != "managed" {
+		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != provisioningModeManaged {
 			return InboundDecision{}, ErrTenantMismatch
 		}
 	default:
