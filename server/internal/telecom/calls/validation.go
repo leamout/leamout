@@ -42,8 +42,8 @@ func validateCreateRequest(req *CreateCallRequest) error {
 	if req.ApplicationID != nil && *req.ApplicationID == uuid.Nil {
 		return apperror.NewBadRequest("application_id is invalid")
 	}
-	if req.TrunkID == uuid.Nil {
-		return apperror.NewBadRequest("trunk_id is required")
+	if req.TrunkID != nil && *req.TrunkID == uuid.Nil {
+		return apperror.NewBadRequest("trunk_id is invalid")
 	}
 
 	var err error
