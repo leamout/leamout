@@ -9,7 +9,6 @@ type Email struct {
 	ReplyTo string
 	Subject string
 	HTML    string
-	Text    string
 }
 
 // Delivery identifies a message accepted by an email provider.
