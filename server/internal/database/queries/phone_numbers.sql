@@ -88,6 +88,20 @@ WHERE pn.id = sqlc.arg(id)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
+-- Release lifecycle lookup deliberately includes disabled ownership. Normal
+-- reads remain active-only, but a customer must still be able to end ownership
+-- after temporarily disabling a BYOC number.
+-- name: GetPhoneNumberForRelease :one
+SELECT pn.*
+FROM phone_numbers AS pn
+JOIN organizations AS o ON o.id = pn.organization_id
+WHERE pn.id = sqlc.arg(id)
+  AND pn.organization_id = sqlc.arg(organization_id)
+  AND pn.status IN ('active', 'disabled')
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+LIMIT 1;
+
 -- name: GetPhoneNumberByNumber :one
 SELECT pn.*
 FROM phone_numbers AS pn
