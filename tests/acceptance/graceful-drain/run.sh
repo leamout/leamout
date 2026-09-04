@@ -206,9 +206,8 @@ fi
 # subscribes and lose the initial CHANNEL_CREATE event.
 worker_ready=0
 for _ in $(seq 1 60); do
-    if $COMPOSE ps --status running --services | grep -qx 'worker' \
-        && $COMPOSE logs --no-color worker 2>&1 \
-            | grep -Fq 'worker subscribed to FreeSWITCH call and recording lifecycle events'; then
+    if $COMPOSE exec -T worker \
+        wget --spider -q http://127.0.0.1:8081/readyz; then
         worker_ready=1
         break
     fi

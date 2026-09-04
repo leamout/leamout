@@ -197,13 +197,13 @@ make up
 make verify
 ```
 
-This mode may include the marketing site, hosted-console application, waitlist application, development image tags, self-signed certificates, and other repository-level conveniences that are not part of the self-hosted production release.
+This mode may include the combined marketing/waitlist site, hosted-console application, development image tags, self-signed certificates, and other repository-level conveniences that are not part of the self-hosted production release.
 
 ### Self-hosted production deployment
 
 The first customer production target is a single supported Linux host managed through the Leamout CLI and a pinned runtime release.
 
-The self-hosted production release contains runtime components, not `clients/apps/web`, `clients/apps/console`, or `clients/apps/waitlist`.
+The self-hosted production release contains runtime components, not `clients/apps/web` or `clients/apps/console`.
 
 The CLI owns configuration generation, release selection, secrets, migrations, TLS setup, health verification, upgrades, backup/restore coordination, and license installation.
 
@@ -470,10 +470,9 @@ It explicitly does **not** contain:
 ```text
 web
 console
-waitlist
 ```
 
-Those applications remain Leamout-hosted web properties.
+Those applications remain Leamout-hosted web properties. The `web` application owns both the marketing and waitlist surfaces.
 
 Every production runtime image is resolved by OCI digest through the signed release manifest. Repository tags such as `dev`, `latest`, or human-readable semantic-version tags are not the production lockfile.
 
@@ -632,7 +631,7 @@ The hosted console can then show the registered deployment without becoming part
 - [x] Define a signed/checksummed CLI release artifact format.
 - [x] Define a versioned Leamout release manifest.
 - [x] Remove floating production image assumptions from the production release contract.
-- [x] Exclude `web`, `console`, and `waitlist` from the self-hosted runtime manifest.
+- [x] Exclude `web` and `console` from the self-hosted runtime manifest.
 - [x] Add CI enforcement for release-artifact and runtime-boundary invariants.
 
 ### Phase 2 — bootstrap installer and CLI foundation
@@ -681,10 +680,12 @@ The hosted console can then show the registered deployment without becoming part
 - [ ] Initialize without repository checkout.
 - [ ] Activate/register using a short-lived activation credential.
 - [ ] Start the complete runtime-only production stack.
+- [x] Probe API and worker readiness from the deployed runtime.
 - [ ] Verify the deployment becomes visible in the hosted-console fixture.
 - [ ] Verify cloud disconnection does not immediately interrupt valid call processing.
 - [ ] Complete inbound and outbound BYOC calls.
 - [ ] Exercise API-controlled media.
+- [x] Restart the control-plane API and worker while preserving an active SIP/media session.
 - [ ] Upgrade without losing authoritative control-plane state.
 - [ ] Backup and restore the deployment.
 - [ ] Verify diagnostics and support data do not leak secrets.

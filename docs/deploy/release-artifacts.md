@@ -216,9 +216,8 @@ atlas
 The frontend applications are intentionally excluded:
 
 ```text
-web       -> Leamout-hosted marketing site
+web       -> Leamout-hosted marketing and waitlist site
 console   -> Leamout-hosted dashboard at console.leamout.com
-waitlist  -> Leamout-hosted website application
 ```
 
 The hosted console may show self-hosted deployment registration, license, version, connectivity/check-in, health summaries, usage/capacity metadata, and update availability in later phases, but its container image is never a dependency of the customer's self-hosted runtime.
@@ -318,7 +317,7 @@ Phase 1 is complete when:
 - the CLI release archive, checksum, and detached-signature formats are defined;
 - the release manifest has a versioned machine-readable schema and validation rules;
 - production image references are required to be immutable OCI digests;
-- `web`, `console`, and `waitlist` are excluded from the customer self-hosted runtime;
+- `web` and `console` are excluded from the customer self-hosted runtime;
 - development Compose tags/services are explicitly separated from production release pins;
 - CI enforces the artifact and manifest invariants.
 

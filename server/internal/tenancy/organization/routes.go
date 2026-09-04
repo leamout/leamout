@@ -10,14 +10,15 @@ func RegisterRoutes(
 	router chi.Router,
 	handler *Handler,
 	authMiddleware func(http.Handler) http.Handler,
+	organizationAccess func(http.Handler) http.Handler,
 ) {
 	router.Route("/organizations", func(r chi.Router) {
 		r.Use(authMiddleware)
 
 		r.Post("/", handler.Create)
 		r.Get("/", handler.List)
-		r.Get("/{organization_id}", handler.Get)
-		r.Patch("/{organization_id}", handler.Update)
-		r.Delete("/{organization_id}", handler.Delete)
+		r.With(organizationAccess).Get("/{organization_id}", handler.Get)
+		r.With(organizationAccess).Patch("/{organization_id}", handler.Update)
+		r.With(organizationAccess).Delete("/{organization_id}", handler.Delete)
 	})
 }

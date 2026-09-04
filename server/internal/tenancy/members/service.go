@@ -12,10 +12,18 @@ import (
 )
 
 type Service struct {
-	repo *Repository
+	repo serviceRepository
 }
 
-func NewService(repo *Repository) *Service {
+type serviceRepository interface {
+	Add(context.Context, sqlc.AddOrganizationMemberParams) (sqlc.OrganizationMember, error)
+	Get(context.Context, sqlc.GetOrganizationMemberParams) (sqlc.OrganizationMember, error)
+	ListByOrganizationID(context.Context, uuid.UUID) ([]sqlc.OrganizationMember, error)
+	UpdateRole(context.Context, sqlc.UpdateMemberRoleParams) (sqlc.OrganizationMember, error)
+	Disable(context.Context, sqlc.DisableOrganizationMemberParams) error
+}
+
+func NewService(repo serviceRepository) *Service {
 	return &Service{repo: repo}
 }
 
@@ -35,7 +43,12 @@ func (s *Service) Add(ctx context.Context, requesterID, organizationID uuid.UUID
 		return sqlc.OrganizationMember{}, apperror.NewConflict("organization owner must be transferred explicitly")
 	}
 
-	member, err := s.repo.Add(ctx, sqlc.AddOrganizationMemberParams{OrganizationID: organizationID, UserID: req.UserID, Role: role})
+	member, err := s.repo.Add(ctx, sqlc.AddOrganizationMemberParams{
+		OrganizationID: organizationID,
+		UserID:         req.UserID,
+		Role:           role,
+		ActorUserID:    requesterID,
+	})
 	if err != nil {
 		if isUniqueViolation(err) {
 			return sqlc.OrganizationMember{}, apperror.NewConflict("organization member already exists")
@@ -94,7 +107,12 @@ func (s *Service) Update(ctx context.Context, requesterID, organizationID, membe
 		return sqlc.OrganizationMember{}, apperror.NewConflict("organization owner cannot be demoted")
 	}
 
-	member, err := s.repo.UpdateRole(ctx, sqlc.UpdateMemberRoleParams{OrganizationID: organizationID, UserID: memberID, Role: role})
+	member, err := s.repo.UpdateRole(ctx, sqlc.UpdateMemberRoleParams{
+		OrganizationID: organizationID,
+		UserID:         memberID,
+		Role:           role,
+		ActorUserID:    requesterID,
+	})
 	if err != nil {
 		return sqlc.OrganizationMember{}, apperror.NewNotFound("organization member not found")
 	}
@@ -118,7 +136,11 @@ func (s *Service) Delete(ctx context.Context, requesterID, organizationID, membe
 		return apperror.NewConflict("organization owner cannot be removed")
 	}
 
-	return s.repo.Disable(ctx, sqlc.DisableOrganizationMemberParams{OrganizationID: organizationID, UserID: memberID})
+	return s.repo.Disable(ctx, sqlc.DisableOrganizationMemberParams{
+		OrganizationID: organizationID,
+		UserID:         memberID,
+		ActorUserID:    requesterID,
+	})
 }
 
 func (s *Service) requireMember(ctx context.Context, requesterID, organizationID uuid.UUID) error {

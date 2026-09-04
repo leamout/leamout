@@ -48,6 +48,15 @@ def compose(*args, check=True):
     return run(COMPOSE + list(args), check)
 
 
+def compose_succeeds(*args):
+    return subprocess.run(
+        COMPOSE + list(args),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    ).returncode == 0
+
+
 def fs_args(service, command):
     return COMPOSE + [
         "exec",
@@ -319,6 +328,39 @@ def establish_call():
     )
 
 
+def restart_control_plane():
+    call = STATE["call"]
+    channel_id = call["sip_call_id"]
+
+    compose("restart", "server", "worker")
+
+    wait(
+        "worker readiness after restart",
+        lambda: compose_succeeds(
+            "exec",
+            "-T",
+            "worker",
+            "wget",
+            "--spider",
+            "-q",
+            "http://127.0.0.1:8081/readyz",
+        ),
+        60,
+    )
+
+    def recovered_call():
+        current = api("GET", f"/v1/calls/{call['id']}")
+        return current if current.get("state") in ("answered", "active") else None
+
+    STATE["call"] = wait("active call after control-plane restart", recovered_call, 60)
+    if not channel_exists("freeswitch", channel_id):
+        raise Failure("control-plane restart interrupted the active FreeSWITCH channel")
+    if opensips_dialogs() == 0 or rtpengine_media_sockets() < 2:
+        raise Failure("control-plane restart interrupted active SIP/media state")
+
+    print("PASS server and worker restart preserved the active SIP/media session")
+
+
 def cleanup_call():
     call = STATE.get("call")
     if not call:
@@ -360,6 +402,7 @@ def cleanup_call():
 def main():
     provision()
     establish_call()
+    restart_control_plane()
     cleanup_call()
     return 0
 

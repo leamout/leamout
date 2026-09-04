@@ -29,25 +29,6 @@
         "typescript": "^7.0.2",
       },
     },
-    "apps/waitlist": {
-      "name": "@leamout/waitlist",
-      "version": "0.1.0",
-      "dependencies": {
-        "@base-ui/react": "1.6.0",
-        "@leamout/ui": "workspace:*",
-        "next": "16.3.3",
-        "react": "19.2.8",
-        "react-dom": "19.2.8",
-      },
-      "devDependencies": {
-        "@biomejs/biome": "2.5.11",
-        "@tailwindcss/postcss": "^4.3.3",
-        "@types/node": "^24",
-        "@types/react": "^19.2.18",
-        "@types/react-dom": "^19.2.5",
-        "typescript": "^7.0.2",
-      },
-    },
     "apps/web": {
       "name": "@leamout/web",
       "version": "0.1.0",
@@ -272,8 +253,6 @@
     "@leamout/console": ["@leamout/console@workspace:apps/console"],
 
     "@leamout/ui": ["@leamout/ui@workspace:packages/ui"],
-
-    "@leamout/waitlist": ["@leamout/waitlist@workspace:apps/waitlist"],
 
     "@leamout/web": ["@leamout/web@workspace:apps/web"],
 

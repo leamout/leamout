@@ -124,6 +124,11 @@ services:
         condition: service_healthy
       freeswitch:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
     networks:
       - private-control
       - control-egress

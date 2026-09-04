@@ -140,7 +140,7 @@ jobs:
 
       - name: Build frontend images
         env:
-          BUILD_SERVICES: web console waitlist
+          BUILD_SERVICES: web console
         run: sh server/scripts/deploy/build.sh
 
       - name: Build telecom images
