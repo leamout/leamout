@@ -9,13 +9,25 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-const ownerRole = "owner"
+const (
+	ownerRole = "owner"
+	adminRole = "admin"
+)
 
 type Service struct {
-	repo *Repository
+	repo serviceRepository
 }
 
-func NewService(repo *Repository) *Service {
+type serviceRepository interface {
+	CreateWithOwner(context.Context, string, uuid.UUID) (sqlc.Organization, error)
+	GetByID(context.Context, uuid.UUID) (sqlc.Organization, error)
+	GetMember(context.Context, sqlc.GetOrganizationMemberParams) (sqlc.OrganizationMember, error)
+	Update(context.Context, sqlc.UpdateOrganizationParams) (sqlc.Organization, error)
+	Delete(context.Context, uuid.UUID) error
+	ListByUserID(context.Context, uuid.UUID) ([]sqlc.ListOrganizationsByUserIDRow, error)
+}
+
+func NewService(repo serviceRepository) *Service {
 	return &Service{repo: repo}
 }
 
@@ -56,7 +68,8 @@ func (s *Service) Get(ctx context.Context, userID, orgID uuid.UUID) (Response, e
 }
 
 func (s *Service) Update(ctx context.Context, userID, orgID uuid.UUID, req UpdateRequest) (Response, error) {
-	if err := s.requireMember(ctx, userID, orgID); err != nil {
+	member, err := s.requireRole(ctx, userID, orgID, ownerRole, adminRole)
+	if err != nil {
 		return Response{}, err
 	}
 
@@ -73,20 +86,35 @@ func (s *Service) Update(ctx context.Context, userID, orgID uuid.UUID, req Updat
 		return Response{}, apperror.NewNotFound("organization not found")
 	}
 
-	member, err := s.repo.GetMember(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: orgID, UserID: userID})
-	if err != nil {
-		return Response{}, apperror.NewNotFound("organization not found")
-	}
-
 	return toResponse(org, member.Role), nil
 }
 
 func (s *Service) Delete(ctx context.Context, userID, orgID uuid.UUID) error {
-	if err := s.requireMember(ctx, userID, orgID); err != nil {
+	if _, err := s.requireRole(ctx, userID, orgID, ownerRole); err != nil {
 		return err
 	}
 
 	return s.repo.Delete(ctx, orgID)
+}
+
+func (s *Service) requireRole(ctx context.Context, userID, orgID uuid.UUID, roles ...string) (sqlc.OrganizationMember, error) {
+	if userID == uuid.Nil {
+		return sqlc.OrganizationMember{}, apperror.NewUnauthorized("authentication required")
+	}
+	if err := validateOrganizationID(orgID); err != nil {
+		return sqlc.OrganizationMember{}, err
+	}
+
+	member, err := s.repo.GetMember(ctx, sqlc.GetOrganizationMemberParams{OrganizationID: orgID, UserID: userID})
+	if err != nil {
+		return sqlc.OrganizationMember{}, apperror.NewNotFound("organization not found")
+	}
+	for _, role := range roles {
+		if member.Role == role {
+			return member, nil
+		}
+	}
+	return sqlc.OrganizationMember{}, apperror.NewForbidden("organization role does not permit this action")
 }
 
 func (s *Service) List(ctx context.Context, userID uuid.UUID) ([]Response, error) {
