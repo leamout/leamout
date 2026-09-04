@@ -283,7 +283,7 @@ func extractRuntimeArchive(archivePath, destination string) error {
 			if err := os.MkdirAll(target, 0o750); err != nil {
 				return fmt.Errorf("create runtime directory %s: %w", clean, err)
 			}
-		case tar.TypeReg, tar.TypeRegA:
+		case tar.TypeReg:
 			if header.Size < 0 || header.Size > 128<<20 {
 				return fmt.Errorf("runtime bundle file %q has unsupported size %d", header.Name, header.Size)
 			}
