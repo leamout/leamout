@@ -15,7 +15,6 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_phone_numbers_number UNIQUE (number),
     CONSTRAINT chk_phone_numbers_number CHECK (
         number ~ '^\+[1-9][0-9]{6,14}$'
     ),
@@ -43,6 +42,13 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     )
 );
 
+-- A released number is historical ownership, not a permanent reservation.
+-- This allows a recycled E.164 number to be acquired again later while still
+-- preventing two live ownership records for the same number.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_numbers_number_live
+    ON phone_numbers (number)
+    WHERE status <> 'released';
+
 CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_numbers_provider_resource
     ON phone_numbers (provider_id, provider_resource_id)
     WHERE provider_id IS NOT NULL AND provider_resource_id IS NOT NULL;
@@ -64,9 +70,9 @@ CREATE INDEX IF NOT EXISTS idx_phone_numbers_carrier_connection_id
     WHERE carrier_connection_id IS NOT NULL;
 
 -- BYOC numbers may bind only to their organization's carrier connection.
--- Managed numbers may bind only to a Leamout platform connection. A NULL
--- carrier_connection_id is valid while provisioning is incomplete or when the
--- number does not use SIP voice.
+-- Managed numbers may bind only to a Leamout platform connection owned by the
+-- same upstream provider as the number. A NULL carrier_connection_id is valid
+-- while provisioning is incomplete or when the number does not use SIP voice.
 CREATE FUNCTION validate_phone_number_carrier_scope()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -74,13 +80,14 @@ AS $$
 DECLARE
     connection_scope TEXT;
     connection_organization_id UUID;
+    connection_provider_id UUID;
 BEGIN
     IF NEW.carrier_connection_id IS NULL THEN
         RETURN NEW;
     END IF;
 
-    SELECT scope, organization_id
-    INTO connection_scope, connection_organization_id
+    SELECT scope, organization_id, provider_id
+    INTO connection_scope, connection_organization_id, connection_provider_id
     FROM carrier_connections
     WHERE id = NEW.carrier_connection_id;
 
@@ -91,8 +98,9 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
     ELSIF NEW.provisioning_mode = 'managed' THEN
-        IF connection_scope <> 'platform' THEN
-            RAISE EXCEPTION 'managed phone number must use a platform-owned carrier connection'
+        IF connection_scope <> 'platform'
+           OR connection_provider_id IS DISTINCT FROM NEW.provider_id THEN
+            RAISE EXCEPTION 'managed phone number must use a platform carrier connection for the same provider'
                 USING ERRCODE = '23514';
         END IF;
     END IF;
@@ -102,7 +110,7 @@ END;
 $$;
 
 CREATE TRIGGER validate_phone_number_carrier_scope
-BEFORE INSERT OR UPDATE OF carrier_connection_id, provisioning_mode, organization_id
+BEFORE INSERT OR UPDATE OF carrier_connection_id, provisioning_mode, organization_id, provider_id
 ON phone_numbers
 FOR EACH ROW
 EXECUTE FUNCTION validate_phone_number_carrier_scope();
