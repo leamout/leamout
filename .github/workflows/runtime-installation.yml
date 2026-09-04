@@ -139,14 +139,14 @@ jobs:
           cd /tmp
           sudo /usr/local/bin/leamout init
 
-          test -f /etc/leamout/leamout.env
-          test -f /var/lib/leamout/deployment.json
-          test -f /var/lib/leamout/runtime/compose.yaml
-          test -f /var/lib/leamout/runtime/release.json
-          test -f /var/lib/leamout/runtime/migrations/039_create_idempotency.sql
-          test ! -e /var/lib/leamout/runtime/compose.yaml.tmpl
-          ! grep -q '@@IMAGE_' /var/lib/leamout/runtime/compose.yaml
-          ! grep -Eq '^[[:space:]]*build:' /var/lib/leamout/runtime/compose.yaml
+          sudo test -f /etc/leamout/leamout.env
+          sudo test -f /var/lib/leamout/deployment.json
+          sudo test -f /var/lib/leamout/runtime/compose.yaml
+          sudo test -f /var/lib/leamout/runtime/release.json
+          sudo test -f /var/lib/leamout/runtime/migrations/039_create_idempotency.sql
+          sudo test ! -e /var/lib/leamout/runtime/compose.yaml.tmpl
+          ! sudo grep -q '@@IMAGE_' /var/lib/leamout/runtime/compose.yaml
+          ! sudo grep -Eq '^[[:space:]]*build:' /var/lib/leamout/runtime/compose.yaml
 
           sudo cp /etc/leamout/leamout.env /tmp/leamout-env-before
           sudo cp /var/lib/leamout/deployment.json /tmp/deployment-before
