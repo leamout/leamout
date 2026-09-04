@@ -10,11 +10,13 @@ import (
 )
 
 type fakeNumberRepository struct {
-	createdBYOC     BYOCCreateRequest
-	createdManaged  ManagedCreateRequest
-	getNumber       sqlc.PhoneNumber
-	releaseCalls    int
-	setCarrierCalls int
+	createdBYOC      BYOCCreateRequest
+	createdManaged   ManagedCreateRequest
+	getNumber        sqlc.PhoneNumber
+	getForRelease    sqlc.PhoneNumber
+	getReleaseCalls  int
+	releaseCalls     int
+	setCarrierCalls  int
 }
 
 func (f *fakeNumberRepository) CreateBYOC(_ context.Context, _ uuid.UUID, req BYOCCreateRequest) (sqlc.PhoneNumber, error) {
@@ -35,13 +37,21 @@ func (f *fakeNumberRepository) Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.
 	return f.getNumber, nil
 }
 
+func (f *fakeNumberRepository) GetForRelease(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error) {
+	f.getReleaseCalls++
+	if f.getForRelease.ID != uuid.Nil || f.getForRelease.ProvisioningMode != "" || f.getForRelease.Status != "" {
+		return f.getForRelease, nil
+	}
+	return f.getNumber, nil
+}
+
 func (f *fakeNumberRepository) Update(_ context.Context, _ uuid.UUID, _ uuid.UUID, _ UpdateRequest) (sqlc.PhoneNumber, error) {
 	return f.getNumber, nil
 }
 
 func (f *fakeNumberRepository) ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error) {
 	f.releaseCalls++
-	return f.getNumber, nil
+	return f.getForRelease, nil
 }
 
 func (f *fakeNumberRepository) SetCarrierConnection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, audit.Event) (sqlc.PhoneNumber, error) {
@@ -91,7 +101,7 @@ func TestCreateManagedRequiresProviderMetadata(t *testing.T) {
 }
 
 func TestReleaseBYOCRejectsManagedNumber(t *testing.T) {
-	repo := &fakeNumberRepository{getNumber: sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeManaged)}}
+	repo := &fakeNumberRepository{getForRelease: sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeManaged), Status: "active"}}
 	service := NewService(repo)
 
 	if err := service.ReleaseBYOC(context.Background(), uuid.New(), uuid.New()); err == nil {
@@ -103,11 +113,29 @@ func TestReleaseBYOCRejectsManagedNumber(t *testing.T) {
 }
 
 func TestReleaseBYOCReleasesBYOCNumber(t *testing.T) {
-	repo := &fakeNumberRepository{getNumber: sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeBYOC)}}
+	repo := &fakeNumberRepository{getForRelease: sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeBYOC), Status: "active"}}
 	service := NewService(repo)
 
 	if err := service.ReleaseBYOC(context.Background(), uuid.New(), uuid.New()); err != nil {
 		t.Fatalf("ReleaseBYOC() error = %v", err)
+	}
+	if repo.getReleaseCalls != 1 {
+		t.Fatalf("release lookup calls = %d", repo.getReleaseCalls)
+	}
+	if repo.releaseCalls != 1 {
+		t.Fatalf("release calls = %d", repo.releaseCalls)
+	}
+}
+
+func TestReleaseBYOCReleasesDisabledBYOCNumber(t *testing.T) {
+	repo := &fakeNumberRepository{getForRelease: sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeBYOC), Status: "disabled"}}
+	service := NewService(repo)
+
+	if err := service.ReleaseBYOC(context.Background(), uuid.New(), uuid.New()); err != nil {
+		t.Fatalf("ReleaseBYOC() error = %v", err)
+	}
+	if repo.getReleaseCalls != 1 {
+		t.Fatalf("release lookup calls = %d", repo.getReleaseCalls)
 	}
 	if repo.releaseCalls != 1 {
 		t.Fatalf("release calls = %d", repo.releaseCalls)
