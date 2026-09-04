@@ -3,6 +3,7 @@ package numbers
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,6 +43,45 @@ func (s *Service) Create(
 
 	result, err := s.repo.Create(ctx, organizationID, req)
 	return result, writeError(err, "create phone number")
+}
+
+// CreateManaged persists an already-provisioned upstream number. Only trusted
+// provisioning orchestration should call this method; provider metadata is not
+// accepted by the public phone-number creation route.
+func (s *Service) CreateManaged(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req ManagedCreateRequest,
+) (sqlc.PhoneNumber, error) {
+	if err := validateOrganizationID(organizationID); err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	if req.ProviderID == uuid.Nil {
+		return sqlc.PhoneNumber{}, apperror.NewBadRequest("provider_id is required")
+	}
+	if req.CarrierConnectionID != nil && *req.CarrierConnectionID == uuid.Nil {
+		return sqlc.PhoneNumber{}, apperror.NewBadRequest("carrier_connection_id must be valid when provided")
+	}
+
+	var err error
+	req.Number, err = normalizeNumber(req.Number)
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	req.CountryCode, err = normalizeCountryCode(req.CountryCode)
+	if err != nil {
+		return sqlc.PhoneNumber{}, err
+	}
+	req.ProviderResourceID = strings.TrimSpace(req.ProviderResourceID)
+	if req.ProviderResourceID == "" {
+		return sqlc.PhoneNumber{}, apperror.NewBadRequest("provider_resource_id is required")
+	}
+
+	result, err := s.repo.CreateManaged(ctx, organizationID, req)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.PhoneNumber{}, apperror.NewNotFound("active organization, provider, or platform carrier connection not found")
+	}
+	return result, writeError(err, "create managed phone number")
 }
 
 func (s *Service) List(
