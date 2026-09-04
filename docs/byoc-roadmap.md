@@ -105,7 +105,7 @@ received. This prevents host or server-reflexive fallback from satisfying the te
 - [x] Mark credential responses as non-cacheable.
 - [x] Add graceful drain controls for OpenSIPS, RTPengine, and FreeSWITCH nodes.
 - [x] Separate public signaling, public media, and private control networks.
-- [ ] Add certificate and shared-secret rotation runbooks and automation.
+- [x] Verify control-plane health and restart recovery without interrupting active telecom sessions.
 
 ## MVP exit criteria
 

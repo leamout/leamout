@@ -681,10 +681,12 @@ The hosted console can then show the registered deployment without becoming part
 - [ ] Initialize without repository checkout.
 - [ ] Activate/register using a short-lived activation credential.
 - [ ] Start the complete runtime-only production stack.
+- [x] Probe API and worker readiness from the deployed runtime.
 - [ ] Verify the deployment becomes visible in the hosted-console fixture.
 - [ ] Verify cloud disconnection does not immediately interrupt valid call processing.
 - [ ] Complete inbound and outbound BYOC calls.
 - [ ] Exercise API-controlled media.
+- [x] Restart the control-plane API and worker while preserving an active SIP/media session.
 - [ ] Upgrade without losing authoritative control-plane state.
 - [ ] Backup and restore the deployment.
 - [ ] Verify diagnostics and support data do not leak secrets.
