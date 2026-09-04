@@ -164,9 +164,9 @@ func TestResolveOutboundRejectsBYOCCallerIdentityFromAnotherCarrier(t *testing.T
 	organizationID, trunkID := uuid.New(), uuid.New()
 	connectionID, otherConnectionID := uuid.New(), uuid.New()
 	resolver := &Resolver{repo: &fakeRouteStore{
-		trunk: sqlc.Trunk{ID: trunkID, OrganizationID: uuidPtr(organizationID), CarrierConnectionID: connectionID},
+		trunk:      sqlc.Trunk{ID: trunkID, OrganizationID: uuidPtr(organizationID), CarrierConnectionID: connectionID},
 		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization"},
-		phone: sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true, CarrierConnectionID: &otherConnectionID},
+		phone:      sqlc.PhoneNumber{Number: "+233200000001", VoiceEnabled: true, CarrierConnectionID: &otherConnectionID},
 	}}
 
 	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
