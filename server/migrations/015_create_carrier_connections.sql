@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS carrier_connections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
     provider_id UUID NOT NULL REFERENCES carrier_providers(id) ON DELETE RESTRICT,
 
+    scope TEXT NOT NULL DEFAULT 'organization',
     name TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'active',
 
@@ -28,6 +29,13 @@ CREATE TABLE IF NOT EXISTS carrier_connections (
 
     CONSTRAINT uq_carrier_connections_org_name UNIQUE (organization_id, name),
     CONSTRAINT uq_carrier_connections_id_org UNIQUE (id, organization_id),
+    CONSTRAINT chk_carrier_connections_scope CHECK (
+        scope IN ('organization', 'platform')
+    ),
+    CONSTRAINT chk_carrier_connections_owner CHECK (
+        (scope = 'organization' AND organization_id IS NOT NULL)
+        OR (scope = 'platform' AND organization_id IS NULL)
+    ),
     CONSTRAINT chk_carrier_connections_name CHECK (
         length(btrim(name)) > 0
     ),
@@ -77,8 +85,15 @@ CREATE TABLE IF NOT EXISTS carrier_connections (
     )
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS uq_carrier_connections_platform_name
+    ON carrier_connections (name)
+    WHERE scope = 'platform';
+
 CREATE INDEX IF NOT EXISTS idx_carrier_connections_organization_status
     ON carrier_connections (organization_id, status);
+
+CREATE INDEX IF NOT EXISTS idx_carrier_connections_scope_status
+    ON carrier_connections (scope, status);
 
 CREATE INDEX IF NOT EXISTS idx_carrier_connections_provider_id
     ON carrier_connections (provider_id);
@@ -104,6 +119,28 @@ CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_organization_id
 
 CREATE INDEX IF NOT EXISTS idx_carrier_connection_source_ips_cidr
     ON carrier_connection_source_ips USING gist (cidr inet_ops);
+
+-- Ownership is immutable. Moving an existing connection between an
+-- organization and the platform would make historical attribution ambiguous;
+-- create a new connection instead.
+CREATE FUNCTION prevent_carrier_connection_owner_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF OLD.scope IS DISTINCT FROM NEW.scope
+       OR OLD.organization_id IS DISTINCT FROM NEW.organization_id THEN
+        RAISE EXCEPTION 'carrier connection ownership is immutable'
+            USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER prevent_carrier_connection_owner_change
+BEFORE UPDATE OF scope, organization_id ON carrier_connections
+FOR EACH ROW
+EXECUTE FUNCTION prevent_carrier_connection_owner_change();
 
 CREATE TRIGGER set_carrier_connections_updated_at
 BEFORE UPDATE ON carrier_connections
