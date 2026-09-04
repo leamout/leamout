@@ -34,6 +34,9 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
+      - name: Format Go sources
+        run: find server -name '*.go' -print0 | xargs -0 gofmt -w
+
       - name: Regenerate sqlc
         working-directory: server
         run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
@@ -50,9 +53,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
+            server \
             server/migrations/atlas.sum \
             server/internal/database/sqlc
           if ! git diff --cached --quiet; then
-            git commit -m "regenerate domain database artifacts"
+            git commit -m "format managed routing changes"
             git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
           fi
