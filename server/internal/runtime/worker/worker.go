@@ -2,8 +2,10 @@ package worker
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +19,7 @@ import (
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/config"
+	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -37,9 +40,26 @@ type Worker struct {
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
 	idempotencyCleanup      *idempotency.CleanupJob
+	health                  *healthState
+	healthAddress           string
+	logger                  *logging.Logger
+}
+
+var componentNames = []string{
+	"freeswitch-events",
+	"call-reconciliation",
+	"carrier-endpoint-health",
+	"recording-reconciliation",
+	"outbox-publisher",
+	"webhook-consumer",
+	"webhook-delivery",
+	"idempotency-cleanup",
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
+	if strings.TrimSpace(cfg.WorkerHealthAddress) == "" {
+		cfg.WorkerHealthAddress = ":8081"
+	}
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect worker database: %w", err)
@@ -202,6 +222,9 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		webhookConsumer:         webhookConsumer,
 		webhookDelivery:         webhookDelivery,
 		idempotencyCleanup:      idempotencyCleanup,
+		health:                  newHealthState(componentNames...),
+		healthAddress:           cfg.WorkerHealthAddress,
+		logger:                  logging.New(),
 	}, nil
 }
 
@@ -222,11 +245,11 @@ func (w *Worker) Run(ctx context.Context) error {
 		events,
 		func(eventCtx context.Context, event freeswitch.Event) error {
 			if err := w.calls.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
-				log.Printf("FreeSWITCH call event %s failed: %v", event.Name, err)
+				w.logger.Error(eventCtx, "FreeSWITCH call event failed", "event", event.Name, "error", err)
 				return err
 			}
 			if err := w.recordings.HandleFreeSWITCHEvent(eventCtx, event); err != nil {
-				log.Printf("FreeSWITCH recording event %s failed: %v", event.Name, err)
+				w.logger.Error(eventCtx, "FreeSWITCH recording event failed", "event", event.Name, "error", err)
 				return err
 			}
 			return nil
@@ -234,24 +257,37 @@ func (w *Worker) Run(ctx context.Context) error {
 	); err != nil {
 		return fmt.Errorf("subscribe to FreeSWITCH lifecycle events: %w", err)
 	}
+	w.health.setRunning("freeswitch-events")
+	w.logger.Info(ctx, "worker subscribed to FreeSWITCH lifecycle events")
 
-	log.Print("worker subscribed to FreeSWITCH call and recording lifecycle events")
-	log.Print("worker started call reconciliation job")
-	log.Print("worker started recording reconciliation job")
-	log.Print("worker started carrier endpoint health job")
-	log.Print("worker started outbox NATS publisher")
-	log.Print("worker started webhook NATS consumer")
-	log.Print("worker started webhook delivery job")
-	log.Print("worker started idempotency cleanup job")
+	healthServer := &http.Server{
+		Addr:              w.healthAddress,
+		Handler:           healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = healthServer.Shutdown(shutdownCtx)
+	}()
 
-	errCh := make(chan error, 7)
-	go runComponent(ctx, errCh, "call reconciliation", w.callReconciliation.Run)
-	go runComponent(ctx, errCh, "carrier endpoint health", w.endpointHealth.Run)
-	go runComponent(ctx, errCh, "recording reconciliation", w.recordingReconciliation.Run)
-	go runComponent(ctx, errCh, "outbox publisher", w.outbox.Run)
-	go runComponent(ctx, errCh, "webhook consumer", w.webhookConsumer.Run)
-	go runComponent(ctx, errCh, "webhook delivery", w.webhookDelivery.Run)
-	go runComponent(ctx, errCh, "idempotency cleanup", w.idempotencyCleanup.Run)
+	errCh := make(chan error, len(componentNames)+1)
+	go func() {
+		w.logger.Info(ctx, "worker health server started", "address", w.healthAddress)
+		if err := healthServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			errCh <- fmt.Errorf("run health server: %w", err)
+		}
+	}()
+	go w.runComponent(ctx, errCh, "call-reconciliation", w.callReconciliation.Run)
+	go w.runComponent(ctx, errCh, "carrier-endpoint-health", w.endpointHealth.Run)
+	go w.runComponent(ctx, errCh, "recording-reconciliation", w.recordingReconciliation.Run)
+	go w.runComponent(ctx, errCh, "outbox-publisher", w.outbox.Run)
+	go w.runComponent(ctx, errCh, "webhook-consumer", w.webhookConsumer.Run)
+	go w.runComponent(ctx, errCh, "webhook-delivery", w.webhookDelivery.Run)
+	go w.runComponent(ctx, errCh, "idempotency-cleanup", w.idempotencyCleanup.Run)
 
 	select {
 	case <-ctx.Done():
@@ -261,10 +297,20 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
-func runComponent(ctx context.Context, errCh chan<- error, name string, run func(context.Context) error) {
-	if err := run(ctx); err != nil {
-		errCh <- fmt.Errorf("run %s: %w", name, err)
+func (w *Worker) runComponent(ctx context.Context, errCh chan<- error, name string, run func(context.Context) error) {
+	w.health.setRunning(name)
+	w.logger.Info(ctx, "worker component started", "component", name)
+	err := run(ctx)
+	if ctx.Err() != nil {
+		w.health.setStopped(name, nil)
+		return
 	}
+	if err == nil {
+		err = fmt.Errorf("component stopped unexpectedly")
+	}
+	w.health.setStopped(name, err)
+	w.logger.Error(ctx, "worker component stopped", "component", name, "error", err)
+	errCh <- fmt.Errorf("run %s: %w", name, err)
 }
 
 func (w *Worker) Close() {
