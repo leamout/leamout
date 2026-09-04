@@ -166,7 +166,7 @@ func (r *Repository) InboundCallLimits(ctx context.Context, event InboundCallEve
 		PhoneNumberID:       event.PhoneNumberID,
 		OrganizationID:      event.OrganizationID,
 		CalledNumber:        event.To,
-		CarrierConnectionID: event.CarrierConnectionID,
+		CarrierConnectionID: &event.CarrierConnectionID,
 		ApplicationID:       event.ApplicationID,
 	})
 	if err != nil {
