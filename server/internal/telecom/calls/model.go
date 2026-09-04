@@ -47,6 +47,7 @@ type OriginateRequest struct {
 type InboundCallEvent struct {
 	OrganizationID      uuid.UUID
 	CarrierConnectionID uuid.UUID
+	PhoneNumberID       uuid.UUID
 	ApplicationID       uuid.UUID
 	ChannelID           string
 	From                string
@@ -167,7 +168,7 @@ const (
 	StateActive     CallState = "active"
 	StateCompleted  CallState = "completed"
 	StateFailed     CallState = "failed"
-	StateCancelled  CallState = "cancelled"
+	StateCancelled CallState = "cancelled"
 )
 
 // CallMediaState is the persisted media condition stored in calls.media_state.
