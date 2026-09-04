@@ -8,6 +8,9 @@ export function EmailFooter() {
         voice and messaging infrastructure.
       </Text>
       <Text className="m-0 mt-5 font-sans text-[11px] leading-[18px] text-fg-3">
+        4R59+MW, Akatsi South, Volta Region, Ghana
+      </Text>
+      <Text className="m-0 mt-2 font-sans text-[11px] leading-[18px] text-fg-3">
         <Link href="https://leamout.com" className="text-fg-2">
           leamout.com
         </Link>
