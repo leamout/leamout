@@ -192,6 +192,77 @@ func (q *Queries) GetCallBySIPCallIDGlobal(ctx context.Context, sipCallID *strin
 	return i, err
 }
 
+const getInboundCallContext = `-- name: GetInboundCallContext :one
+SELECT
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    cc.max_daily_minutes
+FROM phone_numbers AS pn
+JOIN carrier_connections AS cc
+  ON cc.id = pn.carrier_connection_id
+JOIN voice_bindings AS vb
+  ON vb.phone_number_id = pn.id
+JOIN voice_applications AS va
+  ON va.id = vb.voice_application_id
+JOIN organizations AS o
+  ON o.id = pn.organization_id
+WHERE pn.id = $1
+  AND pn.organization_id = $2
+  AND pn.number = $3
+  AND pn.carrier_connection_id = $4
+  AND pn.status = 'active'
+  AND pn.voice_enabled = true
+  AND cc.status = 'active'
+  AND cc.inbound_enabled = true
+  AND (
+      (
+          cc.scope = 'organization'
+          AND cc.organization_id = pn.organization_id
+          AND pn.provisioning_mode = 'byoc'
+      )
+      OR (
+          cc.scope = 'platform'
+          AND cc.organization_id IS NULL
+          AND pn.provisioning_mode = 'managed'
+      )
+  )
+  AND va.id = $5
+  AND va.organization_id = pn.organization_id
+  AND va.status = 'active'
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+LIMIT 1
+`
+
+type GetInboundCallContextParams struct {
+	PhoneNumberID       uuid.UUID  `db:"phone_number_id" json:"phone_number_id"`
+	OrganizationID      uuid.UUID  `db:"organization_id" json:"organization_id"`
+	CalledNumber        string     `db:"called_number" json:"called_number"`
+	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ApplicationID       uuid.UUID  `db:"application_id" json:"application_id"`
+}
+
+type GetInboundCallContextRow struct {
+	MaxCps             int32  `db:"max_cps" json:"max_cps"`
+	MaxConcurrentCalls int32  `db:"max_concurrent_calls" json:"max_concurrent_calls"`
+	MaxDailyMinutes    *int64 `db:"max_daily_minutes" json:"max_daily_minutes"`
+}
+
+// Revalidate the DID-derived tenant and route tuple before the call service
+// persists or admits an inbound call.
+func (q *Queries) GetInboundCallContext(ctx context.Context, arg GetInboundCallContextParams) (GetInboundCallContextRow, error) {
+	row := q.db.QueryRow(ctx, getInboundCallContext,
+		arg.PhoneNumberID,
+		arg.OrganizationID,
+		arg.CalledNumber,
+		arg.CarrierConnectionID,
+		arg.ApplicationID,
+	)
+	var i GetInboundCallContextRow
+	err := row.Scan(&i.MaxCps, &i.MaxConcurrentCalls, &i.MaxDailyMinutes)
+	return i, err
+}
+
 const listCalls = `-- name: ListCalls :many
 SELECT id, organization_id, application_id, carrier_connection_id, trunk_id, trunk_endpoint_id, direction, state, media_state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 FROM calls
