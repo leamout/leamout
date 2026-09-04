@@ -64,6 +64,10 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
+	if trunk.OrganizationID == nil || *trunk.OrganizationID != req.OrganizationID {
+		return OutboundDecision{}, ErrNoRoute
+	}
+
 	connection, err := r.repo.GetCarrierConnection(ctx, req.OrganizationID, trunk.CarrierConnectionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -71,6 +75,10 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
+	if connection.Scope != "organization" || connection.OrganizationID == nil || *connection.OrganizationID != req.OrganizationID {
+		return OutboundDecision{}, ErrNoRoute
+	}
+
 	caller, err := r.repo.GetPhoneNumber(ctx, req.OrganizationID, req.From)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -78,7 +86,11 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if !caller.VoiceEnabled || caller.CarrierConnectionID == nil || *caller.CarrierConnectionID != trunk.CarrierConnectionID {
+	if caller.OrganizationID != req.OrganizationID ||
+		caller.ProvisioningMode != "byoc" ||
+		!caller.VoiceEnabled ||
+		caller.CarrierConnectionID == nil ||
+		*caller.CarrierConnectionID != trunk.CarrierConnectionID {
 		return OutboundDecision{}, ErrCallerIdentity
 	}
 
@@ -122,7 +134,7 @@ func (r *Resolver) resolveManagedOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if !caller.VoiceEnabled {
+	if caller.OrganizationID != req.OrganizationID || !caller.VoiceEnabled {
 		return OutboundDecision{}, ErrCallerIdentity
 	}
 
@@ -286,11 +298,13 @@ func (r *Resolver) resolveInbound(
 
 	switch connection.Scope {
 	case "organization":
-		if connection.OrganizationID == nil || *connection.OrganizationID != organizationID {
+		if connection.OrganizationID == nil ||
+			*connection.OrganizationID != organizationID ||
+			phoneNumber.ProvisioningMode != "byoc" {
 			return InboundDecision{}, ErrTenantMismatch
 		}
 	case "platform":
-		if connection.OrganizationID != nil {
+		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != "managed" {
 			return InboundDecision{}, ErrTenantMismatch
 		}
 	default:
