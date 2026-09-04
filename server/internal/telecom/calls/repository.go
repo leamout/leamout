@@ -157,10 +157,27 @@ WHERE carrier_connection_id = $1
 	return seconds, err
 }
 
-func (r *Repository) CarrierCallLimits(ctx context.Context, organizationID, carrierID uuid.UUID) (CallLimits, error) {
-	limits := CallLimits{CarrierConnectionID: carrierID}
-	err := r.db.QueryRow(ctx, `SELECT max_cps, max_concurrent_calls, max_daily_minutes FROM carrier_connections WHERE id=$1 AND organization_id=$2 AND status='active'`, carrierID, organizationID).Scan(&limits.MaxCPS, &limits.MaxConcurrent, &limits.MaxDailyMinutes)
-	return limits, err
+// InboundCallLimits revalidates the trusted SIP metadata against the current
+// number/application/carrier relationship and returns limits from the resolved
+// carrier connection. Platform connections are intentionally not required to
+// belong to the call's organization; managed ingress tenancy comes from the DID.
+func (r *Repository) InboundCallLimits(ctx context.Context, event InboundCallEvent) (CallLimits, error) {
+	row, err := r.queries.GetInboundCallContext(ctx, sqlc.GetInboundCallContextParams{
+		PhoneNumberID:       event.PhoneNumberID,
+		OrganizationID:      event.OrganizationID,
+		CalledNumber:        event.To,
+		CarrierConnectionID: event.CarrierConnectionID,
+		ApplicationID:       event.ApplicationID,
+	})
+	if err != nil {
+		return CallLimits{}, err
+	}
+	return CallLimits{
+		CarrierConnectionID: event.CarrierConnectionID,
+		MaxCPS:              row.MaxCps,
+		MaxConcurrent:       row.MaxConcurrentCalls,
+		MaxDailyMinutes:     row.MaxDailyMinutes,
+	}, nil
 }
 
 func (r *Repository) MarkRinging(
@@ -189,91 +206,53 @@ func (r *Repository) MarkAnswered(
 	})
 }
 
-func (r *Repository) MarkActive(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.Call, error) {
+func (r *Repository) MarkActive(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
 	return r.mutateWithEvent(ctx, EventCallActive, func(q *sqlc.Queries) (sqlc.Call, error) {
-		return q.MarkCallActive(ctx, sqlc.MarkCallActiveParams{
-			OrganizationID: organizationID,
-			ID:             id,
-		})
+		return q.MarkCallActive(ctx, sqlc.MarkCallActiveParams{OrganizationID: organizationID, ID: id})
 	})
 }
 
-func (r *Repository) MarkHeld(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.Call, error) {
+func (r *Repository) MarkHeld(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
 	return r.mutateWithEvent(ctx, EventCallHeld, func(q *sqlc.Queries) (sqlc.Call, error) {
-		return q.MarkCallHeld(ctx, sqlc.MarkCallHeldParams{
-			OrganizationID: organizationID,
-			ID:             id,
-		})
+		return q.MarkCallHeld(ctx, sqlc.MarkCallHeldParams{OrganizationID: organizationID, ID: id})
 	})
 }
 
-func (r *Repository) MarkResumed(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.Call, error) {
+func (r *Repository) MarkResumed(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
 	return r.mutateWithEvent(ctx, EventCallResumed, func(q *sqlc.Queries) (sqlc.Call, error) {
-		return q.MarkCallResumed(ctx, sqlc.MarkCallResumedParams{
-			OrganizationID: organizationID,
-			ID:             id,
-		})
+		return q.MarkCallResumed(ctx, sqlc.MarkCallResumedParams{OrganizationID: organizationID, ID: id})
 	})
 }
 
-func (r *Repository) MarkCompleted(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-	hangupReason *string,
-) (sqlc.Call, error) {
+func (r *Repository) MarkCompleted(ctx context.Context, organizationID, id uuid.UUID, reason *string) (sqlc.Call, error) {
 	return r.mutateWithEvent(ctx, EventCallCompleted, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallCompleted(ctx, sqlc.MarkCallCompletedParams{
 			OrganizationID: organizationID,
 			ID:             id,
-			HangupReason:   hangupReason,
+			HangupReason:   reason,
 		})
 	})
 }
 
-func (r *Repository) MarkFailed(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-	hangupReason *string,
-) (sqlc.Call, error) {
+func (r *Repository) MarkFailed(ctx context.Context, organizationID, id uuid.UUID, reason *string) (sqlc.Call, error) {
 	return r.mutateWithEvent(ctx, EventCallFailed, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallFailed(ctx, sqlc.MarkCallFailedParams{
 			OrganizationID: organizationID,
 			ID:             id,
-			HangupReason:   hangupReason,
+			HangupReason:   reason,
 		})
 	})
 }
 
-func (r *Repository) MarkCancelled(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-	hangupReason *string,
-) (sqlc.Call, error) {
+func (r *Repository) MarkCancelled(ctx context.Context, organizationID, id uuid.UUID, reason *string) (sqlc.Call, error) {
 	return r.mutateWithEvent(ctx, EventCallCancelled, func(q *sqlc.Queries) (sqlc.Call, error) {
 		return q.MarkCallCancelled(ctx, sqlc.MarkCallCancelledParams{
 			OrganizationID: organizationID,
 			ID:             id,
-			HangupReason:   hangupReason,
+			HangupReason:   reason,
 		})
 	})
 }
-
-type callMutation func(*sqlc.Queries) (sqlc.Call, error)
 
 func (r *Repository) createWithEvent(
 	ctx context.Context,
@@ -281,126 +260,121 @@ func (r *Repository) createWithEvent(
 	sipCallID string,
 	direction CallDirection,
 	eventType CallEventType,
-	mutation callMutation,
+	mutation func(*sqlc.Queries) (sqlc.Call, error),
 ) (sqlc.Call, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return sqlc.Call{}, fmt.Errorf("begin call transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	queries := r.queries.WithTx(tx)
-	call, err := mutation(queries)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if !errors.As(err, &pgErr) || pgErr.Code != "23505" || pgErr.ConstraintName != "uq_calls_sip_call_id" {
-			return sqlc.Call{}, err
+	var result sqlc.Call
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		q := r.queries.WithTx(tx)
+		call, err := mutation(q)
+		if err != nil {
+			return err
 		}
-
-		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
-			return sqlc.Call{}, fmt.Errorf("rollback duplicate call transaction: %w", rollbackErr)
+		if err := r.publishCallEvent(ctx, q, call, sipCallID, direction, eventType); err != nil {
+			return err
 		}
-		existing, getErr := r.GetBySIPCallID(ctx, organizationID, sipCallID)
-		if getErr != nil {
-			return sqlc.Call{}, fmt.Errorf("get existing call after SIP identity conflict: %w", getErr)
-		}
-		if existing.Direction != string(direction) {
-			return sqlc.Call{}, fmt.Errorf(
-				"SIP call identity %q belongs to %s call %s, not %s",
-				sipCallID,
-				existing.Direction,
-				existing.ID,
-				direction,
-			)
-		}
-		return existing, nil
-	}
-
-	if err := r.insertEvent(ctx, tx, call, eventType); err != nil {
-		return sqlc.Call{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return sqlc.Call{}, fmt.Errorf("commit call transaction: %w", err)
-	}
-	return call, nil
+		result = call
+		return nil
+	})
+	return result, err
 }
 
 func (r *Repository) mutateWithEvent(
 	ctx context.Context,
 	eventType CallEventType,
-	mutation callMutation,
+	mutation func(*sqlc.Queries) (sqlc.Call, error),
 ) (sqlc.Call, error) {
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return sqlc.Call{}, fmt.Errorf("begin call transaction: %w", err)
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	queries := r.queries.WithTx(tx)
-	call, err := mutation(queries)
-	if err != nil {
-		return sqlc.Call{}, err
-	}
-
-	if err := r.insertEvent(ctx, tx, call, eventType); err != nil {
-		return sqlc.Call{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return sqlc.Call{}, fmt.Errorf("commit call transaction: %w", err)
-	}
-	return call, nil
+	var result sqlc.Call
+	err := pgx.BeginFunc(ctx, r.db, func(tx pgx.Tx) error {
+		q := r.queries.WithTx(tx)
+		call, err := mutation(q)
+		if err != nil {
+			return err
+		}
+		if err := r.publishCallEvent(ctx, q, call, stringValue(call.SipCallID), CallDirection(call.Direction), eventType); err != nil {
+			return err
+		}
+		result = call
+		return nil
+	})
+	return result, err
 }
 
-func (r *Repository) insertEvent(
+func (r *Repository) publishCallEvent(
 	ctx context.Context,
-	tx pgx.Tx,
+	q *sqlc.Queries,
 	call sqlc.Call,
+	sipCallID string,
+	direction CallDirection,
 	eventType CallEventType,
 ) error {
-	occurredAt := time.Now().UTC()
-	event := callDomainEvent(call, eventType, occurredAt)
-	if _, err := r.outbox.WithTx(tx).Insert(ctx, outbox.Event{
-		Subject:       string(eventType),
-		AggregateType: "call",
-		AggregateID:   call.ID,
-		Payload:       event,
-		Headers: map[string]string{
-			"event_type":      string(eventType),
-			"organization_id": call.OrganizationID.String(),
-			"schema_version":  "1",
-		},
-	}); err != nil {
-		return fmt.Errorf("insert call outbox event: %w", err)
-	}
-	return nil
-}
-
-func callDomainEvent(call sqlc.Call, eventType CallEventType, occurredAt time.Time) CallEvent {
-	applicationID := ""
-	if call.ApplicationID != nil {
-		applicationID = call.ApplicationID.String()
-	}
-	sipCallID := ""
-	if call.SipCallID != nil {
-		sipCallID = *call.SipCallID
-	}
-	hangupReason := ""
-	if call.HangupReason != nil {
-		hangupReason = *call.HangupReason
-	}
-
-	return CallEvent{
+	payload := CallEvent{
 		EventType:      eventType,
 		CallID:         call.ID.String(),
 		SIPCallID:      sipCallID,
-		ApplicationID:  applicationID,
+		ApplicationID:  uuidString(call.ApplicationID),
 		OrganizationID: call.OrganizationID.String(),
 		From:           call.FromUri,
 		To:             call.ToUri,
-		Direction:      CallDirection(call.Direction),
+		Direction:      direction,
 		Status:         statusForState(call.State),
 		MediaState:     CallMediaState(call.MediaState),
-		HangupReason:   hangupReason,
-		OccurredAt:     occurredAt,
+		HangupReason:   stringValue(call.HangupReason),
+		DurationSec:    durationSeconds(call),
+		OccurredAt:     time.Now().UTC(),
 	}
+	_, err := r.outbox.PublishCallEvent(ctx, q, call.OrganizationID, call.ID, string(eventType), payload)
+	return err
+}
+
+func durationSeconds(call sqlc.Call) int {
+	if !call.AnsweredAt.Valid || !call.EndedAt.Valid {
+		return 0
+	}
+	seconds := int(call.EndedAt.Time.Sub(call.AnsweredAt.Time).Seconds())
+	if seconds < 0 {
+		return 0
+	}
+	return seconds
+}
+
+func uuidString(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func readCall(call sqlc.Call, err error) (sqlc.Call, error) {
+	if err == nil {
+		return call, nil
+	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.Call{}, fmt.Errorf("call not found: %w", err)
+	}
+	return sqlc.Call{}, fmt.Errorf("read call: %w", err)
+}
+
+func writeError(err error, action string) error {
+	if err == nil {
+		return nil
+	}
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case "23503":
+			return fmt.Errorf("%s: invalid reference: %w", action, err)
+		case "23505":
+			return fmt.Errorf("%s: duplicate call: %w", action, err)
+		case "23514":
+			return fmt.Errorf("%s: invalid call state: %w", action, err)
+		}
+	}
+	return fmt.Errorf("%s: %w", action, err)
 }
