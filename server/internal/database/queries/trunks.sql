@@ -4,69 +4,151 @@ INSERT INTO trunks (
     carrier_connection_id,
     name,
     direction,
-    status
+    status,
+    managed_default
 )
 SELECT
-    sqlc.arg(organization_id) AS organization_id,
-    sqlc.arg(carrier_connection_id) AS carrier_connection_id,
-    sqlc.arg(name) AS name,
-    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
-    COALESCE(sqlc.narg(status), 'active') AS status
+    cc.organization_id,
+    cc.id,
+    sqlc.arg(name),
+    COALESCE(sqlc.narg(direction), 'bidirectional'),
+    COALESCE(sqlc.narg(status), 'active'),
+    false
 FROM carrier_connections AS cc
 WHERE cc.id = sqlc.arg(carrier_connection_id)
+  AND cc.scope = 'organization'
   AND cc.organization_id = sqlc.arg(organization_id)
   AND cc.status = 'active'
 RETURNING *;
 
+-- name: CreatePlatformTrunk :one
+INSERT INTO trunks (
+    organization_id,
+    carrier_connection_id,
+    name,
+    direction,
+    status,
+    managed_default
+)
+SELECT
+    NULL::UUID,
+    cc.id,
+    sqlc.arg(name),
+    COALESCE(sqlc.narg(direction), 'bidirectional'),
+    COALESCE(sqlc.narg(status), 'active'),
+    COALESCE(sqlc.narg(managed_default), false)
+FROM carrier_connections AS cc
+WHERE cc.id = sqlc.arg(carrier_connection_id)
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
+  AND cc.status = 'active'
+RETURNING *;
+
 -- name: GetTrunkByID :one
-SELECT *
-FROM trunks
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
+SELECT t.*
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE t.id = sqlc.arg(id)
+  AND t.organization_id = sqlc.arg(organization_id)
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
+LIMIT 1;
+
+-- name: GetPlatformTrunkByID :one
+SELECT t.*
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE t.id = sqlc.arg(id)
+  AND t.organization_id IS NULL
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
 LIMIT 1;
 
 -- name: ListTrunksByOrganizationID :many
-SELECT *
-FROM trunks
-WHERE organization_id = sqlc.arg(organization_id)
-ORDER BY created_at DESC;
+SELECT t.*
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE t.organization_id = sqlc.arg(organization_id)
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
+ORDER BY t.created_at DESC;
+
+-- name: ListPlatformTrunks :many
+SELECT t.*
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE t.organization_id IS NULL
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
+ORDER BY t.created_at DESC;
 
 -- name: ListTrunksByCarrierConnectionID :many
-SELECT *
-FROM trunks
-WHERE carrier_connection_id = sqlc.arg(carrier_connection_id)
-  AND organization_id = sqlc.arg(organization_id)
-ORDER BY created_at DESC;
+SELECT t.*
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE t.carrier_connection_id = sqlc.arg(carrier_connection_id)
+  AND t.organization_id = sqlc.arg(organization_id)
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
+ORDER BY t.created_at DESC;
 
 -- name: UpdateTrunk :one
-UPDATE trunks
+UPDATE trunks AS t
 SET
-    name = COALESCE(sqlc.narg(name), name),
-    direction = COALESCE(sqlc.narg(direction), direction),
-    status = COALESCE(sqlc.narg(status), status),
+    name = COALESCE(sqlc.narg(name), t.name),
+    direction = COALESCE(sqlc.narg(direction), t.direction),
+    status = COALESCE(sqlc.narg(status), t.status),
     updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
-RETURNING *;
+FROM carrier_connections AS cc
+WHERE t.id = sqlc.arg(id)
+  AND t.organization_id = sqlc.arg(organization_id)
+  AND cc.id = t.carrier_connection_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
+RETURNING t.*;
+
+-- name: UpdatePlatformTrunk :one
+UPDATE trunks AS t
+SET
+    name = COALESCE(sqlc.narg(name), t.name),
+    direction = COALESCE(sqlc.narg(direction), t.direction),
+    status = COALESCE(sqlc.narg(status), t.status),
+    managed_default = COALESCE(sqlc.narg(managed_default), t.managed_default),
+    updated_at = NOW()
+FROM carrier_connections AS cc
+WHERE t.id = sqlc.arg(id)
+  AND t.organization_id IS NULL
+  AND cc.id = t.carrier_connection_id
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
+RETURNING t.*;
 
 -- name: DisableTrunk :one
-UPDATE trunks
+UPDATE trunks AS t
 SET
     status = 'disabled',
     updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
-  AND status = 'active'
-RETURNING *;
+FROM carrier_connections AS cc
+WHERE t.id = sqlc.arg(id)
+  AND t.organization_id = sqlc.arg(organization_id)
+  AND t.status = 'active'
+  AND cc.id = t.carrier_connection_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
+RETURNING t.*;
 
 -- name: EnableTrunk :exec
-UPDATE trunks
+UPDATE trunks AS t
 SET
     status = 'active',
     updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
-  AND status = 'disabled';
+FROM carrier_connections AS cc
+WHERE t.id = sqlc.arg(id)
+  AND t.organization_id = sqlc.arg(organization_id)
+  AND t.status = 'disabled'
+  AND cc.id = t.carrier_connection_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id;
 
 -- name: CreateTrunkEndpoint :one
 INSERT INTO trunk_endpoints (
@@ -81,89 +163,172 @@ INSERT INTO trunk_endpoints (
     enabled
 )
 SELECT
-    sqlc.arg(organization_id) AS organization_id,
-    sqlc.arg(trunk_id) AS trunk_id,
-    sqlc.arg(host) AS host,
-    COALESCE(sqlc.narg(port), 5060) AS port,
-    COALESCE(sqlc.narg(transport), 'udp') AS transport,
-    COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
-    COALESCE(sqlc.narg(priority), 10) AS priority,
-    COALESCE(sqlc.narg(weight), 100) AS weight,
-    COALESCE(sqlc.narg(enabled), true) AS enabled
+    t.organization_id,
+    t.id,
+    sqlc.arg(host),
+    COALESCE(sqlc.narg(port), 5060),
+    COALESCE(sqlc.narg(transport), 'udp'),
+    COALESCE(sqlc.narg(direction), 'bidirectional'),
+    COALESCE(sqlc.narg(priority), 10),
+    COALESCE(sqlc.narg(weight), 100),
+    COALESCE(sqlc.narg(enabled), true)
 FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
+RETURNING *;
+
+-- name: CreatePlatformTrunkEndpoint :one
+INSERT INTO trunk_endpoints (
+    organization_id,
+    trunk_id,
+    host,
+    port,
+    transport,
+    direction,
+    priority,
+    weight,
+    enabled
+)
+SELECT
+    NULL::UUID,
+    t.id,
+    sqlc.arg(host),
+    COALESCE(sqlc.narg(port), 5060),
+    COALESCE(sqlc.narg(transport), 'udp'),
+    COALESCE(sqlc.narg(direction), 'bidirectional'),
+    COALESCE(sqlc.narg(priority), 10),
+    COALESCE(sqlc.narg(weight), 100),
+    COALESCE(sqlc.narg(enabled), true)
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE t.id = sqlc.arg(trunk_id)
+  AND t.organization_id IS NULL
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
 RETURNING *;
 
 -- name: GetTrunkEndpointByID :one
-SELECT *
-FROM trunk_endpoints
-WHERE id = sqlc.arg(id)
-  AND trunk_id = sqlc.arg(trunk_id)
-  AND organization_id = sqlc.arg(organization_id)
+SELECT te.*
+FROM trunk_endpoints AS te
+JOIN trunks AS t ON t.id = te.trunk_id
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE te.id = sqlc.arg(id)
+  AND te.trunk_id = sqlc.arg(trunk_id)
+  AND te.organization_id = sqlc.arg(organization_id)
+  AND t.organization_id = te.organization_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = te.organization_id
 LIMIT 1;
 
 -- name: ListTrunkEndpoints :many
-SELECT *
-FROM trunk_endpoints
-WHERE trunk_id = sqlc.arg(trunk_id)
-  AND organization_id = sqlc.arg(organization_id)
-ORDER BY priority ASC, weight DESC, created_at ASC;
+SELECT te.*
+FROM trunk_endpoints AS te
+JOIN trunks AS t ON t.id = te.trunk_id
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE te.trunk_id = sqlc.arg(trunk_id)
+  AND te.organization_id = sqlc.arg(organization_id)
+  AND t.organization_id = te.organization_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = te.organization_id
+ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
 
 -- name: UpdateTrunkEndpoint :one
-UPDATE trunk_endpoints
+UPDATE trunk_endpoints AS te
 SET
-    host = COALESCE(sqlc.narg(host), host),
-    port = COALESCE(sqlc.narg(port), port),
-    transport = COALESCE(sqlc.narg(transport), transport),
-    direction = COALESCE(sqlc.narg(direction), direction),
-    priority = COALESCE(sqlc.narg(priority), priority),
-    weight = COALESCE(sqlc.narg(weight), weight),
-    enabled = COALESCE(sqlc.narg(enabled), enabled),
+    host = COALESCE(sqlc.narg(host), te.host),
+    port = COALESCE(sqlc.narg(port), te.port),
+    transport = COALESCE(sqlc.narg(transport), te.transport),
+    direction = COALESCE(sqlc.narg(direction), te.direction),
+    priority = COALESCE(sqlc.narg(priority), te.priority),
+    weight = COALESCE(sqlc.narg(weight), te.weight),
+    enabled = COALESCE(sqlc.narg(enabled), te.enabled),
     health_status = CASE
         WHEN sqlc.narg(host)::TEXT IS NOT NULL
           OR sqlc.narg(port)::INTEGER IS NOT NULL
           OR sqlc.narg(transport)::TEXT IS NOT NULL THEN 'unknown'
-        ELSE health_status
+        ELSE te.health_status
     END,
     consecutive_failures = CASE
         WHEN sqlc.narg(host)::TEXT IS NOT NULL
           OR sqlc.narg(port)::INTEGER IS NOT NULL
           OR sqlc.narg(transport)::TEXT IS NOT NULL THEN 0
-        ELSE consecutive_failures
+        ELSE te.consecutive_failures
     END,
-    last_checked_at = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE last_checked_at END,
-    last_response_code = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE last_response_code END,
-    last_latency_ms = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE last_latency_ms END,
-    last_error = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE last_error END,
-    cooldown_until = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE cooldown_until END,
+    last_checked_at = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE te.last_checked_at END,
+    last_response_code = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE te.last_response_code END,
+    last_latency_ms = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE te.last_latency_ms END,
+    last_error = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE te.last_error END,
+    cooldown_until = CASE WHEN sqlc.narg(host)::TEXT IS NOT NULL OR sqlc.narg(port)::INTEGER IS NOT NULL OR sqlc.narg(transport)::TEXT IS NOT NULL THEN NULL ELSE te.cooldown_until END,
     updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND trunk_id = sqlc.arg(trunk_id)
-  AND organization_id = sqlc.arg(organization_id)
-RETURNING *;
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+WHERE te.id = sqlc.arg(id)
+  AND te.trunk_id = sqlc.arg(trunk_id)
+  AND te.organization_id = sqlc.arg(organization_id)
+  AND t.id = te.trunk_id
+  AND t.organization_id = te.organization_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = te.organization_id
+RETURNING te.*;
 
 -- name: DeleteTrunkEndpoint :one
-DELETE FROM trunk_endpoints
-WHERE id = sqlc.arg(id)
-  AND trunk_id = sqlc.arg(trunk_id)
-  AND organization_id = sqlc.arg(organization_id)
-RETURNING *;
+DELETE FROM trunk_endpoints AS te
+USING trunks AS t, carrier_connections AS cc
+WHERE te.id = sqlc.arg(id)
+  AND te.trunk_id = sqlc.arg(trunk_id)
+  AND te.organization_id = sqlc.arg(organization_id)
+  AND t.id = te.trunk_id
+  AND t.organization_id = te.organization_id
+  AND cc.id = t.carrier_connection_id
+  AND cc.scope = 'organization'
+  AND cc.organization_id = te.organization_id
+RETURNING te.*;
 
 -- name: ListActiveOutboundTrunkEndpoints :many
 SELECT te.*
 FROM trunk_endpoints AS te
-JOIN trunks AS t
-  ON t.id = te.trunk_id
- AND t.organization_id = te.organization_id
-JOIN carrier_connections AS cc
-  ON cc.id = t.carrier_connection_id
- AND cc.organization_id = t.organization_id
+JOIN trunks AS t ON t.id = te.trunk_id
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
   AND t.status = 'active'
   AND t.direction IN ('outbound', 'bidirectional')
+  AND cc.scope = 'organization'
+  AND cc.organization_id = t.organization_id
   AND cc.status = 'active'
+  AND te.organization_id = t.organization_id
+  AND te.enabled = true
+  AND te.direction IN ('outbound', 'bidirectional')
+ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
+
+-- name: ResolveManagedOutboundRoute :many
+SELECT
+    cc.id AS carrier_connection_id,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    cc.max_daily_minutes,
+    t.id AS trunk_id,
+    te.id AS endpoint_id,
+    te.host,
+    te.port,
+    te.transport,
+    te.priority,
+    te.weight,
+    te.health_status
+FROM trunks AS t
+JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN trunk_endpoints AS te ON te.trunk_id = t.id
+WHERE t.organization_id IS NULL
+  AND t.managed_default = true
+  AND t.status = 'active'
+  AND t.direction IN ('outbound', 'bidirectional')
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
+  AND cc.status = 'active'
+  AND te.organization_id IS NULL
   AND te.enabled = true
   AND te.direction IN ('outbound', 'bidirectional')
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
@@ -172,15 +337,13 @@ ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
 WITH due AS (
     SELECT te.id
     FROM trunk_endpoints AS te
-    JOIN trunks AS t
-      ON t.id = te.trunk_id
-     AND t.organization_id = te.organization_id
-    JOIN carrier_connections AS cc
-      ON cc.id = t.carrier_connection_id
-     AND cc.organization_id = t.organization_id
+    JOIN trunks AS t ON t.id = te.trunk_id
+    JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
     WHERE te.enabled = true
       AND t.status = 'active'
       AND cc.status = 'active'
+      AND te.organization_id IS NOT DISTINCT FROM t.organization_id
+      AND cc.organization_id IS NOT DISTINCT FROM t.organization_id
       AND (te.cooldown_until IS NULL OR te.cooldown_until <= sqlc.arg(checked_at))
       AND (te.last_checked_at IS NULL OR te.last_checked_at <= sqlc.arg(due_before))
     ORDER BY te.last_checked_at ASC NULLS FIRST
