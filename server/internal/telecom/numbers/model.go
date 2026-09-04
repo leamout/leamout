@@ -22,6 +22,19 @@ type CreateRequest struct {
 	SMSEnabled   *bool  `json:"sms_enabled,omitempty"`
 }
 
+// ManagedCreateRequest is an internal provisioning input. Provider metadata is
+// supplied by trusted provisioning orchestration after the upstream resource
+// has been created; it is never accepted from the public numbers API.
+type ManagedCreateRequest struct {
+	Number              string
+	CountryCode         string
+	ProviderID          uuid.UUID
+	ProviderResourceID  string
+	CarrierConnectionID *uuid.UUID
+	VoiceEnabled        *bool
+	SMSEnabled          *bool
+}
+
 type UpdateRequest struct {
 	CountryCode  *string `json:"country_code,omitempty"`
 	VoiceEnabled *bool   `json:"voice_enabled,omitempty"`

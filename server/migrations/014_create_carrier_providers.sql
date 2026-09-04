@@ -31,14 +31,29 @@ BEFORE UPDATE ON carrier_providers
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
--- Every deployment includes a carrier-neutral provider so organizations can
--- configure standards-based SIP trunks without operator-managed catalog data.
+-- Built-in provider definitions establish stable provider identities for
+-- generic SIP connectivity and provider-specific managed integrations.
 INSERT INTO carrier_providers (id, slug, name, adapter, status)
-VALUES (
-    '00000000-0000-0000-0000-000000002000',
-    'generic-sip',
-    'Generic SIP',
-    'sip',
-    'active'
-)
+VALUES
+    (
+        'eb3a4a81-ca51-44a7-9410-0841428ae43c',
+        'generic-sip',
+        'Generic SIP',
+        'sip',
+        'active'
+    ),
+    (
+        '26c5448a-2540-4731-848d-9c713c19d8cd',
+        'didww',
+        'DIDWW',
+        'didww',
+        'active'
+    ),
+    (
+        '300e6073-fe60-4d40-ac6d-808d74749a0c',
+        'commpeak',
+        'CommPeak',
+        'commpeak',
+        'active'
+    )
 ON CONFLICT (slug) DO NOTHING;
