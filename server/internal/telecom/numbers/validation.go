@@ -8,7 +8,7 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-var e164 = regexp.MustCompile(`^\+[1-9][0-9]{7,14}$`)
+var e164 = regexp.MustCompile(`^\+[1-9][0-9]{6,14}$`)
 var country = regexp.MustCompile(`^[A-Z]{2}$`)
 
 func validateOrganizationID(id uuid.UUID) error {
@@ -17,12 +17,14 @@ func validateOrganizationID(id uuid.UUID) error {
 	}
 	return nil
 }
+
 func validateNumberID(id uuid.UUID) error {
 	if id == uuid.Nil {
 		return apperror.NewBadRequest("number id is required")
 	}
 	return nil
 }
+
 func normalizeNumber(v string) (string, error) {
 	v = strings.TrimSpace(v)
 	if !e164.MatchString(v) {
@@ -30,6 +32,7 @@ func normalizeNumber(v string) (string, error) {
 	}
 	return v, nil
 }
+
 func normalizeCountryCode(v string) (string, error) {
 	v = strings.ToUpper(strings.TrimSpace(v))
 	if !country.MatchString(v) {
