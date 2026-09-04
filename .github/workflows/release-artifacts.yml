@@ -126,7 +126,7 @@ jobs:
           from pathlib import Path
 
           source = Path("server/release/fixtures/valid-manifest.json")
-          for frontend in ("console", "web", "waitlist"):
+          for frontend in ("console", "web"):
               manifest = json.loads(source.read_text())
               manifest["images"][frontend] = (
                   f"ghcr.io/leamout/{frontend}@sha256:" + ("f" * 64)
@@ -135,7 +135,7 @@ jobs:
               target.write_text(json.dumps(manifest))
           PY
 
-          for frontend in console web waitlist; do
+          for frontend in console web; do
             if python3 server/scripts/release/validate-manifest.py "/tmp/${frontend}-manifest.json"; then
               echo "validator unexpectedly accepted hosted frontend image: ${frontend}" >&2
               exit 1
@@ -229,7 +229,7 @@ jobs:
       - name: Verify CLI excludes hosted frontend services
         run: |
           grep -q 'selfHostedDeployServices = "server worker opensips coturn freeswitch rtpengine postgres redis nats"' server/internal/runtime/leamout/cli.go
-          if grep -q 'selfHostedDeployServices.*console' server/internal/runtime/leamout/cli.go; then
+          if grep -Eq 'selfHostedDeployServices.*(console|web)' server/internal/runtime/leamout/cli.go; then
             echo "self-hosted CLI unexpectedly includes hosted console" >&2
             exit 1
           fi

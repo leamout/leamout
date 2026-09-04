@@ -125,10 +125,13 @@ const getOrganizationMember = `-- name: GetOrganizationMember :one
 SELECT tm.organization_id, tm.user_id, tm.role, tm.status, tm.created_at, tm.updated_at
 FROM organization_members AS tm
 JOIN users AS u ON u.id = tm.user_id
+JOIN organizations AS o ON o.id = tm.organization_id
 WHERE tm.organization_id = $1
 AND tm.user_id = $2
 AND tm.status = 'active'
 AND u.disabled_at IS NULL
+AND o.status = 'active'
+AND o.deleted_at IS NULL
 LIMIT 1
 `
 

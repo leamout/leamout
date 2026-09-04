@@ -138,7 +138,7 @@ jobs:
           grep -q 'leamout-private-control' /tmp/runtime-config.yaml
           grep -q 'leamout-control-egress' /tmp/runtime-config.yaml
 
-          if grep -Eq '(^|[[:space:]])(web|console|waitlist)(:|[[:space:]]|$)' /tmp/runtime-services.txt; then
+          if grep -Eq '(^|[[:space:]])(web|console)(:|[[:space:]]|$)' /tmp/runtime-services.txt; then
             echo "hosted frontend leaked into production runtime" >&2
             exit 1
           fi

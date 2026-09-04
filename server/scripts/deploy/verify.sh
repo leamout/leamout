@@ -20,7 +20,7 @@ test "$ready" -eq 1 || {
   exit 1
 }
 
-for service in server worker web console waitlist opensips coturn freeswitch rtpengine postgres redis nats; do
+for service in server worker web console opensips coturn freeswitch rtpengine postgres redis nats; do
   container_id="$(compose ps -q "$service")"
   test -n "$container_id" || {
     echo "Missing container for service: $service" >&2

@@ -25,10 +25,13 @@ RETURNING *;
 SELECT tm.*
 FROM organization_members AS tm
 JOIN users AS u ON u.id = tm.user_id
+JOIN organizations AS o ON o.id = tm.organization_id
 WHERE tm.organization_id = sqlc.arg(organization_id)
 AND tm.user_id = sqlc.arg(user_id)
 AND tm.status = 'active'
 AND u.disabled_at IS NULL
+AND o.status = 'active'
+AND o.deleted_at IS NULL
 LIMIT 1;
 
 -- name: ListMembersByOrganizationID :many
