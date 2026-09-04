@@ -18,12 +18,12 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
-func (r *Repository) Create(
+func (r *Repository) CreateBYOC(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	req CreateRequest,
+	req BYOCCreateRequest,
 ) (sqlc.PhoneNumber, error) {
-	return r.queries.CreatePhoneNumber(ctx, sqlc.CreatePhoneNumberParams{
+	return r.queries.CreateBYOCPhoneNumber(ctx, sqlc.CreateBYOCPhoneNumberParams{
 		OrganizationID: organizationID,
 		Number:         req.Number,
 		CountryCode:    req.CountryCode,
@@ -78,18 +78,17 @@ func (r *Repository) Update(
 	return r.queries.UpdatePhoneNumber(ctx, sqlc.UpdatePhoneNumberParams{
 		ID:             id,
 		OrganizationID: organizationID,
-		CountryCode:    req.CountryCode,
 		VoiceEnabled:   req.VoiceEnabled,
 		SmsEnabled:     req.SMSEnabled,
 	})
 }
 
-func (r *Repository) Disable(
+func (r *Repository) ReleaseBYOC(
 	ctx context.Context,
 	organizationID uuid.UUID,
 	id uuid.UUID,
-) error {
-	return r.queries.DisablePhoneNumber(ctx, sqlc.DisablePhoneNumberParams{
+) (sqlc.PhoneNumber, error) {
+	return r.queries.ReleaseBYOCPhoneNumber(ctx, sqlc.ReleaseBYOCPhoneNumberParams{
 		ID:             id,
 		OrganizationID: organizationID,
 	})
