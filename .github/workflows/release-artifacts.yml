@@ -162,10 +162,17 @@ jobs:
 
       - name: Exercise bootstrap installer
         run: |
+          VERSION=1.0.0-preview.1 \
+          OUT_DIR=/tmp/leamout-release \
+          sh server/scripts/release/package-runtime.sh >/dev/null
+
           mkdir -p /tmp/installer-release/1.0.0-preview.1 /tmp/installer-tools
           cp /tmp/leamout-release/leamout_1.0.0-preview.1_linux_amd64.tar.gz /tmp/installer-release/1.0.0-preview.1/
+          cp /tmp/leamout-release/leamout_runtime_1.0.0-preview.1_linux_amd64.tar.gz /tmp/installer-release/1.0.0-preview.1/
           cp /tmp/leamout-release/checksums.txt /tmp/installer-release/1.0.0-preview.1/
+          cp server/release/fixtures/valid-manifest.json /tmp/installer-release/1.0.0-preview.1/release-manifest.json
           : > /tmp/installer-release/1.0.0-preview.1/checksums.txt.minisig
+          : > /tmp/installer-release/1.0.0-preview.1/release-manifest.json.minisig
 
           cat > /tmp/installer-os-release <<'EOF'
           ID=ubuntu
