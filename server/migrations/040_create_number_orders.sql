@@ -63,11 +63,12 @@ CREATE TABLE IF NOT EXISTS number_orders (
     )
 );
 
--- An upstream inventory selection represents one specific number. Keeping this
--- unique prevents two organizations from racing the same provider inventory
--- item through separate Leamout orders.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_number_orders_provider_inventory
-    ON number_orders (provider_id, provider_inventory_id);
+-- A live/recoverable order owns its provider inventory selection. Completed
+-- orders remain historical records without assuming a provider will never
+-- recycle an inventory identifier in the future.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_number_orders_provider_inventory_open
+    ON number_orders (provider_id, provider_inventory_id)
+    WHERE status <> 'completed';
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_number_orders_provider_order
     ON number_orders (provider_id, provider_order_id)
