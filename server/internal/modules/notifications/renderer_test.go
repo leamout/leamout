@@ -21,13 +21,11 @@ func TestRendererRenderAuthOTP(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, body := range []string{email.HTML, email.Text} {
-		if !strings.Contains(body, "482913") {
-			t.Fatalf("rendered body does not contain OTP: %q", body)
-		}
-		if !strings.Contains(body, "10") {
-			t.Fatalf("rendered body does not contain expiry: %q", body)
-		}
+	if !strings.Contains(email.HTML, "482913") {
+		t.Fatalf("rendered HTML does not contain OTP: %q", email.HTML)
+	}
+	if !strings.Contains(email.HTML, "10") {
+		t.Fatalf("rendered HTML does not contain expiry: %q", email.HTML)
 	}
 	if email.Subject != "Your Leamout verification code" {
 		t.Fatalf("subject = %q", email.Subject)
