@@ -86,7 +86,16 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 		return fmt.Errorf("inspect installed runtime: %w", err)
 	}
 	if exists {
-		return validateInstalledRuntime(runtimeDir, manifest, expectedSHA, manifestSHA)
+		installedVersion, err := installedRuntimeVersion(runtimeDir)
+		if err != nil {
+			return err
+		}
+		if installedVersion == manifest.ReleaseVersion {
+			return validateInstalledRuntime(runtimeDir, manifest, expectedSHA, manifestSHA)
+		}
+		if err := os.RemoveAll(runtimeDir); err != nil {
+			return fmt.Errorf("remove runtime version %q before installing %q: %w", installedVersion, manifest.ReleaseVersion, err)
+		}
 	}
 
 	if err := os.MkdirAll(filepath.Dir(runtimeDir), 0o750); err != nil {
@@ -138,6 +147,24 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 		return fmt.Errorf("validate installed runtime: %w", err)
 	}
 	return nil
+}
+
+func installedRuntimeVersion(runtimeDir string) (string, error) {
+	content, err := os.ReadFile(filepath.Join(runtimeDir, "release.json"))
+	if err != nil {
+		return "", fmt.Errorf("read installed runtime metadata: %w", err)
+	}
+	var installed installedRuntimeRelease
+	if err := json.Unmarshal(content, &installed); err != nil {
+		return "", fmt.Errorf("decode installed runtime metadata: %w", err)
+	}
+	if installed.SchemaVersion != 1 {
+		return "", fmt.Errorf("unsupported installed runtime metadata schema: %d", installed.SchemaVersion)
+	}
+	if installed.ReleaseVersion == "" {
+		return "", errors.New("installed runtime metadata has no release version")
+	}
+	return installed.ReleaseVersion, nil
 }
 
 func loadReleaseManifest(path, version string) (releaseManifest, string, error) {

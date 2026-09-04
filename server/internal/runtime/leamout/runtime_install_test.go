@@ -31,12 +31,12 @@ func stageRuntimeRelease(t *testing.T, stateDir, version string) string {
 		"channel":             "preview",
 		"source_commit":       strings.Repeat("1", 40),
 		"minimum_cli_version": version,
-		"supported_hosts": []map[string]string{{"os": "ubuntu", "version": "24.04", "arch": "amd64"}},
-		"database": map[string]string{"migration": "039_create_idempotency.sql"},
+		"supported_hosts":     []map[string]string{{"os": "ubuntu", "version": "24.04", "arch": "amd64"}},
+		"database":            map[string]string{"migration": "039_create_idempotency.sql"},
 		"cli_artifacts": []map[string]string{{
 			"os": "linux", "arch": "amd64",
 			"filename": "leamout_" + version + "_linux_amd64.tar.gz",
-			"sha256": strings.Repeat("2", 64),
+			"sha256":   strings.Repeat("2", 64),
 		}},
 		"images": images,
 	}
@@ -63,9 +63,9 @@ func stageRuntimeRelease(t *testing.T, stateDir, version string) string {
 		compose += fmt.Sprintf("  %s:\n    image: %s\n", name, token)
 	}
 	files := map[string]string{
-		"runtime/compose.yaml.tmpl":                 compose,
-		"runtime/coturn/turnserver.conf":           "listening-port=3478\n",
-		"runtime/migrations/atlas.sum":             "h1:test\n",
+		"runtime/compose.yaml.tmpl":                     compose,
+		"runtime/coturn/turnserver.conf":                "listening-port=3478\n",
+		"runtime/migrations/atlas.sum":                  "h1:test\n",
 		"runtime/migrations/039_create_idempotency.sql": "-- fixture\n",
 	}
 	for name, content := range files {
@@ -132,5 +132,37 @@ func TestInstallRuntimeBundleRejectsTamperedArchive(t *testing.T) {
 	}
 	if err := installRuntimeBundle(releaseDir, filepath.Join(root, "runtime"), version); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("expected checksum mismatch, got %v", err)
+	}
+}
+
+func TestInstallRuntimeBundleReplacesOlderVersion(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "runtime")
+	oldVersion := "1.0.0-preview.1"
+	newVersion := "1.0.0-preview.2"
+
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, oldVersion), runtimeDir, oldVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(runtimeDir, "old-version-only"), []byte("stale\n"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, newVersion), runtimeDir, newVersion); err != nil {
+		t.Fatalf("upgrade runtime installation failed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(runtimeDir, "old-version-only")); !os.IsNotExist(err) {
+		t.Fatalf("old runtime was not replaced: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(runtimeDir, "release.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var installed installedRuntimeRelease
+	if err := json.Unmarshal(content, &installed); err != nil {
+		t.Fatal(err)
+	}
+	if installed.ReleaseVersion != newVersion {
+		t.Fatalf("installed runtime version = %q, want %q", installed.ReleaseVersion, newVersion)
 	}
 }
