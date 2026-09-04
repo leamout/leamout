@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { Hr, Text } from "react-email";
 
 export function EmailFooter() {
@@ -9,12 +10,12 @@ export function EmailFooter() {
   );
 }
 
-const divider = {
+const divider: CSSProperties = {
   borderColor: "#e5e5e5",
   margin: "32px 0 20px",
 };
 
-const footer = {
+const footer: CSSProperties = {
   margin: 0,
   color: "#737373",
   fontSize: "12px",
