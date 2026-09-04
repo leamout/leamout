@@ -18,7 +18,7 @@ type OutboundRequest struct {
 	ApplicationID  *uuid.UUID
 	From           string
 	To             string
-	TrunkID        uuid.UUID
+	TrunkID        *uuid.UUID
 }
 
 type OutboundDecision struct {
