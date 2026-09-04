@@ -23,7 +23,8 @@ export const leamoutTailwindConfig: TailwindConfig = {
           "0px 76px 21px 0px rgba(193,195,193,0), 0px 49px 19px 0px rgba(193,195,193,0.01), 0px 27px 16px 0px rgba(193,195,193,0.05), 0px 12px 12px 0px rgba(193,195,193,0.09), 0px 3px 7px 0px rgba(193,195,193,0.1)",
       },
       fontFamily: {
-        sans: ["Inter", "Arial", "sans-serif"],
+        sans: ["IBM Plex Sans", "Arial", "sans-serif"],
+        mono: ["IBM Plex Mono", "Courier New", "monospace"],
       },
     },
   },
