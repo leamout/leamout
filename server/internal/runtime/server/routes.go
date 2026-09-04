@@ -106,6 +106,8 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		credentials.RegisterRoutes(
 			r,
 			modules.Credentials.Handler,
+			// Credential lifecycle operations stay session-only. In particular,
+			// organization tokens must not be able to mint or elevate tokens.
 			sessionOrganizationAccess("credentials"),
 		)
 		voice.RegisterRoutes(

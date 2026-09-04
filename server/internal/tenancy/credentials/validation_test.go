@@ -21,6 +21,7 @@ func TestValidateScopesRejectsUnknownAndDuplicateScopes(t *testing.T) {
 		scopes []string
 	}{
 		{name: "unknown", scopes: []string{"everything:write"}},
+		{name: "credential self-management", scopes: []string{"credentials:write"}},
 		{name: "duplicate", scopes: []string{"calls:read", "calls:read"}},
 	}
 	for _, tt := range tests {

@@ -4,9 +4,12 @@ package authz
 type Scope string
 
 const (
-	ScopeOrganizationRead       Scope = "organization:read"
-	ScopeMembersRead            Scope = "members:read"
-	ScopeMembersWrite           Scope = "members:write"
+	ScopeOrganizationRead Scope = "organization:read"
+	ScopeMembersRead      Scope = "members:read"
+	ScopeMembersWrite     Scope = "members:write"
+	// Credential lifecycle writes intentionally have no token scope. Creating,
+	// updating, and revoking organization tokens requires an owner/admin session
+	// so a compromised token cannot mint a more privileged replacement.
 	ScopeCredentialsRead        Scope = "credentials:read"
 	ScopeLicensingRead          Scope = "licensing:read"
 	ScopeLicensingWrite         Scope = "licensing:write"
