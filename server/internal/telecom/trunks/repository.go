@@ -25,7 +25,7 @@ func (r *Repository) Create(ctx context.Context, arg sqlc.CreateTrunkParams) (sq
 }
 
 func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.Trunk, error) {
-	return r.queries.ListTrunksByOrganizationID(ctx, organizationID)
+	return r.queries.ListTrunksByOrganizationID(ctx, &organizationID)
 }
 
 func (r *Repository) Get(
@@ -35,7 +35,7 @@ func (r *Repository) Get(
 ) (sqlc.Trunk, error) {
 	return r.queries.GetTrunkByID(ctx, sqlc.GetTrunkByIDParams{
 		ID:             id,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
 
@@ -50,7 +50,7 @@ func (r *Repository) Disable(
 ) (sqlc.Trunk, error) {
 	return r.queries.DisableTrunk(ctx, sqlc.DisableTrunkParams{
 		ID:             id,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
 
@@ -68,7 +68,7 @@ func (r *Repository) ListEndpoints(
 ) ([]sqlc.TrunkEndpoint, error) {
 	return r.queries.ListTrunkEndpoints(ctx, sqlc.ListTrunkEndpointsParams{
 		TrunkID:        trunkID,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
 
@@ -81,7 +81,7 @@ func (r *Repository) GetEndpoint(
 	return r.queries.GetTrunkEndpointByID(ctx, sqlc.GetTrunkEndpointByIDParams{
 		ID:             id,
 		TrunkID:        trunkID,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
 
@@ -101,6 +101,6 @@ func (r *Repository) DeleteEndpoint(
 	return r.queries.DeleteTrunkEndpoint(ctx, sqlc.DeleteTrunkEndpointParams{
 		ID:             id,
 		TrunkID:        trunkID,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 	})
 }
