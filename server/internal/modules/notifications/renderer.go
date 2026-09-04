@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-//go:embed templates/*.tmpl
+//go:embed templates
 var templateFS embed.FS
 
 type AuthOTPData struct {
@@ -21,7 +21,7 @@ type Renderer struct {
 }
 
 func NewRenderer() (*Renderer, error) {
-	htmlTemplate, err := template.ParseFS(templateFS, "templates/auth_otp.html.tmpl")
+	htmlTemplate, err := template.ParseFS(templateFS, "templates/auth/otp.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse auth OTP HTML template: %w", err)
 	}
