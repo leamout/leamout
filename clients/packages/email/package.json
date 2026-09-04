@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "email dev --dir ./src/templates",
-    "export": "email export --pretty --dir ./src/templates --outDir ../../../server/internal/modules/notifications/templates",
+    "export": "email export --pretty --dir ./src/templates --outDir ../../../server/internal/modules/notifications/templates/generated",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit"
