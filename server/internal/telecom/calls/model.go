@@ -168,7 +168,7 @@ const (
 	StateActive     CallState = "active"
 	StateCompleted  CallState = "completed"
 	StateFailed     CallState = "failed"
-	StateCancelled CallState = "cancelled"
+	StateCancelled  CallState = "cancelled"
 )
 
 // CallMediaState is the persisted media condition stored in calls.media_state.
