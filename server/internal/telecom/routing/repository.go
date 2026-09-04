@@ -8,6 +8,21 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
+type managedRouteCandidate struct {
+	CarrierConnectionID uuid.UUID
+	MaxCPS              int32
+	MaxConcurrentCalls  int32
+	MaxDailyMinutes     *int64
+	TrunkID             uuid.UUID
+	EndpointID          uuid.UUID
+	Host                string
+	Port                int32
+	Transport           string
+	Priority            int32
+	Weight              int32
+	HealthStatus        string
+}
+
 type Repository struct {
 	queries *sqlc.Queries
 }
@@ -33,7 +48,7 @@ func (r *Repository) GetCarrierConnection(ctx context.Context, organizationID, i
 		return sqlc.CarrierConnection{}, err
 	}
 	return sqlc.CarrierConnection{
-		ID: row.ID, OrganizationID: row.OrganizationID, ProviderID: row.ProviderID,
+		ID: row.ID, OrganizationID: row.OrganizationID, ProviderID: row.ProviderID, Scope: row.Scope,
 		Status: row.Status, MaxCps: row.MaxCps, MaxConcurrentCalls: row.MaxConcurrentCalls,
 		MaxDailyMinutes: row.MaxDailyMinutes,
 	}, nil
@@ -48,6 +63,31 @@ func (r *Repository) ListOutboundEndpoints(
 		TrunkID:        trunkID,
 		OrganizationID: organizationID,
 	})
+}
+
+func (r *Repository) ListManagedOutboundRoutes(ctx context.Context) ([]managedRouteCandidate, error) {
+	rows, err := r.queries.ResolveManagedOutboundRoute(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]managedRouteCandidate, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, managedRouteCandidate{
+			CarrierConnectionID: row.CarrierConnectionID,
+			MaxCPS:              row.MaxCps,
+			MaxConcurrentCalls:  row.MaxConcurrentCalls,
+			MaxDailyMinutes:     row.MaxDailyMinutes,
+			TrunkID:             row.TrunkID,
+			EndpointID:          row.EndpointID,
+			Host:                row.Host,
+			Port:                row.Port,
+			Transport:           row.Transport,
+			Priority:            row.Priority,
+			Weight:              row.Weight,
+			HealthStatus:        row.HealthStatus,
+		})
+	}
+	return result, nil
 }
 
 func (r *Repository) ResolveInboundCarrier(
