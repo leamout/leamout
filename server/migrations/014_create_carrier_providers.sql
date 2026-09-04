@@ -42,3 +42,24 @@ VALUES (
     'active'
 )
 ON CONFLICT (slug) DO NOTHING;
+
+-- Managed provider definitions identify control-plane integrations. They do
+-- not imply provider-owned routing; Leamout carrier/trunk/number primitives
+-- remain authoritative for tenancy and runtime route selection.
+INSERT INTO carrier_providers (id, slug, name, adapter, status)
+VALUES
+    (
+        '00000000-0000-0000-0000-000000002001',
+        'didww',
+        'DIDWW',
+        'didww',
+        'active'
+    ),
+    (
+        '00000000-0000-0000-0000-000000002002',
+        'commpeak',
+        'CommPeak',
+        'commpeak',
+        'active'
+    )
+ON CONFLICT (slug) DO NOTHING;
