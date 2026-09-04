@@ -17,7 +17,7 @@
     }
   ],
   "database": {
-    "migration": "039_create_idempotency.sql"
+    "migration": "040_create_provider_cdrs.sql"
   },
   "cli_artifacts": [
     {

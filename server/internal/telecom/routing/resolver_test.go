@@ -188,6 +188,9 @@ func TestResolveManagedOutboundWithoutTrunk(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve managed outbound: %v", err)
 	}
+	if !decision.Managed {
+		t.Fatal("managed route was not marked for commercial admission")
+	}
 	if decision.CarrierConnectionID != managedConnectionID || decision.TrunkID != managedTrunkID || decision.EndpointID != managedEndpointID {
 		t.Fatalf("unexpected managed decision: %+v", decision)
 	}

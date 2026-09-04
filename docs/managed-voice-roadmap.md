@@ -174,6 +174,18 @@ Rules:
 
 ## Phase 4 — managed provider integration
 
+Managed outbound private-alpha foundations now include:
+
+- [x] Keep platform carrier connections/trunks/endpoints behind internal SQL operations.
+- [x] Select a single platform `managed_default` trunk for trunkless outbound calls.
+- [x] Require `voice.managed.enabled` and a positive daily spend entitlement.
+- [x] Fail closed when entitlement resolution or wholesale-spend state is unavailable.
+- [x] Persist provider-neutral CDRs and reconcile each record idempotently to a
+      platform-routed outbound call and one wholesale charge.
+- [ ] Add the production CommPeak account, encrypted credential, and endpoint configuration.
+- [ ] Schedule authenticated CommPeak CDR polling with a durable cursor and retry policy.
+- [ ] Prove real PSTN termination and provider reconciliation in acceptance coverage.
+
 Only after the ownership/routing foundation exists should provider adapters enter customer workflows.
 
 ### DIDWW
