@@ -22,16 +22,20 @@ type numberRepository interface {
 	Update(context.Context, uuid.UUID, uuid.UUID, UpdateRequest) (sqlc.PhoneNumber, error)
 	ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
 	SetCarrierConnection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, audit.Event) (sqlc.PhoneNumber, error)
-	SaveManagedSelection(context.Context, uuid.UUID, ManagedNumberCandidate) (string, error)
 }
 
 type ManagedNumberInventory interface {
 	SearchAvailable(context.Context, AvailableSearchRequest) ([]ManagedNumberCandidate, error)
 }
 
+type ManagedNumberSelectionStore interface {
+	SaveManagedSelection(context.Context, uuid.UUID, ManagedNumberCandidate) (string, error)
+}
+
 type Service struct {
-	repo             numberRepository
-	managedInventory ManagedNumberInventory
+	repo              numberRepository
+	managedInventory  ManagedNumberInventory
+	managedSelections ManagedNumberSelectionStore
 }
 
 func NewService(repo numberRepository) *Service {
@@ -42,6 +46,10 @@ func (s *Service) SetManagedAcquisition(inventory ManagedNumberInventory) {
 	s.managedInventory = inventory
 }
 
+func (s *Service) SetManagedSelectionStore(store ManagedNumberSelectionStore) {
+	s.managedSelections = store
+}
+
 func (s *Service) SearchAvailable(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -50,7 +58,7 @@ func (s *Service) SearchAvailable(
 	if err := validateOrganizationID(organizationID); err != nil {
 		return nil, err
 	}
-	if s.managedInventory == nil {
+	if s.managedInventory == nil || s.managedSelections == nil {
 		return nil, apperror.NewServiceUnavailable("managed number inventory is not configured", nil)
 	}
 
@@ -90,7 +98,7 @@ func (s *Service) SearchAvailable(
 			return nil, apperror.NewServiceUnavailable("managed number provider returned a number without included voice capacity", nil)
 		}
 
-		selectionID, err := s.repo.SaveManagedSelection(ctx, organizationID, candidate)
+		selectionID, err := s.managedSelections.SaveManagedSelection(ctx, organizationID, candidate)
 		if err != nil {
 			return nil, apperror.NewServiceUnavailable("store managed number selection", err)
 		}
