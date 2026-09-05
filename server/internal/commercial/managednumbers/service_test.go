@@ -50,7 +50,9 @@ func (s *storeStub) CompleteOrder(context.Context, uuid.UUID, didww.DID, OrderRe
 	s.completed = true
 	return uuid.New(), nil
 }
-func (s *storeStub) BeginRelease(context.Context, ReleaseRequest) (Operation, error) { return s.op, nil }
+func (s *storeStub) BeginRelease(context.Context, ReleaseRequest) (Operation, error) {
+	return s.op, nil
+}
 func (s *storeStub) CompleteRelease(context.Context, uuid.UUID, uuid.UUID) error {
 	s.completed = true
 	return nil
