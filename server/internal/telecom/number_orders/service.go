@@ -27,8 +27,8 @@ type numberOrderRepository interface {
 
 type ManagedNumberProvider interface {
 	FindNumberOrder(context.Context, string) (ProviderOrder, bool, error)
-	OrderNumber(context.Context, ProviderOrderRequest) (ProviderOrder, error)
-	FindNumber(context.Context, string) (ProviderNumber, error)
+	CreateNumberOrder(context.Context, ProviderOrderRequest) (ProviderOrder, error)
+	FindManagedNumber(context.Context, string) (ProviderNumber, error)
 	ConfigureNumberRouting(context.Context, string, string) (ProviderNumber, error)
 }
 
@@ -134,7 +134,7 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 		return s.handleProviderError(ctx, operation, fmt.Errorf("reconcile provider number order: %w", err))
 	}
 	if !found {
-		providerOrder, err = provider.OrderNumber(ctx, ProviderOrderRequest{
+		providerOrder, err = provider.CreateNumberOrder(ctx, ProviderOrderRequest{
 			ProviderInventoryID: request.ProviderInventoryID,
 			ProviderProductID:   request.ProviderProductID,
 			ExternalReferenceID: externalReferenceID,
@@ -178,7 +178,7 @@ func (s *Service) completeProviderOperation(
 	provider ManagedNumberProvider,
 	providerResponse []byte,
 ) error {
-	providerNumber, err := provider.FindNumber(ctx, request.Number)
+	providerNumber, err := provider.FindManagedNumber(ctx, request.Number)
 	if err != nil {
 		return s.handleProviderError(ctx, operation, fmt.Errorf("resolve purchased provider number: %w", err))
 	}
