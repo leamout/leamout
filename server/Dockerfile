@@ -28,8 +28,8 @@ RUN set -eux; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
-        -o /out/bootstrap \
-        ./cmd/bootstrap
+        -o /out/provision \
+        ./cmd/provision
 
 FROM alpine:3.22
 
@@ -43,7 +43,7 @@ RUN apk add --no-cache \
 
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
-COPY --from=build /out/bootstrap /leamout/bootstrap
+COPY --from=build /out/provision /leamout/provision
 
 USER leamout
 
