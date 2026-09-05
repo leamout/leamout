@@ -85,6 +85,7 @@ func (j *ProviderOperationJob) Execute(ctx context.Context) error {
 		return fmt.Errorf("list provider operations ready for execution: %w", err)
 	}
 
+	var firstErr error
 	for _, operation := range operations {
 		if operation.OperationType != "number_order" {
 			continue
@@ -92,7 +93,10 @@ func (j *ProviderOperationJob) Execute(ctx context.Context) error {
 
 		release, locked, err := j.repo.TryProviderOperationLock(ctx, operation.ID)
 		if err != nil {
-			return fmt.Errorf("lock provider operation %s: %w", operation.ID, err)
+			if firstErr == nil {
+				firstErr = fmt.Errorf("lock provider operation %s: %w", operation.ID, err)
+			}
+			continue
 		}
 		if !locked {
 			continue
@@ -100,10 +104,10 @@ func (j *ProviderOperationJob) Execute(ctx context.Context) error {
 
 		err = j.service.ExecuteProviderOperation(ctx, operation)
 		release()
-		if err != nil {
-			return fmt.Errorf("execute provider operation %s: %w", operation.ID, err)
+		if err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("execute provider operation %s: %w", operation.ID, err)
 		}
 	}
 
-	return nil
+	return firstErr
 }
