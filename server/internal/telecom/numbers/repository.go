@@ -2,55 +2,20 @@ package numbers
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
 )
-
-const managedNumberSelectionTTL = 10 * time.Minute
 
 type Repository struct {
 	db      *pgxpool.Pool
 	queries *sqlc.Queries
-	redis   *redisintegration.Client
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, queries: sqlc.New(db)}
-}
-
-func (r *Repository) SetRedis(redis *redisintegration.Client) {
-	r.redis = redis
-}
-
-func (r *Repository) SaveManagedSelection(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	candidate ManagedNumberCandidate,
-) (string, error) {
-	if r == nil || r.redis == nil {
-		return "", fmt.Errorf("managed number selection store is unavailable")
-	}
-	if organizationID == uuid.Nil {
-		return "", fmt.Errorf("organization id is required")
-	}
-
-	selectionID := "sel_" + uuid.NewString()
-	payload, err := json.Marshal(candidate)
-	if err != nil {
-		return "", fmt.Errorf("encode managed number selection: %w", err)
-	}
-	key := "telecom:numbers:selection:" + organizationID.String() + ":" + selectionID
-	if err := r.redis.Set(ctx, key, payload, managedNumberSelectionTTL); err != nil {
-		return "", fmt.Errorf("store managed number selection: %w", err)
-	}
-	return selectionID, nil
 }
 
 func (r *Repository) CreateBYOC(
