@@ -10,17 +10,17 @@ import (
 )
 
 type fakeNumberRepository struct {
-	createdBYOC          BYOCCreateRequest
-	createdManaged       ManagedCreateRequest
-	getNumber            sqlc.PhoneNumber
-	getForRelease        sqlc.PhoneNumber
-	getReleaseCalls      int
-	releaseCalls         int
-	setCarrierCalls      int
-	selectionOrgID       uuid.UUID
-	selectionCandidate   ManagedNumberCandidate
-	selectionID          string
-	selectionErr         error
+	createdBYOC        BYOCCreateRequest
+	createdManaged     ManagedCreateRequest
+	getNumber          sqlc.PhoneNumber
+	getForRelease      sqlc.PhoneNumber
+	getReleaseCalls    int
+	releaseCalls       int
+	setCarrierCalls    int
+	selectionOrgID     uuid.UUID
+	selectionCandidate ManagedNumberCandidate
+	selectionID        string
+	selectionErr       error
 }
 
 func (f *fakeNumberRepository) CreateBYOC(_ context.Context, _ uuid.UUID, req BYOCCreateRequest) (sqlc.PhoneNumber, error) {
@@ -92,6 +92,7 @@ func TestSearchAvailableReturnsOpaqueCustomerResponse(t *testing.T) {
 	}}}
 	service := NewService(repo)
 	service.SetManagedAcquisition(inventory)
+	service.SetManagedSelectionStore(repo)
 	organizationID := uuid.New()
 
 	result, err := service.SearchAvailable(context.Background(), organizationID, AvailableSearchRequest{
