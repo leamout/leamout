@@ -174,9 +174,37 @@ Rules:
 
 ## Phase 4 — managed provider integration
 
+Managed outbound private-alpha foundations now include:
+
+- [x] Keep platform carrier connections/trunks/endpoints behind internal SQL operations.
+- [x] Select a single platform `managed_default` trunk for trunkless outbound calls.
+- [x] Require `voice.managed.enabled` and a positive daily spend entitlement.
+- [x] Fail closed when entitlement resolution or wholesale-spend state is unavailable.
+- [x] Persist provider-neutral CDRs and reconcile each record idempotently to a
+      platform-routed outbound call and one wholesale charge.
+- [ ] Add the production CommPeak account, encrypted credential, and endpoint configuration.
+- [ ] Schedule authenticated CommPeak CDR polling with a durable cursor and retry policy.
+- [ ] Prove real PSTN termination and provider reconciliation in acceptance coverage.
+
 Only after the ownership/routing foundation exists should provider adapters enter customer workflows.
 
 ### DIDWW
+
+Managed inbound private-alpha foundations now include:
+
+- [x] Search voice-capable DIDWW inventory through the provider adapter.
+- [x] Persist order intent before the provider call and use the operation ID as
+      DIDWW's external reference for timeout recovery.
+- [x] Reconcile an accepted order by resolving the DID, configuring the expected
+      Voice IN trunk, and atomically creating the tenant-owned managed number.
+- [x] Persist managed-number release intent and disable inbound routing before
+      relinquishing the upstream DID.
+- [x] Detect inactive provider resources and repair Voice IN routing drift.
+- [x] Keep managed inbound tenant resolution on the called DID rather than the
+      shared platform carrier connection.
+- [ ] Schedule provider-operation reconciliation and expose operator diagnostics.
+- [ ] Prove purchase, routing, inbound calling, drift repair, and release against
+      a production DIDWW account.
 
 1. provider HTTP client/auth;
 2. number search;

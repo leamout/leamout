@@ -10,6 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
+	"github.com/leamout/leamout/internal/commercial/managedvoice"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -201,6 +202,12 @@ func NewModules(
 	}
 	callsService := calls.NewService(callsRepository, callsController, routingService, callAdmission)
 	callsService.SetMetrics(telecomMetrics)
+	managedVoiceRepository := managedvoice.NewRepository(db)
+	managedVoicePolicy, err := managedvoice.NewPolicy(entitlementsService, managedVoiceRepository)
+	if err != nil {
+		return Modules{}, err
+	}
+	callsService.SetManagedOutboundPolicy(managedVoicePolicy)
 
 	recordingsRepository := recordings.NewRepository(db)
 	recordingsService := recordings.NewService(recordingsRepository, nil)

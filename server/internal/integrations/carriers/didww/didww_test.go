@@ -118,3 +118,20 @@ func TestConfigureRoutingAssignsVoiceInTrunk(t *testing.T) {
 		t.Fatalf("DID = %+v", did)
 	}
 }
+
+func TestReleaseNumberDeletesOwnedDID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodDelete || r.URL.Path != "/v3/dids/did-1" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+	client, err := NewClient(Config{BaseURL: server.URL, APIKey: "secret", HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := client.ReleaseNumber(context.Background(), "did-1"); err != nil {
+		t.Fatal(err)
+	}
+}
