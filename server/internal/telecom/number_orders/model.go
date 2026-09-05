@@ -11,25 +11,15 @@ import (
 type Status string
 
 const (
-	StatusPending     Status = "pending"
-	StatusPurchasing  Status = "purchasing"
-	StatusPurchased   Status = "purchased"
-	StatusPersisting  Status = "persisting"
-	StatusConfiguring Status = "configuring"
-	StatusCompleted   Status = "completed"
-	StatusFailed      Status = "failed"
-)
-
-type Stage string
-
-const (
-	StagePurchasing  Stage = "purchasing"
-	StagePersisting  Stage = "persisting"
-	StageConfiguring Stage = "configuring"
+	StatusPending    Status = "pending"
+	StatusProcessing Status = "processing"
+	StatusCompleted  Status = "completed"
+	StatusFailed     Status = "failed"
 )
 
 // CreateInput is trusted provisioning input. Provider inventory/product
-// identifiers are intentionally not part of the public customer API.
+// identifiers are persisted as immutable selection context but intentionally
+// omitted from the public customer response.
 type CreateInput struct {
 	OrganizationID      uuid.UUID
 	ProviderID          uuid.UUID
@@ -39,21 +29,13 @@ type CreateInput struct {
 	CountryCode         string
 }
 
-type Failure struct {
-	Stage   Stage
-	Code    string
-	Message string
-}
-
-// Response exposes customer-relevant order state without leaking upstream
-// provider inventory, SKU, order, or resource identifiers.
+// Response exposes only customer-relevant order state.
 type Response struct {
 	ID             uuid.UUID  `json:"id"`
 	OrganizationID uuid.UUID  `json:"organization_id"`
 	Number         string     `json:"number"`
 	CountryCode    string     `json:"country_code"`
 	Status         Status     `json:"status"`
-	FailedStage    *Stage     `json:"failed_stage,omitempty"`
 	ErrorCode      *string    `json:"error_code,omitempty"`
 	ErrorMessage   *string    `json:"error_message,omitempty"`
 	PhoneNumberID  *uuid.UUID `json:"phone_number_id,omitempty"`
@@ -62,7 +44,7 @@ type Response struct {
 }
 
 func response(order sqlc.NumberOrder) Response {
-	result := Response{
+	return Response{
 		ID:             order.ID,
 		OrganizationID: order.OrganizationID,
 		Number:         order.Number,
@@ -74,9 +56,4 @@ func response(order sqlc.NumberOrder) Response {
 		CreatedAt:      pgconv.TimestamptzToTime(order.CreatedAt),
 		UpdatedAt:      pgconv.TimestamptzToTime(order.UpdatedAt),
 	}
-	if order.FailedStage != nil {
-		stage := Stage(*order.FailedStage)
-		result.FailedStage = &stage
-	}
-	return result
 }
