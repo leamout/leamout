@@ -9,6 +9,7 @@ import (
 func RegisterRoutes(router chi.Router, handler *Handler, auth func(http.Handler) http.Handler) {
 	router.Route("/numbers", func(r chi.Router) {
 		r.Use(auth)
+		r.Get("/available", handler.SearchAvailable)
 		r.Post("/", handler.Create)
 		r.Get("/", handler.List)
 		r.Get("/{number_id}", handler.Get)
