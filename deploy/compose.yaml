@@ -1,5 +1,6 @@
 x-leamout-environment: &leamout-environment
   APP_ENV: ${APP_ENV:-development}
+  LEAMOUT_DEPLOYMENT_ID: ${LEAMOUT_DEPLOYMENT_ID:-local-development}
   DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
   REDIS_URL: redis://redis:6379
   NATS_URL: nats://nats:4222
@@ -7,6 +8,13 @@ x-leamout-environment: &leamout-environment
   FREESWITCH_ESL_ADDRESS: freeswitch:8021
   FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
   CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?CARRIER_CREDENTIAL_ENCRYPTION_KEY is required}
+  DIDWW_API_KEY: ${DIDWW_API_KEY:-}
+  DIDWW_API_BASE_URL: ${DIDWW_API_BASE_URL:-https://api.didww.com/v3}
+  DIDWW_SOURCE_CIDRS: ${DIDWW_SOURCE_CIDRS:-}
+  DIDWW_SIP_ENDPOINTS: ${DIDWW_SIP_ENDPOINTS:-}
+  SIP_PUBLIC_HOST: ${SIP_PUBLIC_HOST:-}
+  SIP_PUBLIC_PORT: ${SIP_PUBLIC_PORT:-5060}
+  SIP_PUBLIC_TRANSPORT: ${SIP_PUBLIC_TRANSPORT:-udp}
   TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
   TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
@@ -42,6 +50,20 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - private-control
+
+  bootstrap:
+    image: leamout/server:1.0.0
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    command: ["/leamout/bootstrap"]
+    restart: "no"
+    environment: *leamout-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     networks:
       - private-control
 
@@ -84,7 +106,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -109,7 +131,7 @@ services:
     restart: unless-stopped
     environment: *leamout-environment
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
