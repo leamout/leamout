@@ -374,13 +374,13 @@ func NewModules(
 }
 
 func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Service) error {
-	if strings.TrimSpace(cfg.DIDWWAPIKey) == "" {
+	if strings.TrimSpace(cfg.DIDWW.APIKey) == "" {
 		return nil
 	}
 
 	client, err := didww.NewClient(didww.Config{
-		BaseURL: cfg.DIDWWBaseURL,
-		APIKey:  cfg.DIDWWAPIKey,
+		BaseURL: cfg.DIDWW.APIBaseURL,
+		APIKey:  cfg.DIDWW.APIKey,
 	})
 	if err != nil {
 		return err
