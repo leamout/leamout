@@ -25,7 +25,9 @@ type numberRepository interface {
 }
 
 type Service struct {
-	repo numberRepository
+	repo              numberRepository
+	managedInventory  ManagedNumberInventory
+	managedSelections ManagedNumberSelectionStore
 }
 
 func NewService(repo numberRepository) *Service {
