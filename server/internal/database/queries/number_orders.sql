@@ -39,91 +39,36 @@ FROM number_orders AS no
 WHERE no.organization_id = sqlc.arg(organization_id)
 ORDER BY no.created_at DESC;
 
--- name: MarkNumberOrderPurchasing :one
-UPDATE number_orders
-SET
-    status = 'purchasing',
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
+-- name: LockNumberOrderForProviderOperation :one
+SELECT *
+FROM number_orders
 WHERE id = sqlc.arg(id)
-  AND (
-      status = 'pending'
-      OR (status = 'failed' AND failed_stage = 'purchasing')
-  )
-RETURNING *;
+  AND organization_id = sqlc.arg(organization_id)
+  AND provider_id = sqlc.arg(provider_id)
+  AND provider_inventory_id = sqlc.arg(provider_inventory_id)
+  AND provider_product_id = sqlc.arg(provider_product_id)
+  AND number = sqlc.arg(number)
+  AND country_code = sqlc.arg(country_code)
+FOR UPDATE;
 
--- name: MarkNumberOrderPurchased :one
+-- name: MarkNumberOrderProcessing :one
 UPDATE number_orders
-SET
-    status = 'purchased',
-    provider_order_id = sqlc.arg(provider_order_id),
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
+SET status = 'processing'
 WHERE id = sqlc.arg(id)
-  AND status = 'purchasing'
-RETURNING *;
-
--- name: MarkNumberOrderPersisting :one
-UPDATE number_orders
-SET
-    status = 'persisting',
-    provider_resource_id = COALESCE(sqlc.narg(provider_resource_id), provider_resource_id),
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
-WHERE id = sqlc.arg(id)
-  AND (
-      status = 'purchased'
-      OR (status = 'failed' AND failed_stage = 'persisting')
-  )
-RETURNING *;
-
--- name: MarkNumberOrderConfiguring :one
-UPDATE number_orders
-SET
-    status = 'configuring',
-    phone_number_id = COALESCE(sqlc.narg(phone_number_id), phone_number_id),
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
-WHERE id = sqlc.arg(id)
-  AND (
-      status = 'persisting'
-      OR (status = 'failed' AND failed_stage = 'configuring')
-  )
+  AND organization_id = sqlc.arg(organization_id)
+  AND provider_id = sqlc.arg(provider_id)
+  AND status = 'pending'
 RETURNING *;
 
 -- name: MarkNumberOrderCompleted :one
 UPDATE number_orders
 SET
     status = 'completed',
-    failed_stage = NULL,
+    phone_number_id = sqlc.arg(phone_number_id),
     error_code = NULL,
     error_message = NULL
 WHERE id = sqlc.arg(id)
-  AND status = 'configuring'
-  AND provider_order_id IS NOT NULL
-  AND provider_resource_id IS NOT NULL
-  AND phone_number_id IS NOT NULL
+  AND organization_id = sqlc.arg(organization_id)
+  AND provider_id = sqlc.arg(provider_id)
+  AND status = 'processing'
 RETURNING *;
-
--- name: MarkNumberOrderFailed :one
-UPDATE number_orders
-SET
-    status = 'failed',
-    failed_stage = sqlc.arg(failed_stage),
-    error_code = sqlc.narg(error_code),
-    error_message = sqlc.arg(error_message)
-WHERE id = sqlc.arg(id)
-  AND status = sqlc.arg(expected_status)
-  AND status IN ('purchasing', 'persisting', 'configuring')
-RETURNING *;
-
--- name: ListRecoverableNumberOrders :many
-SELECT *
-FROM number_orders
-WHERE status IN ('pending', 'purchasing', 'purchased', 'persisting', 'configuring', 'failed')
-ORDER BY updated_at ASC
-LIMIT sqlc.arg(limit_count);

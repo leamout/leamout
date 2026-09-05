@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS carrier_connections (
 
     CONSTRAINT uq_carrier_connections_org_name UNIQUE (organization_id, name),
     CONSTRAINT uq_carrier_connections_id_org UNIQUE (id, organization_id),
+    CONSTRAINT uq_carrier_connections_id_provider UNIQUE (id, provider_id),
     CONSTRAINT chk_carrier_connections_scope CHECK (
         scope IN ('organization', 'platform')
     ),

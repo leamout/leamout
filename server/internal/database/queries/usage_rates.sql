@@ -1,5 +1,5 @@
--- name: CreateCarrierRate :one
-INSERT INTO carrier_rates (
+-- name: CreateUsageRate :one
+INSERT INTO usage_rates (
     plan_id,
     meter_id,
     carrier_provider_id,
@@ -44,28 +44,28 @@ WHERE pl.id = sqlc.arg(plan_id)
   )
 RETURNING *;
 
--- name: GetCarrierRateByID :one
+-- name: GetUsageRateByID :one
 SELECT *
-FROM carrier_rates
+FROM usage_rates
 WHERE id = sqlc.arg(id)
 LIMIT 1;
 
--- name: ListCarrierRatesByPlan :many
+-- name: ListUsageRatesByPlan :many
 SELECT *
-FROM carrier_rates
+FROM usage_rates
 WHERE plan_id = sqlc.arg(plan_id)
 ORDER BY effective_from DESC, created_at DESC;
 
--- name: ResolveCarrierRate :one
-SELECT cr.*
+-- name: ResolveUsageRate :one
+SELECT ur.*
 FROM subscriptions AS s
 JOIN organizations AS o ON o.id = s.organization_id
 JOIN plans AS pl ON pl.id = s.plan_id
 JOIN products AS p ON p.id = pl.product_id
 JOIN meters AS m ON m.id = sqlc.arg(meter_id)
-JOIN carrier_rates AS cr
-  ON cr.plan_id = s.plan_id
- AND cr.meter_id = m.id
+JOIN usage_rates AS ur
+  ON ur.plan_id = s.plan_id
+ AND ur.meter_id = m.id
 WHERE s.id = sqlc.arg(subscription_id)
   AND s.organization_id = sqlc.arg(organization_id)
   AND s.status IN ('active', 'past_due')
@@ -74,31 +74,31 @@ WHERE s.id = sqlc.arg(subscription_id)
   AND pl.active = true
   AND p.active = true
   AND m.active = true
-  AND cr.active = true
-  AND cr.effective_from <= sqlc.arg(at_time)
-  AND (cr.effective_until IS NULL OR cr.effective_until > sqlc.arg(at_time))
-  AND (cr.carrier_provider_id IS NULL OR cr.carrier_provider_id = sqlc.narg(carrier_provider_id)::uuid)
-  AND (cr.direction IS NULL OR cr.direction = sqlc.narg(direction))
-  AND (cr.country_code IS NULL OR cr.country_code = sqlc.narg(country_code))
-  AND (cr.network IS NULL OR cr.network = sqlc.narg(network))
+  AND ur.active = true
+  AND ur.effective_from <= sqlc.arg(at_time)
+  AND (ur.effective_until IS NULL OR ur.effective_until > sqlc.arg(at_time))
+  AND (ur.carrier_provider_id IS NULL OR ur.carrier_provider_id = sqlc.narg(carrier_provider_id)::uuid)
+  AND (ur.direction IS NULL OR ur.direction = sqlc.narg(direction))
+  AND (ur.country_code IS NULL OR ur.country_code = sqlc.narg(country_code))
+  AND (ur.network IS NULL OR ur.network = sqlc.narg(network))
 ORDER BY
-    (cr.carrier_provider_id IS NOT NULL)::int
-    + (cr.direction IS NOT NULL)::int
-    + (cr.country_code IS NOT NULL)::int
-    + (cr.network IS NOT NULL)::int DESC,
-    cr.effective_from DESC
+    (ur.carrier_provider_id IS NOT NULL)::int
+    + (ur.direction IS NOT NULL)::int
+    + (ur.country_code IS NOT NULL)::int
+    + (ur.network IS NOT NULL)::int DESC,
+    ur.effective_from DESC
 LIMIT 1;
 
--- name: SetCarrierRateActive :one
-UPDATE carrier_rates AS cr
+-- name: SetUsageRateActive :one
+UPDATE usage_rates AS ur
 SET
     active = sqlc.arg(active),
     updated_at = NOW()
 FROM plans AS pl, products AS p, meters AS m
-WHERE cr.id = sqlc.arg(id)
-  AND pl.id = cr.plan_id
+WHERE ur.id = sqlc.arg(id)
+  AND pl.id = ur.plan_id
   AND p.id = pl.product_id
-  AND m.id = cr.meter_id
+  AND m.id = ur.meter_id
   AND (
       sqlc.arg(active) = false
       OR (
@@ -106,11 +106,11 @@ WHERE cr.id = sqlc.arg(id)
           AND p.active = true
           AND m.active = true
           AND (
-              cr.carrier_provider_id IS NULL
+              ur.carrier_provider_id IS NULL
               OR EXISTS (
                   SELECT 1
                   FROM carrier_providers AS cp
-                  WHERE cp.id = cr.carrier_provider_id
+                  WHERE cp.id = ur.carrier_provider_id
                     AND cp.status = 'active'
               )
           )

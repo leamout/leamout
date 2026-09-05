@@ -74,7 +74,7 @@ organization
     └── payments
 
 plan + meter
-    └── carrier_rates
+    └── usage_rates
 ```
 
 The existing commercial tables are:
@@ -88,12 +88,14 @@ licenses
 entitlements
 deployments
 meters
-carrier_rates
+usage_rates
 usage_events
 invoices
 invoice_items
 payments
 ```
+
+Managed telecom wholesale cost is a separate concern: provider CDRs reconcile into `wholesale_charges`; they are not usage pricing rules.
 
 Existing tables do not imply that every future commercial workflow is implemented. Package behavior should continue to follow concrete callers and roadmap needs.
 
@@ -156,7 +158,7 @@ See [security.md](security.md) for the database defense model.
 - **State** — resolved commercial capabilities and limits consumed by operational code.
 - [Licensing](licensing.md) — self-hosted commercial authority and deployment activation.
 - [Metering](metering.md) — authoritative usage ingestion and meters for managed/billable services.
-- [Rating](rating.md) — telecom usage economic resolution through carrier rates.
+- [Rating](rating.md) — customer-facing telecom usage pricing through usage rates.
 - [Invoicing](invoicing.md) — period statements and historical monetary snapshots.
 - [Payments](payments.md) — provider-independent payment reconciliation.
 

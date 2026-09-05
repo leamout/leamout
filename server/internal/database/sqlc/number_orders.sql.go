@@ -34,7 +34,7 @@ JOIN carrier_providers AS cp
 WHERE o.id = $1
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING number_orders.id, number_orders.organization_id, number_orders.provider_id, number_orders.provider_inventory_id, number_orders.provider_product_id, number_orders.number, number_orders.country_code, number_orders.status, number_orders.provider_order_id, number_orders.provider_resource_id, number_orders.phone_number_id, number_orders.failed_stage, number_orders.error_code, number_orders.error_message, number_orders.created_at, number_orders.updated_at
+RETURNING number_orders.id, number_orders.organization_id, number_orders.provider_id, number_orders.provider_inventory_id, number_orders.provider_product_id, number_orders.number, number_orders.country_code, number_orders.status, number_orders.phone_number_id, number_orders.error_code, number_orders.error_message, number_orders.created_at, number_orders.updated_at
 `
 
 type CreateNumberOrderParams struct {
@@ -65,10 +65,7 @@ func (q *Queries) CreateNumberOrder(ctx context.Context, arg CreateNumberOrderPa
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
 		&i.PhoneNumberID,
-		&i.FailedStage,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
@@ -78,7 +75,7 @@ func (q *Queries) CreateNumberOrder(ctx context.Context, arg CreateNumberOrderPa
 }
 
 const getNumberOrderByID = `-- name: GetNumberOrderByID :one
-SELECT no.id, no.organization_id, no.provider_id, no.provider_inventory_id, no.provider_product_id, no.number, no.country_code, no.status, no.provider_order_id, no.provider_resource_id, no.phone_number_id, no.failed_stage, no.error_code, no.error_message, no.created_at, no.updated_at
+SELECT no.id, no.organization_id, no.provider_id, no.provider_inventory_id, no.provider_product_id, no.number, no.country_code, no.status, no.phone_number_id, no.error_code, no.error_message, no.created_at, no.updated_at
 FROM number_orders AS no
 JOIN organizations AS o ON o.id = no.organization_id
 WHERE no.id = $1
@@ -105,10 +102,7 @@ func (q *Queries) GetNumberOrderByID(ctx context.Context, arg GetNumberOrderByID
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
 		&i.PhoneNumberID,
-		&i.FailedStage,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
@@ -118,7 +112,7 @@ func (q *Queries) GetNumberOrderByID(ctx context.Context, arg GetNumberOrderByID
 }
 
 const listNumberOrdersByOrganizationID = `-- name: ListNumberOrdersByOrganizationID :many
-SELECT no.id, no.organization_id, no.provider_id, no.provider_inventory_id, no.provider_product_id, no.number, no.country_code, no.status, no.provider_order_id, no.provider_resource_id, no.phone_number_id, no.failed_stage, no.error_code, no.error_message, no.created_at, no.updated_at
+SELECT no.id, no.organization_id, no.provider_id, no.provider_inventory_id, no.provider_product_id, no.number, no.country_code, no.status, no.phone_number_id, no.error_code, no.error_message, no.created_at, no.updated_at
 FROM number_orders AS no
 WHERE no.organization_id = $1
 ORDER BY no.created_at DESC
@@ -142,10 +136,7 @@ func (q *Queries) ListNumberOrdersByOrganizationID(ctx context.Context, organiza
 			&i.Number,
 			&i.CountryCode,
 			&i.Status,
-			&i.ProviderOrderID,
-			&i.ProviderResourceID,
 			&i.PhoneNumberID,
-			&i.FailedStage,
 			&i.ErrorCode,
 			&i.ErrorMessage,
 			&i.CreatedAt,
@@ -161,163 +152,85 @@ func (q *Queries) ListNumberOrdersByOrganizationID(ctx context.Context, organiza
 	return items, nil
 }
 
-const listRecoverableNumberOrders = `-- name: ListRecoverableNumberOrders :many
-SELECT id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
+const lockNumberOrderForProviderOperation = `-- name: LockNumberOrderForProviderOperation :one
+SELECT id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
 FROM number_orders
-WHERE status IN ('pending', 'purchasing', 'purchased', 'persisting', 'configuring', 'failed')
-ORDER BY updated_at ASC
-LIMIT $1
+WHERE id = $1
+  AND organization_id = $2
+  AND provider_id = $3
+  AND provider_inventory_id = $4
+  AND provider_product_id = $5
+  AND number = $6
+  AND country_code = $7
+FOR UPDATE
 `
 
-func (q *Queries) ListRecoverableNumberOrders(ctx context.Context, limitCount int32) ([]NumberOrder, error) {
-	rows, err := q.db.Query(ctx, listRecoverableNumberOrders, limitCount)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []NumberOrder{}
-	for rows.Next() {
-		var i NumberOrder
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrganizationID,
-			&i.ProviderID,
-			&i.ProviderInventoryID,
-			&i.ProviderProductID,
-			&i.Number,
-			&i.CountryCode,
-			&i.Status,
-			&i.ProviderOrderID,
-			&i.ProviderResourceID,
-			&i.PhoneNumberID,
-			&i.FailedStage,
-			&i.ErrorCode,
-			&i.ErrorMessage,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type LockNumberOrderForProviderOperationParams struct {
+	ID                  uuid.UUID `db:"id" json:"id"`
+	OrganizationID      uuid.UUID `db:"organization_id" json:"organization_id"`
+	ProviderID          uuid.UUID `db:"provider_id" json:"provider_id"`
+	ProviderInventoryID string    `db:"provider_inventory_id" json:"provider_inventory_id"`
+	ProviderProductID   string    `db:"provider_product_id" json:"provider_product_id"`
+	Number              string    `db:"number" json:"number"`
+	CountryCode         string    `db:"country_code" json:"country_code"`
+}
+
+func (q *Queries) LockNumberOrderForProviderOperation(ctx context.Context, arg LockNumberOrderForProviderOperationParams) (NumberOrder, error) {
+	row := q.db.QueryRow(ctx, lockNumberOrderForProviderOperation,
+		arg.ID,
+		arg.OrganizationID,
+		arg.ProviderID,
+		arg.ProviderInventoryID,
+		arg.ProviderProductID,
+		arg.Number,
+		arg.CountryCode,
+	)
+	var i NumberOrder
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ProviderID,
+		&i.ProviderInventoryID,
+		&i.ProviderProductID,
+		&i.Number,
+		&i.CountryCode,
+		&i.Status,
+		&i.PhoneNumberID,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const markNumberOrderCompleted = `-- name: MarkNumberOrderCompleted :one
 UPDATE number_orders
 SET
     status = 'completed',
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
-WHERE id = $1
-  AND status = 'configuring'
-  AND provider_order_id IS NOT NULL
-  AND provider_resource_id IS NOT NULL
-  AND phone_number_id IS NOT NULL
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
-`
-
-func (q *Queries) MarkNumberOrderCompleted(ctx context.Context, id uuid.UUID) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderCompleted, id)
-	var i NumberOrder
-	err := row.Scan(
-		&i.ID,
-		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
-		&i.Number,
-		&i.CountryCode,
-		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
-		&i.PhoneNumberID,
-		&i.FailedStage,
-		&i.ErrorCode,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const markNumberOrderConfiguring = `-- name: MarkNumberOrderConfiguring :one
-UPDATE number_orders
-SET
-    status = 'configuring',
-    phone_number_id = COALESCE($1, phone_number_id),
-    failed_stage = NULL,
+    phone_number_id = $1,
     error_code = NULL,
     error_message = NULL
 WHERE id = $2
-  AND (
-      status = 'persisting'
-      OR (status = 'failed' AND failed_stage = 'configuring')
-  )
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
+  AND organization_id = $3
+  AND provider_id = $4
+  AND status = 'processing'
+RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
 `
 
-type MarkNumberOrderConfiguringParams struct {
-	PhoneNumberID *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
-	ID            uuid.UUID  `db:"id" json:"id"`
+type MarkNumberOrderCompletedParams struct {
+	PhoneNumberID  *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
+	ID             uuid.UUID  `db:"id" json:"id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+	ProviderID     uuid.UUID  `db:"provider_id" json:"provider_id"`
 }
 
-func (q *Queries) MarkNumberOrderConfiguring(ctx context.Context, arg MarkNumberOrderConfiguringParams) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderConfiguring, arg.PhoneNumberID, arg.ID)
-	var i NumberOrder
-	err := row.Scan(
-		&i.ID,
-		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
-		&i.Number,
-		&i.CountryCode,
-		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
-		&i.PhoneNumberID,
-		&i.FailedStage,
-		&i.ErrorCode,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const markNumberOrderFailed = `-- name: MarkNumberOrderFailed :one
-UPDATE number_orders
-SET
-    status = 'failed',
-    failed_stage = $1,
-    error_code = $2,
-    error_message = $3
-WHERE id = $4
-  AND status = $5
-  AND status IN ('purchasing', 'persisting', 'configuring')
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
-`
-
-type MarkNumberOrderFailedParams struct {
-	FailedStage    *string   `db:"failed_stage" json:"failed_stage"`
-	ErrorCode      *string   `db:"error_code" json:"error_code"`
-	ErrorMessage   *string   `db:"error_message" json:"error_message"`
-	ID             uuid.UUID `db:"id" json:"id"`
-	ExpectedStatus string    `db:"expected_status" json:"expected_status"`
-}
-
-func (q *Queries) MarkNumberOrderFailed(ctx context.Context, arg MarkNumberOrderFailedParams) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderFailed,
-		arg.FailedStage,
-		arg.ErrorCode,
-		arg.ErrorMessage,
+func (q *Queries) MarkNumberOrderCompleted(ctx context.Context, arg MarkNumberOrderCompletedParams) (NumberOrder, error) {
+	row := q.db.QueryRow(ctx, markNumberOrderCompleted,
+		arg.PhoneNumberID,
 		arg.ID,
-		arg.ExpectedStatus,
+		arg.OrganizationID,
+		arg.ProviderID,
 	)
 	var i NumberOrder
 	err := row.Scan(
@@ -329,10 +242,7 @@ func (q *Queries) MarkNumberOrderFailed(ctx context.Context, arg MarkNumberOrder
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
 		&i.PhoneNumberID,
-		&i.FailedStage,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,
@@ -341,110 +251,24 @@ func (q *Queries) MarkNumberOrderFailed(ctx context.Context, arg MarkNumberOrder
 	return i, err
 }
 
-const markNumberOrderPersisting = `-- name: MarkNumberOrderPersisting :one
+const markNumberOrderProcessing = `-- name: MarkNumberOrderProcessing :one
 UPDATE number_orders
-SET
-    status = 'persisting',
-    provider_resource_id = COALESCE($1, provider_resource_id),
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
-WHERE id = $2
-  AND (
-      status = 'purchased'
-      OR (status = 'failed' AND failed_stage = 'persisting')
-  )
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
-`
-
-type MarkNumberOrderPersistingParams struct {
-	ProviderResourceID *string   `db:"provider_resource_id" json:"provider_resource_id"`
-	ID                 uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) MarkNumberOrderPersisting(ctx context.Context, arg MarkNumberOrderPersistingParams) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderPersisting, arg.ProviderResourceID, arg.ID)
-	var i NumberOrder
-	err := row.Scan(
-		&i.ID,
-		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
-		&i.Number,
-		&i.CountryCode,
-		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
-		&i.PhoneNumberID,
-		&i.FailedStage,
-		&i.ErrorCode,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const markNumberOrderPurchased = `-- name: MarkNumberOrderPurchased :one
-UPDATE number_orders
-SET
-    status = 'purchased',
-    provider_order_id = $1,
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
-WHERE id = $2
-  AND status = 'purchasing'
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
-`
-
-type MarkNumberOrderPurchasedParams struct {
-	ProviderOrderID *string   `db:"provider_order_id" json:"provider_order_id"`
-	ID              uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) MarkNumberOrderPurchased(ctx context.Context, arg MarkNumberOrderPurchasedParams) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderPurchased, arg.ProviderOrderID, arg.ID)
-	var i NumberOrder
-	err := row.Scan(
-		&i.ID,
-		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
-		&i.Number,
-		&i.CountryCode,
-		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
-		&i.PhoneNumberID,
-		&i.FailedStage,
-		&i.ErrorCode,
-		&i.ErrorMessage,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const markNumberOrderPurchasing = `-- name: MarkNumberOrderPurchasing :one
-UPDATE number_orders
-SET
-    status = 'purchasing',
-    failed_stage = NULL,
-    error_code = NULL,
-    error_message = NULL
+SET status = 'processing'
 WHERE id = $1
-  AND (
-      status = 'pending'
-      OR (status = 'failed' AND failed_stage = 'purchasing')
-  )
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, provider_order_id, provider_resource_id, phone_number_id, failed_stage, error_code, error_message, created_at, updated_at
+  AND organization_id = $2
+  AND provider_id = $3
+  AND status = 'pending'
+RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
 `
 
-func (q *Queries) MarkNumberOrderPurchasing(ctx context.Context, id uuid.UUID) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderPurchasing, id)
+type MarkNumberOrderProcessingParams struct {
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ProviderID     uuid.UUID `db:"provider_id" json:"provider_id"`
+}
+
+func (q *Queries) MarkNumberOrderProcessing(ctx context.Context, arg MarkNumberOrderProcessingParams) (NumberOrder, error) {
+	row := q.db.QueryRow(ctx, markNumberOrderProcessing, arg.ID, arg.OrganizationID, arg.ProviderID)
 	var i NumberOrder
 	err := row.Scan(
 		&i.ID,
@@ -455,10 +279,7 @@ func (q *Queries) MarkNumberOrderPurchasing(ctx context.Context, id uuid.UUID) (
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
-		&i.ProviderOrderID,
-		&i.ProviderResourceID,
 		&i.PhoneNumberID,
-		&i.FailedStage,
 		&i.ErrorCode,
 		&i.ErrorMessage,
 		&i.CreatedAt,

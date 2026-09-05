@@ -2,7 +2,7 @@
 INSERT INTO invoice_items (
     invoice_id,
     meter_id,
-    carrier_rate_id,
+    usage_rate_id,
     type,
     description,
     quantity,
@@ -15,7 +15,7 @@ INSERT INTO invoice_items (
 SELECT
     i.id AS invoice_id,
     sqlc.narg(meter_id)::uuid AS meter_id,
-    sqlc.narg(carrier_rate_id)::uuid AS carrier_rate_id,
+    sqlc.narg(usage_rate_id)::uuid AS usage_rate_id,
     sqlc.arg(type) AS type,
     sqlc.arg(description) AS description,
     COALESCE(sqlc.narg(quantity), 1) AS quantity,
@@ -40,21 +40,21 @@ WHERE i.id = sqlc.arg(invoice_id)
       )
   )
   AND (
-      sqlc.narg(carrier_rate_id)::uuid IS NULL
+      sqlc.narg(usage_rate_id)::uuid IS NULL
       OR EXISTS (
           SELECT 1
-          FROM carrier_rates AS cr
+          FROM usage_rates AS ur
           LEFT JOIN subscriptions AS s
             ON s.id = i.subscription_id
            AND s.organization_id = i.organization_id
-          WHERE cr.id = sqlc.narg(carrier_rate_id)::uuid
+          WHERE ur.id = sqlc.narg(usage_rate_id)::uuid
             AND (
                 sqlc.narg(meter_id)::uuid IS NULL
-                OR cr.meter_id = sqlc.narg(meter_id)::uuid
+                OR ur.meter_id = sqlc.narg(meter_id)::uuid
             )
             AND (
                 i.subscription_id IS NULL
-                OR cr.plan_id = s.plan_id
+                OR ur.plan_id = s.plan_id
             )
       )
   )

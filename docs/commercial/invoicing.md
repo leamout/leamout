@@ -66,14 +66,14 @@ usage
 
 A fixed line can represent a platform/subscription charge.
 
-A usage line requires a meter and unit price and may reference the exact carrier rate used.
+A usage line requires a meter and unit price and may reference the exact usage rate used.
 
 Important fields are:
 
 ```text
 invoice_id
 meter_id
-carrier_rate_id
+usage_rate_id
 type
 description
 quantity
@@ -104,17 +104,17 @@ Finalization behavior should be implemented as an explicit service operation.
 
 ## Historical price snapshot
 
-Do not calculate an old invoice by looking up today's carrier rate.
+Do not calculate an old invoice by looking up today's usage rate.
 
 ```text
 usage at billing time
     ↓
-rate selected at billing time
+usage rate selected at billing time
     ↓
 invoice item stores rate reference + unit price + amount
 ```
 
-Changing or deactivating a carrier rate later must not change a finalized historical invoice.
+Changing or deactivating a usage rate later must not change a finalized historical invoice.
 
 ## Tenant safety
 
@@ -130,7 +130,7 @@ invoice belongs to organization
 item belongs to invoice
 ```
 
-When a usage line references a carrier rate and an invoice has a subscription, the rate should correspond to the subscription plan.
+When a usage line references a usage rate and an invoice has a subscription, the rate should correspond to the subscription plan.
 
 ## Usage allocation is not solved yet
 

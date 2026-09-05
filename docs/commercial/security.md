@@ -124,7 +124,7 @@ Some commercial resources are global catalog/configuration records rather than t
 products
 plans
 meters
-carrier_rates
+usage_rates
 ```
 
 They do not use organization guards in the same way. Their mutation must instead be restricted to trusted administrative/service paths, and related active-state checks should prevent inactive catalog records from being used for new commercial state.
