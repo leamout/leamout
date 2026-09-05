@@ -30,8 +30,7 @@ jobs:
         run: |
           find server/internal/telecom/numbers -name '*.go' -print0 | xargs -0 gofmt -w
           find server/internal/telecom/number_orders -name '*.go' -print0 | xargs -0 gofmt -w
-          find server/internal/commercial/managednumbers -name '*.go' -print0 | xargs -0 gofmt -w
-          find server/internal/commercial/managedvoice -name '*.go' -print0 | xargs -0 gofmt -w
+          find server/internal/commercial/usage_rating -name '*.go' -print0 | xargs -0 gofmt -w
 
       - name: Regenerate sqlc
         working-directory: server
@@ -53,8 +52,7 @@ jobs:
             server/internal/database/sqlc \
             server/internal/telecom/numbers \
             server/internal/telecom/number_orders \
-            server/internal/commercial/managednumbers \
-            server/internal/commercial/managedvoice
+            server/internal/commercial/usage_rating
           if ! git diff --cached --quiet; then
             git commit -m "regenerate number order artifacts"
             git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
