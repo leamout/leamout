@@ -2,7 +2,9 @@
 
 DIDWW is the initial managed provider for DID inventory and inbound PSTN routing.
 
-This document records the internal integration contract. DIDWW provider identifiers, credentials, routing resources, and platform carrier topology are not customer-facing API resources.
+This document records the internal integration contract. DIDWW provider identifiers, credentials, routing resources, and deployment-level carrier topology are not customer-facing API resources.
+
+Hosting mode and carrier mode are independent. See `docs/deployment-carrier-modes.md`. DIDWW belongs to the **Managed Carrier** capability; it is not synonymous with Leamout Cloud and it is not part of BYOC.
 
 ## Managed number path
 
@@ -21,7 +23,7 @@ DIDWW DID
   ↓
 DIDWW Voice IN trunk
   ↓
-Leamout platform ingress
+deployment managed ingress
   ↓
 phone_numbers
 ```
@@ -36,14 +38,16 @@ Use the existing carrier and number primitives.
 | --- | --- |
 | `carrier_providers` | Built-in DIDWW provider definition. |
 | `carrier_connections` | Platform-scoped DIDWW managed ingress connection. |
-| `carrier_connection_source_ips` | DIDWW signaling networks accepted for that platform connection. |
-| `trunks` | Internal platform inbound SIP trunk representing DIDWW ingress topology. |
+| `carrier_connection_source_ips` | DIDWW signaling networks accepted for that deployment-level connection. |
+| `trunks` | Internal deployment-level inbound SIP trunk representing DIDWW ingress topology. |
 | `trunk_endpoints` | Optional known DIDWW remote signaling endpoints; never Leamout's own SIP address. |
-| `carrier_connection_provider_resources` | Maps the platform connection to DIDWW provider objects such as `voice_in_trunk`. |
+| `carrier_connection_provider_resources` | Maps the deployment-level connection to DIDWW provider objects such as `voice_in_trunk`. |
 | `phone_numbers` | Purchased DIDs; `provider_resource_id` stores the DIDWW DID resource ID. |
 | `voice_bindings` | Maps a DID to a voice application. |
 
-Managed inbound tenancy is derived from the called DID. A platform carrier connection therefore has `organization_id = NULL`; it does not belong to the customer that owns a managed DID.
+Managed inbound tenancy is derived from the called DID. A platform-scoped carrier connection therefore has `organization_id = NULL`; it does not belong to the customer that owns a managed DID.
+
+`scope = 'platform'` means deployment-level/shared internal state. It does **not** mean Leamout Cloud. The same model can represent Managed Carrier ingress for a self-hosted deployment or for a Leamout Cloud deployment.
 
 ## Control-plane adapter
 
@@ -55,21 +59,21 @@ server/internal/integrations/carriers/didww/
 
 Number behavior remains in `numbers.go`, provider routing behavior in `routing.go`, and DIDWW wire/domain types in `model.go`.
 
-DIDWW API credentials are deployment secrets/configuration. They do not belong in `carrier_connections`, which models SIP-facing runtime state.
+DIDWW API credentials are managed-carrier provider configuration. They do not belong in customer `carrier_connections`, which model SIP-facing runtime state.
 
-## Explicit platform ingress provisioning
+## Explicit managed-carrier ingress provisioning
 
-DIDWW managed ingress is provisioned by an explicit operator action. It is not part of API-server or worker startup.
+DIDWW managed ingress is provisioned by an explicit internal managed-carrier operation. It is not part of API-server or worker startup, and it is not a command in the public self-hosted `leamout` CLI.
 
-For an installed deployment:
+Internal deployment/operator automation invokes:
 
 ```text
-sudo leamout provider didww provision-ingress
+/leamout/internal-provision managed-carrier didww ingress
 ```
 
-The command runs a one-shot provisioning process using the installed runtime configuration and then exits. Server and worker startup remain independent of provider provisioning.
+The hosting model does not determine whether this capability is applicable. It is needed when a deployment uses DIDWW-backed Managed Carrier, whether the control plane is self-hosted or Leamout Cloud. BYOC-only deployments do not invoke it.
 
-Provisioning requires:
+Provisioning requires a stable deployment identity plus the managed-carrier/provider and public SIP configuration needed to create the DIDWW ingress target:
 
 ```text
 LEAMOUT_DEPLOYMENT_ID
@@ -82,7 +86,7 @@ DIDWW_SOURCE_CIDRS
 
 `DIDWW_SIP_ENDPOINTS` is optional and is only for known provider-side remote signaling endpoints. Entries use `host:port/transport` format.
 
-`LEAMOUT_DEPLOYMENT_ID` is the stable deployment identity created by `leamout init`. Ordinary local development does not need a fake deployment ID. A local environment needs a stable unique ID only when it explicitly provisions real DIDWW infrastructure.
+Credential delivery and entitlement for Self-Hosted + Managed Carrier are separate product concerns from this ingress reconciler. This code must not treat self-hosting itself as ownership of the DIDWW carrier account.
 
 ### Provider-side resource
 
@@ -113,19 +117,19 @@ carrier_connection_provider_resources
   provider_resource_id = <DIDWW Voice IN trunk UUID>
 ```
 
-### Local platform topology
+### Deployment-level topology
 
 Provisioning transactionally converges:
 
 ```text
 carrier_provider: didww
         ↓
-platform carrier_connection
+platform-scoped carrier_connection
   name = DIDWW Managed Ingress
   inbound_enabled = true
   inbound_auth_method = ip
         ↓
-platform inbound trunk
+platform-scoped inbound trunk
   name = DIDWW Managed Ingress
   direction = inbound
   managed_default = false
@@ -137,7 +141,7 @@ platform inbound trunk
 
 The inbound trunk is not the managed outbound default. Managed outbound termination remains independent from DIDWW numbering/inbound origination.
 
-The provisioning action is idempotent. Re-running it reconciles the same DIDWW Voice IN trunk and the same Leamout platform topology rather than creating duplicates.
+The provisioning action is idempotent. Re-running it reconciles the same DIDWW Voice IN trunk and the same deployment-level topology rather than creating duplicates.
 
 ## SIP ingress
 
@@ -148,7 +152,7 @@ DIDWW
   ↓ SIP INVITE from configured signaling CIDR
 OpenSIPS
   ↓ source-IP carrier resolution
-platform DIDWW carrier_connection
+platform-scoped DIDWW carrier_connection
   ↓ called DID
 managed phone_numbers row
   ↓ customer organization
@@ -178,7 +182,7 @@ After a provider order completes, the executor:
 
 Provider object IDs remain internal; OpenSIPS never needs the DIDWW Voice IN trunk UUID.
 
-If platform ingress has not been explicitly provisioned, managed number acquisition must fail before provider purchase rather than inventing provider topology during request handling or process startup.
+If managed ingress has not been explicitly provisioned, managed number acquisition must fail before provider purchase rather than inventing provider topology during request handling or process startup.
 
 ## Capacity and wholesale cost
 
@@ -214,10 +218,11 @@ DIDWW SMS/SMPP is outside the managed voice path. When messaging work starts, no
 - [x] Reconcile-before-purchase provider executor.
 - [x] Persist managed DID provider resource IDs.
 - [x] Configure purchased DIDs to a DIDWW Voice IN trunk.
-- [x] Model platform managed ingress separately from customer BYOC connections.
+- [x] Model deployment-level managed ingress separately from customer BYOC connections.
 - [x] Model provider-side Voice IN trunk IDs as internal provider resources.
-- [x] Explicitly provision the DIDWW Voice IN trunk and Leamout platform ingress topology.
+- [x] Explicitly provision the DIDWW Voice IN trunk and deployment managed-ingress topology.
 - [x] Populate platform `carrier_connection_source_ips` from deployment configuration.
 - [x] Route managed inbound DIDs through the existing number/binding path.
 - [ ] Add provider-sandbox acceptance coverage for purchase → route → inbound call.
+- [ ] Define Self-Hosted + Managed Carrier credential/entitlement delivery without exposing provider ownership as BYOC.
 - [ ] Add broader inventory/routing drift reconciliation.
