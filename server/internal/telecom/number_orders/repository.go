@@ -233,8 +233,9 @@ func (r *Repository) RecordProviderOperationFailure(ctx context.Context, id uuid
 	if err == nil {
 		return nil
 	}
+	message := err.Error()
 	_, recordErr := r.queries.RecordProviderOperationAttemptFailure(ctx, sqlc.RecordProviderOperationAttemptFailureParams{
-		LastError: err.Error(),
+		LastError: &message,
 		ID:        id,
 	})
 	return recordErr
@@ -323,12 +324,13 @@ func (r *Repository) CompleteProviderOperation(
 		}
 	}
 
+	providerID := operation.CarrierProviderID
 	phoneNumber, err := queries.EnsureManagedPhoneNumberForProviderOperation(ctx, sqlc.EnsureManagedPhoneNumberForProviderOperationParams{
 		OrganizationID:      operation.OrganizationID,
 		Number:              request.Number,
 		CountryCode:         request.CountryCode,
-		ProviderID:          operation.CarrierProviderID,
-		ProviderResourceID:  providerResourceID,
+		ProviderID:          &providerID,
+		ProviderResourceID:  &providerResourceID,
 		CarrierConnectionID: request.CarrierConnectionID,
 	})
 	if err != nil {
