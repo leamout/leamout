@@ -32,6 +32,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -220,8 +221,10 @@ func NewModules(
 	subscribersService := subscribers.NewService(subscribersRepository)
 
 	numbersRepository := numbers.NewRepository(db)
-	numbersRepository.SetRedis(redisClient)
+	numberOrdersRepository := number_orders.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
+	numbersService.SetManagedSelectionStore(numberOrdersRepository)
+	numberOrdersService := number_orders.NewService(numberOrdersRepository)
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
@@ -320,6 +323,11 @@ func NewModules(
 			Repository: numbersRepository,
 			Service:    numbersService,
 			Handler:    numbers.NewHandler(numbersService),
+		},
+		NumberOrders: NumberOrdersModule{
+			Repository: numberOrdersRepository,
+			Service:    numberOrdersService,
+			Handler:    number_orders.NewHandler(numberOrdersService),
 		},
 		SIPDomains: SIPDomainsModule{
 			Repository: sipDomainsRepository,
