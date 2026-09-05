@@ -17,10 +17,10 @@ import (
 )
 
 const (
-	didwwProviderSlug           = "didww"
-	didwwConnectionName        = "DIDWW Managed Ingress"
-	didwwTrunkName             = "DIDWW Managed Ingress"
-	didwwProviderResourceType  = "voice_in_trunk"
+	didwwProviderSlug         = "didww"
+	didwwConnectionName       = "DIDWW Managed Ingress"
+	didwwTrunkName            = "DIDWW Managed Ingress"
+	didwwProviderResourceType = "voice_in_trunk"
 )
 
 type sipEndpoint struct {
