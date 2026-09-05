@@ -45,7 +45,7 @@ type stockKeepingUnitAttributes struct {
 }
 
 type availableDIDSearchResponse struct {
-	Data     []availableDIDSearchResource  `json:"data"`
+	Data     []availableDIDSearchResource   `json:"data"`
 	Included []includedAvailabilityResource `json:"included,omitempty"`
 }
 
