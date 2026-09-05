@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS provider_operations (
     carrier_provider_id UUID NOT NULL REFERENCES carrier_providers(id) ON DELETE RESTRICT,
 
     operation_type TEXT NOT NULL,
-    number_order_id UUID REFERENCES number_orders(id) ON DELETE RESTRICT,
-    phone_number_id UUID REFERENCES phone_numbers(id) ON DELETE RESTRICT,
+    number_order_id UUID,
+    phone_number_id UUID,
 
     idempotency_key TEXT NOT NULL,
     state TEXT NOT NULL DEFAULT 'pending',
@@ -29,6 +29,14 @@ CREATE TABLE IF NOT EXISTS provider_operations (
         carrier_provider_id,
         idempotency_key
     ),
+    CONSTRAINT fk_provider_operations_number_order
+        FOREIGN KEY (number_order_id, organization_id, carrier_provider_id)
+        REFERENCES number_orders (id, organization_id, provider_id)
+        ON DELETE RESTRICT,
+    CONSTRAINT fk_provider_operations_phone_number
+        FOREIGN KEY (phone_number_id, organization_id, carrier_provider_id)
+        REFERENCES phone_numbers (id, organization_id, provider_id)
+        ON DELETE RESTRICT,
     CONSTRAINT chk_provider_operations_type CHECK (
         operation_type IN ('number_order', 'number_release', 'number_reconcile')
     ),
@@ -92,48 +100,6 @@ CREATE TABLE IF NOT EXISTS provider_operations (
 
 COMMENT ON TABLE provider_operations IS
     'Internal durable journal for external provider side effects. Number acquisition operations link directly to number_orders.';
-
-CREATE FUNCTION validate_provider_operation_target()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-    IF NEW.number_order_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1
-        FROM number_orders AS no
-        WHERE no.id = NEW.number_order_id
-          AND no.organization_id = NEW.organization_id
-          AND no.provider_id = NEW.carrier_provider_id
-    ) THEN
-        RAISE EXCEPTION 'provider operation number order must belong to the same organization and provider'
-            USING ERRCODE = '23514';
-    END IF;
-
-    IF NEW.phone_number_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1
-        FROM phone_numbers AS pn
-        WHERE pn.id = NEW.phone_number_id
-          AND pn.organization_id = NEW.organization_id
-          AND pn.provisioning_mode = 'managed'
-          AND pn.provider_id = NEW.carrier_provider_id
-    ) THEN
-        RAISE EXCEPTION 'provider operation phone number must be a managed number for the same organization and provider'
-            USING ERRCODE = '23514';
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER validate_provider_operation_target
-BEFORE INSERT OR UPDATE OF
-    organization_id,
-    carrier_provider_id,
-    number_order_id,
-    phone_number_id
-ON provider_operations
-FOR EACH ROW
-EXECUTE FUNCTION validate_provider_operation_target();
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_operations_number_order
     ON provider_operations (number_order_id)
