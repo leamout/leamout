@@ -22,6 +22,7 @@ type OutboundRequest struct {
 }
 
 type OutboundDecision struct {
+	Managed             bool
 	OrganizationID      uuid.UUID
 	CarrierConnectionID uuid.UUID
 	TrunkID             uuid.UUID

@@ -137,6 +137,16 @@ func (c *Client) OrderNumber(ctx context.Context, request OrderNumberRequest) (O
 	}, nil
 }
 
+// ReleaseNumber relinquishes an owned DID. Callers must persist release intent
+// before invoking this irreversible provider operation.
+func (c *Client) ReleaseNumber(ctx context.Context, didID string) error {
+	didID = strings.TrimSpace(didID)
+	if didID == "" {
+		return fmt.Errorf("didww: DID id is required")
+	}
+	return c.do(ctx, http.MethodDelete, "/v3/dids/"+url.PathEscape(didID), nil, nil, nil)
+}
+
 func setFilter(query url.Values, name, value string) {
 	if value = strings.TrimSpace(value); value != "" {
 		query.Set("filter["+name+"]", value)

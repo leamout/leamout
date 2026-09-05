@@ -174,6 +174,7 @@ func (r *Resolver) resolveManagedOutbound(
 
 	r.recordEndpointSelection(ctx, selected.CarrierConnectionID, selected.TrunkID, endpoint, endpoints)
 	return OutboundDecision{
+		Managed:             true,
 		OrganizationID:      req.OrganizationID,
 		CarrierConnectionID: selected.CarrierConnectionID,
 		TrunkID:             selected.TrunkID,

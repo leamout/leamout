@@ -17,7 +17,7 @@
     }
   ],
   "database": {
-    "migration": "039_create_idempotency.sql"
+    "migration": "042_create_managed_number_operations.sql"
   },
   "cli_artifacts": [
     {

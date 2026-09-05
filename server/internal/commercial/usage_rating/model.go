@@ -1,4 +1,4 @@
-package rating
+package usage_rating
 
 import "time"
 

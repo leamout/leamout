@@ -156,7 +156,7 @@ Prefer avoiding transcoding where possible. Codec policy belongs on the carrier 
 
 ## Wholesale rates
 
-`carrier_rates` is customer-facing billing data. Do not store CommPeak wholesale termination rates there.
+`usage_rates` is customer-facing billing data. Do not store CommPeak wholesale termination rates there.
 
 Before cost-aware routing or margin accounting is implemented, add a separate upstream cost model.
 

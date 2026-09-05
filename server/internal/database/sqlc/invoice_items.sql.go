@@ -16,7 +16,7 @@ const createInvoiceItem = `-- name: CreateInvoiceItem :one
 INSERT INTO invoice_items (
     invoice_id,
     meter_id,
-    carrier_rate_id,
+    usage_rate_id,
     type,
     description,
     quantity,
@@ -29,7 +29,7 @@ INSERT INTO invoice_items (
 SELECT
     i.id AS invoice_id,
     $1::uuid AS meter_id,
-    $2::uuid AS carrier_rate_id,
+    $2::uuid AS usage_rate_id,
     $3 AS type,
     $4 AS description,
     COALESCE($5, 1) AS quantity,
@@ -57,27 +57,27 @@ WHERE i.id = $11
       $2::uuid IS NULL
       OR EXISTS (
           SELECT 1
-          FROM carrier_rates AS cr
+          FROM usage_rates AS ur
           LEFT JOIN subscriptions AS s
             ON s.id = i.subscription_id
            AND s.organization_id = i.organization_id
-          WHERE cr.id = $2::uuid
+          WHERE ur.id = $2::uuid
             AND (
                 $1::uuid IS NULL
-                OR cr.meter_id = $1::uuid
+                OR ur.meter_id = $1::uuid
             )
             AND (
                 i.subscription_id IS NULL
-                OR cr.plan_id = s.plan_id
+                OR ur.plan_id = s.plan_id
             )
       )
   )
-RETURNING id, invoice_id, meter_id, carrier_rate_id, type, description, quantity, unit_amount_micros, amount, period_start, period_end, metadata, created_at
+RETURNING id, invoice_id, meter_id, usage_rate_id, type, description, quantity, unit_amount_micros, amount, period_start, period_end, metadata, created_at
 `
 
 type CreateInvoiceItemParams struct {
 	MeterID          *uuid.UUID         `db:"meter_id" json:"meter_id"`
-	CarrierRateID    *uuid.UUID         `db:"carrier_rate_id" json:"carrier_rate_id"`
+	UsageRateID      *uuid.UUID         `db:"usage_rate_id" json:"usage_rate_id"`
 	Type             string             `db:"type" json:"type"`
 	Description      string             `db:"description" json:"description"`
 	Quantity         *int64             `db:"quantity" json:"quantity"`
@@ -93,7 +93,7 @@ type CreateInvoiceItemParams struct {
 func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemParams) (InvoiceItem, error) {
 	row := q.db.QueryRow(ctx, createInvoiceItem,
 		arg.MeterID,
-		arg.CarrierRateID,
+		arg.UsageRateID,
 		arg.Type,
 		arg.Description,
 		arg.Quantity,
@@ -110,7 +110,7 @@ func (q *Queries) CreateInvoiceItem(ctx context.Context, arg CreateInvoiceItemPa
 		&i.ID,
 		&i.InvoiceID,
 		&i.MeterID,
-		&i.CarrierRateID,
+		&i.UsageRateID,
 		&i.Type,
 		&i.Description,
 		&i.Quantity,
@@ -147,7 +147,7 @@ func (q *Queries) DeleteInvoiceItems(ctx context.Context, arg DeleteInvoiceItems
 }
 
 const listInvoiceItems = `-- name: ListInvoiceItems :many
-SELECT ii.id, ii.invoice_id, ii.meter_id, ii.carrier_rate_id, ii.type, ii.description, ii.quantity, ii.unit_amount_micros, ii.amount, ii.period_start, ii.period_end, ii.metadata, ii.created_at
+SELECT ii.id, ii.invoice_id, ii.meter_id, ii.usage_rate_id, ii.type, ii.description, ii.quantity, ii.unit_amount_micros, ii.amount, ii.period_start, ii.period_end, ii.metadata, ii.created_at
 FROM invoice_items AS ii
 JOIN invoices AS i ON i.id = ii.invoice_id
 JOIN organizations AS o ON o.id = i.organization_id
@@ -176,7 +176,7 @@ func (q *Queries) ListInvoiceItems(ctx context.Context, arg ListInvoiceItemsPara
 			&i.ID,
 			&i.InvoiceID,
 			&i.MeterID,
-			&i.CarrierRateID,
+			&i.UsageRateID,
 			&i.Type,
 			&i.Description,
 			&i.Quantity,
