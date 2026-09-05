@@ -22,16 +22,87 @@ type numberRepository interface {
 	Update(context.Context, uuid.UUID, uuid.UUID, UpdateRequest) (sqlc.PhoneNumber, error)
 	ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
 	SetCarrierConnection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, audit.Event) (sqlc.PhoneNumber, error)
+	SaveManagedSelection(context.Context, uuid.UUID, ManagedNumberCandidate) (string, error)
+}
+
+type ManagedNumberInventory interface {
+	SearchAvailable(context.Context, AvailableSearchRequest) ([]ManagedNumberCandidate, error)
 }
 
 type Service struct {
-	repo              numberRepository
-	managedInventory  ManagedNumberInventory
-	managedSelections ManagedNumberSelectionStore
+	repo             numberRepository
+	managedInventory ManagedNumberInventory
 }
 
 func NewService(repo numberRepository) *Service {
 	return &Service{repo: repo}
+}
+
+func (s *Service) SetManagedAcquisition(inventory ManagedNumberInventory) {
+	s.managedInventory = inventory
+}
+
+func (s *Service) SearchAvailable(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req AvailableSearchRequest,
+) ([]AvailableNumberResponse, error) {
+	if err := validateOrganizationID(organizationID); err != nil {
+		return nil, err
+	}
+	if s.managedInventory == nil {
+		return nil, apperror.NewServiceUnavailable("managed number inventory is not configured", nil)
+	}
+
+	countryCode, err := normalizeCountryCode(req.CountryCode)
+	if err != nil {
+		return nil, err
+	}
+	contains, err := normalizeNumberContains(req.Contains)
+	if err != nil {
+		return nil, err
+	}
+	req.CountryCode = countryCode
+	req.Contains = contains
+
+	candidates, err := s.managedInventory.SearchAvailable(ctx, req)
+	if err != nil {
+		return nil, apperror.NewServiceUnavailable("search managed number inventory", err)
+	}
+
+	result := make([]AvailableNumberResponse, 0, len(candidates))
+	for _, candidate := range candidates {
+		candidate.Provider = strings.TrimSpace(candidate.Provider)
+		candidate.ProviderInventoryID = strings.TrimSpace(candidate.ProviderInventoryID)
+		candidate.ProviderProductID = strings.TrimSpace(candidate.ProviderProductID)
+		if candidate.Provider == "" || candidate.ProviderInventoryID == "" || candidate.ProviderProductID == "" {
+			return nil, apperror.NewServiceUnavailable("managed number provider returned incomplete purchase metadata", nil)
+		}
+		candidate.Number, err = normalizeNumber(candidate.Number)
+		if err != nil {
+			return nil, apperror.NewServiceUnavailable("managed number provider returned an invalid number", err)
+		}
+		candidate.CountryCode, err = normalizeCountryCode(candidate.CountryCode)
+		if err != nil {
+			return nil, apperror.NewServiceUnavailable("managed number provider returned an invalid country", err)
+		}
+		if candidate.ChannelsIncludedCount <= 0 {
+			return nil, apperror.NewServiceUnavailable("managed number provider returned a number without included voice capacity", nil)
+		}
+
+		selectionID, err := s.repo.SaveManagedSelection(ctx, organizationID, candidate)
+		if err != nil {
+			return nil, apperror.NewServiceUnavailable("store managed number selection", err)
+		}
+		result = append(result, AvailableNumberResponse{
+			SelectionID:  selectionID,
+			Number:       candidate.Number,
+			CountryCode:  candidate.CountryCode,
+			VoiceEnabled: true,
+		})
+	}
+
+	return result, nil
 }
 
 func (s *Service) CreateBYOC(
@@ -58,9 +129,6 @@ func (s *Service) CreateBYOC(
 	return result, writeError(err, "create BYOC phone number")
 }
 
-// CreateManaged persists an already-provisioned upstream number. Only trusted
-// provisioning orchestration should call this method; provider metadata is not
-// accepted by the public phone-number creation route.
 func (s *Service) CreateManaged(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -144,9 +212,6 @@ func (s *Service) Update(
 	return result, writeError(err, "phone number not found")
 }
 
-// ReleaseBYOC ends customer ownership of a BYOC number. Managed numbers cannot
-// be released through this path because the upstream provider must be released
-// first by the managed provisioning workflow.
 func (s *Service) ReleaseBYOC(
 	ctx context.Context,
 	organizationID uuid.UUID,
