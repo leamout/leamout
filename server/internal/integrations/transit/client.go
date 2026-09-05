@@ -34,22 +34,22 @@ type Client struct {
 func NewClient(cfg Config) (*Client, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	if baseURL == "" {
-		return nil, fmt.Errorf("Transit base URL is required")
+		return nil, fmt.Errorf("transit base URL is required")
 	}
 	parsed, err := url.Parse(baseURL)
 	if err != nil {
 		return nil, fmt.Errorf("parse Transit base URL: %w", err)
 	}
 	if parsed.Scheme != "https" && parsed.Scheme != "http" {
-		return nil, fmt.Errorf("Transit base URL must use http or https")
+		return nil, fmt.Errorf("transit base URL must use http or https")
 	}
 	token := strings.TrimSpace(cfg.Token)
 	if token == "" {
-		return nil, fmt.Errorf("Transit token is required")
+		return nil, fmt.Errorf("transit token is required")
 	}
 	deploymentID := strings.TrimSpace(cfg.DeploymentID)
 	if deploymentID == "" {
-		return nil, fmt.Errorf("Transit deployment ID is required")
+		return nil, fmt.Errorf("transit deployment ID is required")
 	}
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
@@ -81,7 +81,7 @@ func (c *Client) ExecuteNumberOrder(ctx context.Context, req ExecuteNumberOrderR
 
 func (c *Client) doJSON(ctx context.Context, method, path string, requestBody any, responseBody any) error {
 	if c == nil || c.baseURL == nil || c.httpClient == nil {
-		return fmt.Errorf("Transit client is not initialized")
+		return fmt.Errorf("transit client is not initialized")
 	}
 	body, err := json.Marshal(requestBody)
 	if err != nil {
@@ -101,7 +101,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, requestBody an
 
 	httpResponse, err := c.httpClient.Do(httpRequest)
 	if err != nil {
-		return fmt.Errorf("Transit request failed: %w", err)
+		return fmt.Errorf("transit request failed: %w", err)
 	}
 	defer func() { _ = httpResponse.Body.Close() }()
 
@@ -111,7 +111,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, requestBody an
 		if message == "" {
 			message = http.StatusText(httpResponse.StatusCode)
 		}
-		return fmt.Errorf("Transit returned %d: %s", httpResponse.StatusCode, message)
+		return fmt.Errorf("transit returned %d: %s", httpResponse.StatusCode, message)
 	}
 	if responseBody == nil {
 		return nil
