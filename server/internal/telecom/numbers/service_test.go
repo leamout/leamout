@@ -10,13 +10,17 @@ import (
 )
 
 type fakeNumberRepository struct {
-	createdBYOC     BYOCCreateRequest
-	createdManaged  ManagedCreateRequest
-	getNumber       sqlc.PhoneNumber
-	getForRelease   sqlc.PhoneNumber
-	getReleaseCalls int
-	releaseCalls    int
-	setCarrierCalls int
+	createdBYOC          BYOCCreateRequest
+	createdManaged       ManagedCreateRequest
+	getNumber            sqlc.PhoneNumber
+	getForRelease        sqlc.PhoneNumber
+	getReleaseCalls      int
+	releaseCalls         int
+	setCarrierCalls      int
+	selectionOrgID       uuid.UUID
+	selectionCandidate   ManagedNumberCandidate
+	selectionID          string
+	selectionErr         error
 }
 
 func (f *fakeNumberRepository) CreateBYOC(_ context.Context, _ uuid.UUID, req BYOCCreateRequest) (sqlc.PhoneNumber, error) {
@@ -57,6 +61,69 @@ func (f *fakeNumberRepository) ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID
 func (f *fakeNumberRepository) SetCarrierConnection(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, audit.Event) (sqlc.PhoneNumber, error) {
 	f.setCarrierCalls++
 	return f.getNumber, nil
+}
+
+func (f *fakeNumberRepository) SaveManagedSelection(_ context.Context, organizationID uuid.UUID, candidate ManagedNumberCandidate) (string, error) {
+	f.selectionOrgID = organizationID
+	f.selectionCandidate = candidate
+	return f.selectionID, f.selectionErr
+}
+
+type fakeManagedInventory struct {
+	request    AvailableSearchRequest
+	candidates []ManagedNumberCandidate
+	err        error
+}
+
+func (f *fakeManagedInventory) SearchAvailable(_ context.Context, request AvailableSearchRequest) ([]ManagedNumberCandidate, error) {
+	f.request = request
+	return f.candidates, f.err
+}
+
+func TestSearchAvailableReturnsOpaqueCustomerResponse(t *testing.T) {
+	repo := &fakeNumberRepository{selectionID: "sel_test"}
+	inventory := &fakeManagedInventory{candidates: []ManagedNumberCandidate{{
+		Provider:              "didww",
+		ProviderInventoryID:   "available-1",
+		ProviderProductID:     "sku-1",
+		Number:                "+12125550100",
+		CountryCode:           "US",
+		ChannelsIncludedCount: 2,
+	}}}
+	service := NewService(repo)
+	service.SetManagedAcquisition(inventory)
+	organizationID := uuid.New()
+
+	result, err := service.SearchAvailable(context.Background(), organizationID, AvailableSearchRequest{
+		CountryCode: " us ",
+		Contains:    "+212",
+	})
+	if err != nil {
+		t.Fatalf("SearchAvailable() error = %v", err)
+	}
+	if inventory.request.CountryCode != "US" || inventory.request.Contains != "212" {
+		t.Fatalf("normalized request = %#v", inventory.request)
+	}
+	if repo.selectionOrgID != organizationID {
+		t.Fatalf("selection organization = %s", repo.selectionOrgID)
+	}
+	if repo.selectionCandidate.ProviderInventoryID != "available-1" || repo.selectionCandidate.ProviderProductID != "sku-1" {
+		t.Fatalf("stored selection = %#v", repo.selectionCandidate)
+	}
+	if len(result) != 1 {
+		t.Fatalf("result count = %d", len(result))
+	}
+	if result[0].SelectionID != "sel_test" || result[0].Number != "+12125550100" || result[0].CountryCode != "US" || !result[0].VoiceEnabled {
+		t.Fatalf("public result = %#v", result[0])
+	}
+}
+
+func TestSearchAvailableRequiresConfiguredInventory(t *testing.T) {
+	service := NewService(&fakeNumberRepository{})
+	_, err := service.SearchAvailable(context.Background(), uuid.New(), AvailableSearchRequest{CountryCode: "US"})
+	if err == nil {
+		t.Fatal("SearchAvailable accepted an unconfigured managed inventory")
+	}
 }
 
 func TestCreateBYOCNormalizesIdentity(t *testing.T) {
