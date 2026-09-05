@@ -320,7 +320,7 @@ SET
     next_attempt_at = now()
 WHERE id = $3
   AND operation_type = 'number_order'
-  AND state IN ('pending', 'provider_accepted')
+  AND state = 'pending'
 RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
