@@ -103,6 +103,53 @@ type didAttributes struct {
 	CreatedAt              time.Time  `json:"created_at"`
 }
 
+type InboundTrunk struct {
+	ID                  string
+	Name                string
+	ExternalReferenceID string
+	Host                string
+	Port                int
+	TransportProtocolID int
+}
+
+type inboundTrunkAttributes struct {
+	Name                string                    `json:"name"`
+	ExternalReferenceID string                    `json:"external_reference_id"`
+	Priority            int                       `json:"priority"`
+	Weight              int                       `json:"weight"`
+	CapacityLimit       int                       `json:"capacity_limit"`
+	RingingTimeout      int                       `json:"ringing_timeout"`
+	CLIFormat           string                    `json:"cli_format"`
+	CLIPrefix           string                    `json:"cli_prefix"`
+	Configuration       inboundTrunkConfiguration `json:"configuration"`
+}
+
+type inboundTrunkConfiguration struct {
+	Type       string                     `json:"type"`
+	Attributes inboundSIPConfiguration    `json:"attributes"`
+}
+
+type inboundSIPConfiguration struct {
+	Username            string `json:"username"`
+	Host                string `json:"host"`
+	Port                int    `json:"port"`
+	TransportProtocolID int    `json:"transport_protocol_id"`
+	RXDTMFFormatID      int    `json:"rx_dtmf_format_id"`
+	TXDTMFFormatID      int    `json:"tx_dtmf_format_id"`
+	AuthEnabled         bool   `json:"auth_enabled"`
+	MediaEncryptionMode string `json:"media_encryption_mode"`
+}
+
+type inboundTrunkRequest struct {
+	Data inboundTrunkRequestData `json:"data"`
+}
+
+type inboundTrunkRequestData struct {
+	ID         string                 `json:"id,omitempty"`
+	Type       string                 `json:"type"`
+	Attributes inboundTrunkAttributes `json:"attributes"`
+}
+
 type Order struct {
 	ID                  string
 	Reference           string
