@@ -337,13 +337,13 @@ func (r *Repository) CompleteProviderOperation(
 
 	phoneNumberID := phoneNumber.ID
 	if _, err := queries.MarkNumberOrderProviderOperationSucceeded(ctx, sqlc.MarkNumberOrderProviderOperationSucceededParams{
-		ProviderResourceID:  &providerResourceID,
-		PhoneNumberID:       &phoneNumberID,
-		Response:            response,
-		ID:                  operation.ID,
-		OrganizationID:      operation.OrganizationID,
-		CarrierProviderID:   operation.CarrierProviderID,
-		NumberOrderID:       operation.NumberOrderID,
+		ProviderResourceID: &providerResourceID,
+		PhoneNumberID:      &phoneNumberID,
+		Response:           response,
+		ID:                 operation.ID,
+		OrganizationID:     operation.OrganizationID,
+		CarrierProviderID:  operation.CarrierProviderID,
+		NumberOrderID:      operation.NumberOrderID,
 	}); err != nil {
 		return err
 	}
