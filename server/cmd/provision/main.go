@@ -7,12 +7,12 @@ import (
 	"os"
 
 	"github.com/leamout/leamout/internal/platform/config"
-	"github.com/leamout/leamout/internal/runtime/provisioning"
+	"github.com/leamout/leamout/internal/platform/provisioning"
 )
 
 func main() {
-	if len(os.Args) != 3 || os.Args[1] != "didww" || os.Args[2] != "ingress" {
-		fmt.Fprintln(os.Stderr, "usage: provision didww ingress")
+	if len(os.Args) != 4 || os.Args[1] != "managed-carrier" || os.Args[2] != "didww" || os.Args[3] != "ingress" {
+		fmt.Fprintln(os.Stderr, "usage: provision managed-carrier didww ingress")
 		os.Exit(2)
 	}
 
@@ -23,5 +23,5 @@ func main() {
 	if err := provisioning.ProvisionDIDWWIngress(context.Background(), cfg); err != nil {
 		log.Fatal(err)
 	}
-	log.Print("DIDWW platform ingress provisioned")
+	log.Print("DIDWW managed-carrier ingress provisioned")
 }
