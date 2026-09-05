@@ -21,6 +21,11 @@ CREATE TABLE IF NOT EXISTS number_orders (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT uq_number_orders_id_org_provider UNIQUE (
+        id,
+        organization_id,
+        provider_id
+    ),
     CONSTRAINT chk_number_orders_inventory_id CHECK (
         length(btrim(provider_inventory_id)) > 0
     ),
