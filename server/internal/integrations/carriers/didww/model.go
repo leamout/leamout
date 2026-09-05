@@ -125,8 +125,8 @@ type inboundTrunkAttributes struct {
 }
 
 type inboundTrunkConfiguration struct {
-	Type       string                     `json:"type"`
-	Attributes inboundSIPConfiguration    `json:"attributes"`
+	Type       string                  `json:"type"`
+	Attributes inboundSIPConfiguration `json:"attributes"`
 }
 
 type inboundSIPConfiguration struct {
@@ -136,6 +136,7 @@ type inboundSIPConfiguration struct {
 	TransportProtocolID int    `json:"transport_protocol_id"`
 	RXDTMFFormatID      int    `json:"rx_dtmf_format_id"`
 	TXDTMFFormatID      int    `json:"tx_dtmf_format_id"`
+	ResolveRURI         bool   `json:"resolve_ruri"`
 	AuthEnabled         bool   `json:"auth_enabled"`
 	MediaEncryptionMode string `json:"media_encryption_mode"`
 }
