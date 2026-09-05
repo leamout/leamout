@@ -91,8 +91,8 @@ jobs:
 
           text = Path('/tmp/leamout-runtime.yaml').read_text()
           images = re.findall(r'^\s+image:\s+(\S+)\s*$', text, re.MULTILINE)
-          if len(images) != 11:
-              raise SystemExit(f'expected 11 runtime service images, found {len(images)}')
+          if len(images) != 10:
+              raise SystemExit(f'expected 10 runtime images, found {len(images)}')
           invalid = [image for image in images if not re.search(r'@sha256:[0-9a-f]{64}$', image)]
           if invalid:
               raise SystemExit(f'non-immutable runtime images: {invalid}')
@@ -118,7 +118,6 @@ jobs:
           docker compose --env-file /tmp/leamout-runtime.env -f /tmp/leamout-runtime.yaml config --services | sort > /tmp/runtime-services.txt
 
           cat > /tmp/expected-services.txt <<'EOF'
-          bootstrap
           coturn
           freeswitch
           migrate
