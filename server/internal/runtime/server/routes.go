@@ -17,6 +17,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -134,6 +135,12 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			r,
 			modules.Numbers.Handler,
 			organizationAccess("numbers"),
+		)
+		number_orders.RegisterRoutes(
+			r,
+			modules.NumberOrders.Handler,
+			organizationAccess("numbers"),
+			modules.Idempotency.Middleware.Handle,
 		)
 		sip_domains.RegisterRoutes(
 			r,
