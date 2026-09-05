@@ -120,6 +120,12 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
+	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service, redisClient); err != nil {
+		_ = freeSwitch.Close()
+		_ = redisClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
+	}
 
 	router := chi.NewRouter()
 
