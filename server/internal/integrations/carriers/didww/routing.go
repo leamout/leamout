@@ -60,6 +60,7 @@ func (c *Client) EnsureInboundTrunk(ctx context.Context, request EnsureInboundTr
 				TransportProtocolID: transportProtocolID,
 				RXDTMFFormatID:      1,
 				TXDTMFFormatID:      1,
+				ResolveRURI:         true,
 				AuthEnabled:         false,
 				MediaEncryptionMode: "disabled",
 			},
