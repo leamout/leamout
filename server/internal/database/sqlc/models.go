@@ -288,6 +288,7 @@ type Meter struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Customer-visible managed-number acquisition intent. Provider execution and retry state lives in provider_operations.
 type NumberOrder struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -297,10 +298,7 @@ type NumberOrder struct {
 	Number              string             `db:"number" json:"number"`
 	CountryCode         string             `db:"country_code" json:"country_code"`
 	Status              string             `db:"status" json:"status"`
-	ProviderOrderID     *string            `db:"provider_order_id" json:"provider_order_id"`
-	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
 	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
-	FailedStage         *string            `db:"failed_stage" json:"failed_stage"`
 	ErrorCode           *string            `db:"error_code" json:"error_code"`
 	ErrorMessage        *string            `db:"error_message" json:"error_message"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -471,6 +469,7 @@ type Product struct {
 	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Immutable upstream call-detail records reconciled to Leamout-managed calls for wholesale cost accounting.
 type ProviderCdr struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
@@ -480,25 +479,27 @@ type ProviderCdr struct {
 	SipCallID           *string            `db:"sip_call_id" json:"sip_call_id"`
 	CallID              *uuid.UUID         `db:"call_id" json:"call_id"`
 	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
+	ReconciledAt        pgtype.Timestamptz `db:"reconciled_at" json:"reconciled_at"`
 	StartedAt           pgtype.Timestamptz `db:"started_at" json:"started_at"`
 	DurationSeconds     int64              `db:"duration_seconds" json:"duration_seconds"`
 	Currency            string             `db:"currency" json:"currency"`
 	CostMicros          int64              `db:"cost_micros" json:"cost_micros"`
 	Raw                 []byte             `db:"raw" json:"raw"`
-	ReconciledAt        pgtype.Timestamptz `db:"reconciled_at" json:"reconciled_at"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+// Internal durable journal for external provider side effects. Number acquisition operations link directly to number_orders.
 type ProviderOperation struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
 	OperationType       string             `db:"operation_type" json:"operation_type"`
+	NumberOrderID       *uuid.UUID         `db:"number_order_id" json:"number_order_id"`
+	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
 	IdempotencyKey      string             `db:"idempotency_key" json:"idempotency_key"`
 	State               string             `db:"state" json:"state"`
 	ProviderOperationID *string            `db:"provider_operation_id" json:"provider_operation_id"`
 	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
-	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
 	Request             []byte             `db:"request" json:"request"`
 	Response            []byte             `db:"response" json:"response"`
 	Attempts            int32              `db:"attempts" json:"attempts"`
@@ -705,6 +706,7 @@ type WebhookEvent struct {
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+// Provider wholesale call cost attributed to an organization and Leamout call.
 type WholesaleCharge struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	ProviderCdrID  uuid.UUID          `db:"provider_cdr_id" json:"provider_cdr_id"`
