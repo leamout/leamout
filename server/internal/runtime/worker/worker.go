@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
@@ -21,6 +23,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
 )
@@ -35,6 +38,7 @@ type Worker struct {
 	callReconciliation      *calls.ReconciliationJob
 	endpointHealth          *routing.EndpointHealthJob
 	recordingReconciliation *recordings.ReconciliationJob
+	providerOperations      *number_orders.ProviderOperationJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
@@ -50,6 +54,7 @@ var componentNames = []string{
 	"call-reconciliation",
 	"carrier-endpoint-health",
 	"recording-reconciliation",
+	"provider-operations",
 	"outbox-publisher",
 	"webhook-consumer",
 	"webhook-delivery",
@@ -166,6 +171,35 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize recording reconciliation job: %w", err)
 	}
 
+	numberOrdersRepository := number_orders.NewRepository(db, redisClient)
+	numberOrdersService := number_orders.NewService(numberOrdersRepository)
+	if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
+		didwwClient, err := didww.NewClient(didww.Config{
+			BaseURL: cfg.DIDWW.APIBaseURL,
+			APIKey:  cfg.DIDWW.APIKey,
+		})
+		if err != nil {
+			_ = redisClient.Close()
+			_ = freeSwitch.Close()
+			_ = natsClient.Close()
+			db.Close()
+			return nil, fmt.Errorf("initialize DIDWW provider executor: %w", err)
+		}
+		numberOrdersService.SetManagedProvider("didww", didwwClient)
+	}
+	providerOperations, err := number_orders.NewProviderOperationJob(
+		numberOrdersRepository,
+		numberOrdersService,
+		number_orders.DefaultProviderOperationJobConfig(),
+	)
+	if err != nil {
+		_ = redisClient.Close()
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize provider operation job: %w", err)
+	}
+
 	outboxRepository := outbox.NewRepository(queries)
 	outboxPublisher := outbox.NewPublisher(natsClient)
 	outboxJob, err := outbox.NewPublisherJob(
@@ -215,6 +249,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		callReconciliation:      callReconciliation,
 		endpointHealth:          endpointHealth,
 		recordingReconciliation: recordingReconciliation,
+		providerOperations:      providerOperations,
 		outbox:                  outboxJob,
 		webhookConsumer:         webhookConsumer,
 		webhookDelivery:         webhookDelivery,
@@ -280,6 +315,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	go w.runComponent(ctx, errCh, "call-reconciliation", w.callReconciliation.Run)
 	go w.runComponent(ctx, errCh, "carrier-endpoint-health", w.endpointHealth.Run)
 	go w.runComponent(ctx, errCh, "recording-reconciliation", w.recordingReconciliation.Run)
+	go w.runComponent(ctx, errCh, "provider-operations", w.providerOperations.Run)
 	go w.runComponent(ctx, errCh, "outbox-publisher", w.outbox.Run)
 	go w.runComponent(ctx, errCh, "webhook-consumer", w.webhookConsumer.Run)
 	go w.runComponent(ctx, errCh, "webhook-delivery", w.webhookDelivery.Run)
