@@ -110,6 +110,15 @@ type CarrierConnection struct {
 	UpdatedAt               pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type CarrierConnectionProviderResource struct {
+	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderID          uuid.UUID          `db:"provider_id" json:"provider_id"`
+	ResourceType        string             `db:"resource_type" json:"resource_type"`
+	ProviderResourceID  string             `db:"provider_resource_id" json:"provider_resource_id"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type CarrierConnectionSourceIp struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`

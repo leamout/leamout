@@ -35,6 +35,13 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("didww: API returned HTTP %d", e.StatusCode)
 }
 
+func (e *APIError) Retryable() bool {
+	if e == nil {
+		return true
+	}
+	return e.StatusCode == 408 || e.StatusCode == 429 || e.StatusCode >= 500
+}
+
 func newAPIError(statusCode int, payload []byte) error {
 	errorResponse := struct {
 		Errors []APIErrorObject `json:"errors"`

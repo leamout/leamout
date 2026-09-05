@@ -42,6 +42,37 @@ type availableDIDAttributes struct {
 	Number string `json:"number"`
 }
 
+type countryAttributes struct {
+	ISO string `json:"iso"`
+}
+
+type availabilityRelationship struct {
+	Data any `json:"data,omitempty"`
+}
+
+type availableDIDSearchResource struct {
+	ID            string                              `json:"id"`
+	Type          string                              `json:"type"`
+	Attributes    availableDIDAttributes              `json:"attributes"`
+	Relationships map[string]availabilityRelationship `json:"relationships,omitempty"`
+}
+
+type includedAvailabilityResource struct {
+	ID            string                              `json:"id"`
+	Type          string                              `json:"type"`
+	Attributes    stockKeepingUnitAttributes          `json:"attributes"`
+	Relationships map[string]availabilityRelationship `json:"relationships,omitempty"`
+}
+
+type stockKeepingUnitAttributes struct {
+	ChannelsIncludedCount int `json:"channels_included_count"`
+}
+
+type availableDIDSearchResponse struct {
+	Data     []availableDIDSearchResource   `json:"data"`
+	Included []includedAvailabilityResource `json:"included,omitempty"`
+}
+
 type DID struct {
 	ID                     string
 	Number                 string

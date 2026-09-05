@@ -15,6 +15,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -47,6 +48,7 @@ type Modules struct {
 	Idempotency          IdempotencyModule
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
+	NumberOrders         NumberOrdersModule
 	Subscribers          SubscribersModule
 	Trunks               TrunksModule
 	Carriers             CarriersModule
@@ -166,6 +168,12 @@ type NumbersModule struct {
 	Repository *numbers.Repository
 	Service    *numbers.Service
 	Handler    *numbers.Handler
+}
+
+type NumberOrdersModule struct {
+	Repository *number_orders.Repository
+	Service    *number_orders.Service
+	Handler    *number_orders.Handler
 }
 
 type SubscribersModule struct {

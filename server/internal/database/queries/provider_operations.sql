@@ -66,7 +66,7 @@ SET
     next_attempt_at = now()
 WHERE id = sqlc.arg(id)
   AND operation_type = 'number_order'
-  AND state IN ('pending', 'provider_accepted')
+  AND state = 'pending'
 RETURNING *;
 
 -- name: RecordProviderOperationAttemptFailure :one

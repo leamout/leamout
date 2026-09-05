@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +17,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
@@ -30,6 +32,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -119,6 +122,12 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		_ = redisClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
+	}
+	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
+		_ = freeSwitch.Close()
+		_ = redisClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
 	}
 
 	router := chi.NewRouter()
@@ -212,7 +221,10 @@ func NewModules(
 	subscribersService := subscribers.NewService(subscribersRepository)
 
 	numbersRepository := numbers.NewRepository(db)
+	numberOrdersRepository := number_orders.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
+	numbersService.SetManagedSelectionStore(numberOrdersRepository)
+	numberOrdersService := number_orders.NewService(numberOrdersRepository)
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
@@ -312,6 +324,11 @@ func NewModules(
 			Service:    numbersService,
 			Handler:    numbers.NewHandler(numbersService),
 		},
+		NumberOrders: NumberOrdersModule{
+			Repository: numberOrdersRepository,
+			Service:    numberOrdersService,
+			Handler:    number_orders.NewHandler(numberOrdersService),
+		},
 		SIPDomains: SIPDomainsModule{
 			Repository: sipDomainsRepository,
 			Service:    sipDomainsService,
@@ -354,6 +371,23 @@ func NewModules(
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil
+}
+
+func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Service) error {
+	if strings.TrimSpace(cfg.DIDWW.APIKey) == "" {
+		return nil
+	}
+
+	client, err := didww.NewClient(didww.Config{
+		BaseURL: cfg.DIDWW.APIBaseURL,
+		APIKey:  cfg.DIDWW.APIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	service.SetManagedAcquisition(client)
+	return nil
 }
 
 func (s *Server) Close() {

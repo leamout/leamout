@@ -5,8 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
+
+	"github.com/leamout/leamout/internal/telecom/number_orders"
+	"github.com/leamout/leamout/internal/telecom/numbers"
 )
+
+const providerSlug = "didww"
 
 type SearchNumbersRequest struct {
 	NumberContains string
@@ -44,14 +50,108 @@ func (c *Client) SearchNumbers(ctx context.Context, request SearchNumbersRequest
 		return nil, err
 	}
 
-	numbers := make([]AvailableNumber, 0, len(response.Data))
+	result := make([]AvailableNumber, 0, len(response.Data))
 	for _, item := range response.Data {
-		numbers = append(numbers, AvailableNumber{
+		result = append(result, AvailableNumber{
 			ID:     item.ID,
 			Number: item.Attributes.Number,
 		})
 	}
-	return numbers, nil
+	return result, nil
+}
+
+func (c *Client) SearchAvailable(ctx context.Context, request numbers.AvailableSearchRequest) ([]numbers.ManagedNumberCandidate, error) {
+	countryID, err := c.countryIDByISO(ctx, request.CountryCode)
+	if err != nil {
+		return nil, err
+	}
+
+	query := url.Values{}
+	query.Add("include", "did_group")
+	query.Add("include", "did_group.stock_keeping_units")
+	setFilter(query, "country.id", countryID)
+	setFilter(query, "number_contains", request.Contains)
+	setFilter(query, "did_group.features", "voice_in")
+
+	var response availableDIDSearchResponse
+	if err := c.do(ctx, http.MethodGet, "/v3/available_dids", query, nil, &response); err != nil {
+		return nil, err
+	}
+
+	groupSKUs := make(map[string][]string)
+	skus := make(map[string]stockKeepingUnitAttributes)
+	for _, item := range response.Included {
+		switch item.Type {
+		case "did_groups":
+			groupSKUs[item.ID] = relationshipIDs(item.Relationships["stock_keeping_units"])
+		case "stock_keeping_units":
+			skus[item.ID] = item.Attributes
+		}
+	}
+
+	result := make([]numbers.ManagedNumberCandidate, 0, len(response.Data))
+	for _, item := range response.Data {
+		groupID := relationshipID(item.Relationships["did_group"])
+		skuID, channels := selectVoiceSKU(groupSKUs[groupID], skus)
+		if groupID == "" || skuID == "" || channels <= 0 {
+			continue
+		}
+		number := strings.TrimSpace(item.Attributes.Number)
+		if number == "" {
+			continue
+		}
+		result = append(result, numbers.ManagedNumberCandidate{
+			Provider:              providerSlug,
+			ProviderInventoryID:   item.ID,
+			ProviderProductID:     skuID,
+			Number:                "+" + strings.TrimPrefix(number, "+"),
+			CountryCode:           request.CountryCode,
+			ChannelsIncludedCount: channels,
+		})
+	}
+	return result, nil
+}
+
+func (c *Client) countryIDByISO(ctx context.Context, iso string) (string, error) {
+	query := url.Values{}
+	setFilter(query, "iso", strings.ToUpper(strings.TrimSpace(iso)))
+
+	var response collectionResponse[countryAttributes]
+	if err := c.do(ctx, http.MethodGet, "/v3/countries", query, nil, &response); err != nil {
+		return "", err
+	}
+	if len(response.Data) == 0 {
+		return "", fmt.Errorf("didww: country %s is not available", iso)
+	}
+	if len(response.Data) != 1 {
+		return "", fmt.Errorf("didww: country %s resolved ambiguously", iso)
+	}
+	return response.Data[0].ID, nil
+}
+
+func selectVoiceSKU(ids []string, skus map[string]stockKeepingUnitAttributes) (string, int) {
+	type option struct {
+		id       string
+		channels int
+	}
+	options := make([]option, 0, len(ids))
+	for _, id := range ids {
+		attributes, ok := skus[id]
+		if !ok || attributes.ChannelsIncludedCount <= 0 {
+			continue
+		}
+		options = append(options, option{id: id, channels: attributes.ChannelsIncludedCount})
+	}
+	if len(options) == 0 {
+		return "", 0
+	}
+	sort.Slice(options, func(i, j int) bool {
+		if options[i].channels == options[j].channels {
+			return options[i].id < options[j].id
+		}
+		return options[i].channels < options[j].channels
+	})
+	return options[0].id, options[0].channels
 }
 
 func (c *Client) GetNumber(ctx context.Context, didID string) (DID, error) {
@@ -126,14 +226,64 @@ func (c *Client) OrderNumber(ctx context.Context, request OrderNumberRequest) (O
 	if err := c.do(ctx, http.MethodPost, "/v3/orders", nil, payload, &response); err != nil {
 		return Order{}, err
 	}
-	return Order{
-		ID:                  response.Data.ID,
-		Reference:           response.Data.Attributes.Reference,
-		ExternalReferenceID: response.Data.Attributes.ExternalReferenceID,
-		Amount:              response.Data.Attributes.Amount,
-		Status:              response.Data.Attributes.Status,
-		Description:         response.Data.Attributes.Description,
-		CreatedAt:           response.Data.Attributes.CreatedAt,
+	return orderFromResource(response.Data), nil
+}
+
+func (c *Client) FindNumberOrder(ctx context.Context, externalReferenceID string) (number_orders.ProviderOrder, bool, error) {
+	externalReferenceID = strings.TrimSpace(externalReferenceID)
+	if externalReferenceID == "" {
+		return number_orders.ProviderOrder{}, false, fmt.Errorf("didww: external order reference is required")
+	}
+
+	query := url.Values{}
+	query.Set("filter[external_reference_id]", externalReferenceID)
+	var response collectionResponse[orderAttributes]
+	if err := c.do(ctx, http.MethodGet, "/v3/orders", query, nil, &response); err != nil {
+		return number_orders.ProviderOrder{}, false, err
+	}
+	if len(response.Data) == 0 {
+		return number_orders.ProviderOrder{}, false, nil
+	}
+	if len(response.Data) != 1 {
+		return number_orders.ProviderOrder{}, false, fmt.Errorf("didww: external order reference %s resolved ambiguously", externalReferenceID)
+	}
+	order := orderFromResource(response.Data[0])
+	return number_orders.ProviderOrder{ID: order.ID, Status: order.Status}, true, nil
+}
+
+func (c *Client) CreateNumberOrder(ctx context.Context, request number_orders.ProviderOrderRequest) (number_orders.ProviderOrder, error) {
+	order, err := c.OrderNumber(ctx, OrderNumberRequest{
+		AvailableDIDID:      request.ProviderInventoryID,
+		SKUID:               request.ProviderProductID,
+		ExternalReferenceID: request.ExternalReferenceID,
+	})
+	if err != nil {
+		return number_orders.ProviderOrder{}, err
+	}
+	return number_orders.ProviderOrder{ID: order.ID, Status: order.Status}, nil
+}
+
+func (c *Client) FindManagedNumber(ctx context.Context, number string) (number_orders.ProviderNumber, error) {
+	did, err := c.FindNumber(ctx, number)
+	if err != nil {
+		return number_orders.ProviderNumber{}, err
+	}
+	return number_orders.ProviderNumber{
+		ID:                did.ID,
+		Number:            "+" + strings.TrimPrefix(strings.TrimSpace(did.Number), "+"),
+		RoutingResourceID: did.VoiceInTrunkID,
+	}, nil
+}
+
+func (c *Client) ConfigureNumberRouting(ctx context.Context, didID, routingResourceID string) (number_orders.ProviderNumber, error) {
+	did, err := c.ConfigureRouting(ctx, didID, routingResourceID)
+	if err != nil {
+		return number_orders.ProviderNumber{}, err
+	}
+	return number_orders.ProviderNumber{
+		ID:                did.ID,
+		Number:            "+" + strings.TrimPrefix(strings.TrimSpace(did.Number), "+"),
+		RoutingResourceID: did.VoiceInTrunkID,
 	}, nil
 }
 
@@ -147,10 +297,50 @@ func (c *Client) ReleaseNumber(ctx context.Context, didID string) error {
 	return c.do(ctx, http.MethodDelete, "/v3/dids/"+url.PathEscape(didID), nil, nil, nil)
 }
 
+func orderFromResource(item resource[orderAttributes]) Order {
+	return Order{
+		ID:                  item.ID,
+		Reference:           item.Attributes.Reference,
+		ExternalReferenceID: item.Attributes.ExternalReferenceID,
+		Amount:              item.Attributes.Amount,
+		Status:              item.Attributes.Status,
+		Description:         item.Attributes.Description,
+		CreatedAt:           item.Attributes.CreatedAt,
+	}
+}
+
 func setFilter(query url.Values, name, value string) {
 	if value = strings.TrimSpace(value); value != "" {
 		query.Set("filter["+name+"]", value)
 	}
+}
+
+func relationshipID(relationship availabilityRelationship) string {
+	data, ok := relationship.Data.(map[string]any)
+	if !ok {
+		return ""
+	}
+	id, _ := data["id"].(string)
+	return id
+}
+
+func relationshipIDs(relationship availabilityRelationship) []string {
+	data, ok := relationship.Data.([]any)
+	if !ok {
+		return nil
+	}
+	ids := make([]string, 0, len(data))
+	for _, raw := range data {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := item["id"].(string)
+		if id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 func didFromResource(item resource[didAttributes]) DID {
