@@ -5,16 +5,12 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 type fakeRepository struct {
-	created        CreateInput
-	order          sqlc.NumberOrder
-	markError      error
-	failed         Failure
-	failedExpected Status
+	created CreateInput
+	order   sqlc.NumberOrder
 }
 
 func (f *fakeRepository) Create(_ context.Context, input CreateInput) (sqlc.NumberOrder, error) {
@@ -27,36 +23,6 @@ func (f *fakeRepository) Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.Number
 }
 
 func (f *fakeRepository) List(context.Context, uuid.UUID) ([]sqlc.NumberOrder, error) {
-	return []sqlc.NumberOrder{f.order}, nil
-}
-
-func (f *fakeRepository) MarkPurchasing(context.Context, uuid.UUID) (sqlc.NumberOrder, error) {
-	return f.order, f.markError
-}
-
-func (f *fakeRepository) MarkPurchased(context.Context, uuid.UUID, string) (sqlc.NumberOrder, error) {
-	return f.order, f.markError
-}
-
-func (f *fakeRepository) MarkPersisting(context.Context, uuid.UUID, *string) (sqlc.NumberOrder, error) {
-	return f.order, f.markError
-}
-
-func (f *fakeRepository) MarkConfiguring(context.Context, uuid.UUID, *uuid.UUID) (sqlc.NumberOrder, error) {
-	return f.order, f.markError
-}
-
-func (f *fakeRepository) MarkCompleted(context.Context, uuid.UUID) (sqlc.NumberOrder, error) {
-	return f.order, f.markError
-}
-
-func (f *fakeRepository) MarkFailed(_ context.Context, _ uuid.UUID, expected Status, failure Failure) (sqlc.NumberOrder, error) {
-	f.failedExpected = expected
-	f.failed = failure
-	return f.order, f.markError
-}
-
-func (f *fakeRepository) ListRecoverable(context.Context, int32) ([]sqlc.NumberOrder, error) {
 	return []sqlc.NumberOrder{f.order}, nil
 }
 
@@ -119,51 +85,5 @@ func TestCreateRejectsInvalidSelection(t *testing.T) {
 				t.Fatal("Create() accepted invalid selection")
 			}
 		})
-	}
-}
-
-func TestTransitionConflictOnInvalidDatabaseState(t *testing.T) {
-	service := NewService(&fakeRepository{markError: pgx.ErrNoRows})
-	if _, err := service.BeginPurchase(context.Background(), uuid.New()); err == nil {
-		t.Fatal("BeginPurchase() accepted an invalid transition")
-	}
-}
-
-func TestFailRequiresMatchingStage(t *testing.T) {
-	service := NewService(&fakeRepository{})
-	_, err := service.Fail(context.Background(), uuid.New(), StatusPersisting, Failure{
-		Stage:   StageConfiguring,
-		Message: "routing failed",
-	})
-	if err == nil {
-		t.Fatal("Fail() accepted a mismatched failure stage")
-	}
-}
-
-func TestFailRecordsRecoverableStage(t *testing.T) {
-	repo := &fakeRepository{}
-	service := NewService(repo)
-	_, err := service.Fail(context.Background(), uuid.New(), StatusConfiguring, Failure{
-		Stage:   StageConfiguring,
-		Code:    "provider_unavailable",
-		Message: " routing failed ",
-	})
-	if err != nil {
-		t.Fatalf("Fail() error = %v", err)
-	}
-	if repo.failedExpected != StatusConfiguring {
-		t.Fatalf("expected status = %q", repo.failedExpected)
-	}
-	if repo.failed.Stage != StageConfiguring || repo.failed.Message != "routing failed" {
-		t.Fatalf("failure = %#v", repo.failed)
-	}
-}
-
-func TestListRecoverableValidatesBatchSize(t *testing.T) {
-	service := NewService(&fakeRepository{})
-	for _, limit := range []int32{0, -1, 501} {
-		if _, err := service.ListRecoverable(context.Background(), limit); err == nil {
-			t.Fatalf("ListRecoverable(%d) accepted invalid limit", limit)
-		}
 	}
 }
