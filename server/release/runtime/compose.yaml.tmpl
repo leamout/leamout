@@ -2,6 +2,7 @@ name: leamout
 
 x-leamout-environment: &leamout-environment
   APP_ENV: production
+  LEAMOUT_DEPLOYMENT_ID: ${LEAMOUT_DEPLOYMENT_ID:?required}
   DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?required}@postgres:5432/leamout?sslmode=disable
   REDIS_URL: redis://:${REDIS_PASSWORD:?required}@redis:6379
   NATS_URL: nats://leamout:${NATS_PASSWORD:?required}@nats:4222
@@ -9,6 +10,13 @@ x-leamout-environment: &leamout-environment
   FREESWITCH_ESL_ADDRESS: freeswitch:8021
   FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?required}
   CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?required}
+  DIDWW_API_KEY: ${DIDWW_API_KEY:-}
+  DIDWW_API_BASE_URL: ${DIDWW_API_BASE_URL:-https://api.didww.com/v3}
+  DIDWW_SOURCE_CIDRS: ${DIDWW_SOURCE_CIDRS:-}
+  DIDWW_SIP_ENDPOINTS: ${DIDWW_SIP_ENDPOINTS:-}
+  SIP_PUBLIC_HOST: ${SIP_PUBLIC_HOST:-}
+  SIP_PUBLIC_PORT: ${SIP_PUBLIC_PORT:-5060}
+  SIP_PUBLIC_TRANSPORT: ${SIP_PUBLIC_TRANSPORT:-udp}
   TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?required}
   TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?required}
 
@@ -45,6 +53,18 @@ services:
         condition: service_healthy
     networks:
       - private-control
+
+  bootstrap:
+    image: @@IMAGE_SERVER@@
+    command: ["/leamout/bootstrap"]
+    restart: "no"
+    environment: *leamout-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - private-control
+      - control-egress
 
   redis:
     image: @@IMAGE_REDIS@@
@@ -93,7 +113,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -116,7 +136,7 @@ services:
     restart: unless-stopped
     environment: *leamout-environment
     depends_on:
-      migrate:
+      bootstrap:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -237,13 +257,9 @@ services:
 
 volumes:
   postgres_data:
-    name: leamout-postgres-data
   redis_data:
-    name: leamout-redis-data
   nats_data:
-    name: leamout-nats-data
   freeswitch_recordings:
-    name: leamout-recordings
 
 networks:
   private-control:
