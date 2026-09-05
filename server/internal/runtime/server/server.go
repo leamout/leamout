@@ -247,30 +247,120 @@ func NewModules(
 	organizationMiddleware := middleware.NewOrganizationMiddleware(queries)
 
 	return Modules{
-		Catalog: CatalogModule{Repository: catalogRepository, Service: catalogService, Handler: catalog.NewHandler(catalogService)},
-		Licensing: LicensingModule{Repository: licensingRepository, Service: licensingService, Handler: licensing.NewHandler(licensingService)},
-		CommercialState: CommercialStateModule{Service: commercialStateService, Handler: commercialstate.NewHandler(commercialStateService)},
-		Subscriptions: SubscriptionsModule{Repository: subscriptionsRepository, Service: subscriptionsService, Handler: subscriptions.NewHandler(subscriptionsService)},
-		Auth: AuthModule{Repository: authRepository, Service: authService, Handler: auth.NewHandler(authService, sessionService)},
-		Session: SessionModule{Repository: sessionRepository, Service: sessionService, Handler: session.NewHandler(sessionService)},
-		Users: UsersModule{Repository: usersRepository, Service: usersService, Handler: users.NewHandler(usersService)},
-		Organizations: OrganizationModule{Repository: organizationRepository, Service: organizationService, Handler: organization.NewHandler(organizationService)},
-		Members: MembersModule{Repository: membersRepository, Service: membersService, Handler: members.NewHandler(membersService)},
-		Credentials: CredentialsModule{Repository: credentialsRepository, Service: credentialsService, Handler: credentials.NewHandler(credentialsService)},
-		Voice: VoiceModule{Repository: voiceRepository, Service: voiceService, Handler: voice.NewHandler(voiceService)},
-		Calls: CallsModule{Repository: callsRepository, Service: callsService, Handler: calls.NewHandler(callsService)},
-		Recordings: RecordingsModule{Repository: recordingsRepository, Service: recordingsService, Handler: recordings.NewHandler(recordingsService)},
-		Subscribers: SubscribersModule{Repository: subscribersRepository, Service: subscribersService, Handler: subscribers.NewHandler(subscribersService)},
-		Numbers: NumbersModule{Repository: numbersRepository, Service: numbersService, Handler: numbers.NewHandler(numbersService)},
-		SIPDomains: SIPDomainsModule{Repository: sipDomainsRepository, Service: sipDomainsService, Handler: sip_domains.NewHandler(sipDomainsService)},
-		Carriers: CarriersModule{Repository: carriersRepository, Service: carriersService, Handler: carriers.NewHandler(carriersService)},
-		Trunks: TrunksModule{Repository: trunksRepository, Service: trunksService, Handler: trunks.NewHandler(trunksService)},
-		Webhooks: WebhooksModule{Repository: webhooksRepository, Service: webhooksService, Handler: webhooks.NewHandler(webhooksService)},
-		Audit: AuditModule{Repository: auditRepository, Service: auditService, Handler: audit.NewHandler(auditService)},
-		Idempotency: IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService)},
-		Conferences: ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
-		Realtime: RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
-		Authn: authMiddleware,
+		Catalog: CatalogModule{
+			Repository: catalogRepository,
+			Service:    catalogService,
+			Handler:    catalog.NewHandler(catalogService),
+		},
+		Licensing: LicensingModule{
+			Repository: licensingRepository,
+			Service:    licensingService,
+			Handler:    licensing.NewHandler(licensingService),
+		},
+		CommercialState: CommercialStateModule{
+			Service: commercialStateService,
+			Handler: commercialstate.NewHandler(commercialStateService),
+		},
+		Subscriptions: SubscriptionsModule{
+			Repository: subscriptionsRepository,
+			Service:    subscriptionsService,
+			Handler:    subscriptions.NewHandler(subscriptionsService),
+		},
+		Auth: AuthModule{
+			Repository: authRepository,
+			Service:    authService,
+			Handler:    auth.NewHandler(authService, sessionService),
+		},
+		Session: SessionModule{
+			Repository: sessionRepository,
+			Service:    sessionService,
+			Handler:    session.NewHandler(sessionService),
+		},
+		Users: UsersModule{
+			Repository: usersRepository,
+			Service:    usersService,
+			Handler:    users.NewHandler(usersService),
+		},
+		Organizations: OrganizationModule{
+			Repository: organizationRepository,
+			Service:    organizationService,
+			Handler:    organization.NewHandler(organizationService),
+		},
+		Members: MembersModule{
+			Repository: membersRepository,
+			Service:    membersService,
+			Handler:    members.NewHandler(membersService),
+		},
+		Credentials: CredentialsModule{
+			Repository: credentialsRepository,
+			Service:    credentialsService,
+			Handler:    credentials.NewHandler(credentialsService),
+		},
+		Voice: VoiceModule{
+			Repository: voiceRepository,
+			Service:    voiceService,
+			Handler:    voice.NewHandler(voiceService),
+		},
+		Calls: CallsModule{
+			Repository: callsRepository,
+			Service:    callsService,
+			Handler:    calls.NewHandler(callsService),
+		},
+		Recordings: RecordingsModule{
+			Repository: recordingsRepository,
+			Service:    recordingsService,
+			Handler:    recordings.NewHandler(recordingsService),
+		},
+		Subscribers: SubscribersModule{
+			Repository: subscribersRepository,
+			Service:    subscribersService,
+			Handler:    subscribers.NewHandler(subscribersService),
+		},
+		Numbers: NumbersModule{
+			Repository: numbersRepository,
+			Service:    numbersService,
+			Handler:    numbers.NewHandler(numbersService),
+		},
+		SIPDomains: SIPDomainsModule{
+			Repository: sipDomainsRepository,
+			Service:    sipDomainsService,
+			Handler:    sip_domains.NewHandler(sipDomainsService),
+		},
+		Carriers: CarriersModule{
+			Repository: carriersRepository,
+			Service:    carriersService,
+			Handler:    carriers.NewHandler(carriersService),
+		},
+		Trunks: TrunksModule{
+			Repository: trunksRepository,
+			Service:    trunksService,
+			Handler:    trunks.NewHandler(trunksService),
+		},
+		Webhooks: WebhooksModule{
+			Repository: webhooksRepository,
+			Service:    webhooksService,
+			Handler:    webhooks.NewHandler(webhooksService),
+		},
+		Audit: AuditModule{
+			Repository: auditRepository,
+			Service:    auditService,
+			Handler:    audit.NewHandler(auditService),
+		},
+		Idempotency: IdempotencyModule{
+			Repository: idempotencyRepository,
+			Service:    idempotencyService,
+			Middleware: middleware.NewIdempotencyMiddleware(idempotencyService),
+		},
+		Conferences: ConferencesModule{
+			Repository: conferencesRepository,
+			Service:    conferencesService,
+			Handler:    conferences.NewHandler(conferencesService),
+		},
+		Realtime: RealtimeModule{
+			Service: turnService,
+			Handler: realtime.NewHandler(turnService),
+		},
+		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil
 }
