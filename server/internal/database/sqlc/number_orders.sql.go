@@ -151,3 +151,139 @@ func (q *Queries) ListNumberOrdersByOrganizationID(ctx context.Context, organiza
 	}
 	return items, nil
 }
+
+const lockNumberOrderForProviderOperation = `-- name: LockNumberOrderForProviderOperation :one
+SELECT id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
+FROM number_orders
+WHERE id = $1
+  AND organization_id = $2
+  AND provider_id = $3
+  AND provider_inventory_id = $4
+  AND provider_product_id = $5
+  AND number = $6
+  AND country_code = $7
+FOR UPDATE
+`
+
+type LockNumberOrderForProviderOperationParams struct {
+	ID                  uuid.UUID `db:"id" json:"id"`
+	OrganizationID      uuid.UUID `db:"organization_id" json:"organization_id"`
+	ProviderID          uuid.UUID `db:"provider_id" json:"provider_id"`
+	ProviderInventoryID string    `db:"provider_inventory_id" json:"provider_inventory_id"`
+	ProviderProductID   string    `db:"provider_product_id" json:"provider_product_id"`
+	Number              string    `db:"number" json:"number"`
+	CountryCode         string    `db:"country_code" json:"country_code"`
+}
+
+func (q *Queries) LockNumberOrderForProviderOperation(ctx context.Context, arg LockNumberOrderForProviderOperationParams) (NumberOrder, error) {
+	row := q.db.QueryRow(ctx, lockNumberOrderForProviderOperation,
+		arg.ID,
+		arg.OrganizationID,
+		arg.ProviderID,
+		arg.ProviderInventoryID,
+		arg.ProviderProductID,
+		arg.Number,
+		arg.CountryCode,
+	)
+	var i NumberOrder
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ProviderID,
+		&i.ProviderInventoryID,
+		&i.ProviderProductID,
+		&i.Number,
+		&i.CountryCode,
+		&i.Status,
+		&i.PhoneNumberID,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markNumberOrderCompleted = `-- name: MarkNumberOrderCompleted :one
+UPDATE number_orders
+SET
+    status = 'completed',
+    phone_number_id = $1,
+    error_code = NULL,
+    error_message = NULL
+WHERE id = $2
+  AND organization_id = $3
+  AND provider_id = $4
+  AND status = 'processing'
+RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
+`
+
+type MarkNumberOrderCompletedParams struct {
+	PhoneNumberID  *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
+	ID             uuid.UUID  `db:"id" json:"id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+	ProviderID     uuid.UUID  `db:"provider_id" json:"provider_id"`
+}
+
+func (q *Queries) MarkNumberOrderCompleted(ctx context.Context, arg MarkNumberOrderCompletedParams) (NumberOrder, error) {
+	row := q.db.QueryRow(ctx, markNumberOrderCompleted,
+		arg.PhoneNumberID,
+		arg.ID,
+		arg.OrganizationID,
+		arg.ProviderID,
+	)
+	var i NumberOrder
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ProviderID,
+		&i.ProviderInventoryID,
+		&i.ProviderProductID,
+		&i.Number,
+		&i.CountryCode,
+		&i.Status,
+		&i.PhoneNumberID,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markNumberOrderProcessing = `-- name: MarkNumberOrderProcessing :one
+UPDATE number_orders
+SET status = 'processing'
+WHERE id = $1
+  AND organization_id = $2
+  AND provider_id = $3
+  AND status = 'pending'
+RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
+`
+
+type MarkNumberOrderProcessingParams struct {
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ProviderID     uuid.UUID `db:"provider_id" json:"provider_id"`
+}
+
+func (q *Queries) MarkNumberOrderProcessing(ctx context.Context, arg MarkNumberOrderProcessingParams) (NumberOrder, error) {
+	row := q.db.QueryRow(ctx, markNumberOrderProcessing, arg.ID, arg.OrganizationID, arg.ProviderID)
+	var i NumberOrder
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.ProviderID,
+		&i.ProviderInventoryID,
+		&i.ProviderProductID,
+		&i.Number,
+		&i.CountryCode,
+		&i.Status,
+		&i.PhoneNumberID,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
