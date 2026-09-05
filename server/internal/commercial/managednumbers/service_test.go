@@ -38,6 +38,7 @@ type storeStub struct {
 	op        Operation
 	accepted  string
 	completed bool
+	failures  int
 }
 
 func (s *storeStub) BeginOrder(context.Context, OrderRequest) (Operation, error) { return s.op, nil }
@@ -49,14 +50,15 @@ func (s *storeStub) CompleteOrder(context.Context, uuid.UUID, didww.DID, OrderRe
 	s.completed = true
 	return uuid.New(), nil
 }
-func (s *storeStub) BeginRelease(context.Context, ReleaseRequest) (Operation, error) {
-	return s.op, nil
-}
+func (s *storeStub) BeginRelease(context.Context, ReleaseRequest) (Operation, error) { return s.op, nil }
 func (s *storeStub) CompleteRelease(context.Context, uuid.UUID, uuid.UUID) error {
 	s.completed = true
 	return nil
 }
-func (s *storeStub) Fail(context.Context, uuid.UUID, error) error { return nil }
+func (s *storeStub) RecordAttemptFailure(context.Context, uuid.UUID, error) error {
+	s.failures++
+	return nil
+}
 
 func TestOrderPersistsIntentAndUsesOperationAsProviderReference(t *testing.T) {
 	opID := uuid.New()
@@ -72,6 +74,19 @@ func TestOrderPersistsIntentAndUsesOperationAsProviderReference(t *testing.T) {
 		t.Fatalf("op=%+v provider=%+v store=%+v", op, provider, store)
 	}
 }
+
+func TestOrderDoesNotRetryTerminalFailure(t *testing.T) {
+	provider := &providerStub{}
+	store := &storeStub{op: Operation{ID: uuid.New(), State: "failed"}}
+	service, _ := NewService(provider, store)
+	if _, err := service.Order(context.Background(), validOrder()); !errors.Is(err, ErrOperationFailed) {
+		t.Fatalf("got %v", err)
+	}
+	if provider.ordered.ExternalReferenceID != "" {
+		t.Fatal("terminal operation called provider again")
+	}
+}
+
 func TestReconcileConfiguresRoutingBeforeCreatingNumber(t *testing.T) {
 	provider := &providerStub{did: didww.DID{ID: "did-1", Number: "12124727600"}}
 	store := &storeStub{}
@@ -83,6 +98,19 @@ func TestReconcileConfiguresRoutingBeforeCreatingNumber(t *testing.T) {
 		t.Fatal("order completed before routing reconciliation")
 	}
 }
+
+func TestReconcileRecordsRetryableFailure(t *testing.T) {
+	provider := &providerStub{did: didww.DID{ID: "did-1", Number: "12124727600", PendingRemoval: true}}
+	store := &storeStub{}
+	service, _ := NewService(provider, store)
+	if _, err := service.ReconcileOrder(context.Background(), uuid.New(), validOrder()); err == nil {
+		t.Fatal("ReconcileOrder() accepted inactive DID")
+	}
+	if store.failures != 1 {
+		t.Fatalf("failures = %d", store.failures)
+	}
+}
+
 func TestReleaseCompletesProviderBeforeLocalRelease(t *testing.T) {
 	provider := &providerStub{}
 	store := &storeStub{op: Operation{ID: uuid.New(), State: "pending"}}
@@ -95,9 +123,10 @@ func TestReleaseCompletesProviderBeforeLocalRelease(t *testing.T) {
 		t.Fatal("release was not reconciled")
 	}
 }
+
 func TestReleaseTreatsAlreadyMissingProviderDIDAsIdempotent(t *testing.T) {
 	provider := &providerStub{releaseErr: &didww.APIError{StatusCode: 404}}
-	store := &storeStub{op: Operation{ID: uuid.New(), State: "failed"}}
+	store := &storeStub{op: Operation{ID: uuid.New(), State: "pending"}}
 	service, _ := NewService(provider, store)
 	request := ReleaseRequest{OrganizationID: uuid.New(), ProviderID: uuid.New(), PhoneNumberID: uuid.New(), IdempotencyKey: "release-1", ProviderResourceID: "did-1"}
 	if err := service.Release(context.Background(), request); err != nil {
@@ -107,6 +136,7 @@ func TestReleaseTreatsAlreadyMissingProviderDIDAsIdempotent(t *testing.T) {
 		t.Fatal("already released DID did not complete local reconciliation")
 	}
 }
+
 func validOrder() OrderRequest {
-	return OrderRequest{OrganizationID: uuid.New(), ProviderID: uuid.New(), IngressConnectionID: uuid.New(), IdempotencyKey: "order-1", AvailableDIDID: "available-1", SKUID: "sku-1", Number: "+12124727600", CountryCode: "US", VoiceInTrunkID: "voice-in-1"}
+	return OrderRequest{OrganizationID: uuid.New(), NumberOrderID: uuid.New(), ProviderID: uuid.New(), IngressConnectionID: uuid.New(), IdempotencyKey: "order-1", AvailableDIDID: "available-1", SKUID: "sku-1", Number: "+12124727600", CountryCode: "US", VoiceInTrunkID: "voice-in-1"}
 }
