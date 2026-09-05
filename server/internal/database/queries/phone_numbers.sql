@@ -77,6 +77,42 @@ WHERE o.id = sqlc.arg(organization_id)
   )
 RETURNING *;
 
+-- name: EnsureManagedPhoneNumberForProviderOperation :one
+INSERT INTO phone_numbers (
+    organization_id,
+    number,
+    country_code,
+    provisioning_mode,
+    carrier_connection_id,
+    provider_id,
+    provider_resource_id,
+    voice_enabled,
+    sms_enabled,
+    status
+)
+SELECT
+    sqlc.arg(organization_id),
+    sqlc.arg(number),
+    sqlc.arg(country_code),
+    'managed',
+    cc.id,
+    sqlc.arg(provider_id),
+    sqlc.arg(provider_resource_id),
+    true,
+    false,
+    'active'
+FROM carrier_connections AS cc
+WHERE cc.id = sqlc.arg(carrier_connection_id)
+  AND cc.scope = 'platform'
+  AND cc.provider_id = sqlc.arg(provider_id)
+  AND cc.status = 'active'
+ON CONFLICT (provider_id, provider_resource_id)
+    WHERE provider_id IS NOT NULL AND provider_resource_id IS NOT NULL
+DO UPDATE SET updated_at = phone_numbers.updated_at
+WHERE phone_numbers.organization_id = EXCLUDED.organization_id
+  AND phone_numbers.status <> 'released'
+RETURNING *;
+
 -- name: GetPhoneNumberByID :one
 SELECT pn.*
 FROM phone_numbers AS pn
@@ -88,9 +124,6 @@ WHERE pn.id = sqlc.arg(id)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
--- Release lifecycle lookup deliberately includes disabled ownership. Normal
--- reads remain active-only, but a customer must still be able to end ownership
--- after temporarily disabling a BYOC number.
 -- name: GetPhoneNumberForRelease :one
 SELECT pn.*
 FROM phone_numbers AS pn
@@ -172,6 +205,32 @@ WHERE pn.id = sqlc.arg(id)
   AND cc.provider_id = pn.provider_id
   AND cc.status = 'active'
 RETURNING pn.*;
+
+-- name: DisableManagedPhoneNumberForRelease :one
+UPDATE phone_numbers
+SET
+    status = 'disabled',
+    voice_enabled = false,
+    sms_enabled = false,
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND provisioning_mode = 'managed'
+  AND status IN ('active', 'disabled')
+RETURNING *;
+
+-- name: ReleaseManagedPhoneNumber :one
+UPDATE phone_numbers
+SET
+    status = 'released',
+    carrier_connection_id = NULL,
+    voice_enabled = false,
+    sms_enabled = false,
+    updated_at = now()
+WHERE id = sqlc.arg(id)
+  AND provisioning_mode = 'managed'
+  AND status IN ('active', 'disabled')
+RETURNING *;
 
 -- name: ReleaseBYOCPhoneNumber :one
 UPDATE phone_numbers
