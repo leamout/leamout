@@ -57,21 +57,19 @@ Number behavior remains in `numbers.go`, provider routing behavior in `routing.g
 
 DIDWW API credentials are deployment secrets/configuration. They do not belong in `carrier_connections`, which models SIP-facing runtime state.
 
-## Platform ingress bootstrap
+## Explicit platform ingress provisioning
 
-Managed DIDWW ingress is converged by the one-shot bootstrap executable before the API server and worker start:
+DIDWW managed ingress is provisioned by an explicit operator action. It is not part of API-server or worker startup.
+
+For an installed deployment:
 
 ```text
-migrate
-  ↓
-/leamout/bootstrap
-  ↓
-server + worker
+sudo leamout provider didww provision-ingress
 ```
 
-With no `DIDWW_API_KEY`, the bootstrap is a no-op so BYOC-only deployments continue to start normally.
+The command runs a one-shot provisioning process using the installed runtime configuration and then exits. Server and worker startup remain independent of provider provisioning.
 
-When DIDWW is enabled, bootstrap requires:
+Provisioning requires:
 
 ```text
 LEAMOUT_DEPLOYMENT_ID
@@ -84,9 +82,11 @@ DIDWW_SOURCE_CIDRS
 
 `DIDWW_SIP_ENDPOINTS` is optional and is only for known provider-side remote signaling endpoints. Entries use `host:port/transport` format.
 
+`LEAMOUT_DEPLOYMENT_ID` is the stable deployment identity created by `leamout init`. Ordinary local development does not need a fake deployment ID. A local environment needs a stable unique ID only when it explicitly provisions real DIDWW infrastructure.
+
 ### Provider-side resource
 
-Bootstrap reconciles one DIDWW Voice IN trunk using a deployment-scoped external reference:
+Provisioning reconciles one DIDWW Voice IN trunk using a deployment-scoped external reference:
 
 ```text
 leamout:<deployment-id>:managed-ingress
@@ -115,7 +115,7 @@ carrier_connection_provider_resources
 
 ### Local platform topology
 
-Bootstrap transactionally converges:
+Provisioning transactionally converges:
 
 ```text
 carrier_provider: didww
@@ -136,6 +136,8 @@ platform inbound trunk
 ```
 
 The inbound trunk is not the managed outbound default. Managed outbound termination remains independent from DIDWW numbering/inbound origination.
+
+The provisioning action is idempotent. Re-running it reconciles the same DIDWW Voice IN trunk and the same Leamout platform topology rather than creating duplicates.
 
 ## SIP ingress
 
@@ -176,6 +178,8 @@ After a provider order completes, the executor:
 
 Provider object IDs remain internal; OpenSIPS never needs the DIDWW Voice IN trunk UUID.
 
+If platform ingress has not been explicitly provisioned, managed number acquisition must fail before provider purchase rather than inventing provider topology during request handling or process startup.
+
 ## Capacity and wholesale cost
 
 DIDWW capacity selection is provider state, not customer pricing. The current managed-number acquisition path excludes DID+0 until DIDWW Capacity provisioning is implemented.
@@ -212,7 +216,7 @@ DIDWW SMS/SMPP is outside the managed voice path. When messaging work starts, no
 - [x] Configure purchased DIDs to a DIDWW Voice IN trunk.
 - [x] Model platform managed ingress separately from customer BYOC connections.
 - [x] Model provider-side Voice IN trunk IDs as internal provider resources.
-- [x] Bootstrap the DIDWW Voice IN trunk and Leamout platform ingress topology.
+- [x] Explicitly provision the DIDWW Voice IN trunk and Leamout platform ingress topology.
 - [x] Populate platform `carrier_connection_source_ips` from deployment configuration.
 - [x] Route managed inbound DIDs through the existing number/binding path.
 - [ ] Add provider-sandbox acceptance coverage for purchase → route → inbound call.
