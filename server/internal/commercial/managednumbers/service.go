@@ -38,6 +38,8 @@ type Operation struct {
 	PhoneNumberID *uuid.UUID
 }
 
+// OrderRequest is internal provider-execution input. Provider inventory and SKU
+// identifiers must be resolved by Leamout and must not be trusted public API input.
 type OrderRequest struct {
 	OrganizationID      uuid.UUID
 	NumberOrderID       uuid.UUID
