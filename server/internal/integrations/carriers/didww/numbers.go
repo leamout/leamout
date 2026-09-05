@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 )
 
@@ -225,14 +226,64 @@ func (c *Client) OrderNumber(ctx context.Context, request OrderNumberRequest) (O
 	if err := c.do(ctx, http.MethodPost, "/v3/orders", nil, payload, &response); err != nil {
 		return Order{}, err
 	}
-	return Order{
-		ID:                  response.Data.ID,
-		Reference:           response.Data.Attributes.Reference,
-		ExternalReferenceID: response.Data.Attributes.ExternalReferenceID,
-		Amount:              response.Data.Attributes.Amount,
-		Status:              response.Data.Attributes.Status,
-		Description:         response.Data.Attributes.Description,
-		CreatedAt:           response.Data.Attributes.CreatedAt,
+	return orderFromResource(response.Data), nil
+}
+
+func (c *Client) FindNumberOrder(ctx context.Context, externalReferenceID string) (number_orders.ProviderOrder, bool, error) {
+	externalReferenceID = strings.TrimSpace(externalReferenceID)
+	if externalReferenceID == "" {
+		return number_orders.ProviderOrder{}, false, fmt.Errorf("didww: external order reference is required")
+	}
+
+	query := url.Values{}
+	query.Set("filter[external_reference_id]", externalReferenceID)
+	var response collectionResponse[orderAttributes]
+	if err := c.do(ctx, http.MethodGet, "/v3/orders", query, nil, &response); err != nil {
+		return number_orders.ProviderOrder{}, false, err
+	}
+	if len(response.Data) == 0 {
+		return number_orders.ProviderOrder{}, false, nil
+	}
+	if len(response.Data) != 1 {
+		return number_orders.ProviderOrder{}, false, fmt.Errorf("didww: external order reference %s resolved ambiguously", externalReferenceID)
+	}
+	order := orderFromResource(response.Data[0])
+	return number_orders.ProviderOrder{ID: order.ID, Status: order.Status}, true, nil
+}
+
+func (c *Client) CreateNumberOrder(ctx context.Context, request number_orders.ProviderOrderRequest) (number_orders.ProviderOrder, error) {
+	order, err := c.OrderNumber(ctx, OrderNumberRequest{
+		AvailableDIDID:      request.ProviderInventoryID,
+		SKUID:               request.ProviderProductID,
+		ExternalReferenceID: request.ExternalReferenceID,
+	})
+	if err != nil {
+		return number_orders.ProviderOrder{}, err
+	}
+	return number_orders.ProviderOrder{ID: order.ID, Status: order.Status}, nil
+}
+
+func (c *Client) FindManagedNumber(ctx context.Context, number string) (number_orders.ProviderNumber, error) {
+	did, err := c.FindNumber(ctx, number)
+	if err != nil {
+		return number_orders.ProviderNumber{}, err
+	}
+	return number_orders.ProviderNumber{
+		ID:                did.ID,
+		Number:            "+" + strings.TrimPrefix(strings.TrimSpace(did.Number), "+"),
+		RoutingResourceID: did.VoiceInTrunkID,
+	}, nil
+}
+
+func (c *Client) ConfigureNumberRouting(ctx context.Context, didID, routingResourceID string) (number_orders.ProviderNumber, error) {
+	did, err := c.ConfigureRouting(ctx, didID, routingResourceID)
+	if err != nil {
+		return number_orders.ProviderNumber{}, err
+	}
+	return number_orders.ProviderNumber{
+		ID:                did.ID,
+		Number:            "+" + strings.TrimPrefix(strings.TrimSpace(did.Number), "+"),
+		RoutingResourceID: did.VoiceInTrunkID,
 	}, nil
 }
 
@@ -244,6 +295,18 @@ func (c *Client) ReleaseNumber(ctx context.Context, didID string) error {
 		return fmt.Errorf("didww: DID id is required")
 	}
 	return c.do(ctx, http.MethodDelete, "/v3/dids/"+url.PathEscape(didID), nil, nil, nil)
+}
+
+func orderFromResource(item resource[orderAttributes]) Order {
+	return Order{
+		ID:                  item.ID,
+		Reference:           item.Attributes.Reference,
+		ExternalReferenceID: item.Attributes.ExternalReferenceID,
+		Amount:              item.Attributes.Amount,
+		Status:              item.Attributes.Status,
+		Description:         item.Attributes.Description,
+		CreatedAt:           item.Attributes.CreatedAt,
+	}
 }
 
 func setFilter(query url.Values, name, value string) {
