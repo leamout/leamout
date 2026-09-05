@@ -471,6 +471,44 @@ type Product struct {
 	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type ProviderCdr struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
+	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderRecordID    string             `db:"provider_record_id" json:"provider_record_id"`
+	Direction           string             `db:"direction" json:"direction"`
+	SipCallID           *string            `db:"sip_call_id" json:"sip_call_id"`
+	CallID              *uuid.UUID         `db:"call_id" json:"call_id"`
+	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
+	StartedAt           pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	DurationSeconds     int64              `db:"duration_seconds" json:"duration_seconds"`
+	Currency            string             `db:"currency" json:"currency"`
+	CostMicros          int64              `db:"cost_micros" json:"cost_micros"`
+	Raw                 []byte             `db:"raw" json:"raw"`
+	ReconciledAt        pgtype.Timestamptz `db:"reconciled_at" json:"reconciled_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type ProviderOperation struct {
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
+	OperationType       string             `db:"operation_type" json:"operation_type"`
+	IdempotencyKey      string             `db:"idempotency_key" json:"idempotency_key"`
+	State               string             `db:"state" json:"state"`
+	ProviderOperationID *string            `db:"provider_operation_id" json:"provider_operation_id"`
+	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
+	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
+	Request             []byte             `db:"request" json:"request"`
+	Response            []byte             `db:"response" json:"response"`
+	Attempts            int32              `db:"attempts" json:"attempts"`
+	LastError           *string            `db:"last_error" json:"last_error"`
+	NextAttemptAt       pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	CompletedAt         pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Recording struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -663,6 +701,17 @@ type WebhookEvent struct {
 	ObjectType     string             `db:"object_type" json:"object_type"`
 	ObjectID       *uuid.UUID         `db:"object_id" json:"object_id"`
 	Payload        []byte             `db:"payload" json:"payload"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type WholesaleCharge struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	ProviderCdrID  uuid.UUID          `db:"provider_cdr_id" json:"provider_cdr_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	CallID         uuid.UUID          `db:"call_id" json:"call_id"`
+	AmountMicros   int64              `db:"amount_micros" json:"amount_micros"`
+	Currency       string             `db:"currency" json:"currency"`
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
