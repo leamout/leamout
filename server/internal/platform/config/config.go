@@ -11,13 +11,16 @@ import (
 )
 
 type DIDWWConfig struct {
-	APIKey     string `env:"API_KEY"`
-	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
+	APIKey        string   `env:"API_KEY"`
+	APIBaseURL    string   `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
+	SourceCIDRs   []string `env:"SOURCE_CIDRS" envSeparator:","`
+	SIPEndpoints []string `env:"SIP_ENDPOINTS" envSeparator:","`
 }
 
 type SIPConfig struct {
-	PublicHost string `env:"PUBLIC_HOST"`
-	PublicPort int    `env:"PUBLIC_PORT" envDefault:"5060"`
+	PublicHost      string `env:"PUBLIC_HOST"`
+	PublicPort      int    `env:"PUBLIC_PORT" envDefault:"5060"`
+	PublicTransport string `env:"PUBLIC_TRANSPORT" envDefault:"udp"`
 }
 
 type Config struct {
@@ -67,7 +70,10 @@ func (c *Config) normalize() {
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
+	c.DIDWW.SourceCIDRs = normalizeStrings(c.DIDWW.SourceCIDRs)
+	c.DIDWW.SIPEndpoints = normalizeStrings(c.DIDWW.SIPEndpoints)
 	c.SIP.PublicHost = strings.TrimSpace(c.SIP.PublicHost)
+	c.SIP.PublicTransport = strings.ToLower(strings.TrimSpace(c.SIP.PublicTransport))
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
