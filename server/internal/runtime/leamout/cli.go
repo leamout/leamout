@@ -44,6 +44,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		return runInstalledCompose(ctx, stdout, stderr, composeArgs...)
 	case "doctor":
 		return runDoctor(ctx, stdout, stderr)
+	case "provider":
+		return runProvider(ctx, stdout, stderr, args[1:])
 	case "license":
 		return runLicense(stdout, stderr, args[1:])
 	case "backup":
@@ -144,6 +146,7 @@ Commands:
   status     Show installed runtime service status
   logs       Follow installed runtime logs
   doctor     Validate the local Leamout deployment
+  provider   Provision platform-owned provider infrastructure
   license    Install or verify a signed offline license
   backup     Create a portable deployment backup
   restore    Restore a deployment backup
