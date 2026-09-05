@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
     meter_id UUID REFERENCES meters(id) ON DELETE SET NULL,
-    carrier_rate_id UUID REFERENCES carrier_rates(id) ON DELETE SET NULL,
+    usage_rate_id UUID REFERENCES usage_rates(id) ON DELETE SET NULL,
     type TEXT NOT NULL,
     description TEXT NOT NULL,
     quantity BIGINT NOT NULL DEFAULT 1,
