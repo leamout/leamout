@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -16,6 +17,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
@@ -120,7 +122,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service, redisClient); err != nil {
+	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -218,6 +220,7 @@ func NewModules(
 	subscribersService := subscribers.NewService(subscribersRepository)
 
 	numbersRepository := numbers.NewRepository(db)
+	numbersRepository.SetRedis(redisClient)
 	numbersService := numbers.NewService(numbersRepository)
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
@@ -244,122 +247,49 @@ func NewModules(
 	organizationMiddleware := middleware.NewOrganizationMiddleware(queries)
 
 	return Modules{
-		Catalog: CatalogModule{
-			Repository: catalogRepository,
-			Service:    catalogService,
-			Handler:    catalog.NewHandler(catalogService),
-		},
-		Licensing: LicensingModule{
-			Repository: licensingRepository,
-			Service:    licensingService,
-			Handler:    licensing.NewHandler(licensingService),
-		},
-		CommercialState: CommercialStateModule{
-			Service: commercialStateService,
-			Handler: commercialstate.NewHandler(commercialStateService),
-		},
-		Subscriptions: SubscriptionsModule{
-			Repository: subscriptionsRepository,
-			Service:    subscriptionsService,
-			Handler:    subscriptions.NewHandler(subscriptionsService),
-		},
-		Auth: AuthModule{
-			Repository: authRepository,
-			Service:    authService,
-			Handler:    auth.NewHandler(authService, sessionService),
-		},
-		Session: SessionModule{
-			Repository: sessionRepository,
-			Service:    sessionService,
-			Handler:    session.NewHandler(sessionService),
-		},
-		Users: UsersModule{
-			Repository: usersRepository,
-			Service:    usersService,
-			Handler:    users.NewHandler(usersService),
-		},
-		Organizations: OrganizationModule{
-			Repository: organizationRepository,
-			Service:    organizationService,
-			Handler:    organization.NewHandler(organizationService),
-		},
-		Members: MembersModule{
-			Repository: membersRepository,
-			Service:    membersService,
-			Handler:    members.NewHandler(membersService),
-		},
-		Credentials: CredentialsModule{
-			Repository: credentialsRepository,
-			Service:    credentialsService,
-			Handler:    credentials.NewHandler(credentialsService),
-		},
-		Voice: VoiceModule{
-			Repository: voiceRepository,
-			Service:    voiceService,
-			Handler:    voice.NewHandler(voiceService),
-		},
-		Calls: CallsModule{
-			Repository: callsRepository,
-			Service:    callsService,
-			Handler:    calls.NewHandler(callsService),
-		},
-		Recordings: RecordingsModule{
-			Repository: recordingsRepository,
-			Service:    recordingsService,
-			Handler:    recordings.NewHandler(recordingsService),
-		},
-		Subscribers: SubscribersModule{
-			Repository: subscribersRepository,
-			Service:    subscribersService,
-			Handler:    subscribers.NewHandler(subscribersService),
-		},
-		Numbers: NumbersModule{
-			Repository: numbersRepository,
-			Service:    numbersService,
-			Handler:    numbers.NewHandler(numbersService),
-		},
-		SIPDomains: SIPDomainsModule{
-			Repository: sipDomainsRepository,
-			Service:    sipDomainsService,
-			Handler:    sip_domains.NewHandler(sipDomainsService),
-		},
-		Carriers: CarriersModule{
-			Repository: carriersRepository,
-			Service:    carriersService,
-			Handler:    carriers.NewHandler(carriersService),
-		},
-		Trunks: TrunksModule{
-			Repository: trunksRepository,
-			Service:    trunksService,
-			Handler:    trunks.NewHandler(trunksService),
-		},
-		Webhooks: WebhooksModule{
-			Repository: webhooksRepository,
-			Service:    webhooksService,
-			Handler:    webhooks.NewHandler(webhooksService),
-		},
-		Audit: AuditModule{
-			Repository: auditRepository,
-			Service:    auditService,
-			Handler:    audit.NewHandler(auditService),
-		},
-		Idempotency: IdempotencyModule{
-			Repository: idempotencyRepository,
-			Service:    idempotencyService,
-			Middleware: middleware.NewIdempotencyMiddleware(idempotencyService),
-		},
-		Conferences: ConferencesModule{
-			Repository: conferencesRepository,
-			Service:    conferencesService,
-			Handler:    conferences.NewHandler(conferencesService),
-		},
-		Realtime: RealtimeModule{
-			Service: turnService,
-			Handler: realtime.NewHandler(turnService),
-		},
-		Authn:                authMiddleware,
+		Catalog: CatalogModule{Repository: catalogRepository, Service: catalogService, Handler: catalog.NewHandler(catalogService)},
+		Licensing: LicensingModule{Repository: licensingRepository, Service: licensingService, Handler: licensing.NewHandler(licensingService)},
+		CommercialState: CommercialStateModule{Service: commercialStateService, Handler: commercialstate.NewHandler(commercialStateService)},
+		Subscriptions: SubscriptionsModule{Repository: subscriptionsRepository, Service: subscriptionsService, Handler: subscriptions.NewHandler(subscriptionsService)},
+		Auth: AuthModule{Repository: authRepository, Service: authService, Handler: auth.NewHandler(authService, sessionService)},
+		Session: SessionModule{Repository: sessionRepository, Service: sessionService, Handler: session.NewHandler(sessionService)},
+		Users: UsersModule{Repository: usersRepository, Service: usersService, Handler: users.NewHandler(usersService)},
+		Organizations: OrganizationModule{Repository: organizationRepository, Service: organizationService, Handler: organization.NewHandler(organizationService)},
+		Members: MembersModule{Repository: membersRepository, Service: membersService, Handler: members.NewHandler(membersService)},
+		Credentials: CredentialsModule{Repository: credentialsRepository, Service: credentialsService, Handler: credentials.NewHandler(credentialsService)},
+		Voice: VoiceModule{Repository: voiceRepository, Service: voiceService, Handler: voice.NewHandler(voiceService)},
+		Calls: CallsModule{Repository: callsRepository, Service: callsService, Handler: calls.NewHandler(callsService)},
+		Recordings: RecordingsModule{Repository: recordingsRepository, Service: recordingsService, Handler: recordings.NewHandler(recordingsService)},
+		Subscribers: SubscribersModule{Repository: subscribersRepository, Service: subscribersService, Handler: subscribers.NewHandler(subscribersService)},
+		Numbers: NumbersModule{Repository: numbersRepository, Service: numbersService, Handler: numbers.NewHandler(numbersService)},
+		SIPDomains: SIPDomainsModule{Repository: sipDomainsRepository, Service: sipDomainsService, Handler: sip_domains.NewHandler(sipDomainsService)},
+		Carriers: CarriersModule{Repository: carriersRepository, Service: carriersService, Handler: carriers.NewHandler(carriersService)},
+		Trunks: TrunksModule{Repository: trunksRepository, Service: trunksService, Handler: trunks.NewHandler(trunksService)},
+		Webhooks: WebhooksModule{Repository: webhooksRepository, Service: webhooksService, Handler: webhooks.NewHandler(webhooksService)},
+		Audit: AuditModule{Repository: auditRepository, Service: auditService, Handler: audit.NewHandler(auditService)},
+		Idempotency: IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService)},
+		Conferences: ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
+		Realtime: RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
+		Authn: authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil
+}
+
+func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Service) error {
+	if strings.TrimSpace(cfg.DIDWWAPIKey) == "" {
+		return nil
+	}
+
+	client, err := didww.NewClient(didww.Config{
+		BaseURL: cfg.DIDWWBaseURL,
+		APIKey:  cfg.DIDWWAPIKey,
+	})
+	if err != nil {
+		return err
+	}
+
+	service.SetManagedAcquisition(client)
+	return nil
 }
 
 func (s *Server) Close() {
