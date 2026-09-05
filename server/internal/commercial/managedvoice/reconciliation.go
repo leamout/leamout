@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 var ErrCDRNotMatched = errors.New("provider CDR does not match a managed call")
@@ -32,9 +34,6 @@ type ReconciliationResult struct {
 	Duplicate                     bool
 }
 
-// IngestProviderCDR stores the immutable provider record and reconciles it to
-// an outbound call atomically. Re-delivery returns the original result without
-// creating a second wholesale charge.
 func (r *Repository) IngestProviderCDR(ctx context.Context, input ProviderCDR) (ReconciliationResult, error) {
 	if err := validateCDR(input); err != nil {
 		return ReconciliationResult{}, err
@@ -45,89 +44,77 @@ func (r *Repository) IngestProviderCDR(ctx context.Context, input ProviderCDR) (
 		return ReconciliationResult{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
 
-	var cdrID uuid.UUID
+	cdr, err := q.InsertProviderCDR(ctx, sqlc.InsertProviderCDRParams{
+		CarrierProviderID:   input.ProviderID,
+		CarrierConnectionID: input.CarrierConnectionID,
+		ProviderRecordID:    input.ProviderRecordID,
+		Direction:           input.Direction,
+		SipCallID:           &input.SIPCallID,
+		StartedAt:           pgtype.Timestamptz{Time: input.StartedAt, Valid: true},
+		DurationSeconds:     input.DurationSeconds,
+		Currency:            input.Currency,
+		CostMicros:          input.CostMicros,
+		Raw:                 input.Raw,
+	})
 	duplicate := false
-	err = tx.QueryRow(ctx, `
-		INSERT INTO provider_cdrs (
-			carrier_provider_id, carrier_connection_id, provider_record_id,
-			direction, sip_call_id, started_at, duration_seconds,
-			currency, cost_micros, raw
-		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-		ON CONFLICT (carrier_provider_id,direction,provider_record_id)
-		DO NOTHING
-		RETURNING id
-	`, input.ProviderID, input.CarrierConnectionID, input.ProviderRecordID, input.Direction, input.SIPCallID, input.StartedAt, input.DurationSeconds, input.Currency, input.CostMicros, input.Raw).Scan(&cdrID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		var existingCallID, existingOrganizationID *uuid.UUID
-		err = tx.QueryRow(ctx, `
-			SELECT id,call_id,organization_id
-			FROM provider_cdrs
-			WHERE carrier_provider_id=$1 AND direction=$2 AND provider_record_id=$3
-			FOR UPDATE
-		`, input.ProviderID, input.Direction, input.ProviderRecordID).Scan(&cdrID, &existingCallID, &existingOrganizationID)
+		cdr, err = q.GetProviderCDRForUpdate(ctx, sqlc.GetProviderCDRForUpdateParams{
+			CarrierProviderID: input.ProviderID,
+			Direction:         input.Direction,
+			ProviderRecordID:  input.ProviderRecordID,
+		})
 		if err != nil {
 			return ReconciliationResult{}, err
 		}
 		duplicate = true
-		if existingCallID != nil && existingOrganizationID != nil {
-			result := ReconciliationResult{CDRID: cdrID, CallID: *existingCallID, OrganizationID: *existingOrganizationID, Duplicate: true}
+		if cdr.CallID != nil && cdr.OrganizationID != nil {
+			result := ReconciliationResult{CDRID: cdr.ID, CallID: *cdr.CallID, OrganizationID: *cdr.OrganizationID, Duplicate: true}
 			return result, tx.Commit(ctx)
 		}
-	}
-	if err != nil {
+	} else if err != nil {
 		return ReconciliationResult{}, err
 	}
 
-	var callID, organizationID uuid.UUID
-	err = tx.QueryRow(ctx, `
-		SELECT c.id,c.organization_id
-		FROM calls AS c
-		JOIN carrier_connections AS cc ON cc.id=c.carrier_connection_id
-		WHERE c.sip_call_id=$1
-		  AND c.direction='outbound'
-		  AND c.carrier_connection_id=$2
-		  AND cc.scope='platform'
-		  AND cc.provider_id=$3
-	`, input.SIPCallID, input.CarrierConnectionID, input.ProviderID).Scan(&callID, &organizationID)
+	call, err := q.FindManagedCallForProviderCDR(ctx, sqlc.FindManagedCallForProviderCDRParams{
+		SipCallID:           &input.SIPCallID,
+		CarrierConnectionID: &input.CarrierConnectionID,
+		CarrierProviderID:   input.ProviderID,
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		if commitErr := tx.Commit(ctx); commitErr != nil {
 			return ReconciliationResult{}, commitErr
 		}
-		return ReconciliationResult{CDRID: cdrID, Duplicate: duplicate}, ErrCDRNotMatched
+		return ReconciliationResult{CDRID: cdr.ID, Duplicate: duplicate}, ErrCDRNotMatched
 	}
 	if err != nil {
 		return ReconciliationResult{}, err
 	}
 
-	tag, err := tx.Exec(ctx, `
-		UPDATE provider_cdrs
-		SET call_id=$2, organization_id=$3, reconciled_at=now()
-		WHERE id=$1
-	`, cdrID, callID, organizationID)
-	if err != nil {
+	if _, err = q.MarkProviderCDRReconciled(ctx, sqlc.MarkProviderCDRReconciledParams{
+		ID:             cdr.ID,
+		CallID:         &call.ID,
+		OrganizationID: &call.OrganizationID,
+	}); err != nil {
 		return ReconciliationResult{}, err
 	}
-	if tag.RowsAffected() != 1 {
-		return ReconciliationResult{}, pgx.ErrNoRows
-	}
 
-	_, err = tx.Exec(ctx, `
-		INSERT INTO wholesale_charges (
-			provider_cdr_id, organization_id, call_id,
-			amount_micros, currency, occurred_at
-		)
-		VALUES ($1,$2,$3,$4,$5,$6)
-	`, cdrID, organizationID, callID, input.CostMicros, input.Currency, input.StartedAt)
-	if err != nil {
+	if _, err = q.CreateWholesaleCharge(ctx, sqlc.CreateWholesaleChargeParams{
+		ProviderCdrID:  cdr.ID,
+		OrganizationID: call.OrganizationID,
+		CallID:         call.ID,
+		AmountMicros:   input.CostMicros,
+		Currency:       input.Currency,
+		OccurredAt:     pgtype.Timestamptz{Time: input.StartedAt, Valid: true},
+	}); err != nil {
 		return ReconciliationResult{}, err
 	}
 
 	if err = tx.Commit(ctx); err != nil {
 		return ReconciliationResult{}, err
 	}
-	return ReconciliationResult{CDRID: cdrID, CallID: callID, OrganizationID: organizationID, Duplicate: duplicate}, nil
+	return ReconciliationResult{CDRID: cdr.ID, CallID: call.ID, OrganizationID: call.OrganizationID, Duplicate: duplicate}, nil
 }
 
 func validateCDR(in ProviderCDR) error {
