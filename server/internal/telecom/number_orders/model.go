@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	ErrSelectionNotFound   = errors.New("number selection not found or expired")
+	ErrSelectionNotFound    = errors.New("number selection not found or expired")
 	ErrSelectionUnavailable = errors.New("number selection is no longer available")
 )
 
