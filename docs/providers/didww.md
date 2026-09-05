@@ -149,7 +149,7 @@ DIDWW capacity selection is provider state, not customer pricing.
 
 The integration must preserve the selected capacity model (`DID+0`, `DID+2`, or any later provider variant) once Leamout starts using it for provisioning or cost calculations.
 
-`carrier_rates` is customer-facing commercial pricing. Do not store DIDWW wholesale cost there.
+`usage_rates` is customer-facing commercial pricing. Do not store DIDWW wholesale cost there.
 
 Wholesale number cost needs its own model when margin accounting is implemented. At minimum it will need to represent:
 
