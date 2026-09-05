@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS calls (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT uq_calls_id_organization UNIQUE (id, organization_id),
     CONSTRAINT chk_calls_direction CHECK (direction IN ('inbound', 'outbound')),
     CONSTRAINT chk_calls_state CHECK (
         state IN ('initiating', 'ringing', 'answered', 'active', 'completed', 'failed', 'cancelled')
