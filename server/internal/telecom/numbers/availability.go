@@ -20,10 +20,10 @@ type AvailableSearchRequest struct {
 // opaque, short-lived handle to the provider purchase inputs retained by
 // Leamout.
 type AvailableNumberResponse struct {
-	SelectionID string `json:"selection_id"`
-	Number      string `json:"number"`
-	CountryCode string `json:"country_code"`
-	VoiceEnabled bool  `json:"voice_enabled"`
+	SelectionID  string `json:"selection_id"`
+	Number       string `json:"number"`
+	CountryCode  string `json:"country_code"`
+	VoiceEnabled bool   `json:"voice_enabled"`
 }
 
 // ManagedNumberCandidate is the provider-neutral internal result produced by a
@@ -107,9 +107,9 @@ func (s *Service) SearchAvailable(
 			return nil, apperror.NewServiceUnavailable("store managed number selection", err)
 		}
 		result = append(result, AvailableNumberResponse{
-			SelectionID: selectionID,
-			Number:      candidate.Number,
-			CountryCode: candidate.CountryCode,
+			SelectionID:  selectionID,
+			Number:       candidate.Number,
+			CountryCode:  candidate.CountryCode,
 			VoiceEnabled: true,
 		})
 	}
