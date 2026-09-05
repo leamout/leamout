@@ -11,16 +11,16 @@ subscription
     ↓
 plan
     ↓
-carrier rate resolution
+usage rate resolution
     ↓
 rated charge
     ↓
 invoice_item snapshot
 ```
 
-## Carrier rates
+## Usage rates
 
-The current `carrier_rates` model is a Leamout customer-facing billable telecom usage rate.
+The `usage_rates` model defines Leamout customer-facing billable usage pricing.
 
 A rate can vary by:
 
@@ -52,9 +52,20 @@ effective_until
 active
 ```
 
-`carrier_provider_id` references the provider definition, not an organization's specific carrier connection.
+`carrier_provider_id` is an optional rating dimension that references the provider definition, not an organization's specific carrier connection. It lets Leamout select different customer pricing when the same usage is served by different upstream providers.
 
-If Leamout later tracks upstream wholesale carrier cost separately, introduce a distinct cost model rather than overloading customer billing rates.
+Usage rates are not upstream carrier costs. Actual completed-call provider costs are recorded separately from provider CDRs as `wholesale_charges`.
+
+```text
+usage_rates
+    = what Leamout uses to price customer usage
+
+provider_cdrs
+    = what the upstream provider reports happened
+
+wholesale_charges
+    = what that provider usage actually cost Leamout
+```
 
 ## Rate resolution
 
@@ -71,7 +82,7 @@ active plan and product
         ↓
 active meter
         ↓
-active effective carrier rate
+active effective usage rate
 ```
 
 Optional rate dimensions behave as fallbacks. A null rate dimension matches any request value; a non-null dimension must match the requested value.
@@ -139,4 +150,4 @@ Possible future fields include minimum and increment quantities. Add them only w
 
 ## Historical pricing
 
-A rated invoice item snapshots the rate/amount used at billing time. Historical invoices must not be recomputed from whatever `carrier_rates` rows happen to be active later.
+A rated invoice item snapshots the rate/amount used at billing time. Historical invoices must not be recomputed from whatever `usage_rates` rows happen to be active later.
