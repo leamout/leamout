@@ -2,25 +2,31 @@
 
 DIDWW is the initial managed provider for DID inventory and inbound PSTN routing.
 
-This document records the integration contract and the work required to make DIDWW a first-class Leamout provider. It is not a customer-facing provider overview.
+This document records the internal integration contract. DIDWW provider identifiers, credentials, routing resources, and platform carrier topology are not customer-facing API resources.
 
-## Phase 1 scope
+## Managed number path
 
-Phase 1 needs to support:
+```text
+customer
+  ↓
+GET /v1/numbers/available
+  ↓
+POST /v1/number-orders
+  ↓
+provider_operations
+  ↓
+DIDWW order
+  ↓
+DIDWW DID
+  ↓
+DIDWW Voice IN trunk
+  ↓
+Leamout platform ingress
+  ↓
+phone_numbers
+```
 
-- search DID inventory;
-- order a DID;
-- persist the DID and DIDWW resource ID;
-- configure DIDWW to send inbound SIP traffic to Leamout;
-- attribute DIDWW ingress to the correct organization and carrier connection;
-- route the called number through `voice_bindings`;
-- reconcile provider inventory and routing state.
-
-Not in the first voice integration:
-
-- automated porting;
-- provider-specific customer billing logic;
-- SMS delivery unless the messaging work requires it.
+The provider-operation executor reconciles by the Leamout provider-operation UUID before purchasing so ambiguous provider responses do not create duplicate orders.
 
 ## Existing Leamout model
 
@@ -29,190 +35,185 @@ Use the existing carrier and number primitives.
 | Leamout object | DIDWW use |
 | --- | --- |
 | `carrier_providers` | Built-in DIDWW provider definition. |
-| `carrier_connections` | Organization-scoped DIDWW SIP ingress configuration. |
-| `carrier_connection_source_ips` | DIDWW source networks accepted for the connection. |
-| `phone_numbers` | Purchased DIDs. `provider_resource_id` stores the DIDWW resource ID. |
+| `carrier_connections` | Platform-scoped DIDWW managed ingress connection. |
+| `carrier_connection_source_ips` | DIDWW signaling networks accepted for that platform connection. |
+| `trunks` | Internal platform inbound SIP trunk representing DIDWW ingress topology. |
+| `trunk_endpoints` | Optional known DIDWW remote signaling endpoints; never Leamout's own SIP address. |
+| `carrier_connection_provider_resources` | Maps the platform connection to DIDWW provider objects such as `voice_in_trunk`. |
+| `phone_numbers` | Purchased DIDs; `provider_resource_id` stores the DIDWW DID resource ID. |
 | `voice_bindings` | Maps a DID to a voice application. |
 
-The current `phone_numbers` schema does not contain DIDWW capacity or provider-routing fields. Do not overload unrelated columns to store them.
-
-Before the integration depends on those values at runtime, define storage for at least:
-
-```text
-capacity model
-provider routing target / routing resource
-provider-side status
-wholesale MRC/NRC/usage inputs
-```
-
-## Provider definition
-
-Add DIDWW to production bootstrap data when the adapter is usable.
-
-The provider needs a stable slug:
-
-```text
-didww
-```
-
-The adapter value should identify the DIDWW control-plane integration. Do not reuse `sip` for REST inventory operations if adapter dispatch will use this value to select provider-specific code.
+Managed inbound tenancy is derived from the called DID. A platform carrier connection therefore has `organization_id = NULL`; it does not belong to the customer that owns a managed DID.
 
 ## Control-plane adapter
 
-Planned package:
+The DIDWW adapter lives under:
 
 ```text
 server/internal/integrations/carriers/didww/
 ```
 
-Keep DIDWW REST credentials out of `carrier_connections`. That table is SIP-facing carrier state and already owns SIP authentication, limits, codecs, and ingress configuration.
+Number behavior remains in `numbers.go`, provider routing behavior in `routing.go`, and DIDWW wire/domain types in `model.go`.
 
-The DIDWW client needs the minimum operations required by number lifecycle:
+DIDWW API credentials are deployment secrets/configuration. They do not belong in `carrier_connections`, which models SIP-facing runtime state.
 
-```text
-SearchNumbers
-OrderNumber
-GetNumber
-ConfigureRouting
-ReleaseNumber
-```
+## Platform ingress bootstrap
 
-Exact names are implementation details, but the adapter boundary should stay small and provider-specific.
-
-### Provisioning flow
+Managed DIDWW ingress is converged by the one-shot bootstrap executable before the API server and worker start:
 
 ```text
-API / worker
-    ↓
-DIDWW adapter
-    ↓
-search / order
-    ↓
-phone_numbers
-    ↓
-configure provider routing
-    ↓
-voice binding
+migrate
+  ↓
+/leamout/bootstrap
+  ↓
+server + worker
 ```
 
-A successful order is not complete until Leamout has persisted enough provider state to retry routing configuration safely.
+With no `DIDWW_API_KEY`, the bootstrap is a no-op so BYOC-only deployments continue to start normally.
 
-Do not make number ordering and provider routing one irreversible operation. A failed routing update after a successful order must be recoverable by reconciliation.
+When DIDWW is enabled, bootstrap requires:
+
+```text
+LEAMOUT_DEPLOYMENT_ID
+DIDWW_API_KEY
+SIP_PUBLIC_HOST
+SIP_PUBLIC_PORT
+SIP_PUBLIC_TRANSPORT
+DIDWW_SOURCE_CIDRS
+```
+
+`DIDWW_SIP_ENDPOINTS` is optional and is only for known provider-side remote signaling endpoints. Entries use `host:port/transport` format.
+
+### Provider-side resource
+
+Bootstrap reconciles one DIDWW Voice IN trunk using a deployment-scoped external reference:
+
+```text
+leamout:<deployment-id>:managed-ingress
+```
+
+The desired SIP target uses:
+
+```text
+username = +{DID}
+host = SIP_PUBLIC_HOST
+port = SIP_PUBLIC_PORT
+transport = SIP_PUBLIC_TRANSPORT
+resolve_ruri = true
+auth_enabled = false
+```
+
+`+{DID}` makes the called number the user portion of the inbound Request-URI in +E.164 format so the existing OpenSIPS number lookup can resolve the managed `phone_numbers` row.
+
+The resulting DIDWW Voice IN trunk ID is stored only as internal provider metadata:
+
+```text
+carrier_connection_provider_resources
+  resource_type = voice_in_trunk
+  provider_resource_id = <DIDWW Voice IN trunk UUID>
+```
+
+### Local platform topology
+
+Bootstrap transactionally converges:
+
+```text
+carrier_provider: didww
+        ↓
+platform carrier_connection
+  name = DIDWW Managed Ingress
+  inbound_enabled = true
+  inbound_auth_method = ip
+        ↓
+platform inbound trunk
+  name = DIDWW Managed Ingress
+  direction = inbound
+  managed_default = false
+        ├── carrier_connection_source_ips
+        ├── optional inbound trunk_endpoints
+        └── carrier_connection_provider_resources
+              voice_in_trunk → DIDWW UUID
+```
+
+The inbound trunk is not the managed outbound default. Managed outbound termination remains independent from DIDWW numbering/inbound origination.
 
 ## SIP ingress
 
-DIDWW sends inbound calls to the Leamout SIP edge.
-
-Expected path:
+Expected runtime path:
 
 ```text
 DIDWW
-  ↓ SIP INVITE
+  ↓ SIP INVITE from configured signaling CIDR
 OpenSIPS
   ↓ source-IP carrier resolution
-carrier_connection
-  ↓ called number
-phone_numbers
-  ↓
+platform DIDWW carrier_connection
+  ↓ called DID
+managed phone_numbers row
+  ↓ customer organization
 voice_bindings
   ↓
 voice application
 ```
 
-Source-IP authorization is already data driven. Store the active DIDWW CIDRs in `carrier_connection_source_ips`; do not hard-code a permanent provider allow list into `opensips.cfg`.
+`carrier_connection_source_ips` is the runtime source-IP authorization/attribution mechanism. DIDWW signaling CIDRs are deployment data and must not be hard-coded in `opensips.cfg`.
 
-Ingress must fail closed when:
+Ingress fails closed when:
 
-- the source IP does not resolve to one carrier connection;
-- the DID is not assigned to that carrier connection;
-- the DID belongs to another organization;
+- the source IP does not resolve uniquely to a carrier connection;
+- the DID is not assigned to that platform connection;
+- the managed number is inactive or voice-disabled;
 - no voice binding exists for the called number.
 
-## DIDWW routing state
+## Routing purchased numbers
 
-Leamout needs one canonical SIP ingress target for managed DIDs per deployment or region.
+After a provider order completes, the executor:
 
-The DIDWW adapter is responsible for translating that target into the provider's routing resources. Provider object IDs must remain provider metadata; OpenSIPS should not need to know them.
+1. resolves the purchased DID at DIDWW;
+2. reads the snapshotted `voice_in_trunk` mapping from the provider operation;
+3. assigns the DID to that DIDWW Voice IN trunk when necessary;
+4. creates or reuses the managed `phone_numbers` row;
+5. completes the provider operation and customer number order transactionally.
 
-Routing reconciliation must detect at least:
-
-- DID exists at DIDWW but not in Leamout;
-- DID exists in Leamout but no longer exists at DIDWW;
-- DIDWW routing no longer points at the expected Leamout ingress;
-- provider status changed outside Leamout.
-
-Do not silently delete local state during reconciliation. Report drift and make destructive recovery explicit.
+Provider object IDs remain internal; OpenSIPS never needs the DIDWW Voice IN trunk UUID.
 
 ## Capacity and wholesale cost
 
-DIDWW capacity selection is provider state, not customer pricing.
+DIDWW capacity selection is provider state, not customer pricing. The current managed-number acquisition path excludes DID+0 until DIDWW Capacity provisioning is implemented.
 
-The integration must preserve the selected capacity model (`DID+0`, `DID+2`, or any later provider variant) once Leamout starts using it for provisioning or cost calculations.
+`usage_rates` is customer-facing commercial pricing. DIDWW wholesale cost belongs in provider/wholesale accounting resources, not customer rate tables.
 
-`usage_rates` is customer-facing commercial pricing. Do not store DIDWW wholesale cost there.
+## Reconciliation
 
-Wholesale number cost needs its own model when margin accounting is implemented. At minimum it will need to represent:
+Provider execution and reconciliation must remain idempotent. Provider state is not authoritative for customer organization ownership or voice bindings; those remain Leamout control-plane state.
 
-```text
-provider
-provider resource
-currency
-MRC
-NRC
-usage/capacity charges
-effective period
-```
+Future inventory/routing reconciliation should detect at least:
 
-## Reconciliation worker
+- DID exists at DIDWW but not in Leamout;
+- DID exists in Leamout but no longer exists at DIDWW;
+- DIDWW routing no longer points at the deployment's expected Voice IN trunk;
+- provider status changed outside Leamout.
 
-The worker should be idempotent and safe to run repeatedly.
+Do not silently delete local state during reconciliation.
 
-It must not treat provider state as authoritative for organization ownership or voice bindings. Those remain Leamout control-plane state.
+## Porting and messaging
 
-Suggested responsibilities:
+Porting remains manual until Leamout owns the full LOA/document/provider-status workflow.
 
-1. list or fetch Leamout-managed DIDWW resources;
-2. compare provider status with `phone_numbers`;
-3. verify the expected provider routing target;
-4. retry incomplete routing configuration;
-5. emit/record drift that requires operator action.
+DIDWW SMS/SMPP is outside the managed voice path. When messaging work starts, normalize provider traffic into the Leamout messaging model instead of exposing raw DIDWW payloads.
 
-## Porting
+## Managed voice checklist
 
-Porting is manual in Phase 1.
-
-Do not add an API that implies automated LNP until Leamout owns the full workflow for LOA/document collection, provider submission, status transitions, and failure handling.
-
-## SMS
-
-DIDWW SMS is outside the initial voice path.
-
-When messaging work starts, normalize provider callbacks/SMPP traffic into the Leamout messaging model. Do not route raw DIDWW payloads directly to customer webhooks.
-
-## Implementation checklist
-
-- [ ] Add the built-in `didww` carrier provider.
-- [ ] Add DIDWW REST credentials to the deployment secrets path.
-- [ ] Implement the DIDWW control-plane adapter.
-- [ ] Search available numbers.
-- [ ] Order a number and persist `provider_resource_id`.
-- [ ] Define storage for DIDWW-specific capacity and routing metadata required at runtime.
-- [ ] Configure purchased DIDs to route to Leamout SIP ingress.
-- [ ] Create the organization-scoped DIDWW carrier connection.
-- [ ] Populate `carrier_connection_source_ips` with the active DIDWW ingress ranges.
-- [ ] Route inbound DIDWW calls through the existing number/binding path.
-- [ ] Add reconciliation for inventory and routing drift.
-- [ ] Add acceptance coverage for purchase → route → inbound call.
-
-## Phase 1 exit criteria
-
-DIDWW Phase 1 is complete when a test can:
-
-1. provision DIDWW credentials from deployment secrets;
-2. search and order a DID;
-3. persist the DID with its provider resource ID;
-4. configure the DID to Leamout ingress;
-5. receive a real DIDWW SIP INVITE;
-6. attribute it to the expected carrier connection and organization;
-7. resolve the DID to the expected voice application;
-8. rerun reconciliation without duplicating or corrupting state.
+- [x] Built-in `didww` carrier provider.
+- [x] DIDWW API deployment configuration.
+- [x] Available-number search.
+- [x] Durable number orders and provider operations.
+- [x] Reconcile-before-purchase provider executor.
+- [x] Persist managed DID provider resource IDs.
+- [x] Configure purchased DIDs to a DIDWW Voice IN trunk.
+- [x] Model platform managed ingress separately from customer BYOC connections.
+- [x] Model provider-side Voice IN trunk IDs as internal provider resources.
+- [x] Bootstrap the DIDWW Voice IN trunk and Leamout platform ingress topology.
+- [x] Populate platform `carrier_connection_source_ips` from deployment configuration.
+- [x] Route managed inbound DIDs through the existing number/binding path.
+- [ ] Add provider-sandbox acceptance coverage for purchase → route → inbound call.
+- [ ] Add broader inventory/routing drift reconciliation.

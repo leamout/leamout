@@ -11,12 +11,21 @@ import (
 )
 
 type DIDWWConfig struct {
-	APIKey     string `env:"API_KEY"`
-	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
+	APIKey       string   `env:"API_KEY"`
+	APIBaseURL   string   `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
+	SourceCIDRs  []string `env:"SOURCE_CIDRS" envSeparator:","`
+	SIPEndpoints []string `env:"SIP_ENDPOINTS" envSeparator:","`
+}
+
+type SIPConfig struct {
+	PublicHost      string `env:"PUBLIC_HOST"`
+	PublicPort      int    `env:"PUBLIC_PORT" envDefault:"5060"`
+	PublicTransport string `env:"PUBLIC_TRANSPORT" envDefault:"udp"`
 }
 
 type Config struct {
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
+	DeploymentID          string      `env:"LEAMOUT_DEPLOYMENT_ID"`
 	DatabaseURL           string      `env:"DATABASE_URL,required"`
 	RedisURL              string      `env:"REDIS_URL,required"`
 	NATSURL               string      `env:"NATS_URL,required"`
@@ -25,6 +34,7 @@ type Config struct {
 	FreeSWITCHESLPassword string      `env:"FREESWITCH_ESL_PASSWORD,required"`
 	CarrierCredentialKey  string      `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
 	DIDWW                 DIDWWConfig `envPrefix:"DIDWW_"`
+	SIP                   SIPConfig   `envPrefix:"SIP_"`
 	TURNAuthSecret        string      `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string    `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
 	CORSOrigins           []string    `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
@@ -51,6 +61,7 @@ func (c Config) IsDevelopment() bool {
 
 func (c *Config) normalize() {
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
+	c.DeploymentID = strings.TrimSpace(c.DeploymentID)
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)
 	c.RedisURL = strings.TrimSpace(c.RedisURL)
 	c.NATSURL = strings.TrimSpace(c.NATSURL)
@@ -59,6 +70,10 @@ func (c *Config) normalize() {
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
+	c.DIDWW.SourceCIDRs = normalizeStrings(c.DIDWW.SourceCIDRs)
+	c.DIDWW.SIPEndpoints = normalizeStrings(c.DIDWW.SIPEndpoints)
+	c.SIP.PublicHost = strings.TrimSpace(c.SIP.PublicHost)
+	c.SIP.PublicTransport = strings.ToLower(strings.TrimSpace(c.SIP.PublicTransport))
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
