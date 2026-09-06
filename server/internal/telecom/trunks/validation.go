@@ -33,6 +33,7 @@ func normalizeName(value string) (string, error) {
 	}
 	return value, nil
 }
+
 func normalizeChoice(value string, choices map[string]struct{}, field string) (string, error) {
 	value = strings.ToLower(strings.TrimSpace(value))
 	if _, ok := choices[value]; !ok {
@@ -61,21 +62,25 @@ func normalizeHost(value string) (string, error) {
 			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 				return "", apperror.NewBadRequest("host must be a valid IP address or hostname")
 			}
+		}
 	}
 	return value, nil
 }
+
 func validatePort(port int32) error {
 	if port < 1 || port > 65535 {
 		return apperror.NewBadRequest("port must be between 1 and 65535")
 	}
 	return nil
 }
+
 func validatePriority(priority int32) error {
 	if priority < 0 {
 		return apperror.NewBadRequest("priority must be non-negative")
 	}
 	return nil
 }
+
 func validateWeight(weight int32) error {
 	if weight < 1 {
 		return apperror.NewBadRequest("weight must be greater than zero")
