@@ -31,8 +31,10 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	if result.Credential != nil {
+	if result.Credential != nil || req.SIP != nil {
 		w.Header().Set("Cache-Control", "no-store")
+	}
+	if result.Credential != nil {
 		httputil.Created(w, ManagedCreateResponse{Response: response(result.Trunk), SIP: *result.Credential})
 		return
 	}
@@ -71,7 +73,6 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, map[string]any{"trunks": result})
 }
-
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	org, trunk, err := trunkIDs(r)
 	if err != nil {
@@ -85,7 +86,6 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, response(item))
 }
-
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	org, trunk, err := trunkIDs(r)
 	if err != nil {
@@ -104,7 +104,6 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, response(item))
 }
-
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	org, trunk, err := trunkIDs(r)
 	if err != nil {
@@ -117,7 +116,6 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
-
 func (h *Handler) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
 	org, trunk, err := trunkIDs(r)
 	if err != nil {
@@ -136,7 +134,6 @@ func (h *Handler) CreateEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.Created(w, endpointResponse(item))
 }
-
 func (h *Handler) ListEndpoints(w http.ResponseWriter, r *http.Request) {
 	org, trunk, err := trunkIDs(r)
 	if err != nil {
@@ -154,7 +151,6 @@ func (h *Handler) ListEndpoints(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, map[string]any{"endpoints": result})
 }
-
 func (h *Handler) GetEndpoint(w http.ResponseWriter, r *http.Request) {
 	org, trunk, endpoint, err := endpointIDs(r)
 	if err != nil {
@@ -168,7 +164,6 @@ func (h *Handler) GetEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, endpointResponse(item))
 }
-
 func (h *Handler) UpdateEndpoint(w http.ResponseWriter, r *http.Request) {
 	org, trunk, endpoint, err := endpointIDs(r)
 	if err != nil {
@@ -187,7 +182,6 @@ func (h *Handler) UpdateEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, endpointResponse(item))
 }
-
 func (h *Handler) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	org, trunk, endpoint, err := endpointIDs(r)
 	if err != nil {
@@ -208,7 +202,6 @@ func organizationID(r *http.Request) (uuid.UUID, error) {
 	}
 	return id, nil
 }
-
 func trunkIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	org, err := organizationID(r)
 	if err != nil {
@@ -220,7 +213,6 @@ func trunkIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	}
 	return org, id, nil
 }
-
 func endpointIDs(r *http.Request) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
 	org, trunk, err := trunkIDs(r)
 	if err != nil {
