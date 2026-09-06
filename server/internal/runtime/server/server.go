@@ -245,7 +245,7 @@ func NewModules(
 		Trunks:               TrunksModule{Repository: trunksRepository, Service: trunksService, Handler: trunks.NewHandler(trunksService)},
 		Webhooks:             WebhooksModule{Repository: webhooksRepository, Service: webhooksService, Handler: webhooks.NewHandler(webhooksService)},
 		Audit:                AuditModule{Repository: auditRepository, Service: auditService, Handler: audit.NewHandler(auditService)},
-		Idempotency:          IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService, idempotency.DefaultConfig())},
+		Idempotency:          IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService)},
 		Conferences:          ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
 		Realtime:             RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
 		Authn:                authMiddleware,
