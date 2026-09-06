@@ -15,6 +15,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/edge"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -51,8 +52,14 @@ type Modules struct {
 	Trunks               TrunksModule
 	Carriers             CarriersModule
 	Realtime             RealtimeModule
+	Edge                 EdgeModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
+}
+type EdgeModule struct {
+	Repository *edge.Repository
+	Service    *edge.Service
+	Handler    *edge.Handler
 }
 
 type CatalogModule struct {

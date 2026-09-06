@@ -4,6 +4,7 @@ set -eu
 config=${OPENSIPS_CONFIG:-/etc/opensips/opensips.cfg}
 advertised_address=${OPENSIPS_ADVERTISED_ADDRESS:-}
 database_password=${OPENSIPS_DATABASE_PASSWORD:-}
+admission_secret=${MANAGED_SIP_ADMISSION_SECRET:-}
 
 [ -n "$database_password" ] || {
   echo "OPENSIPS_DATABASE_PASSWORD is required" >&2
@@ -16,11 +17,27 @@ case "$database_password" in
     ;;
 esac
 
+[ -n "$admission_secret" ] || {
+  echo "MANAGED_SIP_ADMISSION_SECRET is required" >&2
+  exit 1
+}
+case "$admission_secret" in
+  *[!A-Za-z0-9._~-]*)
+    echo "MANAGED_SIP_ADMISSION_SECRET contains unsupported characters" >&2
+    exit 1
+    ;;
+esac
+
 # The source configuration keeps the contributor credential solely so the
 # image can be syntax-checked during build. Replace it before OpenSIPS starts;
 # production always supplies a deployment-owned generated credential.
 tmp=$(mktemp)
 sed "s#postgres://leamout:leamout@postgres:5432/leamout#postgres://leamout:${database_password}@postgres:5432/leamout#g" "$config" > "$tmp"
+cat "$tmp" > "$config"
+rm -f "$tmp"
+
+tmp=$(mktemp)
+sed "s#__MANAGED_SIP_ADMISSION_SECRET__#${admission_secret}#g" "$config" > "$tmp"
 cat "$tmp" > "$config"
 rm -f "$tmp"
 
