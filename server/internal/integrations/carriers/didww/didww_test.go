@@ -147,6 +147,69 @@ func TestOrderNumberPurchasesSpecificAvailableDID(t *testing.T) {
 	}
 }
 
+func TestEnsureInboundTrunkCreatesDeploymentScopedSIPTarget(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", jsonAPIMediaType)
+		switch requests {
+		case 1:
+			if r.Method != http.MethodGet || r.URL.Path != "/v3/voice_in_trunks" {
+				t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+			}
+			if got := r.URL.Query().Get("filter[external_reference_id]"); got != "leamout:deployment-1:managed-ingress" {
+				t.Fatalf("external reference filter = %q", got)
+			}
+			_, _ = w.Write([]byte(`{"data":[]}`))
+		case 2:
+			if r.Method != http.MethodPost || r.URL.Path != "/v3/voice_in_trunks" {
+				t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload := string(body)
+			for _, expected := range []string{
+				`"external_reference_id":"leamout:deployment-1:managed-ingress"`,
+				`"username":"+{DID}"`,
+				`"host":"sip.leamout.example"`,
+				`"port":5060`,
+				`"transport_protocol_id":1`,
+				`"resolve_ruri":true`,
+				`"auth_enabled":false`,
+			} {
+				if !strings.Contains(payload, expected) {
+					t.Fatalf("body missing %s: %s", expected, payload)
+				}
+			}
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte(`{"data":{"id":"voice-in-1","type":"voice_in_trunks","attributes":{"name":"DIDWW Managed Ingress","external_reference_id":"leamout:deployment-1:managed-ingress","configuration":{"type":"sip_configurations","attributes":{"username":"+{DID}","host":"sip.leamout.example","port":5060,"transport_protocol_id":1,"resolve_ruri":true,"auth_enabled":false}}}}}`))
+		default:
+			t.Fatalf("unexpected extra request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{BaseURL: server.URL, APIKey: "secret", HTTPClient: server.Client()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	trunk, err := client.EnsureInboundTrunk(context.Background(), EnsureInboundTrunkRequest{
+		Name:                "DIDWW Managed Ingress",
+		ExternalReferenceID: "leamout:deployment-1:managed-ingress",
+		Host:                "sip.leamout.example",
+		Port:                5060,
+		Transport:           "udp",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if trunk.ID != "voice-in-1" || trunk.Host != "sip.leamout.example" || trunk.TransportProtocolID != 1 {
+		t.Fatalf("trunk = %+v", trunk)
+	}
+}
+
 func TestConfigureRoutingAssignsVoiceInTrunk(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch || r.URL.Path != "/v3/dids/did-1" {

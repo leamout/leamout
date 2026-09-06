@@ -45,3 +45,16 @@ func TestHelpDoesNotExposeFilesystemOverrides(t *testing.T) {
 		t.Fatalf("help exposes production filesystem overrides: %s", stdout.String())
 	}
 }
+
+func TestHelpDoesNotExposeManagedCarrierProvisioning(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"help"}, &stdout, &stderr, BuildInfo{})
+	if code != 0 {
+		t.Fatalf("Run returned %d: %s", code, stderr.String())
+	}
+	for _, forbidden := range []string{"provider", "didww", "managed-carrier", "provision-ingress"} {
+		if strings.Contains(strings.ToLower(stdout.String()), forbidden) {
+			t.Fatalf("self-hosted help exposes managed-carrier provisioning %q: %s", forbidden, stdout.String())
+		}
+	}
+}

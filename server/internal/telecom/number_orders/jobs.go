@@ -28,22 +28,31 @@ type providerOperationJobRepository interface {
 	TryProviderOperationLock(context.Context, uuid.UUID) (func(), bool, error)
 }
 
+// ProviderOperationExecutor is the execution boundary for durable managed-carrier
+// operations. The job owns polling and locking; the executor owns how an operation
+// reaches the managed-carrier implementation. A local provider-backed Service is
+// one implementation, while a delegated managed-carrier executor can implement the
+// same contract without changing the job or customer-facing number-order API.
+type ProviderOperationExecutor interface {
+	ExecuteProviderOperation(context.Context, sqlc.ProviderOperation) error
+}
+
 type ProviderOperationJob struct {
-	repo    providerOperationJobRepository
-	service *Service
-	config  ProviderOperationJobConfig
+	repo     providerOperationJobRepository
+	executor ProviderOperationExecutor
+	config   ProviderOperationJobConfig
 }
 
 func NewProviderOperationJob(
 	repo providerOperationJobRepository,
-	service *Service,
+	executor ProviderOperationExecutor,
 	config ProviderOperationJobConfig,
 ) (*ProviderOperationJob, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("provider operation repository is required")
 	}
-	if service == nil {
-		return nil, fmt.Errorf("provider operation service is required")
+	if executor == nil {
+		return nil, fmt.Errorf("provider operation executor is required")
 	}
 	if config.Interval <= 0 {
 		config.Interval = 10 * time.Second
@@ -51,7 +60,7 @@ func NewProviderOperationJob(
 	if config.BatchSize <= 0 {
 		config.BatchSize = 50
 	}
-	return &ProviderOperationJob{repo: repo, service: service, config: config}, nil
+	return &ProviderOperationJob{repo: repo, executor: executor, config: config}, nil
 }
 
 func (j *ProviderOperationJob) Run(ctx context.Context) error {
@@ -102,7 +111,7 @@ func (j *ProviderOperationJob) Execute(ctx context.Context) error {
 			continue
 		}
 
-		err = j.service.ExecuteProviderOperation(ctx, operation)
+		err = j.executor.ExecuteProviderOperation(ctx, operation)
 		release()
 		if err != nil && firstErr == nil {
 			firstErr = fmt.Errorf("execute provider operation %s: %w", operation.ID, err)
