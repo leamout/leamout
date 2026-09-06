@@ -103,10 +103,12 @@ def number_and_app():
     return "DID and caller identity ownership plus application binding use public APIs"
 
 def reject_cross_org_did_ownership():
+    foreign_connection = api("POST", "/v1/carrier-connections/", {"provider_id":S["provider"]["id"], "name":"BYOC foreign tenant carrier", "inbound_enabled":True}, (201,), TOKEN_B)
     api("GET", f"/v1/numbers/{S['number']['id']}", expected=(404,), token=TOKEN_B)
+    api("PUT", f"/v1/numbers/{S['number']['id']}/carrier-connection", {"carrier_connection_id":foreign_connection["id"]}, (404,), TOKEN_B)
     owned = api("GET", f"/v1/numbers/{S['number']['id']}")
     if owned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("cross-organization request changed DID ownership")
-    return "tenant B cannot read tenant A DID ownership"
+    return "tenant B cannot read or reassign tenant A DID ownership"
 
 def outbound(label):
     call = api("POST", "/v1/calls/", {"application_id":S["app"]["id"], "trunk_id":S["trunk"]["id"], "from":CALLER, "to":DID}, (201,))
