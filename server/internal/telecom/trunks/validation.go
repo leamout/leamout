@@ -17,6 +17,9 @@ func validateID(id uuid.UUID, field string) error {
 
 func normalizeProvisioningMode(value ProvisioningMode) (ProvisioningMode, error) {
 	value = ProvisioningMode(strings.ToLower(strings.TrimSpace(string(value))))
+	if value == "" {
+		return ProvisioningModeBYOC, nil
+	}
 	if value != ProvisioningModeBYOC && value != ProvisioningModeManaged {
 		return "", apperror.NewBadRequest("type must be byoc or managed")
 	}
@@ -58,7 +61,6 @@ func normalizeHost(value string) (string, error) {
 			if (char < 'a' || char > 'z') && (char < '0' || char > '9') && char != '-' {
 				return "", apperror.NewBadRequest("host must be a valid IP address or hostname")
 			}
-		}
 	}
 	return value, nil
 }
