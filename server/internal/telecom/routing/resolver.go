@@ -64,11 +64,13 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if trunk.OrganizationID == nil || *trunk.OrganizationID != req.OrganizationID {
+	if trunk.OrganizationID == nil || *trunk.OrganizationID != req.OrganizationID ||
+		trunk.ProvisioningMode != "byoc" || trunk.CarrierConnectionID == nil {
 		return OutboundDecision{}, ErrNoRoute
 	}
+	connectionID := *trunk.CarrierConnectionID
 
-	connection, err := r.repo.GetCarrierConnection(ctx, req.OrganizationID, trunk.CarrierConnectionID)
+	connection, err := r.repo.GetCarrierConnection(ctx, req.OrganizationID, connectionID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return OutboundDecision{}, ErrNoRoute
@@ -86,7 +88,7 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if err := authorizeBYOCCallerIdentity(caller, req.OrganizationID, trunk.CarrierConnectionID); err != nil {
+	if err := authorizeBYOCCallerIdentity(caller, req.OrganizationID, connectionID); err != nil {
 		return OutboundDecision{}, err
 	}
 
@@ -102,10 +104,10 @@ func (r *Resolver) resolveBYOCOutbound(
 	if err != nil {
 		return OutboundDecision{}, err
 	}
-	r.recordEndpointSelection(ctx, trunk.CarrierConnectionID, trunk.ID, endpoint, endpoints)
+	r.recordEndpointSelection(ctx, connectionID, trunk.ID, endpoint, endpoints)
 	return OutboundDecision{
 		OrganizationID:      req.OrganizationID,
-		CarrierConnectionID: trunk.CarrierConnectionID,
+		CarrierConnectionID: connectionID,
 		TrunkID:             trunk.ID,
 		EndpointID:          endpoint.ID,
 		Host:                endpoint.Host,
