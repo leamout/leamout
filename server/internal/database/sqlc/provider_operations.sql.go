@@ -367,6 +367,28 @@ func (q *Queries) MarkProviderOperationAccepted(ctx context.Context, arg MarkPro
 	return i, err
 }
 
+const markProviderOperationFailed = `-- name: MarkProviderOperationFailed :exec
+UPDATE provider_operations
+SET
+    state = 'failed',
+    attempts = attempts + 1,
+    last_error = $1,
+    next_attempt_at = NULL,
+    completed_at = now()
+WHERE id = $2
+  AND state IN ('pending', 'provider_accepted')
+`
+
+type MarkProviderOperationFailedParams struct {
+	LastError *string   `db:"last_error" json:"last_error"`
+	ID        uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) MarkProviderOperationFailed(ctx context.Context, arg MarkProviderOperationFailedParams) error {
+	_, err := q.db.Exec(ctx, markProviderOperationFailed, arg.LastError, arg.ID)
+	return err
+}
+
 const recordProviderOperationAttemptFailure = `-- name: RecordProviderOperationAttemptFailure :one
 UPDATE provider_operations
 SET
@@ -408,4 +430,24 @@ func (q *Queries) RecordProviderOperationAttemptFailure(ctx context.Context, arg
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const releaseProviderOperationAdvisoryLock = `-- name: ReleaseProviderOperationAdvisoryLock :exec
+SELECT pg_advisory_unlock(hashtextextended($1, 0))
+`
+
+func (q *Queries) ReleaseProviderOperationAdvisoryLock(ctx context.Context, operationID string) error {
+	_, err := q.db.Exec(ctx, releaseProviderOperationAdvisoryLock, operationID)
+	return err
+}
+
+const tryProviderOperationAdvisoryLock = `-- name: TryProviderOperationAdvisoryLock :one
+SELECT pg_try_advisory_lock(hashtextextended($1, 0))
+`
+
+func (q *Queries) TryProviderOperationAdvisoryLock(ctx context.Context, operationID string) (bool, error) {
+	row := q.db.QueryRow(ctx, tryProviderOperationAdvisoryLock, operationID)
+	var pg_try_advisory_lock bool
+	err := row.Scan(&pg_try_advisory_lock)
+	return pg_try_advisory_lock, err
 }

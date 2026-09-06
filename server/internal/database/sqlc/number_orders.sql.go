@@ -217,6 +217,28 @@ func (q *Queries) MarkNumberOrderCompleted(ctx context.Context, arg MarkNumberOr
 	return i, err
 }
 
+const markNumberOrderFailed = `-- name: MarkNumberOrderFailed :exec
+UPDATE number_orders
+SET
+    status = 'failed',
+    error_code = 'provider_order_failed',
+    error_message = $1
+WHERE id = $2
+  AND organization_id = $3
+  AND status IN ('pending', 'processing')
+`
+
+type MarkNumberOrderFailedParams struct {
+	ErrorMessage   *string   `db:"error_message" json:"error_message"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+func (q *Queries) MarkNumberOrderFailed(ctx context.Context, arg MarkNumberOrderFailedParams) error {
+	_, err := q.db.Exec(ctx, markNumberOrderFailed, arg.ErrorMessage, arg.ID, arg.OrganizationID)
+	return err
+}
+
 const markNumberOrderProcessing = `-- name: MarkNumberOrderProcessing :one
 UPDATE number_orders
 SET status = 'processing'
