@@ -391,6 +391,8 @@ def answer_inbound():
         _, ended = api("POST", f"/v1/calls/{call_id}/hangup", expected={200})
         if ended["state"] not in {"completed", "cancelled"}:
             raise AcceptanceError(f"inbound hangup state is {ended['state']}")
+        STATE["terminal_call_id"] = call_id
+        STATE["terminal_state"] = ended["state"]
         return f"inbound answer and hangup persisted {ended['state']}"
     finally:
         carrier_uuid = STATE.get("inbound_carrier_uuid")
@@ -499,6 +501,7 @@ def hangup_outbound():
     _, call = api("POST", f"/v1/calls/{STATE['call_id']}/hangup", expected={200})
     if call["state"] not in {"completed", "cancelled"}:
         raise AcceptanceError(f"hangup state is {call['state']}")
+    STATE["terminal_call_id"] = STATE["call_id"]
     STATE["terminal_state"] = call["state"]
     return f"outbound cleanup persisted {call['state']}"
 
@@ -561,7 +564,7 @@ def normalized_events():
 
 
 def query_call_state():
-    call = get_call(STATE["call_id"])
+    call = get_call(STATE["terminal_call_id"])
     if call["state"] != STATE["terminal_state"]:
         raise AcceptanceError("queried state does not match terminal mutation")
     if call["organization_id"] != ORG_ID:
