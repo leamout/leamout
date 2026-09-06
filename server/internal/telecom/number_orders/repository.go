@@ -102,11 +102,9 @@ func (r *Repository) Create(
 		return sqlc.NumberOrder{}, fmt.Errorf("encode provider operation request: %w", err)
 	}
 	orderID := order.ID
-	providerID := provider.ID
 	if _, err := queries.CreateNumberOrderProviderOperation(ctx, sqlc.CreateNumberOrderProviderOperationParams{
 		OrganizationID:    organizationID,
-		ExecutionTarget:   "direct",
-		CarrierProviderID: &providerID,
+		CarrierProviderID: provider.ID,
 		NumberOrderID:     &orderID,
 		IdempotencyKey:    "number-order:" + order.ID.String(),
 		Request:           request,
@@ -258,8 +256,8 @@ func (r *Repository) CompleteProviderOperation(
 	if operation.NumberOrderID == nil {
 		return fmt.Errorf("number order provider operation is missing number_order_id")
 	}
-	if operation.ExecutionTarget != "direct" || operation.CarrierProviderID == nil {
-		return fmt.Errorf("direct number order provider operation is missing carrier_provider_id")
+	if operation.CarrierProviderID == uuid.Nil {
+		return fmt.Errorf("number order provider operation is missing carrier_provider_id")
 	}
 
 	tx, err := r.db.Begin(ctx)
@@ -311,89 +309,7 @@ func (r *Repository) CompleteProviderOperation(
 		Response:           response,
 		ID:                 operation.ID,
 		OrganizationID:     operation.OrganizationID,
-		NumberOrderID:      operation.NumberOrderID,
-	}); err != nil {
-		return err
-	}
-	if _, err := queries.MarkNumberOrderCompleted(ctx, sqlc.MarkNumberOrderCompletedParams{
-		PhoneNumberID:  &phoneNumberID,
-		ID:             order.ID,
-		OrganizationID: order.OrganizationID,
-	}); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
-}
-
-func (r *Repository) CompleteTransitProviderOperation(
-	ctx context.Context,
-	operation sqlc.ProviderOperation,
-	selectionID string,
-	number string,
-	countryCode string,
-	managedResourceID string,
-	response []byte,
-) error {
-	if operation.NumberOrderID == nil {
-		return fmt.Errorf("transit number order provider operation is missing number_order_id")
-	}
-	if operation.ExecutionTarget != "transit" || operation.CarrierProviderID != nil {
-		return fmt.Errorf("transit number order provider operation has invalid execution target")
-	}
-	if managedResourceID == "" {
-		return fmt.Errorf("transit managed resource id is required")
-	}
-
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	queries := r.queries.WithTx(tx)
-
-	order, err := queries.LockNumberOrderForProviderOperation(ctx, sqlc.LockNumberOrderForProviderOperationParams{
-		ID:             *operation.NumberOrderID,
-		OrganizationID: operation.OrganizationID,
-		SelectionID:    selectionID,
-		Number:         number,
-		CountryCode:    countryCode,
-	})
-	if err != nil {
-		return err
-	}
-	if order.Status == "completed" {
-		return tx.Commit(ctx)
-	}
-	if order.Status == "pending" {
-		order, err = queries.MarkNumberOrderProcessing(ctx, sqlc.MarkNumberOrderProcessingParams{
-			ID:             order.ID,
-			OrganizationID: order.OrganizationID,
-		})
-		if err != nil {
-			return err
-		}
-	}
-
-	phoneNumber, err := queries.EnsureTransitManagedPhoneNumberForProviderOperation(ctx, sqlc.EnsureTransitManagedPhoneNumberForProviderOperationParams{
-		OrganizationID: operation.OrganizationID,
-		Number:         number,
-		CountryCode:    countryCode,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return fmt.Errorf("transit managed number conflicts with an existing phone number: %w", err)
-		}
-		return err
-	}
-
-	phoneNumberID := phoneNumber.ID
-	providerResourceID := managedResourceID
-	if _, err := queries.MarkNumberOrderProviderOperationSucceeded(ctx, sqlc.MarkNumberOrderProviderOperationSucceededParams{
-		ProviderResourceID: &providerResourceID,
-		PhoneNumberID:      &phoneNumberID,
-		Response:           response,
-		ID:                 operation.ID,
-		OrganizationID:     operation.OrganizationID,
+		CarrierProviderID:  operation.CarrierProviderID,
 		NumberOrderID:      operation.NumberOrderID,
 	}); err != nil {
 		return err
