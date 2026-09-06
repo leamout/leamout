@@ -906,6 +906,49 @@ func (q *Queries) ListPlatformCarrierConnections(ctx context.Context) ([]Carrier
 	return items, nil
 }
 
+const listProviderRoutingTargets = `-- name: ListProviderRoutingTargets :many
+SELECT
+    cc.id AS carrier_connection_id,
+    resource.provider_resource_id
+FROM carrier_connections AS cc
+JOIN carrier_connection_provider_resources AS resource
+  ON resource.carrier_connection_id = cc.id
+ AND resource.provider_id = cc.provider_id
+ AND resource.resource_type = 'voice_in_trunk'
+WHERE cc.provider_id = $1
+  AND cc.scope = 'platform'
+  AND cc.organization_id IS NULL
+  AND cc.status = 'active'
+  AND cc.inbound_enabled = true
+ORDER BY cc.created_at ASC
+LIMIT 2
+`
+
+type ListProviderRoutingTargetsRow struct {
+	CarrierConnectionID uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderResourceID  string    `db:"provider_resource_id" json:"provider_resource_id"`
+}
+
+func (q *Queries) ListProviderRoutingTargets(ctx context.Context, providerID uuid.UUID) ([]ListProviderRoutingTargetsRow, error) {
+	rows, err := q.db.Query(ctx, listProviderRoutingTargets, providerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListProviderRoutingTargetsRow{}
+	for rows.Next() {
+		var i ListProviderRoutingTargetsRow
+		if err := rows.Scan(&i.CarrierConnectionID, &i.ProviderResourceID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const resolveCarrierConnectionBySourceIP = `-- name: ResolveCarrierConnectionBySourceIP :one
 SELECT cc.id, cc.organization_id, cc.provider_id, cc.scope, cc.name, cc.status, cc.outbound_auth_method, cc.auth_username, cc.auth_secret_ciphertext, cc.inbound_enabled, cc.inbound_auth_method, cc.inbound_username, cc.inbound_secret_ciphertext, cc.max_cps, cc.max_concurrent_calls, cc.max_daily_minutes, cc.codecs, cc.supports_video, cc.supports_fax, cc.created_at, cc.updated_at
 FROM carrier_connection_source_ips AS src
