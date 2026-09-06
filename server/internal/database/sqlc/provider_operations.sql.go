@@ -14,6 +14,7 @@ import (
 const createNumberOrderProviderOperation = `-- name: CreateNumberOrderProviderOperation :one
 INSERT INTO provider_operations (
     organization_id,
+    execution_target,
     carrier_provider_id,
     operation_type,
     number_order_id,
@@ -23,22 +24,25 @@ INSERT INTO provider_operations (
 VALUES (
     $1,
     $2,
-    'number_order',
     $3,
+    'number_order',
     $4,
-    $5
+    $5,
+    $6
 )
-ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
+ON CONFLICT (organization_id, execution_target, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
 WHERE provider_operations.operation_type = EXCLUDED.operation_type
   AND provider_operations.number_order_id = EXCLUDED.number_order_id
+  AND provider_operations.carrier_provider_id IS NOT DISTINCT FROM EXCLUDED.carrier_provider_id
   AND provider_operations.request = EXCLUDED.request
-RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
 type CreateNumberOrderProviderOperationParams struct {
 	OrganizationID    uuid.UUID  `db:"organization_id" json:"organization_id"`
-	CarrierProviderID uuid.UUID  `db:"carrier_provider_id" json:"carrier_provider_id"`
+	ExecutionTarget   string     `db:"execution_target" json:"execution_target"`
+	CarrierProviderID *uuid.UUID `db:"carrier_provider_id" json:"carrier_provider_id"`
 	NumberOrderID     *uuid.UUID `db:"number_order_id" json:"number_order_id"`
 	IdempotencyKey    string     `db:"idempotency_key" json:"idempotency_key"`
 	Request           []byte     `db:"request" json:"request"`
@@ -47,6 +51,7 @@ type CreateNumberOrderProviderOperationParams struct {
 func (q *Queries) CreateNumberOrderProviderOperation(ctx context.Context, arg CreateNumberOrderProviderOperationParams) (ProviderOperation, error) {
 	row := q.db.QueryRow(ctx, createNumberOrderProviderOperation,
 		arg.OrganizationID,
+		arg.ExecutionTarget,
 		arg.CarrierProviderID,
 		arg.NumberOrderID,
 		arg.IdempotencyKey,
@@ -56,6 +61,7 @@ func (q *Queries) CreateNumberOrderProviderOperation(ctx context.Context, arg Cr
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.ExecutionTarget,
 		&i.CarrierProviderID,
 		&i.OperationType,
 		&i.NumberOrderID,
@@ -79,6 +85,7 @@ func (q *Queries) CreateNumberOrderProviderOperation(ctx context.Context, arg Cr
 const createNumberReleaseProviderOperation = `-- name: CreateNumberReleaseProviderOperation :one
 INSERT INTO provider_operations (
     organization_id,
+    execution_target,
     carrier_provider_id,
     operation_type,
     idempotency_key,
@@ -88,6 +95,7 @@ INSERT INTO provider_operations (
 )
 SELECT
     $1,
+    'direct',
     $2,
     'number_release',
     $3,
@@ -101,22 +109,23 @@ WHERE pn.id = $6
   AND pn.provider_resource_id = $5
   AND pn.provisioning_mode = 'managed'
   AND pn.status IN ('active', 'disabled')
-ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
+ON CONFLICT (organization_id, execution_target, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
 WHERE provider_operations.operation_type = EXCLUDED.operation_type
   AND provider_operations.phone_number_id = EXCLUDED.phone_number_id
+  AND provider_operations.carrier_provider_id = EXCLUDED.carrier_provider_id
   AND provider_operations.provider_resource_id = EXCLUDED.provider_resource_id
   AND provider_operations.request = EXCLUDED.request
-RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
 type CreateNumberReleaseProviderOperationParams struct {
-	OrganizationID     uuid.UUID `db:"organization_id" json:"organization_id"`
-	CarrierProviderID  uuid.UUID `db:"carrier_provider_id" json:"carrier_provider_id"`
-	IdempotencyKey     string    `db:"idempotency_key" json:"idempotency_key"`
-	Request            []byte    `db:"request" json:"request"`
-	ProviderResourceID *string   `db:"provider_resource_id" json:"provider_resource_id"`
-	PhoneNumberID      uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
+	OrganizationID     uuid.UUID  `db:"organization_id" json:"organization_id"`
+	CarrierProviderID  *uuid.UUID `db:"carrier_provider_id" json:"carrier_provider_id"`
+	IdempotencyKey     string     `db:"idempotency_key" json:"idempotency_key"`
+	Request            []byte     `db:"request" json:"request"`
+	ProviderResourceID *string    `db:"provider_resource_id" json:"provider_resource_id"`
+	PhoneNumberID      uuid.UUID  `db:"phone_number_id" json:"phone_number_id"`
 }
 
 func (q *Queries) CreateNumberReleaseProviderOperation(ctx context.Context, arg CreateNumberReleaseProviderOperationParams) (ProviderOperation, error) {
@@ -132,6 +141,7 @@ func (q *Queries) CreateNumberReleaseProviderOperation(ctx context.Context, arg 
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.ExecutionTarget,
 		&i.CarrierProviderID,
 		&i.OperationType,
 		&i.NumberOrderID,
@@ -153,7 +163,7 @@ func (q *Queries) CreateNumberReleaseProviderOperation(ctx context.Context, arg 
 }
 
 const listProviderOperationsReadyForRetry = `-- name: ListProviderOperationsReadyForRetry :many
-SELECT id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+SELECT id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 FROM provider_operations
 WHERE state IN ('pending', 'provider_accepted')
   AND next_attempt_at IS NOT NULL
@@ -174,6 +184,7 @@ func (q *Queries) ListProviderOperationsReadyForRetry(ctx context.Context, limit
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,
+			&i.ExecutionTarget,
 			&i.CarrierProviderID,
 			&i.OperationType,
 			&i.NumberOrderID,
@@ -213,11 +224,10 @@ SET
     next_attempt_at = NULL
 WHERE id = $4
   AND organization_id = $5
-  AND carrier_provider_id = $6
   AND operation_type = 'number_order'
-  AND number_order_id = $7
+  AND number_order_id = $6
   AND state = 'provider_accepted'
-RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
 type MarkNumberOrderProviderOperationSucceededParams struct {
@@ -226,7 +236,6 @@ type MarkNumberOrderProviderOperationSucceededParams struct {
 	Response           []byte     `db:"response" json:"response"`
 	ID                 uuid.UUID  `db:"id" json:"id"`
 	OrganizationID     uuid.UUID  `db:"organization_id" json:"organization_id"`
-	CarrierProviderID  uuid.UUID  `db:"carrier_provider_id" json:"carrier_provider_id"`
 	NumberOrderID      *uuid.UUID `db:"number_order_id" json:"number_order_id"`
 }
 
@@ -237,13 +246,13 @@ func (q *Queries) MarkNumberOrderProviderOperationSucceeded(ctx context.Context,
 		arg.Response,
 		arg.ID,
 		arg.OrganizationID,
-		arg.CarrierProviderID,
 		arg.NumberOrderID,
 	)
 	var i ProviderOperation
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.ExecutionTarget,
 		&i.CarrierProviderID,
 		&i.OperationType,
 		&i.NumberOrderID,
@@ -275,7 +284,7 @@ WHERE id = $1
   AND phone_number_id = $2
   AND operation_type = 'number_release'
   AND state IN ('pending', 'provider_accepted')
-RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
 type MarkNumberReleaseProviderOperationSucceededParams struct {
@@ -289,6 +298,7 @@ func (q *Queries) MarkNumberReleaseProviderOperationSucceeded(ctx context.Contex
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.ExecutionTarget,
 		&i.CarrierProviderID,
 		&i.OperationType,
 		&i.NumberOrderID,
@@ -321,7 +331,7 @@ SET
 WHERE id = $3
   AND operation_type = 'number_order'
   AND state = 'pending'
-RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
 type MarkProviderOperationAcceptedParams struct {
@@ -336,6 +346,7 @@ func (q *Queries) MarkProviderOperationAccepted(ctx context.Context, arg MarkPro
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.ExecutionTarget,
 		&i.CarrierProviderID,
 		&i.OperationType,
 		&i.NumberOrderID,
@@ -364,7 +375,7 @@ SET
     next_attempt_at = now() + interval '5 minutes'
 WHERE id = $2
   AND state IN ('pending', 'provider_accepted')
-RETURNING id, organization_id, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
+RETURNING id, organization_id, execution_target, carrier_provider_id, operation_type, number_order_id, phone_number_id, idempotency_key, state, provider_operation_id, provider_resource_id, request, response, attempts, last_error, next_attempt_at, completed_at, created_at, updated_at
 `
 
 type RecordProviderOperationAttemptFailureParams struct {
@@ -378,6 +389,7 @@ func (q *Queries) RecordProviderOperationAttemptFailure(ctx context.Context, arg
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
+		&i.ExecutionTarget,
 		&i.CarrierProviderID,
 		&i.OperationType,
 		&i.NumberOrderID,
