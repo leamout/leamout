@@ -279,7 +279,7 @@ type Meter struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Customer-visible managed-number acquisition intent. Upstream provider or Transit execution details live in provider_operations.
+// Customer-visible managed-number acquisition intent. Upstream provider execution details live in provider_operations.
 type NumberOrder struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -477,12 +477,11 @@ type ProviderCdr struct {
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-// Internal durable journal for Managed Carrier side effects. execution_target chooses local provider execution or Leamout Transit without coupling that choice to hosting mode.
+// Internal durable journal for external provider side effects. Customer number-order intent remains provider-neutral.
 type ProviderOperation struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ExecutionTarget     string             `db:"execution_target" json:"execution_target"`
-	CarrierProviderID   *uuid.UUID         `db:"carrier_provider_id" json:"carrier_provider_id"`
+	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
 	OperationType       string             `db:"operation_type" json:"operation_type"`
 	NumberOrderID       *uuid.UUID         `db:"number_order_id" json:"number_order_id"`
 	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
