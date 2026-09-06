@@ -18,11 +18,11 @@ const (
 )
 
 type CreateRequest struct {
-	Type                ProvisioningMode       `json:"type"`
-	CarrierConnectionID *uuid.UUID             `json:"carrier_connection_id,omitempty"`
-	Name                string                 `json:"name"`
-	Direction           *string                `json:"direction,omitempty"`
-	Status              *string                `json:"status,omitempty"`
+	Type                ProvisioningMode        `json:"type"`
+	CarrierConnectionID *uuid.UUID              `json:"carrier_connection_id,omitempty"`
+	Name                string                  `json:"name"`
+	Direction           *string                 `json:"direction,omitempty"`
+	Status              *string                 `json:"status,omitempty"`
 	SIP                 *ManagedSIPInstallation `json:"sip,omitempty"`
 }
 
@@ -144,11 +144,15 @@ type EndpointResponse struct {
 }
 
 func response(trunk sqlc.Trunk) Response {
+	carrierConnectionID := trunk.CarrierConnectionID
+	if ProvisioningMode(trunk.ProvisioningMode) == ProvisioningModeManaged {
+		carrierConnectionID = nil
+	}
 	return Response{
 		ID:                  trunk.ID,
 		OrganizationID:      trunk.OrganizationID,
 		Type:                ProvisioningMode(trunk.ProvisioningMode),
-		CarrierConnectionID: trunk.CarrierConnectionID,
+		CarrierConnectionID: carrierConnectionID,
 		Name:                trunk.Name,
 		Direction:           trunk.Direction,
 		Status:              trunk.Status,
