@@ -38,9 +38,12 @@ func (s *Service) Create(
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return sqlc.Trunk{}, err
 	}
-	if err := validateID(req.CarrierConnectionID, "carrier_connection_id"); err != nil {
+
+	mode, err := normalizeProvisioningMode(req.Type)
+	if err != nil {
 		return sqlc.Trunk{}, err
 	}
+	req.Type = mode
 
 	name, err := normalizeName(req.Name)
 	if err != nil {
@@ -63,10 +66,25 @@ func (s *Service) Create(
 		req.Status = &value
 	}
 
+	switch mode {
+	case ProvisioningModeManaged:
+		if req.CarrierConnectionID != nil {
+			return sqlc.Trunk{}, apperror.NewBadRequest("carrier_connection_id is only valid for BYOC trunks")
+		}
+		return sqlc.Trunk{}, apperror.NewServiceUnavailable("managed trunk provisioning is not available yet", nil)
+	case ProvisioningModeBYOC:
+		if req.CarrierConnectionID == nil {
+			return sqlc.Trunk{}, apperror.NewBadRequest("carrier_connection_id is required for BYOC trunks")
+		}
+		if err := validateID(*req.CarrierConnectionID, "carrier_connection_id"); err != nil {
+			return sqlc.Trunk{}, err
+		}
+	}
+
 	item, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
 		return repo.Create(ctx, sqlc.CreateTrunkParams{
 			OrganizationID:      &organizationID,
-			CarrierConnectionID: req.CarrierConnectionID,
+			CarrierConnectionID: *req.CarrierConnectionID,
 			Name:                name,
 			Direction:           req.Direction,
 			Status:              req.Status,
@@ -169,7 +187,7 @@ func (s *Service) CreateEndpoint(
 	trunkID uuid.UUID,
 	req EndpointCreateRequest,
 ) (sqlc.TrunkEndpoint, error) {
-	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
+	if _, err := s.requireBYOCTrunk(ctx, organizationID, trunkID); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
 
@@ -236,7 +254,7 @@ func (s *Service) ListEndpoints(
 	organizationID uuid.UUID,
 	trunkID uuid.UUID,
 ) ([]sqlc.TrunkEndpoint, error) {
-	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
+	if _, err := s.requireBYOCTrunk(ctx, organizationID, trunkID); err != nil {
 		return nil, err
 	}
 
@@ -253,7 +271,7 @@ func (s *Service) GetEndpoint(
 	trunkID uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.TrunkEndpoint, error) {
-	if _, err := s.Get(ctx, organizationID, trunkID); err != nil {
+	if _, err := s.requireBYOCTrunk(ctx, organizationID, trunkID); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
 	if err := validateID(id, "endpoint id"); err != nil {
@@ -364,6 +382,17 @@ func (s *Service) DeleteEndpoint(
 		},
 	)
 	return writeError(err, "trunk endpoint", "trunk endpoint not found")
+}
+
+func (s *Service) requireBYOCTrunk(ctx context.Context, organizationID, trunkID uuid.UUID) (sqlc.Trunk, error) {
+	item, err := s.Get(ctx, organizationID, trunkID)
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+	if ProvisioningMode(item.ProvisioningMode) != ProvisioningModeBYOC {
+		return sqlc.Trunk{}, apperror.NewConflict("managed trunk endpoints are platform-managed")
+	}
+	return item, nil
 }
 
 func (s *Service) mutateTrunk(
