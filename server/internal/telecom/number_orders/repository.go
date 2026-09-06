@@ -79,18 +79,17 @@ func (r *Repository) Create(
 	}
 
 	order, err := queries.CreateNumberOrder(ctx, sqlc.CreateNumberOrderParams{
-		OrganizationID:      organizationID,
-		ProviderInventoryID: selection.ProviderInventoryID,
-		ProviderProductID:   selection.ProviderProductID,
-		Number:              selection.Number,
-		CountryCode:         selection.CountryCode,
-		ProviderID:          provider.ID,
+		OrganizationID: organizationID,
+		SelectionID:    selectionID,
+		Number:         selection.Number,
+		CountryCode:    selection.CountryCode,
 	})
 	if err != nil {
 		return sqlc.NumberOrder{}, err
 	}
 
 	request, err := json.Marshal(ProviderOperationRequest{
+		SelectionID:               selectionID,
 		Provider:                  selection.Provider,
 		ProviderInventoryID:       selection.ProviderInventoryID,
 		ProviderProductID:         selection.ProviderProductID,
@@ -103,9 +102,11 @@ func (r *Repository) Create(
 		return sqlc.NumberOrder{}, fmt.Errorf("encode provider operation request: %w", err)
 	}
 	orderID := order.ID
+	providerID := provider.ID
 	if _, err := queries.CreateNumberOrderProviderOperation(ctx, sqlc.CreateNumberOrderProviderOperationParams{
 		OrganizationID:    organizationID,
-		CarrierProviderID: provider.ID,
+		ExecutionTarget:   "direct",
+		CarrierProviderID: &providerID,
 		NumberOrderID:     &orderID,
 		IdempotencyKey:    "number-order:" + order.ID.String(),
 		Request:           request,
@@ -221,7 +222,6 @@ func (r *Repository) MarkNumberOrderProcessing(ctx context.Context, operation sq
 	_, err := r.queries.MarkNumberOrderProcessing(ctx, sqlc.MarkNumberOrderProcessingParams{
 		ID:             *operation.NumberOrderID,
 		OrganizationID: operation.OrganizationID,
-		ProviderID:     operation.CarrierProviderID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
@@ -290,6 +290,9 @@ func (r *Repository) CompleteProviderOperation(
 	if operation.NumberOrderID == nil {
 		return fmt.Errorf("number order provider operation is missing number_order_id")
 	}
+	if operation.ExecutionTarget != "direct" || operation.CarrierProviderID == nil {
+		return fmt.Errorf("direct number order provider operation is missing carrier_provider_id")
+	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
@@ -299,13 +302,11 @@ func (r *Repository) CompleteProviderOperation(
 	queries := r.queries.WithTx(tx)
 
 	order, err := queries.LockNumberOrderForProviderOperation(ctx, sqlc.LockNumberOrderForProviderOperationParams{
-		ID:                  *operation.NumberOrderID,
-		OrganizationID:      operation.OrganizationID,
-		ProviderID:          operation.CarrierProviderID,
-		ProviderInventoryID: request.ProviderInventoryID,
-		ProviderProductID:   request.ProviderProductID,
-		Number:              request.Number,
-		CountryCode:         request.CountryCode,
+		ID:             *operation.NumberOrderID,
+		OrganizationID: operation.OrganizationID,
+		SelectionID:    request.SelectionID,
+		Number:         request.Number,
+		CountryCode:    request.CountryCode,
 	})
 	if err != nil {
 		return err
@@ -317,19 +318,17 @@ func (r *Repository) CompleteProviderOperation(
 		order, err = queries.MarkNumberOrderProcessing(ctx, sqlc.MarkNumberOrderProcessingParams{
 			ID:             order.ID,
 			OrganizationID: order.OrganizationID,
-			ProviderID:     order.ProviderID,
 		})
 		if err != nil {
 			return err
 		}
 	}
 
-	providerID := operation.CarrierProviderID
 	phoneNumber, err := queries.EnsureManagedPhoneNumberForProviderOperation(ctx, sqlc.EnsureManagedPhoneNumberForProviderOperationParams{
 		OrganizationID:      operation.OrganizationID,
 		Number:              request.Number,
 		CountryCode:         request.CountryCode,
-		ProviderID:          &providerID,
+		ProviderID:          operation.CarrierProviderID,
 		ProviderResourceID:  &providerResourceID,
 		CarrierConnectionID: request.CarrierConnectionID,
 	})
@@ -344,7 +343,6 @@ func (r *Repository) CompleteProviderOperation(
 		Response:           response,
 		ID:                 operation.ID,
 		OrganizationID:     operation.OrganizationID,
-		CarrierProviderID:  operation.CarrierProviderID,
 		NumberOrderID:      operation.NumberOrderID,
 	}); err != nil {
 		return err
@@ -353,7 +351,6 @@ func (r *Repository) CompleteProviderOperation(
 		PhoneNumberID:  &phoneNumberID,
 		ID:             order.ID,
 		OrganizationID: order.OrganizationID,
-		ProviderID:     order.ProviderID,
 	}); err != nil {
 		return err
 	}

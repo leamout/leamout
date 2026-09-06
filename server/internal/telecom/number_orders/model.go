@@ -35,7 +35,11 @@ type Response struct {
 	UpdatedAt     time.Time   `json:"updated_at"`
 }
 
+// ProviderOperationRequest is the internal request used by direct managed-
+// provider execution. Provider inventory, product, and routing identifiers stay
+// in the durable operation journal rather than the customer number_orders row.
 type ProviderOperationRequest struct {
+	SelectionID               string    `json:"selection_id"`
 	Provider                  string    `json:"provider"`
 	ProviderInventoryID       string    `json:"available_did_id"`
 	ProviderProductID         string    `json:"sku_id"`

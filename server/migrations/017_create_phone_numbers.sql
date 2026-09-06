@@ -15,6 +15,10 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
+    CONSTRAINT uq_phone_numbers_id_org UNIQUE (
+        id,
+        organization_id
+    ),
     CONSTRAINT uq_phone_numbers_id_org_provider UNIQUE (
         id,
         organization_id,

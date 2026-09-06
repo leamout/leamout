@@ -14,54 +14,41 @@ import (
 const createNumberOrder = `-- name: CreateNumberOrder :one
 INSERT INTO number_orders (
     organization_id,
-    provider_id,
-    provider_inventory_id,
-    provider_product_id,
+    selection_id,
     number,
     country_code
 )
 SELECT
     $1,
-    cp.id,
     $2,
     $3,
-    $4,
-    $5
+    $4
 FROM organizations AS o
-JOIN carrier_providers AS cp
-  ON cp.id = $6
- AND cp.status = 'active'
 WHERE o.id = $1
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING number_orders.id, number_orders.organization_id, number_orders.provider_id, number_orders.provider_inventory_id, number_orders.provider_product_id, number_orders.number, number_orders.country_code, number_orders.status, number_orders.phone_number_id, number_orders.error_code, number_orders.error_message, number_orders.created_at, number_orders.updated_at
+RETURNING number_orders.id, number_orders.organization_id, number_orders.selection_id, number_orders.number, number_orders.country_code, number_orders.status, number_orders.phone_number_id, number_orders.error_code, number_orders.error_message, number_orders.created_at, number_orders.updated_at
 `
 
 type CreateNumberOrderParams struct {
-	OrganizationID      uuid.UUID `db:"organization_id" json:"organization_id"`
-	ProviderInventoryID string    `db:"provider_inventory_id" json:"provider_inventory_id"`
-	ProviderProductID   string    `db:"provider_product_id" json:"provider_product_id"`
-	Number              string    `db:"number" json:"number"`
-	CountryCode         string    `db:"country_code" json:"country_code"`
-	ProviderID          uuid.UUID `db:"provider_id" json:"provider_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	SelectionID    string    `db:"selection_id" json:"selection_id"`
+	Number         string    `db:"number" json:"number"`
+	CountryCode    string    `db:"country_code" json:"country_code"`
 }
 
 func (q *Queries) CreateNumberOrder(ctx context.Context, arg CreateNumberOrderParams) (NumberOrder, error) {
 	row := q.db.QueryRow(ctx, createNumberOrder,
 		arg.OrganizationID,
-		arg.ProviderInventoryID,
-		arg.ProviderProductID,
+		arg.SelectionID,
 		arg.Number,
 		arg.CountryCode,
-		arg.ProviderID,
 	)
 	var i NumberOrder
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
+		&i.SelectionID,
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
@@ -75,7 +62,7 @@ func (q *Queries) CreateNumberOrder(ctx context.Context, arg CreateNumberOrderPa
 }
 
 const getNumberOrderByID = `-- name: GetNumberOrderByID :one
-SELECT no.id, no.organization_id, no.provider_id, no.provider_inventory_id, no.provider_product_id, no.number, no.country_code, no.status, no.phone_number_id, no.error_code, no.error_message, no.created_at, no.updated_at
+SELECT no.id, no.organization_id, no.selection_id, no.number, no.country_code, no.status, no.phone_number_id, no.error_code, no.error_message, no.created_at, no.updated_at
 FROM number_orders AS no
 JOIN organizations AS o ON o.id = no.organization_id
 WHERE no.id = $1
@@ -96,9 +83,7 @@ func (q *Queries) GetNumberOrderByID(ctx context.Context, arg GetNumberOrderByID
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
+		&i.SelectionID,
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
@@ -112,7 +97,7 @@ func (q *Queries) GetNumberOrderByID(ctx context.Context, arg GetNumberOrderByID
 }
 
 const listNumberOrdersByOrganizationID = `-- name: ListNumberOrdersByOrganizationID :many
-SELECT no.id, no.organization_id, no.provider_id, no.provider_inventory_id, no.provider_product_id, no.number, no.country_code, no.status, no.phone_number_id, no.error_code, no.error_message, no.created_at, no.updated_at
+SELECT no.id, no.organization_id, no.selection_id, no.number, no.country_code, no.status, no.phone_number_id, no.error_code, no.error_message, no.created_at, no.updated_at
 FROM number_orders AS no
 WHERE no.organization_id = $1
 ORDER BY no.created_at DESC
@@ -130,9 +115,7 @@ func (q *Queries) ListNumberOrdersByOrganizationID(ctx context.Context, organiza
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,
-			&i.ProviderID,
-			&i.ProviderInventoryID,
-			&i.ProviderProductID,
+			&i.SelectionID,
 			&i.Number,
 			&i.CountryCode,
 			&i.Status,
@@ -153,35 +136,29 @@ func (q *Queries) ListNumberOrdersByOrganizationID(ctx context.Context, organiza
 }
 
 const lockNumberOrderForProviderOperation = `-- name: LockNumberOrderForProviderOperation :one
-SELECT id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
+SELECT id, organization_id, selection_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
 FROM number_orders
 WHERE id = $1
   AND organization_id = $2
-  AND provider_id = $3
-  AND provider_inventory_id = $4
-  AND provider_product_id = $5
-  AND number = $6
-  AND country_code = $7
+  AND selection_id = $3
+  AND number = $4
+  AND country_code = $5
 FOR UPDATE
 `
 
 type LockNumberOrderForProviderOperationParams struct {
-	ID                  uuid.UUID `db:"id" json:"id"`
-	OrganizationID      uuid.UUID `db:"organization_id" json:"organization_id"`
-	ProviderID          uuid.UUID `db:"provider_id" json:"provider_id"`
-	ProviderInventoryID string    `db:"provider_inventory_id" json:"provider_inventory_id"`
-	ProviderProductID   string    `db:"provider_product_id" json:"provider_product_id"`
-	Number              string    `db:"number" json:"number"`
-	CountryCode         string    `db:"country_code" json:"country_code"`
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	SelectionID    string    `db:"selection_id" json:"selection_id"`
+	Number         string    `db:"number" json:"number"`
+	CountryCode    string    `db:"country_code" json:"country_code"`
 }
 
 func (q *Queries) LockNumberOrderForProviderOperation(ctx context.Context, arg LockNumberOrderForProviderOperationParams) (NumberOrder, error) {
 	row := q.db.QueryRow(ctx, lockNumberOrderForProviderOperation,
 		arg.ID,
 		arg.OrganizationID,
-		arg.ProviderID,
-		arg.ProviderInventoryID,
-		arg.ProviderProductID,
+		arg.SelectionID,
 		arg.Number,
 		arg.CountryCode,
 	)
@@ -189,9 +166,7 @@ func (q *Queries) LockNumberOrderForProviderOperation(ctx context.Context, arg L
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
+		&i.SelectionID,
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
@@ -213,32 +188,23 @@ SET
     error_message = NULL
 WHERE id = $2
   AND organization_id = $3
-  AND provider_id = $4
   AND status = 'processing'
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
+RETURNING id, organization_id, selection_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
 `
 
 type MarkNumberOrderCompletedParams struct {
 	PhoneNumberID  *uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
 	ID             uuid.UUID  `db:"id" json:"id"`
 	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
-	ProviderID     uuid.UUID  `db:"provider_id" json:"provider_id"`
 }
 
 func (q *Queries) MarkNumberOrderCompleted(ctx context.Context, arg MarkNumberOrderCompletedParams) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderCompleted,
-		arg.PhoneNumberID,
-		arg.ID,
-		arg.OrganizationID,
-		arg.ProviderID,
-	)
+	row := q.db.QueryRow(ctx, markNumberOrderCompleted, arg.PhoneNumberID, arg.ID, arg.OrganizationID)
 	var i NumberOrder
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
+		&i.SelectionID,
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,
@@ -256,26 +222,22 @@ UPDATE number_orders
 SET status = 'processing'
 WHERE id = $1
   AND organization_id = $2
-  AND provider_id = $3
   AND status = 'pending'
-RETURNING id, organization_id, provider_id, provider_inventory_id, provider_product_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
+RETURNING id, organization_id, selection_id, number, country_code, status, phone_number_id, error_code, error_message, created_at, updated_at
 `
 
 type MarkNumberOrderProcessingParams struct {
 	ID             uuid.UUID `db:"id" json:"id"`
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	ProviderID     uuid.UUID `db:"provider_id" json:"provider_id"`
 }
 
 func (q *Queries) MarkNumberOrderProcessing(ctx context.Context, arg MarkNumberOrderProcessingParams) (NumberOrder, error) {
-	row := q.db.QueryRow(ctx, markNumberOrderProcessing, arg.ID, arg.OrganizationID, arg.ProviderID)
+	row := q.db.QueryRow(ctx, markNumberOrderProcessing, arg.ID, arg.OrganizationID)
 	var i NumberOrder
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.ProviderID,
-		&i.ProviderInventoryID,
-		&i.ProviderProductID,
+		&i.SelectionID,
 		&i.Number,
 		&i.CountryCode,
 		&i.Status,

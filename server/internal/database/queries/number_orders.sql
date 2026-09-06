@@ -1,23 +1,16 @@
 -- name: CreateNumberOrder :one
 INSERT INTO number_orders (
     organization_id,
-    provider_id,
-    provider_inventory_id,
-    provider_product_id,
+    selection_id,
     number,
     country_code
 )
 SELECT
     sqlc.arg(organization_id),
-    cp.id,
-    sqlc.arg(provider_inventory_id),
-    sqlc.arg(provider_product_id),
+    sqlc.arg(selection_id),
     sqlc.arg(number),
     sqlc.arg(country_code)
 FROM organizations AS o
-JOIN carrier_providers AS cp
-  ON cp.id = sqlc.arg(provider_id)
- AND cp.status = 'active'
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
@@ -44,9 +37,7 @@ SELECT *
 FROM number_orders
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND provider_id = sqlc.arg(provider_id)
-  AND provider_inventory_id = sqlc.arg(provider_inventory_id)
-  AND provider_product_id = sqlc.arg(provider_product_id)
+  AND selection_id = sqlc.arg(selection_id)
   AND number = sqlc.arg(number)
   AND country_code = sqlc.arg(country_code)
 FOR UPDATE;
@@ -56,7 +47,6 @@ UPDATE number_orders
 SET status = 'processing'
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND provider_id = sqlc.arg(provider_id)
   AND status = 'pending'
 RETURNING *;
 
@@ -69,6 +59,5 @@ SET
     error_message = NULL
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND provider_id = sqlc.arg(provider_id)
   AND status = 'processing'
 RETURNING *;

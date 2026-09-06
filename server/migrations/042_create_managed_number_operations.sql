@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS provider_operations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
-    carrier_provider_id UUID NOT NULL REFERENCES carrier_providers(id) ON DELETE RESTRICT,
+
+    execution_target TEXT NOT NULL,
+    carrier_provider_id UUID REFERENCES carrier_providers(id) ON DELETE RESTRICT,
 
     operation_type TEXT NOT NULL,
     number_order_id UUID,
@@ -26,17 +28,30 @@ CREATE TABLE IF NOT EXISTS provider_operations (
 
     CONSTRAINT uq_provider_operations_idempotency UNIQUE (
         organization_id,
-        carrier_provider_id,
+        execution_target,
         idempotency_key
     ),
     CONSTRAINT fk_provider_operations_number_order
-        FOREIGN KEY (number_order_id, organization_id, carrier_provider_id)
-        REFERENCES number_orders (id, organization_id, provider_id)
+        FOREIGN KEY (number_order_id, organization_id)
+        REFERENCES number_orders (id, organization_id)
         ON DELETE RESTRICT,
     CONSTRAINT fk_provider_operations_phone_number
-        FOREIGN KEY (phone_number_id, organization_id, carrier_provider_id)
-        REFERENCES phone_numbers (id, organization_id, provider_id)
+        FOREIGN KEY (phone_number_id, organization_id)
+        REFERENCES phone_numbers (id, organization_id)
         ON DELETE RESTRICT,
+    CONSTRAINT chk_provider_operations_execution_target CHECK (
+        execution_target IN ('direct', 'transit')
+    ),
+    CONSTRAINT chk_provider_operations_provider_target CHECK (
+        (
+            execution_target = 'direct'
+            AND carrier_provider_id IS NOT NULL
+        )
+        OR (
+            execution_target = 'transit'
+            AND carrier_provider_id IS NULL
+        )
+    ),
     CONSTRAINT chk_provider_operations_type CHECK (
         operation_type IN ('number_order', 'number_release', 'number_reconcile')
     ),
@@ -99,24 +114,36 @@ CREATE TABLE IF NOT EXISTS provider_operations (
 );
 
 COMMENT ON TABLE provider_operations IS
-    'Internal durable journal for external provider side effects. Number acquisition operations link directly to number_orders.';
+    'Internal durable journal for Managed Carrier side effects. execution_target chooses local provider execution or Leamout Transit without coupling that choice to hosting mode.';
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_operations_number_order
     ON provider_operations (number_order_id)
     WHERE operation_type = 'number_order';
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_operations_provider_operation
+CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_operations_direct_provider_operation
     ON provider_operations (carrier_provider_id, provider_operation_id)
-    WHERE provider_operation_id IS NOT NULL;
+    WHERE execution_target = 'direct'
+      AND provider_operation_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_provider_operations_transit_operation
+    ON provider_operations (provider_operation_id)
+    WHERE execution_target = 'transit'
+      AND provider_operation_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_provider_operations_retry
     ON provider_operations (next_attempt_at, created_at)
     WHERE state IN ('pending', 'provider_accepted')
       AND next_attempt_at IS NOT NULL;
 
-CREATE INDEX IF NOT EXISTS idx_provider_operations_resource
+CREATE INDEX IF NOT EXISTS idx_provider_operations_direct_resource
     ON provider_operations (carrier_provider_id, provider_resource_id)
-    WHERE provider_resource_id IS NOT NULL;
+    WHERE execution_target = 'direct'
+      AND provider_resource_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_provider_operations_transit_resource
+    ON provider_operations (provider_resource_id)
+    WHERE execution_target = 'transit'
+      AND provider_resource_id IS NOT NULL;
 
 CREATE TRIGGER set_provider_operations_updated_at
 BEFORE UPDATE ON provider_operations
