@@ -31,6 +31,24 @@ type Client struct {
 	httpClient   *http.Client
 }
 
+type HTTPError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("transit returned %d: %s", e.StatusCode, e.Message)
+}
+
+func (e *HTTPError) Retryable() bool {
+	if e == nil {
+		return true
+	}
+	return e.StatusCode == http.StatusRequestTimeout ||
+		e.StatusCode == http.StatusTooManyRequests ||
+		e.StatusCode >= http.StatusInternalServerError
+}
+
 func NewClient(cfg Config) (*Client, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	if baseURL == "" {
@@ -111,7 +129,7 @@ func (c *Client) doJSON(ctx context.Context, method, path string, requestBody an
 		if message == "" {
 			message = http.StatusText(httpResponse.StatusCode)
 		}
-		return fmt.Errorf("transit returned %d: %s", httpResponse.StatusCode, message)
+		return &HTTPError{StatusCode: httpResponse.StatusCode, Message: message}
 	}
 	if responseBody == nil {
 		return nil
