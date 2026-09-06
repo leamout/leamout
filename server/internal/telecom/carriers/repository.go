@@ -191,7 +191,7 @@ func (r *Repository) GetProvider(ctx context.Context, id uuid.UUID) (sqlc.Carrie
 
 func (r *Repository) ListConnectionTrunks(ctx context.Context, organizationID, connectionID uuid.UUID) ([]sqlc.Trunk, error) {
 	return r.queries.ListTrunksByCarrierConnectionID(ctx, sqlc.ListTrunksByCarrierConnectionIDParams{
-		CarrierConnectionID: connectionID,
+		CarrierConnectionID: &connectionID,
 		OrganizationID:      &organizationID,
 	})
 }

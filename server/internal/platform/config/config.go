@@ -23,21 +23,30 @@ type SIPConfig struct {
 	PublicTransport string `env:"PUBLIC_TRANSPORT" envDefault:"udp"`
 }
 
+type ManagedSIPConfig struct {
+	Enabled   bool   `env:"ENABLED" envDefault:"false"`
+	Host      string `env:"HOST" envDefault:"sip.leamout.com"`
+	Port      int    `env:"PORT" envDefault:"5061"`
+	Transport string `env:"TRANSPORT" envDefault:"tls"`
+	Realm     string `env:"REALM" envDefault:"sip.leamout.com"`
+}
+
 type Config struct {
-	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
-	DeploymentID          string      `env:"LEAMOUT_DEPLOYMENT_ID"`
-	DatabaseURL           string      `env:"DATABASE_URL,required"`
-	RedisURL              string      `env:"REDIS_URL,required"`
-	NATSURL               string      `env:"NATS_URL,required"`
-	NATSStreamReplicas    int         `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
-	FreeSWITCHESLAddress  string      `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
-	FreeSWITCHESLPassword string      `env:"FREESWITCH_ESL_PASSWORD,required"`
-	CarrierCredentialKey  string      `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
-	DIDWW                 DIDWWConfig `envPrefix:"DIDWW_"`
-	SIP                   SIPConfig   `envPrefix:"SIP_"`
-	TURNAuthSecret        string      `env:"TURN_AUTH_SECRET,required"`
-	TURNPublicURLs        []string    `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
-	CORSOrigins           []string    `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+	AppEnv                string           `env:"APP_ENV" envDefault:"development"`
+	DeploymentID          string           `env:"LEAMOUT_DEPLOYMENT_ID"`
+	DatabaseURL           string           `env:"DATABASE_URL,required"`
+	RedisURL              string           `env:"REDIS_URL,required"`
+	NATSURL               string           `env:"NATS_URL,required"`
+	NATSStreamReplicas    int              `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
+	FreeSWITCHESLAddress  string           `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
+	FreeSWITCHESLPassword string           `env:"FREESWITCH_ESL_PASSWORD,required"`
+	CarrierCredentialKey  string           `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
+	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
+	SIP                   SIPConfig        `envPrefix:"SIP_"`
+	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
+	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
+	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
+	CORSOrigins           []string         `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
 }
 
 func Load() (Config, error) {
@@ -74,6 +83,9 @@ func (c *Config) normalize() {
 	c.DIDWW.SIPEndpoints = normalizeStrings(c.DIDWW.SIPEndpoints)
 	c.SIP.PublicHost = strings.TrimSpace(c.SIP.PublicHost)
 	c.SIP.PublicTransport = strings.ToLower(strings.TrimSpace(c.SIP.PublicTransport))
+	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
+	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
+	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)

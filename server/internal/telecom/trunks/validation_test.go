@@ -38,3 +38,17 @@ func TestNormalizeChoices(t *testing.T) {
 		t.Fatal("invalid direction accepted")
 	}
 }
+
+func TestNormalizeProvisioningMode(t *testing.T) {
+	got, err := normalizeProvisioningMode("")
+	if err != nil || got != ProvisioningModeBYOC {
+		t.Fatalf("empty type = %q, %v; want byoc", got, err)
+	}
+	got, err = normalizeProvisioningMode(" MANAGED ")
+	if err != nil || got != ProvisioningModeManaged {
+		t.Fatalf("managed type = %q, %v", got, err)
+	}
+	if _, err := normalizeProvisioningMode("other"); err == nil {
+		t.Fatal("invalid provisioning mode accepted")
+	}
+}

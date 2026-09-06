@@ -8,11 +8,22 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
+type ProvisioningMode string
+
+const (
+	ProvisioningModeBYOC    ProvisioningMode = "byoc"
+	ProvisioningModeManaged ProvisioningMode = "managed"
+	ManagedVoiceEntitlement                  = "voice.managed.enabled"
+	LeamoutCarrierProviderSlug                = "leamout"
+)
+
 type CreateRequest struct {
-	CarrierConnectionID uuid.UUID `json:"carrier_connection_id"`
-	Name                string    `json:"name"`
-	Direction           *string   `json:"direction,omitempty"`
-	Status              *string   `json:"status,omitempty"`
+	Type                ProvisioningMode        `json:"type"`
+	CarrierConnectionID *uuid.UUID              `json:"carrier_connection_id,omitempty"`
+	Name                string                  `json:"name"`
+	Direction           *string                 `json:"direction,omitempty"`
+	Status              *string                 `json:"status,omitempty"`
+	SIP                 *ManagedSIPInstallation `json:"sip,omitempty"`
 }
 
 type UpdateRequest struct {
@@ -41,15 +52,47 @@ type EndpointUpdateRequest struct {
 	Enabled   *bool   `json:"enabled,omitempty"`
 }
 
+type ManagedSIPConfig struct {
+	Enabled   bool
+	Host      string
+	Port      int32
+	Transport string
+	Realm     string
+}
+
+type ManagedSIPInstallation struct {
+	Host      string `json:"host"`
+	Port      int32  `json:"port"`
+	Transport string `json:"transport"`
+	Realm     string `json:"realm"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+}
+
+type SIPCredential struct {
+	Host      string `json:"host"`
+	Port      int32  `json:"port"`
+	Transport string `json:"transport"`
+	Realm     string `json:"realm"`
+	Username  string `json:"username"`
+	Password  string `json:"password"`
+}
+
+type CreateResult struct {
+	Trunk      sqlc.Trunk
+	Credential *SIPCredential
+}
+
 type EventType string
 
 const (
-	EventTrunkCreated         EventType = "trunk.created"
-	EventTrunkUpdated         EventType = "trunk.updated"
-	EventTrunkDisabled        EventType = "trunk.disabled"
-	EventTrunkEndpointCreated EventType = "trunk.endpoint.created"
-	EventTrunkEndpointUpdated EventType = "trunk.endpoint.updated"
-	EventTrunkEndpointDeleted EventType = "trunk.endpoint.deleted"
+	EventTrunkCreated           EventType = "trunk.created"
+	EventTrunkUpdated           EventType = "trunk.updated"
+	EventTrunkDisabled          EventType = "trunk.disabled"
+	EventTrunkCredentialRotated EventType = "trunk.credential.rotated"
+	EventTrunkEndpointCreated   EventType = "trunk.endpoint.created"
+	EventTrunkEndpointUpdated   EventType = "trunk.endpoint.updated"
+	EventTrunkEndpointDeleted   EventType = "trunk.endpoint.deleted"
 )
 
 type Event struct {
@@ -62,14 +105,20 @@ type Event struct {
 }
 
 type Response struct {
-	ID                  uuid.UUID  `json:"id"`
-	OrganizationID      *uuid.UUID `json:"organization_id,omitempty"`
-	CarrierConnectionID uuid.UUID  `json:"carrier_connection_id"`
-	Name                string     `json:"name"`
-	Direction           string     `json:"direction"`
-	Status              string     `json:"status"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  uuid.UUID        `json:"id"`
+	OrganizationID      *uuid.UUID       `json:"organization_id,omitempty"`
+	Type                ProvisioningMode `json:"type"`
+	CarrierConnectionID *uuid.UUID       `json:"carrier_connection_id,omitempty"`
+	Name                string           `json:"name"`
+	Direction           string           `json:"direction"`
+	Status              string           `json:"status"`
+	CreatedAt           time.Time        `json:"created_at"`
+	UpdatedAt           time.Time        `json:"updated_at"`
+}
+
+type ManagedCreateResponse struct {
+	Response
+	SIP SIPCredential `json:"sip"`
 }
 
 type EndpointResponse struct {
@@ -95,8 +144,21 @@ type EndpointResponse struct {
 }
 
 func response(trunk sqlc.Trunk) Response {
-	return Response{trunk.ID, trunk.OrganizationID, trunk.CarrierConnectionID, trunk.Name,
-		trunk.Direction, trunk.Status, pgconv.TimestamptzToTime(trunk.CreatedAt), pgconv.TimestamptzToTime(trunk.UpdatedAt)}
+	carrierConnectionID := trunk.CarrierConnectionID
+	if ProvisioningMode(trunk.ProvisioningMode) == ProvisioningModeManaged {
+		carrierConnectionID = nil
+	}
+	return Response{
+		ID:                  trunk.ID,
+		OrganizationID:      trunk.OrganizationID,
+		Type:                ProvisioningMode(trunk.ProvisioningMode),
+		CarrierConnectionID: carrierConnectionID,
+		Name:                trunk.Name,
+		Direction:           trunk.Direction,
+		Status:              trunk.Status,
+		CreatedAt:           pgconv.TimestamptzToTime(trunk.CreatedAt),
+		UpdatedAt:           pgconv.TimestamptzToTime(trunk.UpdatedAt),
+	}
 }
 
 func endpointResponse(endpoint sqlc.TrunkEndpoint) EndpointResponse {

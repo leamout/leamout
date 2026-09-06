@@ -296,6 +296,14 @@ type OpensipsInboundCarrierCredential struct {
 	Ha1Md5              string    `db:"ha1_md5" json:"ha1_md5"`
 }
 
+type OpensipsManagedTrunkCredential struct {
+	TrunkID        uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Username       string    `db:"username" json:"username"`
+	Domain         string    `db:"domain" json:"domain"`
+	Ha1Md5         string    `db:"ha1_md5" json:"ha1_md5"`
+}
+
 type OpensipsOutboundCarrierCredential struct {
 	CarrierConnectionID uuid.UUID   `db:"carrier_connection_id" json:"carrier_connection_id"`
 	OrganizationID      uuid.UUID   `db:"organization_id" json:"organization_id"`
@@ -557,13 +565,24 @@ type Subscription struct {
 type Trunk struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProvisioningMode    string             `db:"provisioning_mode" json:"provisioning_mode"`
 	Name                string             `db:"name" json:"name"`
 	Direction           string             `db:"direction" json:"direction"`
 	Status              string             `db:"status" json:"status"`
 	ManagedDefault      bool               `db:"managed_default" json:"managed_default"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type TrunkCredential struct {
+	TrunkID        uuid.UUID          `db:"trunk_id" json:"trunk_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Username       string             `db:"username" json:"username"`
+	Realm          string             `db:"realm" json:"realm"`
+	Ha1Md5         string             `db:"ha1_md5" json:"ha1_md5"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type TrunkEndpoint struct {
