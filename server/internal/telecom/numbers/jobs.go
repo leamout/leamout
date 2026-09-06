@@ -1,4 +1,4 @@
-package number_orders
+package numbers
 
 import (
 	"context"
@@ -17,10 +17,7 @@ type ProviderOperationJobConfig struct {
 }
 
 func DefaultProviderOperationJobConfig() ProviderOperationJobConfig {
-	return ProviderOperationJobConfig{
-		Interval:  10 * time.Second,
-		BatchSize: 50,
-	}
+	return ProviderOperationJobConfig{Interval: 10 * time.Second, BatchSize: 50}
 }
 
 type providerOperationJobRepository interface {
@@ -28,11 +25,6 @@ type providerOperationJobRepository interface {
 	TryProviderOperationLock(context.Context, uuid.UUID) (func(), bool, error)
 }
 
-// ProviderOperationExecutor is the execution boundary for durable managed-carrier
-// operations. The job owns polling and locking; the executor owns how an operation
-// reaches the managed-carrier implementation. A local provider-backed Service is
-// one implementation, while a delegated managed-carrier executor can implement the
-// same contract without changing the job or customer-facing number-order API.
 type ProviderOperationExecutor interface {
 	ExecuteProviderOperation(context.Context, sqlc.ProviderOperation) error
 }
@@ -43,11 +35,7 @@ type ProviderOperationJob struct {
 	config   ProviderOperationJobConfig
 }
 
-func NewProviderOperationJob(
-	repo providerOperationJobRepository,
-	executor ProviderOperationExecutor,
-	config ProviderOperationJobConfig,
-) (*ProviderOperationJob, error) {
+func NewProviderOperationJob(repo providerOperationJobRepository, executor ProviderOperationExecutor, config ProviderOperationJobConfig) (*ProviderOperationJob, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("provider operation repository is required")
 	}
@@ -67,11 +55,9 @@ func (j *ProviderOperationJob) Run(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf("provider operation context is required")
 	}
-
 	j.runPass(ctx)
 	ticker := time.NewTicker(j.config.Interval)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -93,13 +79,11 @@ func (j *ProviderOperationJob) Execute(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("list provider operations ready for execution: %w", err)
 	}
-
 	var firstErr error
 	for _, operation := range operations {
-		if operation.OperationType != "number_order" {
+		if operation.OperationType != "number_provision" {
 			continue
 		}
-
 		release, locked, err := j.repo.TryProviderOperationLock(ctx, operation.ID)
 		if err != nil {
 			if firstErr == nil {
@@ -110,13 +94,11 @@ func (j *ProviderOperationJob) Execute(ctx context.Context) error {
 		if !locked {
 			continue
 		}
-
 		err = j.executor.ExecuteProviderOperation(ctx, operation)
 		release()
 		if err != nil && firstErr == nil {
 			firstErr = fmt.Errorf("execute provider operation %s: %w", operation.ID, err)
 		}
 	}
-
 	return firstErr
 }

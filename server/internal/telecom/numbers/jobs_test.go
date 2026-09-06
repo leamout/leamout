@@ -1,4 +1,4 @@
-package number_orders
+package numbers
 
 import (
 	"context"
@@ -16,7 +16,6 @@ type providerOperationJobRepositoryStub struct {
 func (r *providerOperationJobRepositoryStub) ListProviderOperationsReady(context.Context, int32) ([]sqlc.ProviderOperation, error) {
 	return r.operations, nil
 }
-
 func (r *providerOperationJobRepositoryStub) TryProviderOperationLock(context.Context, uuid.UUID) (func(), bool, error) {
 	if !r.locked {
 		return func() {}, false, nil
@@ -24,9 +23,7 @@ func (r *providerOperationJobRepositoryStub) TryProviderOperationLock(context.Co
 	return func() {}, true, nil
 }
 
-type providerOperationExecutorStub struct {
-	operations []sqlc.ProviderOperation
-}
+type providerOperationExecutorStub struct{ operations []sqlc.ProviderOperation }
 
 func (e *providerOperationExecutorStub) ExecuteProviderOperation(_ context.Context, operation sqlc.ProviderOperation) error {
 	e.operations = append(e.operations, operation)
@@ -34,16 +31,9 @@ func (e *providerOperationExecutorStub) ExecuteProviderOperation(_ context.Conte
 }
 
 func TestProviderOperationJobUsesExecutorBoundary(t *testing.T) {
-	operation := sqlc.ProviderOperation{
-		ID:            uuid.New(),
-		OperationType: "number_order",
-	}
-	repo := &providerOperationJobRepositoryStub{
-		operations: []sqlc.ProviderOperation{operation},
-		locked:     true,
-	}
+	operation := sqlc.ProviderOperation{ID: uuid.New(), OperationType: "number_provision"}
+	repo := &providerOperationJobRepositoryStub{operations: []sqlc.ProviderOperation{operation}, locked: true}
 	executor := &providerOperationExecutorStub{}
-
 	job, err := NewProviderOperationJob(repo, executor, DefaultProviderOperationJobConfig())
 	if err != nil {
 		t.Fatal(err)
@@ -57,16 +47,9 @@ func TestProviderOperationJobUsesExecutorBoundary(t *testing.T) {
 }
 
 func TestProviderOperationJobSkipsUnlockedOperations(t *testing.T) {
-	operation := sqlc.ProviderOperation{
-		ID:            uuid.New(),
-		OperationType: "number_order",
-	}
-	repo := &providerOperationJobRepositoryStub{
-		operations: []sqlc.ProviderOperation{operation},
-		locked:     false,
-	}
+	operation := sqlc.ProviderOperation{ID: uuid.New(), OperationType: "number_provision"}
+	repo := &providerOperationJobRepositoryStub{operations: []sqlc.ProviderOperation{operation}}
 	executor := &providerOperationExecutorStub{}
-
 	job, err := NewProviderOperationJob(repo, executor, DefaultProviderOperationJobConfig())
 	if err != nil {
 		t.Fatal(err)

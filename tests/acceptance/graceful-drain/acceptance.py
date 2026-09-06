@@ -226,15 +226,20 @@ def provision():
     number = api(
         "POST",
         "/v1/numbers/",
-        {"number": DID, "country_code": "US", "voice_enabled": True},
+        {
+            "type": "byoc",
+            "number": DID,
+            "country_code": "US",
+            "carrier_connection_id": connection["id"],
+            "voice_enabled": True,
+        },
         (201,),
     )
     STATE["number"] = number
-    api(
-        "PUT",
-        f"/v1/numbers/{number['id']}/carrier-connection",
-        {"carrier_connection_id": connection["id"]},
-    )
+    if number.get("type") != "byoc":
+        raise Failure("test DID was not created as a BYOC number")
+    if number.get("carrier_connection_id") != connection["id"]:
+        raise Failure("test DID was not created on the carrier connection")
 
     app = api(
         "POST",

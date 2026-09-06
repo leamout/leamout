@@ -1,24 +1,24 @@
--- name: CreateNumberOrderProviderOperation :one
+-- name: CreateNumberProvisionProviderOperation :one
 INSERT INTO provider_operations (
     organization_id,
     carrier_provider_id,
+    phone_number_id,
     operation_type,
-    number_order_id,
     idempotency_key,
     request
 )
 VALUES (
     sqlc.arg(organization_id),
     sqlc.arg(carrier_provider_id),
-    'number_order',
-    sqlc.arg(number_order_id),
+    sqlc.arg(phone_number_id),
+    'number_provision',
     sqlc.arg(idempotency_key),
     sqlc.arg(request)
 )
 ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
 WHERE provider_operations.operation_type = EXCLUDED.operation_type
-  AND provider_operations.number_order_id = EXCLUDED.number_order_id
+  AND provider_operations.phone_number_id = EXCLUDED.phone_number_id
   AND provider_operations.request = EXCLUDED.request
 RETURNING *;
 
@@ -26,19 +26,19 @@ RETURNING *;
 INSERT INTO provider_operations (
     organization_id,
     carrier_provider_id,
+    phone_number_id,
     operation_type,
     idempotency_key,
     request,
-    phone_number_id,
     provider_resource_id
 )
 SELECT
     sqlc.arg(organization_id),
     sqlc.arg(carrier_provider_id),
+    pn.id,
     'number_release',
     sqlc.arg(idempotency_key),
     sqlc.arg(request),
-    pn.id,
     sqlc.arg(provider_resource_id)
 FROM phone_numbers AS pn
 WHERE pn.id = sqlc.arg(phone_number_id)
@@ -55,7 +55,7 @@ WHERE provider_operations.operation_type = EXCLUDED.operation_type
   AND provider_operations.request = EXCLUDED.request
 RETURNING *;
 
--- name: MarkProviderOperationAccepted :one
+-- name: MarkNumberProvisionProviderOperationAccepted :one
 UPDATE provider_operations
 SET
     state = 'provider_accepted',
@@ -65,7 +65,7 @@ SET
     last_error = NULL,
     next_attempt_at = now()
 WHERE id = sqlc.arg(id)
-  AND operation_type = 'number_order'
+  AND operation_type = 'number_provision'
   AND state = 'pending'
 RETURNING *;
 
@@ -79,12 +79,22 @@ WHERE id = sqlc.arg(id)
   AND state IN ('pending', 'provider_accepted')
 RETURNING *;
 
--- name: MarkNumberOrderProviderOperationSucceeded :one
+-- name: MarkProviderOperationFailed :exec
+UPDATE provider_operations
+SET
+    state = 'failed',
+    attempts = attempts + 1,
+    last_error = sqlc.arg(last_error),
+    next_attempt_at = NULL,
+    completed_at = now()
+WHERE id = sqlc.arg(id)
+  AND state IN ('pending', 'provider_accepted');
+
+-- name: MarkNumberProvisionProviderOperationSucceeded :one
 UPDATE provider_operations
 SET
     state = 'succeeded',
     provider_resource_id = sqlc.arg(provider_resource_id),
-    phone_number_id = sqlc.arg(phone_number_id),
     response = sqlc.arg(response),
     completed_at = now(),
     last_error = NULL,
@@ -92,8 +102,8 @@ SET
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
   AND carrier_provider_id = sqlc.arg(carrier_provider_id)
-  AND operation_type = 'number_order'
-  AND number_order_id = sqlc.arg(number_order_id)
+  AND phone_number_id = sqlc.arg(phone_number_id)
+  AND operation_type = 'number_provision'
   AND state = 'provider_accepted'
 RETURNING *;
 
@@ -118,3 +128,9 @@ WHERE state IN ('pending', 'provider_accepted')
   AND next_attempt_at <= now()
 ORDER BY next_attempt_at ASC, created_at ASC
 LIMIT sqlc.arg(limit_count);
+
+-- name: TryProviderOperationAdvisoryLock :one
+SELECT pg_try_advisory_lock(hashtextextended(sqlc.arg(operation_id), 0));
+
+-- name: ReleaseProviderOperationAdvisoryLock :exec
+SELECT pg_advisory_unlock(hashtextextended(sqlc.arg(operation_id), 0));

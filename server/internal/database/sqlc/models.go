@@ -279,23 +279,6 @@ type Meter struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Customer-visible managed-number acquisition intent. Provider execution and retry state lives in provider_operations.
-type NumberOrder struct {
-	ID                  uuid.UUID          `db:"id" json:"id"`
-	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
-	ProviderID          uuid.UUID          `db:"provider_id" json:"provider_id"`
-	ProviderInventoryID string             `db:"provider_inventory_id" json:"provider_inventory_id"`
-	ProviderProductID   string             `db:"provider_product_id" json:"provider_product_id"`
-	Number              string             `db:"number" json:"number"`
-	CountryCode         string             `db:"country_code" json:"country_code"`
-	Status              string             `db:"status" json:"status"`
-	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
-	ErrorCode           *string            `db:"error_code" json:"error_code"`
-	ErrorMessage        *string            `db:"error_message" json:"error_message"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type OpensipsCarrierDigestCredential struct {
 	CarrierConnectionID uuid.UUID   `db:"carrier_connection_id" json:"carrier_connection_id"`
 	OrganizationID      uuid.UUID   `db:"organization_id" json:"organization_id"`
@@ -311,6 +294,14 @@ type OpensipsInboundCarrierCredential struct {
 	Username            string    `db:"username" json:"username"`
 	Domain              string    `db:"domain" json:"domain"`
 	Ha1Md5              string    `db:"ha1_md5" json:"ha1_md5"`
+}
+
+type OpensipsManagedTrunkCredential struct {
+	TrunkID        uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Username       string    `db:"username" json:"username"`
+	Domain         string    `db:"domain" json:"domain"`
+	Ha1Md5         string    `db:"ha1_md5" json:"ha1_md5"`
 }
 
 type OpensipsOutboundCarrierCredential struct {
@@ -416,6 +407,8 @@ type PhoneNumber struct {
 	VoiceEnabled        bool               `db:"voice_enabled" json:"voice_enabled"`
 	SmsEnabled          bool               `db:"sms_enabled" json:"sms_enabled"`
 	Status              string             `db:"status" json:"status"`
+	ErrorCode           *string            `db:"error_code" json:"error_code"`
+	ErrorMessage        *string            `db:"error_message" json:"error_message"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
@@ -479,14 +472,13 @@ type ProviderCdr struct {
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-// Internal durable journal for external provider side effects. Number acquisition operations link directly to number_orders.
+// Internal durable journal for managed-number provider side effects. Customer lifecycle state remains on phone_numbers.
 type ProviderOperation struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
+	PhoneNumberID       uuid.UUID          `db:"phone_number_id" json:"phone_number_id"`
 	OperationType       string             `db:"operation_type" json:"operation_type"`
-	NumberOrderID       *uuid.UUID         `db:"number_order_id" json:"number_order_id"`
-	PhoneNumberID       *uuid.UUID         `db:"phone_number_id" json:"phone_number_id"`
 	IdempotencyKey      string             `db:"idempotency_key" json:"idempotency_key"`
 	State               string             `db:"state" json:"state"`
 	ProviderOperationID *string            `db:"provider_operation_id" json:"provider_operation_id"`
@@ -573,13 +565,24 @@ type Subscription struct {
 type Trunk struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProvisioningMode    string             `db:"provisioning_mode" json:"provisioning_mode"`
 	Name                string             `db:"name" json:"name"`
 	Direction           string             `db:"direction" json:"direction"`
 	Status              string             `db:"status" json:"status"`
 	ManagedDefault      bool               `db:"managed_default" json:"managed_default"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type TrunkCredential struct {
+	TrunkID        uuid.UUID          `db:"trunk_id" json:"trunk_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Username       string             `db:"username" json:"username"`
+	Realm          string             `db:"realm" json:"realm"`
+	Ha1Md5         string             `db:"ha1_md5" json:"ha1_md5"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type TrunkEndpoint struct {

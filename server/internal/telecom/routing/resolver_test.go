@@ -78,7 +78,8 @@ func TestResolveOutboundUsesExplicitBYOCTrunk(t *testing.T) {
 		trunk: sqlc.Trunk{
 			ID:                  trunkID,
 			OrganizationID:      uuidPtr(organizationID),
-			CarrierConnectionID: connectionID,
+			CarrierConnectionID: uuidPtr(connectionID),
+			ProvisioningMode:    "byoc",
 		},
 		connection: sqlc.CarrierConnection{
 			ID:             connectionID,
@@ -119,12 +120,14 @@ func TestResolveExplicitBYOCNeverFallsBackToManaged(t *testing.T) {
 	organizationID := uuid.New()
 	otherOrganizationID := uuid.New()
 	trunkID := uuid.New()
+	connectionID := uuid.New()
 
 	store := &fakeRouteStore{
 		trunk: sqlc.Trunk{
 			ID:                  trunkID,
 			OrganizationID:      uuidPtr(otherOrganizationID),
-			CarrierConnectionID: uuid.New(),
+			CarrierConnectionID: uuidPtr(connectionID),
+			ProvisioningMode:    "byoc",
 		},
 		managedRoutes: []managedRouteCandidate{{
 			CarrierConnectionID: uuid.New(),
@@ -150,6 +153,60 @@ func TestResolveExplicitBYOCNeverFallsBackToManaged(t *testing.T) {
 	}
 	if store.listManagedCalls != 0 {
 		t.Fatalf("managed route lookup count = %d, want 0 after BYOC failure", store.listManagedCalls)
+	}
+}
+
+func TestResolveExplicitCloudManagedTrunkUsesManagedRoute(t *testing.T) {
+	organizationID := uuid.New()
+	trunkID := uuid.New()
+	managedConnectionID := uuid.New()
+	internalManagedTrunkID := uuid.New()
+	managedEndpointID := uuid.New()
+	store := &fakeRouteStore{
+		trunk: sqlc.Trunk{
+			ID:               trunkID,
+			OrganizationID:   uuidPtr(organizationID),
+			ProvisioningMode: "managed",
+		},
+		phone: sqlc.PhoneNumber{
+			OrganizationID: organizationID,
+			Number:         "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+		},
+		managedRoutes: []managedRouteCandidate{{
+			CarrierConnectionID: managedConnectionID,
+			MaxCPS:              20,
+			MaxConcurrentCalls:  200,
+			TrunkID:             internalManagedTrunkID,
+			EndpointID:          managedEndpointID,
+			Host:                "managed.carrier.example",
+			Port:                5060,
+			Transport:           "udp",
+			Priority:            10,
+			Weight:              100,
+		}},
+	}
+	resolver := &Resolver{repo: store, pickWeight: func(int64) (int64, error) { return 0, nil }}
+
+	decision, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
+		OrganizationID: organizationID,
+		TrunkID:        uuidPtr(trunkID),
+		From:           "+233200000001",
+		To:             "+14155550100",
+	})
+	if err != nil {
+		t.Fatalf("resolve explicit managed outbound: %v", err)
+	}
+	if !decision.Managed {
+		t.Fatal("explicit managed route was not marked for commercial admission")
+	}
+	if decision.TrunkID != trunkID {
+		t.Fatalf("customer-facing trunk attribution = %s, want %s", decision.TrunkID, trunkID)
+	}
+	if decision.CarrierConnectionID != managedConnectionID || decision.EndpointID != managedEndpointID {
+		t.Fatalf("unexpected managed execution route: %+v", decision)
+	}
+	if store.listManagedCalls != 1 {
+		t.Fatalf("managed route lookup count = %d, want 1", store.listManagedCalls)
 	}
 }
 
@@ -224,7 +281,10 @@ func TestResolveOutboundRejectsBYOCCallerIdentityFromAnotherCarrier(t *testing.T
 	organizationID, trunkID := uuid.New(), uuid.New()
 	connectionID, otherConnectionID := uuid.New(), uuid.New()
 	resolver := &Resolver{repo: &fakeRouteStore{
-		trunk:      sqlc.Trunk{ID: trunkID, OrganizationID: uuidPtr(organizationID), CarrierConnectionID: connectionID},
+		trunk: sqlc.Trunk{
+			ID: trunkID, OrganizationID: uuidPtr(organizationID),
+			CarrierConnectionID: uuidPtr(connectionID), ProvisioningMode: "byoc",
+		},
 		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization"},
 		phone: sqlc.PhoneNumber{
 			OrganizationID: organizationID,
@@ -245,7 +305,10 @@ func TestResolveOutboundRejectsManagedNumberOnBYOCTrunk(t *testing.T) {
 	organizationID, trunkID := uuid.New(), uuid.New()
 	connectionID := uuid.New()
 	resolver := &Resolver{repo: &fakeRouteStore{
-		trunk:      sqlc.Trunk{ID: trunkID, OrganizationID: uuidPtr(organizationID), CarrierConnectionID: connectionID},
+		trunk: sqlc.Trunk{
+			ID: trunkID, OrganizationID: uuidPtr(organizationID),
+			CarrierConnectionID: uuidPtr(connectionID), ProvisioningMode: "byoc",
+		},
 		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization"},
 		phone: sqlc.PhoneNumber{
 			OrganizationID: organizationID,

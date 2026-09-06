@@ -83,18 +83,20 @@ def connection_and_auth():
     return "first digest credential is encrypted and active in OpenSIPS runtime"
 
 def trunk():
-    item = api("POST", "/v1/trunks/", {"carrier_connection_id":S["connection"]["id"], "name":"BYOC trunk", "direction":"bidirectional"}, (201,)); S["trunk"] = item
+    item = api("POST", "/v1/trunks/", {"type":"byoc", "carrier_connection_id":S["connection"]["id"], "name":"BYOC trunk", "direction":"bidirectional"}, (201,)); S["trunk"] = item
+    if item.get("type") != "byoc": raise Failure("trunk was not created as BYOC")
+    if item.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("trunk was not created on the carrier connection")
     endpoint = api("POST", f"/v1/trunks/{item['id']}/endpoints", {"host":"byoc-v1-carrier", "port":5060, "transport":"udp", "direction":"bidirectional", "priority":10}, (201,))
     S["endpoint"] = endpoint; return f"trunk {item['id']} routes to endpoint {endpoint['id']}"
 
 def number_and_app():
-    number = api("POST", "/v1/numbers/", {"number":DID, "country_code":"US", "voice_enabled":True}, (201,)); S["number"] = number
-    assigned = api("PUT", f"/v1/numbers/{number['id']}/carrier-connection", {"carrier_connection_id":S["connection"]["id"]})
-    if assigned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("DID ownership was not assigned")
+    number = api("POST", "/v1/numbers/", {"type":"byoc", "number":DID, "country_code":"US", "carrier_connection_id":S["connection"]["id"], "voice_enabled":True}, (201,)); S["number"] = number
+    if number.get("type") != "byoc": raise Failure("DID was not created as BYOC")
+    if number.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("DID ownership was not assigned at creation")
 
-    caller = api("POST", "/v1/numbers/", {"number":CALLER, "country_code":"US", "voice_enabled":True}, (201,)); S["caller_number"] = caller
-    caller_assigned = api("PUT", f"/v1/numbers/{caller['id']}/carrier-connection", {"carrier_connection_id":S["connection"]["id"]})
-    if caller_assigned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("caller identity ownership was not assigned")
+    caller = api("POST", "/v1/numbers/", {"type":"byoc", "number":CALLER, "country_code":"US", "carrier_connection_id":S["connection"]["id"], "voice_enabled":True}, (201,)); S["caller_number"] = caller
+    if caller.get("type") != "byoc": raise Failure("caller identity was not created as BYOC")
+    if caller.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("caller identity ownership was not assigned at creation")
 
     app = api("POST", "/v1/voice-applications/", {"name":"BYOC ingress", "caller_id":CALLER}, (201,)); S["app"] = app
     api("POST", f"/v1/voice-applications/{app['id']}/bindings", {"phone_number_id":number["id"]}, (201,))
@@ -102,6 +104,7 @@ def number_and_app():
 
 def reject_cross_org_did_ownership():
     foreign_connection = api("POST", "/v1/carrier-connections/", {"provider_id":S["provider"]["id"], "name":"BYOC foreign tenant carrier", "inbound_enabled":True}, (201,), TOKEN_B)
+    api("GET", f"/v1/numbers/{S['number']['id']}", expected=(404,), token=TOKEN_B)
     api("PUT", f"/v1/numbers/{S['number']['id']}/carrier-connection", {"carrier_connection_id":foreign_connection["id"]}, (404,), TOKEN_B)
     owned = api("GET", f"/v1/numbers/{S['number']['id']}")
     if owned.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("cross-organization request changed DID ownership")

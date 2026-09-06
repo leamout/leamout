@@ -2,6 +2,7 @@
 INSERT INTO trunks (
     organization_id,
     carrier_connection_id,
+    provisioning_mode,
     name,
     direction,
     status,
@@ -10,21 +11,28 @@ INSERT INTO trunks (
 SELECT
     cc.organization_id AS organization_id,
     cc.id AS carrier_connection_id,
+    sqlc.arg(provisioning_mode) AS provisioning_mode,
     sqlc.arg(name) AS name,
     COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
     COALESCE(sqlc.narg(status), 'active') AS status,
     false AS managed_default
 FROM carrier_connections AS cc
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE cc.id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'organization'
   AND cc.organization_id = sqlc.arg(organization_id)
   AND cc.status = 'active'
+  AND (
+      (sqlc.arg(provisioning_mode)::TEXT = 'byoc' AND cp.slug <> 'leamout')
+      OR (sqlc.arg(provisioning_mode)::TEXT = 'managed' AND cp.slug = 'leamout')
+  )
 RETURNING *;
 
 -- name: CreatePlatformTrunk :one
 INSERT INTO trunks (
     organization_id,
     carrier_connection_id,
+    provisioning_mode,
     name,
     direction,
     status,
@@ -33,6 +41,7 @@ INSERT INTO trunks (
 SELECT
     NULL::UUID AS organization_id,
     cc.id AS carrier_connection_id,
+    'managed' AS provisioning_mode,
     sqlc.arg(name) AS name,
     COALESCE(sqlc.narg(direction), 'bidirectional') AS direction,
     COALESCE(sqlc.narg(status), 'active') AS status,
@@ -47,11 +56,8 @@ RETURNING *;
 -- name: GetTrunkByID :one
 SELECT t.*
 FROM trunks AS t
-JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(id)
   AND t.organization_id = sqlc.arg(organization_id)
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 LIMIT 1;
 
 -- name: GetPlatformTrunkByID :one
@@ -60,6 +66,7 @@ FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(id)
   AND t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
 LIMIT 1;
@@ -67,10 +74,7 @@ LIMIT 1;
 -- name: ListTrunksByOrganizationID :many
 SELECT t.*
 FROM trunks AS t
-JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.organization_id = sqlc.arg(organization_id)
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 ORDER BY t.created_at DESC;
 
 -- name: ListPlatformTrunks :many
@@ -78,6 +82,7 @@ SELECT t.*
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
 ORDER BY t.created_at DESC;
@@ -86,10 +91,15 @@ ORDER BY t.created_at DESC;
 SELECT t.*
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND t.organization_id = sqlc.arg(organization_id)
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
+  AND (
+      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
+      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
+  )
 ORDER BY t.created_at DESC;
 
 -- name: UpdateTrunk :one
@@ -99,12 +109,8 @@ SET
     direction = COALESCE(sqlc.narg(direction), t.direction),
     status = COALESCE(sqlc.narg(status), t.status),
     updated_at = NOW()
-FROM carrier_connections AS cc
 WHERE t.id = sqlc.arg(id)
   AND t.organization_id = sqlc.arg(organization_id)
-  AND cc.id = t.carrier_connection_id
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 RETURNING t.*;
 
 -- name: UpdatePlatformTrunk :one
@@ -118,6 +124,7 @@ SET
 FROM carrier_connections AS cc
 WHERE t.id = sqlc.arg(id)
   AND t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.id = t.carrier_connection_id
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
@@ -128,13 +135,9 @@ UPDATE trunks AS t
 SET
     status = 'disabled',
     updated_at = NOW()
-FROM carrier_connections AS cc
 WHERE t.id = sqlc.arg(id)
   AND t.organization_id = sqlc.arg(organization_id)
   AND t.status = 'active'
-  AND cc.id = t.carrier_connection_id
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 RETURNING t.*;
 
 -- name: EnableTrunk :exec
@@ -142,13 +145,9 @@ UPDATE trunks AS t
 SET
     status = 'active',
     updated_at = NOW()
-FROM carrier_connections AS cc
 WHERE t.id = sqlc.arg(id)
   AND t.organization_id = sqlc.arg(organization_id)
-  AND t.status = 'disabled'
-  AND cc.id = t.carrier_connection_id
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id;
+  AND t.status = 'disabled';
 
 -- name: CreateTrunkEndpoint :one
 INSERT INTO trunk_endpoints (
@@ -174,10 +173,15 @@ SELECT
     COALESCE(sqlc.narg(enabled), true) AS enabled
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
+  AND (
+      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
+      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
+  )
 RETURNING *;
 
 -- name: CreatePlatformTrunkEndpoint :one
@@ -206,6 +210,7 @@ FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
 RETURNING *;
@@ -219,6 +224,7 @@ WHERE te.id = sqlc.arg(id)
   AND te.trunk_id = sqlc.arg(trunk_id)
   AND te.organization_id = sqlc.arg(organization_id)
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
 LIMIT 1;
@@ -231,6 +237,7 @@ JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE te.trunk_id = sqlc.arg(trunk_id)
   AND te.organization_id = sqlc.arg(organization_id)
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
@@ -270,6 +277,7 @@ WHERE te.id = sqlc.arg(id)
   AND te.organization_id = sqlc.arg(organization_id)
   AND t.id = te.trunk_id
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
 RETURNING te.*;
@@ -282,6 +290,7 @@ WHERE te.id = sqlc.arg(id)
   AND te.organization_id = sqlc.arg(organization_id)
   AND t.id = te.trunk_id
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.id = t.carrier_connection_id
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
@@ -292,6 +301,7 @@ SELECT te.*
 FROM trunk_endpoints AS te
 JOIN trunks AS t ON t.id = te.trunk_id
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
   AND t.status = 'active'
@@ -302,6 +312,10 @@ WHERE t.id = sqlc.arg(trunk_id)
   AND te.organization_id = t.organization_id
   AND te.enabled = true
   AND te.direction IN ('outbound', 'bidirectional')
+  AND (
+      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
+      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
+  )
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
 
 -- name: ResolveManagedOutboundRoute :many
@@ -322,6 +336,7 @@ FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 JOIN trunk_endpoints AS te ON te.trunk_id = t.id
 WHERE t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND t.managed_default = true
   AND t.status = 'active'
   AND t.direction IN ('outbound', 'bidirectional')

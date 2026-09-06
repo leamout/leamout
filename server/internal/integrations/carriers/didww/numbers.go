@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/leamout/leamout/internal/telecom/number_orders"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 )
 
@@ -229,58 +228,58 @@ func (c *Client) OrderNumber(ctx context.Context, request OrderNumberRequest) (O
 	return orderFromResource(response.Data), nil
 }
 
-func (c *Client) FindNumberOrder(ctx context.Context, externalReferenceID string) (number_orders.ProviderOrder, bool, error) {
+func (c *Client) FindNumberOrder(ctx context.Context, externalReferenceID string) (numbers.ProviderOrder, bool, error) {
 	externalReferenceID = strings.TrimSpace(externalReferenceID)
 	if externalReferenceID == "" {
-		return number_orders.ProviderOrder{}, false, fmt.Errorf("didww: external order reference is required")
+		return numbers.ProviderOrder{}, false, fmt.Errorf("didww: external order reference is required")
 	}
 
 	query := url.Values{}
 	query.Set("filter[external_reference_id]", externalReferenceID)
 	var response collectionResponse[orderAttributes]
 	if err := c.do(ctx, http.MethodGet, "/v3/orders", query, nil, &response); err != nil {
-		return number_orders.ProviderOrder{}, false, err
+		return numbers.ProviderOrder{}, false, err
 	}
 	if len(response.Data) == 0 {
-		return number_orders.ProviderOrder{}, false, nil
+		return numbers.ProviderOrder{}, false, nil
 	}
 	if len(response.Data) != 1 {
-		return number_orders.ProviderOrder{}, false, fmt.Errorf("didww: external order reference %s resolved ambiguously", externalReferenceID)
+		return numbers.ProviderOrder{}, false, fmt.Errorf("didww: external order reference %s resolved ambiguously", externalReferenceID)
 	}
 	order := orderFromResource(response.Data[0])
-	return number_orders.ProviderOrder{ID: order.ID, Status: order.Status}, true, nil
+	return numbers.ProviderOrder{ID: order.ID, Status: order.Status}, true, nil
 }
 
-func (c *Client) CreateNumberOrder(ctx context.Context, request number_orders.ProviderOrderRequest) (number_orders.ProviderOrder, error) {
+func (c *Client) CreateNumberOrder(ctx context.Context, request numbers.ProviderOrderRequest) (numbers.ProviderOrder, error) {
 	order, err := c.OrderNumber(ctx, OrderNumberRequest{
 		AvailableDIDID:      request.ProviderInventoryID,
 		SKUID:               request.ProviderProductID,
 		ExternalReferenceID: request.ExternalReferenceID,
 	})
 	if err != nil {
-		return number_orders.ProviderOrder{}, err
+		return numbers.ProviderOrder{}, err
 	}
-	return number_orders.ProviderOrder{ID: order.ID, Status: order.Status}, nil
+	return numbers.ProviderOrder{ID: order.ID, Status: order.Status}, nil
 }
 
-func (c *Client) FindManagedNumber(ctx context.Context, number string) (number_orders.ProviderNumber, error) {
+func (c *Client) FindManagedNumber(ctx context.Context, number string) (numbers.ProviderNumber, error) {
 	did, err := c.FindNumber(ctx, number)
 	if err != nil {
-		return number_orders.ProviderNumber{}, err
+		return numbers.ProviderNumber{}, err
 	}
-	return number_orders.ProviderNumber{
+	return numbers.ProviderNumber{
 		ID:                did.ID,
 		Number:            "+" + strings.TrimPrefix(strings.TrimSpace(did.Number), "+"),
 		RoutingResourceID: did.VoiceInTrunkID,
 	}, nil
 }
 
-func (c *Client) ConfigureNumberRouting(ctx context.Context, didID, routingResourceID string) (number_orders.ProviderNumber, error) {
+func (c *Client) ConfigureNumberRouting(ctx context.Context, didID, routingResourceID string) (numbers.ProviderNumber, error) {
 	did, err := c.ConfigureRouting(ctx, didID, routingResourceID)
 	if err != nil {
-		return number_orders.ProviderNumber{}, err
+		return numbers.ProviderNumber{}, err
 	}
-	return number_orders.ProviderNumber{
+	return numbers.ProviderNumber{
 		ID:                did.ID,
 		Number:            "+" + strings.TrimPrefix(strings.TrimSpace(did.Number), "+"),
 		RoutingResourceID: did.VoiceInTrunkID,

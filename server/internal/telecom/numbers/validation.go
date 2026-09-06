@@ -26,6 +26,25 @@ func validateNumberID(id uuid.UUID) error {
 	return nil
 }
 
+func normalizeProvisioningMode(value ProvisioningMode) (ProvisioningMode, error) {
+	value = ProvisioningMode(strings.ToLower(strings.TrimSpace(string(value))))
+	if value != ProvisioningModeBYOC && value != ProvisioningModeManaged {
+		return "", apperror.NewBadRequest("type must be byoc or managed")
+	}
+	return value, nil
+}
+
+func normalizeSelectionID(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", apperror.NewBadRequest("selection_id is required")
+	}
+	if !strings.HasPrefix(value, "sel_") || len(value) > 128 {
+		return "", apperror.NewBadRequest("invalid selection_id")
+	}
+	return value, nil
+}
+
 func normalizeNumber(v string) (string, error) {
 	v = strings.TrimSpace(v)
 	if !e164.MatchString(v) {
