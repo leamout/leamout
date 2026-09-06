@@ -1,6 +1,7 @@
 package edge
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -13,7 +14,7 @@ import (
 func TestHandlerReturnsForbiddenWhenRouteDoesNotAuthorize(t *testing.T) {
 	service := NewService(&fakeStore{resolveErr: pgx.ErrNoRows}, &fakeState{})
 	handler := NewHandler(service, "edge-secret")
-	request := httptest.NewRequest(http.MethodPost, "/internal/v1/sip-edge/authorize", strings.NewReader(`{
+	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/internal/v1/sip-edge/authorize", strings.NewReader(`{
 		"username":"managed-trunk",
 		"realm":"sip.leamout.com",
 		"from":"+14155550100",
