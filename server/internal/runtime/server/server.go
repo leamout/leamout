@@ -269,11 +269,11 @@ func configureManagedSIP(cfg config.Config, service *trunks.Service, state *comm
 		return fmt.Errorf("managed SIP port must be between 1 and 65535")
 	}
 	return service.SetManagedSIP(trunks.ManagedSIPConfig{
-		Enabled: cfg.ManagedSIP.Enabled,
-		Host: cfg.ManagedSIP.Host,
-		Port: int32(cfg.ManagedSIP.Port),
+		Enabled:   cfg.ManagedSIP.Enabled,
+		Host:      cfg.ManagedSIP.Host,
+		Port:      int32(cfg.ManagedSIP.Port),
 		Transport: cfg.ManagedSIP.Transport,
-		Realm: cfg.ManagedSIP.Realm,
+		Realm:     cfg.ManagedSIP.Realm,
 	}, state)
 }
 

@@ -13,7 +13,7 @@ type ProvisioningMode string
 const (
 	ProvisioningModeBYOC    ProvisioningMode = "byoc"
 	ProvisioningModeManaged ProvisioningMode = "managed"
-	ManagedVoiceEntitlement                 = "voice.managed.enabled"
+	ManagedVoiceEntitlement                  = "voice.managed.enabled"
 )
 
 type CreateRequest struct {

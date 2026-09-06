@@ -24,11 +24,11 @@ type managedSIPStateResolver interface {
 }
 
 type Service struct {
-	repo             *Repository
-	db               *pgxpool.Pool
-	outbox           *outbox.Repository
-	managedSIP       ManagedSIPConfig
-	commercialState  managedSIPStateResolver
+	repo            *Repository
+	db              *pgxpool.Pool
+	outbox          *outbox.Repository
+	managedSIP      ManagedSIPConfig
+	commercialState managedSIPStateResolver
 }
 
 func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
