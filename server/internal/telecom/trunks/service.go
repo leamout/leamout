@@ -23,12 +23,17 @@ type managedSIPStateResolver interface {
 	Resolve(context.Context, uuid.UUID) (commercialstate.OrganizationState, error)
 }
 
+type managedSIPClientCipher interface {
+	Encrypt(string) (string, error)
+}
+
 type Service struct {
-	repo            *Repository
-	db              *pgxpool.Pool
-	outbox          *outbox.Repository
-	managedSIP      ManagedSIPConfig
-	commercialState managedSIPStateResolver
+	repo                   *Repository
+	db                     *pgxpool.Pool
+	outbox                 *outbox.Repository
+	managedSIP             ManagedSIPConfig
+	commercialState        managedSIPStateResolver
+	managedSIPClientCipher managedSIPClientCipher
 }
 
 func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
@@ -51,6 +56,10 @@ func (s *Service) SetManagedSIP(config ManagedSIPConfig, state managedSIPStateRe
 	s.managedSIP = normalized
 	s.commercialState = state
 	return nil
+}
+
+func (s *Service) SetManagedSIPClientCipher(cipher managedSIPClientCipher) {
+	s.managedSIPClientCipher = cipher
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (CreateResult, error) {
@@ -87,8 +96,33 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	switch mode {
 	case ProvisioningModeManaged:
 		if req.CarrierConnectionID != nil {
-			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is only valid for BYOC trunks")
+			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is not accepted for managed trunks")
 		}
+
+		if req.SIP != nil {
+			if s.managedSIP.Enabled {
+				return CreateResult{}, apperror.NewConflict("managed SIP installation bundles are only accepted by client runtimes")
+			}
+			if s.managedSIPClientCipher == nil {
+				return CreateResult{}, apperror.NewServiceUnavailable("managed SIP client credential encryption is unavailable", nil)
+			}
+			installation, err := normalizeManagedSIPInstallation(*req.SIP, s.managedSIP)
+			if err != nil {
+				return CreateResult{}, err
+			}
+			ciphertext, err := s.managedSIPClientCipher.Encrypt(installation.Password)
+			if err != nil {
+				return CreateResult{}, apperror.NewInternal("encrypt managed SIP client credential", err)
+			}
+			item, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
+				return repo.InstallManaged(ctx, organizationID, name, req.Direction, req.Status, installation, ciphertext)
+			})
+			if err != nil {
+				return CreateResult{}, writeError(err, "managed trunk installation", "Leamout Carrier provider is unavailable")
+			}
+			return CreateResult{Trunk: item}, nil
+		}
+
 		if err := s.authorizeManagedSIP(ctx, organizationID); err != nil {
 			return CreateResult{}, err
 		}
@@ -112,6 +146,9 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		return CreateResult{Trunk: item, Credential: &credential}, nil
 
 	case ProvisioningModeBYOC:
+		if req.SIP != nil {
+			return CreateResult{}, apperror.NewBadRequest("sip installation credentials are only valid for managed trunks")
+		}
 		if req.CarrierConnectionID == nil {
 			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is required for BYOC trunks")
 		}
@@ -122,6 +159,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 			return repo.Create(ctx, sqlc.CreateTrunkParams{
 				OrganizationID:      &organizationID,
 				CarrierConnectionID: *req.CarrierConnectionID,
+				ProvisioningMode:    string(ProvisioningModeBYOC),
 				Name:                name,
 				Direction:           req.Direction,
 				Status:              req.Status,
@@ -152,7 +190,7 @@ func (s *Service) RotateCredential(ctx context.Context, organizationID, trunkID 
 		return SIPCredential{}, err
 	}
 	if ProvisioningMode(item.ProvisioningMode) != ProvisioningModeManaged || item.CarrierConnectionID != nil {
-		return SIPCredential{}, apperror.NewConflict("SIP credentials are only available for managed trunks")
+		return SIPCredential{}, apperror.NewConflict("SIP credentials are only available for Cloud-authoritative managed trunks")
 	}
 	if item.Status != "active" {
 		return SIPCredential{}, apperror.NewConflict("managed trunk must be active before rotating SIP credentials")
