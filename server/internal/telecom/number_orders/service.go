@@ -110,12 +110,6 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 	if operation.OperationType != "number_order" || operation.NumberOrderID == nil {
 		return nil
 	}
-	if operation.ExecutionTarget != "direct" {
-		return nil
-	}
-	if operation.CarrierProviderID == nil {
-		return s.failOperation(ctx, operation, fmt.Errorf("direct provider operation is missing carrier_provider_id"))
-	}
 
 	var request ProviderOperationRequest
 	if err := json.Unmarshal(operation.Request, &request); err != nil {
@@ -251,41 +245,4 @@ func validateProviderOperationRequest(request ProviderOperationRequest) error {
 		return fmt.Errorf("provider operation request is incomplete")
 	}
 	return nil
-}
-
-// ExecutionRouter is service-layer orchestration for durable managed-carrier
-// operations. Persistence records the execution target; this router selects the
-// corresponding execution service without coupling the background job to a
-// specific carrier or transport.
-type ExecutionRouter struct {
-	direct  ProviderOperationExecutor
-	transit ProviderOperationExecutor
-}
-
-func NewExecutionRouter(
-	direct ProviderOperationExecutor,
-	transit ProviderOperationExecutor,
-) *ExecutionRouter {
-	return &ExecutionRouter{direct: direct, transit: transit}
-}
-
-func (r *ExecutionRouter) ExecuteProviderOperation(
-	ctx context.Context,
-	operation sqlc.ProviderOperation,
-) error {
-	target := strings.ToLower(strings.TrimSpace(operation.ExecutionTarget))
-	switch target {
-	case "direct":
-		if r == nil || r.direct == nil {
-			return fmt.Errorf("direct managed carrier executor is not configured")
-		}
-		return r.direct.ExecuteProviderOperation(ctx, operation)
-	case "transit":
-		if r == nil || r.transit == nil {
-			return fmt.Errorf("transit managed carrier executor is not configured")
-		}
-		return r.transit.ExecuteProviderOperation(ctx, operation)
-	default:
-		return fmt.Errorf("unsupported provider operation execution target %q", operation.ExecutionTarget)
-	}
 }
