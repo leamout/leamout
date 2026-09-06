@@ -26,6 +26,33 @@ func normalizeProvisioningMode(value ProvisioningMode) (ProvisioningMode, error)
 	return value, nil
 }
 
+func normalizeManagedSIPConfig(config ManagedSIPConfig) (ManagedSIPConfig, error) {
+	if !config.Enabled {
+		return ManagedSIPConfig{}, nil
+	}
+
+	host, err := normalizeHost(config.Host)
+	if err != nil {
+		return ManagedSIPConfig{}, apperror.NewBadRequest("managed SIP host is invalid")
+	}
+	realm, err := normalizeHost(config.Realm)
+	if err != nil {
+		return ManagedSIPConfig{}, apperror.NewBadRequest("managed SIP realm is invalid")
+	}
+	if err := validatePort(config.Port); err != nil {
+		return ManagedSIPConfig{}, err
+	}
+	transport, err := normalizeChoice(config.Transport, transports, "managed SIP transport")
+	if err != nil {
+		return ManagedSIPConfig{}, err
+	}
+
+	config.Host = host
+	config.Realm = realm
+	config.Transport = transport
+	return config, nil
+}
+
 func normalizeName(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" || len(value) > 255 {
