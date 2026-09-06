@@ -55,26 +55,116 @@ type Modules struct {
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
 
-type CatalogModule struct { Repository *catalog.Repository; Service *catalog.Service; Handler *catalog.Handler }
-type LicensingModule struct { Repository *licensing.Repository; Service *licensing.Service; Handler *licensing.Handler }
-type CommercialStateModule struct { Service *commercialstate.Service; Handler *commercialstate.Handler }
-type SubscriptionsModule struct { Repository *subscriptions.Repository; Service *subscriptions.Service; Handler *subscriptions.Handler }
-type AuthModule struct { Repository *auth.Repository; Service *auth.Service; Handler *auth.Handler }
-type SessionModule struct { Repository *session.Repository; Service *session.Service; Handler *session.Handler }
-type UsersModule struct { Repository *users.Repository; Service *users.Service; Handler *users.Handler }
-type OrganizationModule struct { Repository *organization.Repository; Service *organization.Service; Handler *organization.Handler }
-type MembersModule struct { Repository *members.Repository; Service *members.Service; Handler *members.Handler }
-type CredentialsModule struct { Repository *credentials.Repository; Service *credentials.Service; Handler *credentials.Handler }
-type VoiceModule struct { Repository *voice.Repository; Service *voice.Service; Handler *voice.Handler }
-type CallsModule struct { Repository *calls.Repository; Service *calls.Service; Handler *calls.Handler }
-type RecordingsModule struct { Repository *recordings.Repository; Service *recordings.Service; Handler *recordings.Handler }
-type ConferencesModule struct { Repository *conferences.Repository; Service *conferences.Service; Handler *conferences.Handler }
-type WebhooksModule struct { Repository *webhooks.Repository; Service *webhooks.Service; Handler *webhooks.Handler }
-type AuditModule struct { Repository *audit.Repository; Service *audit.Service; Handler *audit.Handler }
-type IdempotencyModule struct { Repository *idempotency.Repository; Service *idempotency.Service; Middleware *middleware.IdempotencyMiddleware }
-type SIPDomainsModule struct { Repository *sip_domains.Repository; Service *sip_domains.Service; Handler *sip_domains.Handler }
-type NumbersModule struct { Repository *numbers.Repository; Service *numbers.Service; Handler *numbers.Handler }
-type SubscribersModule struct { Repository *subscribers.Repository; Service *subscribers.Service; Handler *subscribers.Handler }
-type TrunksModule struct { Repository *trunks.Repository; Service *trunks.Service; Handler *trunks.Handler }
-type CarriersModule struct { Repository *carriers.Repository; Service *carriers.Service; Handler *carriers.Handler }
-type RealtimeModule struct { Service *realtime.Service; Handler *realtime.Handler }
+type CatalogModule struct {
+	Repository *catalog.Repository
+	Service    *catalog.Service
+	Handler    *catalog.Handler
+}
+type LicensingModule struct {
+	Repository *licensing.Repository
+	Service    *licensing.Service
+	Handler    *licensing.Handler
+}
+type CommercialStateModule struct {
+	Service *commercialstate.Service
+	Handler *commercialstate.Handler
+}
+type SubscriptionsModule struct {
+	Repository *subscriptions.Repository
+	Service    *subscriptions.Service
+	Handler    *subscriptions.Handler
+}
+type AuthModule struct {
+	Repository *auth.Repository
+	Service    *auth.Service
+	Handler    *auth.Handler
+}
+type SessionModule struct {
+	Repository *session.Repository
+	Service    *session.Service
+	Handler    *session.Handler
+}
+type UsersModule struct {
+	Repository *users.Repository
+	Service    *users.Service
+	Handler    *users.Handler
+}
+type OrganizationModule struct {
+	Repository *organization.Repository
+	Service    *organization.Service
+	Handler    *organization.Handler
+}
+type MembersModule struct {
+	Repository *members.Repository
+	Service    *members.Service
+	Handler    *members.Handler
+}
+type CredentialsModule struct {
+	Repository *credentials.Repository
+	Service    *credentials.Service
+	Handler    *credentials.Handler
+}
+type VoiceModule struct {
+	Repository *voice.Repository
+	Service    *voice.Service
+	Handler    *voice.Handler
+}
+type CallsModule struct {
+	Repository *calls.Repository
+	Service    *calls.Service
+	Handler    *calls.Handler
+}
+type RecordingsModule struct {
+	Repository *recordings.Repository
+	Service    *recordings.Service
+	Handler    *recordings.Handler
+}
+type ConferencesModule struct {
+	Repository *conferences.Repository
+	Service    *conferences.Service
+	Handler    *conferences.Handler
+}
+type WebhooksModule struct {
+	Repository *webhooks.Repository
+	Service    *webhooks.Service
+	Handler    *webhooks.Handler
+}
+type AuditModule struct {
+	Repository *audit.Repository
+	Service    *audit.Service
+	Handler    *audit.Handler
+}
+type IdempotencyModule struct {
+	Repository *idempotency.Repository
+	Service    *idempotency.Service
+	Middleware *middleware.IdempotencyMiddleware
+}
+type SIPDomainsModule struct {
+	Repository *sip_domains.Repository
+	Service    *sip_domains.Service
+	Handler    *sip_domains.Handler
+}
+type NumbersModule struct {
+	Repository *numbers.Repository
+	Service    *numbers.Service
+	Handler    *numbers.Handler
+}
+type SubscribersModule struct {
+	Repository *subscribers.Repository
+	Service    *subscribers.Service
+	Handler    *subscribers.Handler
+}
+type TrunksModule struct {
+	Repository *trunks.Repository
+	Service    *trunks.Service
+	Handler    *trunks.Handler
+}
+type CarriersModule struct {
+	Repository *carriers.Repository
+	Service    *carriers.Service
+	Handler    *carriers.Handler
+}
+type RealtimeModule struct {
+	Service *realtime.Service
+	Handler *realtime.Handler
+}

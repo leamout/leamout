@@ -221,22 +221,22 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 
 	return &Worker{
-		db: db,
-		freeSwitch: freeSwitch,
-		nats: natsClient,
-		redis: redisClient,
-		calls: calls.NewConsumer(callsService),
-		recordings: recordings.NewConsumer(recordingsService),
-		callReconciliation: callReconciliation,
-		endpointHealth: endpointHealth,
+		db:                      db,
+		freeSwitch:              freeSwitch,
+		nats:                    natsClient,
+		redis:                   redisClient,
+		calls:                   calls.NewConsumer(callsService),
+		recordings:              recordings.NewConsumer(recordingsService),
+		callReconciliation:      callReconciliation,
+		endpointHealth:          endpointHealth,
 		recordingReconciliation: recordingReconciliation,
-		providerOperations: providerOperations,
-		outbox: outboxJob,
-		webhookConsumer: webhookConsumer,
-		webhookDelivery: webhookDelivery,
-		idempotencyCleanup: idempotencyCleanup,
-		health: newHealthState(componentNames...),
-		logger: logging.New(),
+		providerOperations:      providerOperations,
+		outbox:                  outboxJob,
+		webhookConsumer:         webhookConsumer,
+		webhookDelivery:         webhookDelivery,
+		idempotencyCleanup:      idempotencyCleanup,
+		health:                  newHealthState(componentNames...),
+		logger:                  logging.New(),
 	}, nil
 }
 
@@ -273,12 +273,12 @@ func (w *Worker) Run(ctx context.Context) error {
 	w.logger.Info(ctx, "worker subscribed to FreeSWITCH lifecycle events")
 
 	healthServer := &http.Server{
-		Addr: workerHealthAddress,
-		Handler: healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
+		Addr:              workerHealthAddress,
+		Handler:           healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout: 5 * time.Second,
-		WriteTimeout: 5 * time.Second,
-		IdleTimeout: 30 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
+		IdleTimeout:       30 * time.Second,
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
