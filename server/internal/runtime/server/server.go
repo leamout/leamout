@@ -32,6 +32,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
+	"github.com/leamout/leamout/internal/telecom/edge"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -127,6 +128,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize managed SIP: %w", err)
 	}
+	modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, cfg.ManagedSIP.AdmissionSecret)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -213,6 +215,8 @@ func NewModules(
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
 	trunksService.SetManagedSIPClientCipher(credentialCipher)
+	edgeRepository := edge.NewRepository(db)
+	edgeService := edge.NewService(edgeRepository, commercialStateService)
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
 	auditRepository := audit.NewRepository(db)
@@ -248,6 +252,7 @@ func NewModules(
 		Idempotency:          IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService)},
 		Conferences:          ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
 		Realtime:             RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
+		Edge:                 EdgeModule{Repository: edgeRepository, Service: edgeService},
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil

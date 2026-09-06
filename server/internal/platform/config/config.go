@@ -24,11 +24,12 @@ type SIPConfig struct {
 }
 
 type ManagedSIPConfig struct {
-	Enabled   bool   `env:"ENABLED" envDefault:"false"`
-	Host      string `env:"HOST" envDefault:"sip.leamout.com"`
-	Port      int    `env:"PORT" envDefault:"5061"`
-	Transport string `env:"TRANSPORT" envDefault:"tls"`
-	Realm     string `env:"REALM" envDefault:"sip.leamout.com"`
+	Enabled         bool   `env:"ENABLED" envDefault:"false"`
+	Host            string `env:"HOST" envDefault:"sip.leamout.com"`
+	Port            int    `env:"PORT" envDefault:"5061"`
+	Transport       string `env:"TRANSPORT" envDefault:"tls"`
+	Realm           string `env:"REALM" envDefault:"sip.leamout.com"`
+	AdmissionSecret string `env:"ADMISSION_SECRET"`
 }
 
 type Config struct {
@@ -86,6 +87,7 @@ func (c *Config) normalize() {
 	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
 	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
 	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)
+	c.ManagedSIP.AdmissionSecret = strings.TrimSpace(c.ManagedSIP.AdmissionSecret)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)

@@ -18,6 +18,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         "opensips=$package_version" \
         "opensips-auth-modules=$package_version" \
+        "opensips-http-modules=$package_version" \
+        "opensips-json-module=$package_version" \
         "opensips-postgres-module=$package_version" \
         "opensips-tls-module=$package_version" \
         "opensips-wss-module=$package_version" \
@@ -29,8 +31,10 @@ RUN apt-get update \
         db_postgres.so \
         gflags.so \
         mi_fifo.so \
+        json.so \
         pike.so \
         rtpengine.so \
+        rest_client.so \
         sqlops.so \
         tls_mgm.so \
         tls_openssl.so \
