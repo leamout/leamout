@@ -100,6 +100,7 @@ func (h *Handler) EnrollManagedCarrier(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
+	w.Header().Set("Cache-Control", "no-store")
 	httputil.Created(w, newManagedCarrierEnrollmentResponse(enrollment))
 }
 
