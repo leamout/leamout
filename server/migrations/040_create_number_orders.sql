@@ -1,16 +1,15 @@
 CREATE TABLE IF NOT EXISTS number_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    provider_id UUID NOT NULL REFERENCES carrier_providers(id) ON DELETE RESTRICT,
 
-    -- Immutable selection context. These identifiers stay internal and are not
-    -- exposed through the customer-facing number-order response.
-    provider_inventory_id TEXT NOT NULL,
-    provider_product_id TEXT NOT NULL,
+    -- Customer acquisition identity. The opaque selection handle is scoped to
+    -- the organization; upstream provider inventory/product identifiers belong
+    -- to the execution journal, not the customer order record.
+    selection_id TEXT NOT NULL,
     number TEXT NOT NULL,
     country_code CHAR(2) NOT NULL,
 
-    -- Customer/business state only. Provider execution state belongs in
+    -- Customer/business state only. Managed-carrier execution state belongs in
     -- provider_operations.
     status TEXT NOT NULL DEFAULT 'pending',
     phone_number_id UUID REFERENCES phone_numbers(id) ON DELETE SET NULL,
@@ -21,16 +20,16 @@ CREATE TABLE IF NOT EXISTS number_orders (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_number_orders_id_org_provider UNIQUE (
+    CONSTRAINT uq_number_orders_id_org UNIQUE (
         id,
+        organization_id
+    ),
+    CONSTRAINT uq_number_orders_selection UNIQUE (
         organization_id,
-        provider_id
+        selection_id
     ),
-    CONSTRAINT chk_number_orders_inventory_id CHECK (
-        length(btrim(provider_inventory_id)) > 0
-    ),
-    CONSTRAINT chk_number_orders_product_id CHECK (
-        length(btrim(provider_product_id)) > 0
+    CONSTRAINT chk_number_orders_selection_id CHECK (
+        length(btrim(selection_id)) > 0
     ),
     CONSTRAINT chk_number_orders_number CHECK (
         number ~ '^\+[1-9][0-9]{6,14}$'
@@ -64,15 +63,9 @@ CREATE TABLE IF NOT EXISTS number_orders (
 );
 
 COMMENT ON TABLE number_orders IS
-    'Customer-visible managed-number acquisition intent. Provider execution and retry state lives in provider_operations.';
+    'Customer-visible managed-number acquisition intent. Upstream provider or Transit execution details live in provider_operations.';
 
--- Only one live order may own a provider inventory selection. Completed or
--- terminally failed history does not permanently reserve recycled inventory.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_number_orders_provider_inventory_open
-    ON number_orders (provider_id, provider_inventory_id)
-    WHERE status IN ('pending', 'processing');
-
--- An E.164 number cannot be acquired concurrently through two provider
+-- An E.164 number cannot be acquired concurrently through two managed-carrier
 -- selections while an order is still live.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_number_orders_number_open
     ON number_orders (number)
