@@ -31,7 +31,7 @@ import (
 
 func RegisterRoutes(r *chi.Mux, modules Modules) {
 	if modules.Edge.Handler != nil {
-		r.Post("/internal/v1/sip-edge/admit", modules.Edge.Handler.Admit)
+		r.Post("/internal/v1/sip-edge/authorize", modules.Edge.Handler.Admit)
 	}
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
