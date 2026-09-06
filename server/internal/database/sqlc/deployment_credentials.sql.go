@@ -169,15 +169,18 @@ func (q *Queries) GetDeploymentCredentialByTokenHash(ctx context.Context, tokenH
 	return i, err
 }
 
-const touchDeploymentCredential = `-- name: TouchDeploymentCredential :exec
+const touchDeploymentCredential = `-- name: TouchDeploymentCredential :one
 UPDATE deployment_credentials
 SET last_used_at = now()
 WHERE id = $1
   AND disabled_at IS NULL
   AND (expires_at IS NULL OR expires_at > now())
+RETURNING id
 `
 
-func (q *Queries) TouchDeploymentCredential(ctx context.Context, id uuid.UUID) error {
-	_, err := q.db.Exec(ctx, touchDeploymentCredential, id)
-	return err
+func (q *Queries) TouchDeploymentCredential(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, touchDeploymentCredential, id)
+	var id_2 uuid.UUID
+	err := row.Scan(&id_2)
+	return id_2, err
 }
