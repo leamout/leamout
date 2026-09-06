@@ -387,7 +387,11 @@ func (r *Repository) GetDeploymentCredentialByTokenHash(ctx context.Context, tok
 }
 
 func (r *Repository) TouchDeploymentCredential(ctx context.Context, id uuid.UUID) error {
-	return r.queries.TouchDeploymentCredential(ctx, id)
+	_, err := r.queries.TouchDeploymentCredential(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrInvalidDeploymentCredential
+	}
+	return err
 }
 
 func licenseFromRow(row sqlc.License) License {
