@@ -16,7 +16,6 @@ import (
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
-	"github.com/leamout/leamout/internal/integrations/transit"
 	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/internal/modules/webhooks"
@@ -188,36 +187,9 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		}
 		numberOrdersService.SetManagedProvider("didww", didwwClient)
 	}
-
-	var transitExecutor number_orders.ProviderOperationExecutor
-	transitConfigured := strings.TrimSpace(cfg.Transit.BaseURL) != "" || strings.TrimSpace(cfg.Transit.Token) != ""
-	if transitConfigured {
-		transitClient, err := transit.NewClient(transit.Config{
-			BaseURL:      cfg.Transit.BaseURL,
-			Token:        cfg.Transit.Token,
-			DeploymentID: cfg.DeploymentID,
-		})
-		if err != nil {
-			_ = redisClient.Close()
-			_ = freeSwitch.Close()
-			_ = natsClient.Close()
-			db.Close()
-			return nil, fmt.Errorf("initialize Transit managed carrier client: %w", err)
-		}
-		transitExecutor, err = transit.NewNumberOrderExecutor(transitClient, numberOrdersRepository)
-		if err != nil {
-			_ = redisClient.Close()
-			_ = freeSwitch.Close()
-			_ = natsClient.Close()
-			db.Close()
-			return nil, fmt.Errorf("initialize Transit number order executor: %w", err)
-		}
-	}
-
-	providerOperationExecutor := number_orders.NewExecutionRouter(numberOrdersService, transitExecutor)
 	providerOperations, err := number_orders.NewProviderOperationJob(
 		numberOrdersRepository,
-		providerOperationExecutor,
+		numberOrdersService,
 		number_orders.DefaultProviderOperationJobConfig(),
 	)
 	if err != nil {
