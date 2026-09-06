@@ -125,7 +125,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
-		return nil, fmt.Errorf("initialize managed SIP authority: %w", err)
+		return nil, fmt.Errorf("initialize managed SIP: %w", err)
 	}
 
 	router := chi.NewRouter()
@@ -212,6 +212,7 @@ func NewModules(
 	carriersService := carriers.NewService(carriersRepository, credentialCipher)
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
+	trunksService.SetManagedSIPClientCipher(credentialCipher)
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
 	auditRepository := audit.NewRepository(db)
@@ -244,7 +245,7 @@ func NewModules(
 		Trunks:               TrunksModule{Repository: trunksRepository, Service: trunksService, Handler: trunks.NewHandler(trunksService)},
 		Webhooks:             WebhooksModule{Repository: webhooksRepository, Service: webhooksService, Handler: webhooks.NewHandler(webhooksService)},
 		Audit:                AuditModule{Repository: auditRepository, Service: auditService, Handler: audit.NewHandler(auditService)},
-		Idempotency:          IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService)},
+		Idempotency:          IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService, idempotency.DefaultConfig())},
 		Conferences:          ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
 		Realtime:             RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
 		Authn:                authMiddleware,
@@ -265,7 +266,7 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 }
 
 func configureManagedSIP(cfg config.Config, service *trunks.Service, state *commercialstate.Service) error {
-	if cfg.ManagedSIP.Enabled && (cfg.ManagedSIP.Port < 1 || cfg.ManagedSIP.Port > 65535) {
+	if cfg.ManagedSIP.Port < 1 || cfg.ManagedSIP.Port > 65535 {
 		return fmt.Errorf("managed SIP port must be between 1 and 65535")
 	}
 	return service.SetManagedSIP(trunks.ManagedSIPConfig{
