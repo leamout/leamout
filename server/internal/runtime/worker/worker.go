@@ -322,10 +322,10 @@ func (w *Worker) Run(ctx context.Context) error {
 	healthServer := &http.Server{
 		Addr:              workerHealthAddress,
 		Handler:           healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
-		ReadHeaderTimeout: 5*time.Second,
-		ReadTimeout:       5*time.Second,
-		WriteTimeout:      5*time.Second,
-		IdleTimeout:       30*time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      5 * time.Second,
+		IdleTimeout:       30 * time.Second,
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
