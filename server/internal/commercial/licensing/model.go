@@ -27,35 +27,44 @@ const (
 	DeploymentStatusDeactivated DeploymentStatus = "deactivated"
 )
 
-const MaxDeploymentsEntitlement = "max.deployments"
+const (
+	MaxDeploymentsEntitlement = "max.deployments"
+	ManagedVoiceEntitlement    = "voice.managed.enabled"
+
+	ManagedCarrierPurpose      = "managed_carrier"
+	ManagedCarrierTransitScope = "managed_carrier:transit"
+)
 
 var (
-	ErrLicenseNotFound            = apperror.NewNotFound("license not found")
-	ErrLicenseUnavailable         = apperror.NewConflict("license is unavailable")
-	ErrCommercialStateUnavailable = apperror.NewPaymentRequired("commercial state does not allow license creation")
-	ErrOrganizationIDRequired     = apperror.NewBadRequest("organization id is required")
-	ErrLicenseIDRequired          = apperror.NewBadRequest("license id is required")
-	ErrSigningKeyRequired         = errors.New("signing key id is required before license activation")
-	ErrInvalidSigningKey          = errors.New("signing key id must not contain whitespace")
-	ErrSigningKeyUnavailable      = errors.New("license signing key is unavailable")
-	ErrUnsupportedLicenseVersion  = errors.New("unsupported signed license version")
-	ErrUnsupportedAlgorithm       = errors.New("unsupported license signature algorithm")
-	ErrMalformedArtifact          = errors.New("malformed signed license artifact")
-	ErrInvalidSignature           = errors.New("invalid signed license signature")
-	ErrArtifactExpired            = errors.New("signed license artifact has expired")
-	ErrArtifactNotYetValid        = errors.New("signed license artifact is not yet valid")
-	ErrDeploymentMismatch         = errors.New("signed license is bound to another deployment")
-	ErrInvalidStatus              = errors.New("invalid license status")
-	ErrInvalidTransition          = errors.New("invalid license status transition")
-	ErrInvalidDeploymentLimit     = apperror.NewConflict("max deployments must be greater than zero")
-	ErrInvalidExpiration          = apperror.NewBadRequest("license expiration must be after issuance")
-	ErrDeploymentIDRequired       = apperror.NewBadRequest("deployment_id is required")
-	ErrInvalidDeploymentID        = apperror.NewBadRequest("deployment_id must not contain whitespace")
-	ErrInvalidDeploymentName      = apperror.NewBadRequest("deployment name must not be blank")
-	ErrDeploymentNotFound         = apperror.NewNotFound("deployment not found")
-	ErrDeploymentInactive         = apperror.NewConflict("deployment is deactivated")
-	ErrDeploymentLimitReached     = apperror.NewConflict("license deployment limit reached")
-	ErrActivationConflict         = apperror.NewConflict("deployment activation conflicted with another concurrent change")
+	ErrLicenseNotFound             = apperror.NewNotFound("license not found")
+	ErrLicenseUnavailable          = apperror.NewConflict("license is unavailable")
+	ErrCommercialStateUnavailable  = apperror.NewPaymentRequired("commercial state does not allow license creation")
+	ErrManagedCarrierUnavailable   = apperror.NewPaymentRequired("managed carrier is not enabled for this organization")
+	ErrOrganizationIDRequired      = apperror.NewBadRequest("organization id is required")
+	ErrLicenseIDRequired           = apperror.NewBadRequest("license id is required")
+	ErrSigningKeyRequired          = errors.New("signing key id is required before license activation")
+	ErrInvalidSigningKey           = errors.New("signing key id must not contain whitespace")
+	ErrSigningKeyUnavailable       = errors.New("license signing key is unavailable")
+	ErrUnsupportedLicenseVersion   = errors.New("unsupported signed license version")
+	ErrUnsupportedAlgorithm        = errors.New("unsupported license signature algorithm")
+	ErrMalformedArtifact           = errors.New("malformed signed license artifact")
+	ErrInvalidSignature            = errors.New("invalid signed license signature")
+	ErrArtifactExpired             = errors.New("signed license artifact has expired")
+	ErrArtifactNotYetValid         = errors.New("signed license artifact is not yet valid")
+	ErrDeploymentMismatch          = errors.New("signed license is bound to another deployment")
+	ErrInvalidStatus               = errors.New("invalid license status")
+	ErrInvalidTransition           = errors.New("invalid license status transition")
+	ErrInvalidDeploymentLimit      = apperror.NewConflict("max deployments must be greater than zero")
+	ErrInvalidExpiration           = apperror.NewBadRequest("license expiration must be after issuance")
+	ErrDeploymentIDRequired        = apperror.NewBadRequest("deployment_id is required")
+	ErrInvalidDeploymentID         = apperror.NewBadRequest("deployment_id must not contain whitespace")
+	ErrInvalidDeploymentName       = apperror.NewBadRequest("deployment name must not be blank")
+	ErrDeploymentNotFound          = apperror.NewNotFound("deployment not found")
+	ErrDeploymentInactive          = apperror.NewConflict("deployment is deactivated")
+	ErrDeploymentLimitReached      = apperror.NewConflict("license deployment limit reached")
+	ErrActivationConflict          = apperror.NewConflict("deployment activation conflicted with another concurrent change")
+	ErrInvalidDeploymentCredential = apperror.NewUnauthorized("invalid deployment credential")
+	ErrDeploymentCredentialScope   = apperror.NewForbidden("deployment credential does not authorize this operation")
 )
 
 // License is Leamout-owned commercial authority for self-hosted installations.
@@ -86,6 +95,54 @@ type Deployment struct {
 	DeactivatedAt  *time.Time
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+// DeploymentCredential is a cloud-authoritative machine identity for one deployment.
+// The usable token is returned once at enrollment time and is never persisted.
+type DeploymentCredential struct {
+	ID              uuid.UUID
+	DeploymentRowID uuid.UUID
+	Purpose         string
+	TokenPrefix     string
+	Scopes          []string
+	ExpiresAt       *time.Time
+	LastUsedAt      *time.Time
+	DisabledAt      *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type deploymentCredentialAuthentication struct {
+	CredentialID     uuid.UUID
+	OrganizationID   uuid.UUID
+	LicenseID        uuid.UUID
+	DeploymentID     string
+	DeploymentStatus string
+	LicenseStatus    string
+	LicenseExpiresAt *time.Time
+	Purpose          string
+	Scopes           []string
+}
+
+// DeploymentIdentity is the trusted identity returned after authenticating a
+// deployment credential at the Leamout control-plane boundary.
+type DeploymentIdentity struct {
+	CredentialID   uuid.UUID
+	OrganizationID uuid.UUID
+	LicenseID      uuid.UUID
+	DeploymentID   string
+	Purpose        string
+	Scopes         []string
+}
+
+// ManagedCarrierEnrollment contains the one-time deployment credential issued for
+// self-hosted access to Leamout-managed carrier services.
+type ManagedCarrierEnrollment struct {
+	DeploymentID string
+	Token        string
+	TokenPrefix  string
+	Scopes       []string
+	ExpiresAt    *time.Time
 }
 
 // CreateInput contains trusted licensing-authority metadata. Subscription identity
@@ -146,4 +203,16 @@ func newDeploymentResponse(deployment Deployment) deploymentResponse {
 		LastSeenAt: deployment.LastSeenAt, DeactivatedAt: deployment.DeactivatedAt,
 		CreatedAt: deployment.CreatedAt, UpdatedAt: deployment.UpdatedAt,
 	}
+}
+
+type managedCarrierEnrollmentResponse struct {
+	DeploymentID string     `json:"deployment_id"`
+	Token        string     `json:"token"`
+	TokenPrefix  string     `json:"token_prefix"`
+	Scopes       []string   `json:"scopes"`
+	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+}
+
+func newManagedCarrierEnrollmentResponse(enrollment ManagedCarrierEnrollment) managedCarrierEnrollmentResponse {
+	return managedCarrierEnrollmentResponse(enrollment)
 }

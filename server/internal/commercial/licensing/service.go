@@ -2,10 +2,20 @@ package licensing
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+)
+
+const (
+	deploymentTokenPrefix = "lm_dep_"
+	deploymentSecretBytes = 32
 )
 
 // Service owns self-hosted license lifecycle and deployment activation policy.
@@ -146,4 +156,156 @@ func (s *Service) DeactivateDeployment(ctx context.Context, organizationID, lice
 		return Deployment{}, err
 	}
 	return s.repo.DeactivateDeployment(ctx, organizationID, licenseID, normalized.DeploymentID)
+}
+
+// EnrollManagedCarrier rotates the managed-carrier machine credential for an
+// already-active self-hosted deployment. The usable token is returned only from
+// this call; persistence contains only its cryptographic hash.
+func (s *Service) EnrollManagedCarrier(
+	ctx context.Context,
+	organizationID, licenseID uuid.UUID,
+	deploymentID string,
+) (ManagedCarrierEnrollment, error) {
+	normalized, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: deploymentID})
+	if err != nil {
+		return ManagedCarrierEnrollment{}, err
+	}
+
+	deployment, err := s.repo.GetDeployment(ctx, organizationID, licenseID, normalized.DeploymentID)
+	if err != nil {
+		return ManagedCarrierEnrollment{}, err
+	}
+	if deployment.Status != DeploymentStatusActive {
+		return ManagedCarrierEnrollment{}, ErrDeploymentInactive
+	}
+
+	now := s.now().UTC()
+	license, err := s.Get(ctx, organizationID, licenseID)
+	if err != nil {
+		return ManagedCarrierEnrollment{}, err
+	}
+	if license.Status != StatusActive || (license.ExpiresAt != nil && !license.ExpiresAt.After(now)) {
+		return ManagedCarrierEnrollment{}, ErrLicenseUnavailable
+	}
+
+	commercial, err := s.state.ResolveAt(ctx, organizationID, now)
+	if err != nil {
+		return ManagedCarrierEnrollment{}, fmt.Errorf("resolve managed carrier commercial state: %w", err)
+	}
+	if commercial.Standing != commercialstate.StandingActive || !commercial.Enabled(ManagedVoiceEntitlement) {
+		return ManagedCarrierEnrollment{}, ErrManagedCarrierUnavailable
+	}
+
+	token, prefix, hash, err := generateDeploymentToken()
+	if err != nil {
+		return ManagedCarrierEnrollment{}, err
+	}
+	scopes := []string{ManagedCarrierTransitScope}
+	credential, err := s.repo.RotateDeploymentCredential(
+		ctx,
+		deployment.ID,
+		ManagedCarrierPurpose,
+		hash,
+		prefix,
+		scopes,
+		license.ExpiresAt,
+	)
+	if err != nil {
+		return ManagedCarrierEnrollment{}, err
+	}
+
+	return ManagedCarrierEnrollment{
+		DeploymentID: deployment.DeploymentID,
+		Token:        token,
+		TokenPrefix:  credential.TokenPrefix,
+		Scopes:       credential.Scopes,
+		ExpiresAt:    credential.ExpiresAt,
+	}, nil
+}
+
+// AuthenticateDeploymentCredential resolves a deployment machine credential at
+// the Leamout control-plane boundary. It deliberately re-checks cloud-owned
+// deployment, license, organization, and commercial state instead of trusting
+// state reported by the self-hosted runtime.
+func (s *Service) AuthenticateDeploymentCredential(
+	ctx context.Context,
+	token string,
+	requiredScope string,
+) (DeploymentIdentity, error) {
+	if _, err := parseDeploymentTokenPrefix(token); err != nil {
+		return DeploymentIdentity{}, ErrInvalidDeploymentCredential
+	}
+	identity, err := s.repo.GetDeploymentCredentialByTokenHash(ctx, hashDeploymentToken(token))
+	if err != nil {
+		return DeploymentIdentity{}, ErrInvalidDeploymentCredential
+	}
+
+	now := s.now().UTC()
+	if identity.Purpose != ManagedCarrierPurpose ||
+		identity.DeploymentStatus != string(DeploymentStatusActive) ||
+		identity.LicenseStatus != string(StatusActive) {
+		return DeploymentIdentity{}, ErrInvalidDeploymentCredential
+	}
+	if identity.LicenseExpiresAt != nil && !identity.LicenseExpiresAt.After(now) {
+		return DeploymentIdentity{}, ErrInvalidDeploymentCredential
+	}
+	if requiredScope != "" && !hasScope(identity.Scopes, requiredScope) {
+		return DeploymentIdentity{}, ErrDeploymentCredentialScope
+	}
+
+	commercial, err := s.state.ResolveAt(ctx, identity.OrganizationID, now)
+	if err != nil {
+		return DeploymentIdentity{}, ErrInvalidDeploymentCredential
+	}
+	if commercial.Standing != commercialstate.StandingActive || !commercial.Enabled(ManagedVoiceEntitlement) {
+		return DeploymentIdentity{}, ErrManagedCarrierUnavailable
+	}
+
+	if err := s.repo.TouchDeploymentCredential(ctx, identity.CredentialID); err != nil {
+		return DeploymentIdentity{}, err
+	}
+	return DeploymentIdentity{
+		CredentialID:   identity.CredentialID,
+		OrganizationID: identity.OrganizationID,
+		LicenseID:      identity.LicenseID,
+		DeploymentID:   identity.DeploymentID,
+		Purpose:        identity.Purpose,
+		Scopes:         append([]string(nil), identity.Scopes...),
+	}, nil
+}
+
+func generateDeploymentToken() (token, prefix, hash string, err error) {
+	secret := make([]byte, deploymentSecretBytes)
+	if _, err := rand.Read(secret); err != nil {
+		return "", "", "", fmt.Errorf("generate deployment credential: %w", err)
+	}
+	encoded := base64.RawURLEncoding.EncodeToString(secret)
+	prefix = deploymentTokenPrefix + encoded[:8]
+	token = prefix + "_" + encoded
+	return token, prefix, hashDeploymentToken(token), nil
+}
+
+func hashDeploymentToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func parseDeploymentTokenPrefix(token string) (string, error) {
+	if len(token) < len(deploymentTokenPrefix)+9 || !strings.HasPrefix(token, deploymentTokenPrefix) {
+		return "", ErrInvalidDeploymentCredential
+	}
+	separator := len(deploymentTokenPrefix) + 8
+	if token[separator] != '_' || len(token) == separator+1 {
+		return "", ErrInvalidDeploymentCredential
+	}
+	return token[:separator], nil
+}
+
+func hasScope(scopes []string, required string) bool {
+	for _, scope := range scopes {
+		if scope == required {
+			return true
+		}
+	}
+	return false
 }

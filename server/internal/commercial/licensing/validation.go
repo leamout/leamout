@@ -1,6 +1,8 @@
 package licensing
 
 import (
+	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -88,4 +90,20 @@ func normalizeDeployment(input ActivateDeploymentInput) (ActivateDeploymentInput
 		input.Name = &name
 	}
 	return input, nil
+}
+
+func deploymentCredentialScopes(raw json.RawMessage) ([]string, error) {
+	var scopes []string
+	if err := json.Unmarshal(raw, &scopes); err != nil {
+		return nil, err
+	}
+	if len(scopes) == 0 {
+		return nil, errors.New("deployment credential requires at least one scope")
+	}
+	for _, scope := range scopes {
+		if strings.TrimSpace(scope) == "" {
+			return nil, errors.New("deployment credential contains blank scope")
+		}
+	}
+	return scopes, nil
 }

@@ -89,6 +89,20 @@ func (h *Handler) ActivateDeployment(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, newDeploymentResponse(deployment))
 }
 
+func (h *Handler) EnrollManagedCarrier(w http.ResponseWriter, r *http.Request) {
+	organizationID, licenseID, deploymentID, err := requestDeploymentIDs(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	enrollment, err := h.service.EnrollManagedCarrier(r.Context(), organizationID, licenseID, deploymentID)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.Created(w, newManagedCarrierEnrollmentResponse(enrollment))
+}
+
 func (h *Handler) HeartbeatDeployment(w http.ResponseWriter, r *http.Request) {
 	organizationID, licenseID, deploymentID, err := requestDeploymentIDs(r)
 	if err != nil {

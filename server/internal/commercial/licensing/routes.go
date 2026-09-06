@@ -18,6 +18,7 @@ func RegisterRoutes(
 		r.Get("/{license_id}", handler.Get)
 		r.Get("/{license_id}/deployments", handler.ListDeployments)
 		r.With(idempotency).Post("/{license_id}/deployments", handler.ActivateDeployment)
+		r.With(idempotency).Post("/{license_id}/deployments/{deployment_id}/managed-carrier/enrollment", handler.EnrollManagedCarrier)
 		r.With(idempotency).Post("/{license_id}/deployments/{deployment_id}/heartbeat", handler.HeartbeatDeployment)
 		r.With(idempotency).Delete("/{license_id}/deployments/{deployment_id}", handler.DeactivateDeployment)
 	})

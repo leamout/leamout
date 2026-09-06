@@ -2,6 +2,7 @@ package licensing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -274,27 +275,7 @@ func (r *Repository) ListDeployments(ctx context.Context, organizationID, licens
 	return result, nil
 }
 
-func (r *Repository) TouchDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string, at time.Time) (Deployment, error) {
-	_, err := r.queries.TouchDeployment(ctx, sqlc.TouchDeploymentParams{
-		LastSeenAt: pgconv.NullableTimestamptz(&at), LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
-	})
-	if err != nil {
-		return Deployment{}, mapDeploymentWriteError(err)
-	}
-	return r.getDeployment(ctx, organizationID, licenseID, deploymentID)
-}
-
-func (r *Repository) DeactivateDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
-	_, err := r.queries.DeactivateDeployment(ctx, sqlc.DeactivateDeploymentParams{
-		LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
-	})
-	if err != nil {
-		return Deployment{}, mapDeploymentWriteError(err)
-	}
-	return r.getDeployment(ctx, organizationID, licenseID, deploymentID)
-}
-
-func (r *Repository) getDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
+func (r *Repository) GetDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
 	row, err := r.queries.GetDeployment(ctx, sqlc.GetDeploymentParams{
 		LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
 	})
@@ -305,6 +286,108 @@ func (r *Repository) getDeployment(ctx context.Context, organizationID, licenseI
 		return Deployment{}, err
 	}
 	return deploymentFromRow(organizationID, row), nil
+}
+
+func (r *Repository) TouchDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string, at time.Time) (Deployment, error) {
+	_, err := r.queries.TouchDeployment(ctx, sqlc.TouchDeploymentParams{
+		LastSeenAt: pgconv.NullableTimestamptz(&at), LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
+	})
+	if err != nil {
+		return Deployment{}, mapDeploymentWriteError(err)
+	}
+	return r.GetDeployment(ctx, organizationID, licenseID, deploymentID)
+}
+
+func (r *Repository) DeactivateDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
+	_, err := r.queries.DeactivateDeployment(ctx, sqlc.DeactivateDeploymentParams{
+		LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
+	})
+	if err != nil {
+		return Deployment{}, mapDeploymentWriteError(err)
+	}
+	return r.GetDeployment(ctx, organizationID, licenseID, deploymentID)
+}
+
+func (r *Repository) RotateDeploymentCredential(
+	ctx context.Context,
+	deploymentID uuid.UUID,
+	purpose, tokenHash, tokenPrefix string,
+	scopes []string,
+	expiresAt *time.Time,
+) (DeploymentCredential, error) {
+	scopeJSON, err := json.Marshal(scopes)
+	if err != nil {
+		return DeploymentCredential{}, fmt.Errorf("encode deployment credential scopes: %w", err)
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return DeploymentCredential{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+
+	if err := queries.DisableActiveDeploymentCredentials(ctx, sqlc.DisableActiveDeploymentCredentialsParams{
+		DeploymentID: deploymentID,
+		Purpose:      purpose,
+	}); err != nil {
+		return DeploymentCredential{}, err
+	}
+	row, err := queries.CreateDeploymentCredential(ctx, sqlc.CreateDeploymentCredentialParams{
+		Purpose:      purpose,
+		TokenHash:    tokenHash,
+		TokenPrefix:  tokenPrefix,
+		Scopes:       scopeJSON,
+		ExpiresAt:    pgconv.NullableTimestamptz(expiresAt),
+		DeploymentID: deploymentID,
+	})
+	if err != nil {
+		return DeploymentCredential{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return DeploymentCredential{}, err
+	}
+	scopesCopy, err := deploymentCredentialScopes(row.Scopes)
+	if err != nil {
+		return DeploymentCredential{}, err
+	}
+	return DeploymentCredential{
+		ID:              row.ID,
+		DeploymentRowID: row.DeploymentID,
+		Purpose:         row.Purpose,
+		TokenPrefix:     row.TokenPrefix,
+		Scopes:          scopesCopy,
+		ExpiresAt:       pgconv.TimestamptzToTimePtr(row.ExpiresAt),
+		LastUsedAt:      pgconv.TimestamptzToTimePtr(row.LastUsedAt),
+		DisabledAt:      pgconv.TimestamptzToTimePtr(row.DisabledAt),
+		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
+	}, nil
+}
+
+func (r *Repository) GetDeploymentCredentialByTokenHash(ctx context.Context, tokenHash string) (deploymentCredentialAuthentication, error) {
+	row, err := r.queries.GetDeploymentCredentialByTokenHash(ctx, tokenHash)
+	if err != nil {
+		return deploymentCredentialAuthentication{}, err
+	}
+	scopes, err := deploymentCredentialScopes(row.Scopes)
+	if err != nil {
+		return deploymentCredentialAuthentication{}, err
+	}
+	return deploymentCredentialAuthentication{
+		CredentialID:      row.CredentialID,
+		OrganizationID:    row.OrganizationID,
+		LicenseID:         row.LicenseID,
+		DeploymentID:      row.DeploymentID,
+		DeploymentStatus:  row.DeploymentStatus,
+		LicenseStatus:     row.LicenseStatus,
+		LicenseExpiresAt:  pgconv.TimestamptzToTimePtr(row.LicenseExpiresAt),
+		Purpose:           row.Purpose,
+		Scopes:            scopes,
+	}, nil
+}
+
+func (r *Repository) TouchDeploymentCredential(ctx context.Context, id uuid.UUID) error {
+	return r.queries.TouchDeploymentCredential(ctx, id)
 }
 
 func licenseFromRow(row sqlc.License) License {
