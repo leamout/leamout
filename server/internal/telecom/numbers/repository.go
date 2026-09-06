@@ -241,7 +241,7 @@ func (r *Repository) FailProviderOperation(ctx context.Context, operation sqlc.P
 		ErrorMessage:   &message,
 		ID:             operation.PhoneNumberID,
 		OrganizationID: operation.OrganizationID,
-		ProviderID:     operation.CarrierProviderID,
+		ProviderID:     &operation.CarrierProviderID,
 	}); err != nil {
 		return err
 	}
@@ -259,7 +259,7 @@ func (r *Repository) CompleteProviderOperation(ctx context.Context, operation sq
 	number, err := queries.LockManagedPhoneNumberForProviderOperation(ctx, sqlc.LockManagedPhoneNumberForProviderOperationParams{
 		ID:             operation.PhoneNumberID,
 		OrganizationID: operation.OrganizationID,
-		ProviderID:     operation.CarrierProviderID,
+		ProviderID:     &operation.CarrierProviderID,
 		Number:         request.Number,
 		CountryCode:    request.CountryCode,
 	})
@@ -275,7 +275,7 @@ func (r *Repository) CompleteProviderOperation(ctx context.Context, operation sq
 		ProviderResourceID: &resourceID,
 		ID:                 number.ID,
 		OrganizationID:     number.OrganizationID,
-		ProviderID:         operation.CarrierProviderID,
+		ProviderID:         &operation.CarrierProviderID,
 	}); err != nil {
 		return err
 	}
