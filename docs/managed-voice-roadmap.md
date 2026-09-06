@@ -182,9 +182,28 @@ Managed outbound private-alpha foundations now include:
 - [x] Fail closed when entitlement resolution or wholesale-spend state is unavailable.
 - [x] Persist provider-neutral CDRs and reconcile each record idempotently to a
       platform-routed outbound call and one wholesale charge.
+- [x] Authenticate self-hosted managed trunks with SIP Digest at the hosted
+      edge and authorize each call through a fail-closed admission service.
 - [ ] Add the production CommPeak account, encrypted credential, and endpoint configuration.
 - [ ] Schedule authenticated CommPeak CDR polling with a durable cursor and retry policy.
 - [ ] Prove real PSTN termination and provider reconciliation in acceptance coverage.
+
+### Hosted SIP edge admission
+
+The hosted edge treats Digest authentication and call authorization as
+separate decisions. OpenSIPS obtains the authenticated username from the
+realm-bound managed-trunk credential view, then calls the private admission
+endpoint over the control network. The endpoint re-resolves the active tenant
+trunk, validates an active managed caller ID owned by that tenant, requires
+active commercial standing plus `voice.managed.enabled`, enforces the positive
+`voice.managed.daily_spend_micros` entitlement against reconciled wholesale
+charges, and returns only the platform `managed_default` route.
+Successful responses explicitly set `allowed` and include the internal route;
+policy denials return `allowed: false` without exposing routing metadata.
+
+The edge and API share `MANAGED_SIP_ADMISSION_SECRET`. An absent/invalid secret,
+an unavailable entitlement or spend lookup, an unknown caller ID, and a missing
+platform route all fail closed before OpenSIPS creates the outbound transaction.
 
 Only after the ownership/routing foundation exists should provider adapters enter customer workflows.
 

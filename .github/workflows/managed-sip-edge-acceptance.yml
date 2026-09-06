@@ -1,0 +1,32 @@
+name: Managed SIP edge acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "server/**"
+      - "deploy/**"
+      - "tests/acceptance/managed-sip-edge/**"
+      - ".github/workflows/managed-sip-edge-acceptance.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: managed-sip-edge-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: Managed trunk authentication and authorization
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Validate acceptance scripts
+        run: |
+          sh -n tests/acceptance/managed-sip-edge/run.sh
+          python3 -m py_compile tests/acceptance/managed-sip-edge/acceptance.py tests/acceptance/managed-sip-edge/wholesale.py
+      - name: Run managed SIP edge acceptance suite
+        run: sh tests/acceptance/managed-sip-edge/run.sh

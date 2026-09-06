@@ -18,6 +18,7 @@ x-leamout-environment: &leamout-environment
   TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
   TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?MANAGED_SIP_ADMISSION_SECRET is required}
 
 services:
   postgres:
@@ -170,6 +171,7 @@ services:
     stop_grace_period: 30s
     environment:
       OPENSIPS_DATABASE_PASSWORD: leamout
+      MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?MANAGED_SIP_ADMISSION_SECRET is required}
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
