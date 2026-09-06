@@ -31,6 +31,7 @@ jobs:
           find server/internal/telecom/numbers -name '*.go' -print0 | xargs -0 gofmt -w
           find server/internal/telecom/number_orders -name '*.go' -print0 | xargs -0 gofmt -w
           find server/internal/commercial/usage_rating -name '*.go' -print0 | xargs -0 gofmt -w
+          find server/internal/commercial/licensing -name '*.go' -print0 | xargs -0 gofmt -w
 
       - name: Regenerate sqlc
         working-directory: server
@@ -52,7 +53,8 @@ jobs:
             server/internal/database/sqlc \
             server/internal/telecom/numbers \
             server/internal/telecom/number_orders \
-            server/internal/commercial/usage_rating
+            server/internal/commercial/usage_rating \
+            server/internal/commercial/licensing
           if ! git diff --cached --quiet; then
             git commit -m "regenerate domain artifacts"
             git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
