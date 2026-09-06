@@ -85,6 +85,17 @@ WHERE id = sqlc.arg(id)
   AND state IN ('pending', 'provider_accepted')
 RETURNING *;
 
+-- name: MarkProviderOperationFailed :exec
+UPDATE provider_operations
+SET
+    state = 'failed',
+    attempts = attempts + 1,
+    last_error = sqlc.arg(last_error),
+    next_attempt_at = NULL,
+    completed_at = now()
+WHERE id = sqlc.arg(id)
+  AND state IN ('pending', 'provider_accepted');
+
 -- name: MarkNumberOrderProviderOperationSucceeded :one
 UPDATE provider_operations
 SET
@@ -123,3 +134,9 @@ WHERE state IN ('pending', 'provider_accepted')
   AND next_attempt_at <= now()
 ORDER BY next_attempt_at ASC, created_at ASC
 LIMIT sqlc.arg(limit_count);
+
+-- name: TryProviderOperationAdvisoryLock :one
+SELECT pg_try_advisory_lock(hashtextextended(sqlc.arg(operation_id), 0));
+
+-- name: ReleaseProviderOperationAdvisoryLock :exec
+SELECT pg_advisory_unlock(hashtextextended(sqlc.arg(operation_id), 0));
