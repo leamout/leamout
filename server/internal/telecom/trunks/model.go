@@ -8,11 +8,19 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
+type ProvisioningMode string
+
+const (
+	ProvisioningModeBYOC    ProvisioningMode = "byoc"
+	ProvisioningModeManaged ProvisioningMode = "managed"
+)
+
 type CreateRequest struct {
-	CarrierConnectionID uuid.UUID `json:"carrier_connection_id"`
-	Name                string    `json:"name"`
-	Direction           *string   `json:"direction,omitempty"`
-	Status              *string   `json:"status,omitempty"`
+	Type                ProvisioningMode `json:"type"`
+	CarrierConnectionID *uuid.UUID       `json:"carrier_connection_id,omitempty"`
+	Name                string           `json:"name"`
+	Direction           *string          `json:"direction,omitempty"`
+	Status              *string          `json:"status,omitempty"`
 }
 
 type UpdateRequest struct {
@@ -62,14 +70,15 @@ type Event struct {
 }
 
 type Response struct {
-	ID                  uuid.UUID  `json:"id"`
-	OrganizationID      *uuid.UUID `json:"organization_id,omitempty"`
-	CarrierConnectionID uuid.UUID  `json:"carrier_connection_id"`
-	Name                string     `json:"name"`
-	Direction           string     `json:"direction"`
-	Status              string     `json:"status"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  uuid.UUID        `json:"id"`
+	OrganizationID      *uuid.UUID       `json:"organization_id,omitempty"`
+	Type                ProvisioningMode `json:"type"`
+	CarrierConnectionID *uuid.UUID       `json:"carrier_connection_id,omitempty"`
+	Name                string           `json:"name"`
+	Direction           string           `json:"direction"`
+	Status              string           `json:"status"`
+	CreatedAt           time.Time        `json:"created_at"`
+	UpdatedAt           time.Time        `json:"updated_at"`
 }
 
 type EndpointResponse struct {
@@ -95,8 +104,17 @@ type EndpointResponse struct {
 }
 
 func response(trunk sqlc.Trunk) Response {
-	return Response{trunk.ID, trunk.OrganizationID, trunk.CarrierConnectionID, trunk.Name,
-		trunk.Direction, trunk.Status, pgconv.TimestamptzToTime(trunk.CreatedAt), pgconv.TimestamptzToTime(trunk.UpdatedAt)}
+	return Response{
+		ID:                  trunk.ID,
+		OrganizationID:      trunk.OrganizationID,
+		Type:                ProvisioningMode(trunk.ProvisioningMode),
+		CarrierConnectionID: trunk.CarrierConnectionID,
+		Name:                trunk.Name,
+		Direction:           trunk.Direction,
+		Status:              trunk.Status,
+		CreatedAt:           pgconv.TimestamptzToTime(trunk.CreatedAt),
+		UpdatedAt:           pgconv.TimestamptzToTime(trunk.UpdatedAt),
+	}
 }
 
 func endpointResponse(endpoint sqlc.TrunkEndpoint) EndpointResponse {
