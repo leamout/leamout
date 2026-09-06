@@ -290,11 +290,12 @@ func (r *Repository) CompleteProviderOperation(
 		}
 	}
 
+	providerID := operation.CarrierProviderID
 	phoneNumber, err := queries.EnsureManagedPhoneNumberForProviderOperation(ctx, sqlc.EnsureManagedPhoneNumberForProviderOperationParams{
 		OrganizationID:      operation.OrganizationID,
 		Number:              request.Number,
 		CountryCode:         request.CountryCode,
-		ProviderID:          operation.CarrierProviderID,
+		ProviderID:          &providerID,
 		ProviderResourceID:  &providerResourceID,
 		CarrierConnectionID: request.CarrierConnectionID,
 	})
