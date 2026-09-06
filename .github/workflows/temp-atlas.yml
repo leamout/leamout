@@ -28,8 +28,7 @@ jobs:
 
       - name: Format Go sources
         run: |
-          find server/internal/telecom/numbers -name '*.go' -print0 | xargs -0 gofmt -w
-          find server/internal/commercial/usage_rating -name '*.go' -print0 | xargs -0 gofmt -w
+          find server -name '*.go' -print0 | xargs -0 gofmt -w
 
       - name: Regenerate sqlc
         working-directory: server
@@ -46,12 +45,11 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          find server -name '*.go' -print0 | xargs -0 git add --
           git add \
             server/migrations/atlas.sum \
-            server/internal/database/sqlc \
-            server/internal/telecom/numbers \
-            server/internal/commercial/usage_rating
+            server/internal/database/sqlc
           if ! git diff --cached --quiet; then
-            git commit -m "regenerate domain artifacts"
+            git commit -m "gofmt server sources"
             git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
           fi
