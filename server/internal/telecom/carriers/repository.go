@@ -2,117 +2,137 @@ package carriers
 
 import (
 	"context"
-	"errors"
 	"net/netip"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	"github.com/leamout/leamout/internal/security/encryption"
+	"github.com/leamout/leamout/internal/modules/audit"
 )
 
 type Repository struct {
 	db      *pgxpool.Pool
 	queries *sqlc.Queries
-	cipher  *encryption.Cipher
 }
 
-func NewRepository(db *pgxpool.Pool, cipher *encryption.Cipher) *Repository {
-	return &Repository{db: db, queries: sqlc.New(db), cipher: cipher}
+func NewRepository(db *pgxpool.Pool) *Repository {
+	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
-func (r *Repository) WithTx(tx pgx.Tx) *Repository {
-	return &Repository{db: r.db, queries: r.queries.WithTx(tx), cipher: r.cipher}
-}
-
-func (r *Repository) Create(ctx context.Context, arg sqlc.CreateCarrierConnectionParams) (sqlc.CarrierConnection, error) {
+func (r *Repository) Create(
+	ctx context.Context,
+	arg sqlc.CreateCarrierConnectionParams,
+) (sqlc.CarrierConnection, error) {
 	return r.queries.CreateCarrierConnection(ctx, arg)
 }
 
-func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.CarrierConnection, error) {
-	return r.queries.ListCarrierConnections(ctx, &organizationID)
+func (r *Repository) List(
+	ctx context.Context,
+	organizationID uuid.UUID,
+) ([]sqlc.ListCarrierConnectionsByOrganizationIDRow, error) {
+	return r.queries.ListCarrierConnectionsByOrganizationID(ctx, &organizationID)
 }
 
-func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.CarrierConnection, error) {
-	row, err := r.queries.GetCarrierConnectionByID(ctx, sqlc.GetCarrierConnectionByIDParams{
-		ID:             id,
-		OrganizationID: &organizationID,
-	})
-	if err != nil {
-		return sqlc.CarrierConnection{}, err
-	}
-	return carrierConnectionFromGet(row), nil
+func (r *Repository) Get(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	id uuid.UUID,
+) (sqlc.GetCarrierConnectionByIDRow, error) {
+	return r.queries.GetCarrierConnectionByID(
+		ctx,
+		sqlc.GetCarrierConnectionByIDParams{
+			ID:             id,
+			OrganizationID: &organizationID,
+		},
+	)
 }
 
-func (r *Repository) Update(ctx context.Context, arg sqlc.UpdateCarrierConnectionParams) (sqlc.CarrierConnection, error) {
+func (r *Repository) Update(
+	ctx context.Context,
+	arg sqlc.UpdateCarrierConnectionParams,
+) (sqlc.CarrierConnection, error) {
 	return r.queries.UpdateCarrierConnection(ctx, arg)
 }
 
-func (r *Repository) UpdateOutboundAuth(
+func (r *Repository) Disable(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	connectionID uuid.UUID,
-	request OutboundAuthRequest,
-) (sqlc.CarrierConnection, error) {
-	if r.cipher == nil {
-		return sqlc.CarrierConnection{}, errors.New("carrier credential cipher is required")
-	}
-	secretCiphertext, err := r.cipher.EncryptString(request.Secret)
-	if err != nil {
-		return sqlc.CarrierConnection{}, err
-	}
-
-	tx, err := r.db.Begin(ctx)
-	if err != nil {
-		return sqlc.CarrierConnection{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	queries := r.queries.WithTx(tx)
-
-	updated, err := queries.UpdateCarrierConnectionOutboundAuth(ctx, sqlc.UpdateCarrierConnectionOutboundAuthParams{
-		OrganizationID:      &organizationID,
-		ID:                  connectionID,
-		OutboundAuthMethod:  request.Method,
-		AuthUsername:        request.Username,
-		AuthRealm:           request.Realm,
-		AuthSecretCiphertext: &secretCiphertext,
-	})
-	if err != nil {
-		return sqlc.CarrierConnection{}, err
-	}
-
-	if err := syncDigestCredential(ctx, queries, updated, request.Secret); err != nil {
-		return sqlc.CarrierConnection{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return sqlc.CarrierConnection{}, err
-	}
-	return updated, nil
+	id uuid.UUID,
+) error {
+	return r.queries.DisableCarrierConnection(
+		ctx,
+		sqlc.DisableCarrierConnectionParams{
+			ID:             id,
+			OrganizationID: &organizationID,
+		},
+	)
 }
 
-func (r *Repository) DeleteOutboundAuth(ctx context.Context, organizationID, connectionID uuid.UUID) (sqlc.CarrierConnection, error) {
+func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direction, username, realm, ciphertext, ha1 string, event audit.Event) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return sqlc.CarrierConnection{}, err
+		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	queries := r.queries.WithTx(tx)
-
-	updated, err := queries.ClearCarrierConnectionOutboundAuth(ctx, sqlc.ClearCarrierConnectionOutboundAuthParams{
-		ID:             connectionID,
-		OrganizationID: &organizationID,
-	})
+	q := r.queries.WithTx(tx)
+	if direction == "outbound" {
+		err = q.SetCarrierConnectionOutboundDigestAuth(ctx, sqlc.SetCarrierConnectionOutboundDigestAuthParams{ID: id, OrganizationID: &org, AuthUsername: &username, AuthSecretCiphertext: &ciphertext})
+	} else {
+		err = q.SetCarrierConnectionInboundDigestAuth(ctx, sqlc.SetCarrierConnectionInboundDigestAuthParams{ID: id, OrganizationID: &org, InboundUsername: &username, InboundSecretCiphertext: &ciphertext})
+	}
 	if err != nil {
-		return sqlc.CarrierConnection{}, err
+		return err
 	}
-	if err := queries.DeleteCarrierDigestCredentialsByConnection(ctx, connectionID); err != nil {
-		return sqlc.CarrierConnection{}, err
+	_, err = tx.Exec(ctx, `INSERT INTO carrier_digest_credentials (carrier_connection_id, organization_id, direction, username, realm, ha1_md5) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (carrier_connection_id, direction) DO UPDATE SET username=EXCLUDED.username, realm=EXCLUDED.realm, ha1_md5=EXCLUDED.ha1_md5, updated_at=now()`, id, org, direction, username, realm, ha1)
+	if err != nil {
+		return err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return sqlc.CarrierConnection{}, err
+	if err := audit.Insert(ctx, tx, event); err != nil {
+		return err
 	}
-	return updated, nil
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) ClearAuth(ctx context.Context, org, id uuid.UUID, direction string, event audit.Event) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	if direction == "outbound" {
+		err = q.ClearCarrierConnectionOutboundAuth(ctx, sqlc.ClearCarrierConnectionOutboundAuthParams{ID: id, OrganizationID: &org})
+	} else {
+		err = q.SetCarrierConnectionInboundNoAuth(ctx, sqlc.SetCarrierConnectionInboundNoAuthParams{ID: id, OrganizationID: &org})
+	}
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM carrier_digest_credentials WHERE carrier_connection_id=$1 AND organization_id=$2 AND direction=$3`, id, org, direction); err != nil {
+		return err
+	}
+	if err := audit.Insert(ctx, tx, event); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID, event audit.Event) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if err = r.queries.WithTx(tx).SetCarrierConnectionInboundIPAuth(ctx, sqlc.SetCarrierConnectionInboundIPAuthParams{ID: id, OrganizationID: &org}); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, `DELETE FROM carrier_digest_credentials WHERE carrier_connection_id=$1 AND organization_id=$2 AND direction='inbound'`, id, org); err != nil {
+		return err
+	}
+	if err := audit.Insert(ctx, tx, event); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) CreateSourceIP(
@@ -121,11 +141,14 @@ func (r *Repository) CreateSourceIP(
 	connectionID uuid.UUID,
 	cidr netip.Prefix,
 ) (sqlc.CarrierConnectionSourceIp, error) {
-	return r.queries.CreateCarrierConnectionSourceIP(ctx, sqlc.CreateCarrierConnectionSourceIPParams{
-		CarrierConnectionID: connectionID,
-		OrganizationID:      &organizationID,
-		Cidr:                cidr,
-	})
+	return r.queries.CreateCarrierConnectionSourceIP(
+		ctx,
+		sqlc.CreateCarrierConnectionSourceIPParams{
+			OrganizationID:      &organizationID,
+			CarrierConnectionID: connectionID,
+			Cidr:                cidr,
+		},
+	)
 }
 
 func (r *Repository) ListSourceIPs(
@@ -133,23 +156,13 @@ func (r *Repository) ListSourceIPs(
 	organizationID uuid.UUID,
 	connectionID uuid.UUID,
 ) ([]sqlc.CarrierConnectionSourceIp, error) {
-	return r.queries.ListCarrierConnectionSourceIPs(ctx, sqlc.ListCarrierConnectionSourceIPsParams{
-		CarrierConnectionID: connectionID,
-		OrganizationID:      &organizationID,
-	})
-}
-
-func (r *Repository) GetSourceIP(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	connectionID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.CarrierConnectionSourceIp, error) {
-	return r.queries.GetCarrierConnectionSourceIPByID(ctx, sqlc.GetCarrierConnectionSourceIPByIDParams{
-		ID:                  id,
-		CarrierConnectionID: connectionID,
-		OrganizationID:      &organizationID,
-	})
+	return r.queries.ListCarrierConnectionSourceIPs(
+		ctx,
+		sqlc.ListCarrierConnectionSourceIPsParams{
+			CarrierConnectionID: connectionID,
+			OrganizationID:      &organizationID,
+		},
+	)
 }
 
 func (r *Repository) DeleteSourceIP(
