@@ -22,6 +22,9 @@ func TestGenerateDeploymentToken(t *testing.T) {
 	if hash == "" || hash != hashDeploymentToken(token) {
 		t.Fatalf("hash = %q", hash)
 	}
+	if hash == token || strings.Contains(hash, token) {
+		t.Fatal("deployment credential hash must not expose the usable token")
+	}
 }
 
 func TestGenerateDeploymentTokenProducesDistinctCredentials(t *testing.T) {
