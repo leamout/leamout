@@ -162,20 +162,26 @@ INSERT INTO trunks (
 SELECT
     cc.organization_id AS organization_id,
     cc.id AS carrier_connection_id,
-    'byoc' AS provisioning_mode,
-    $1 AS name,
-    COALESCE($2, 'bidirectional') AS direction,
-    COALESCE($3, 'active') AS status,
+    $1 AS provisioning_mode,
+    $2 AS name,
+    COALESCE($3, 'bidirectional') AS direction,
+    COALESCE($4, 'active') AS status,
     false AS managed_default
 FROM carrier_connections AS cc
-WHERE cc.id = $4
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+WHERE cc.id = $5
   AND cc.scope = 'organization'
-  AND cc.organization_id = $5
+  AND cc.organization_id = $6
   AND cc.status = 'active'
+  AND (
+      ($1::TEXT = 'byoc' AND cp.slug <> 'leamout')
+      OR ($1::TEXT = 'managed' AND cp.slug = 'leamout')
+  )
 RETURNING id, organization_id, carrier_connection_id, provisioning_mode, name, direction, status, managed_default, created_at, updated_at
 `
 
 type CreateTrunkParams struct {
+	ProvisioningMode    string     `db:"provisioning_mode" json:"provisioning_mode"`
 	Name                string     `db:"name" json:"name"`
 	Direction           *string    `db:"direction" json:"direction"`
 	Status              *string    `db:"status" json:"status"`
@@ -185,6 +191,7 @@ type CreateTrunkParams struct {
 
 func (q *Queries) CreateTrunk(ctx context.Context, arg CreateTrunkParams) (Trunk, error) {
 	row := q.db.QueryRow(ctx, createTrunk,
+		arg.ProvisioningMode,
 		arg.Name,
 		arg.Direction,
 		arg.Status,
@@ -231,11 +238,15 @@ SELECT
     COALESCE($7, true) AS enabled
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.id = $8
   AND t.organization_id = $9
-  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
+  AND (
+      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
+      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
+  )
 RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
 `
 
@@ -504,9 +515,9 @@ SELECT te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, t
 FROM trunk_endpoints AS te
 JOIN trunks AS t ON t.id = te.trunk_id
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.id = $1
   AND t.organization_id = $2
-  AND t.provisioning_mode = 'byoc'
   AND t.status = 'active'
   AND t.direction IN ('outbound', 'bidirectional')
   AND cc.scope = 'organization'
@@ -515,6 +526,10 @@ WHERE t.id = $1
   AND te.organization_id = t.organization_id
   AND te.enabled = true
   AND te.direction IN ('outbound', 'bidirectional')
+  AND (
+      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
+      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
+  )
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC
 `
 
@@ -738,11 +753,15 @@ const listTrunksByCarrierConnectionID = `-- name: ListTrunksByCarrierConnectionI
 SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.carrier_connection_id = $1
   AND t.organization_id = $2
-  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
+  AND (
+      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
+      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
+  )
 ORDER BY t.created_at DESC
 `
 
