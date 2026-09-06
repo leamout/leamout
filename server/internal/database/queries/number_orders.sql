@@ -61,3 +61,13 @@ WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
   AND status = 'processing'
 RETURNING *;
+
+-- name: MarkNumberOrderFailed :exec
+UPDATE number_orders
+SET
+    status = 'failed',
+    error_code = 'provider_order_failed',
+    error_message = sqlc.arg(error_message)
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND status IN ('pending', 'processing');
