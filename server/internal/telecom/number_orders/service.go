@@ -77,7 +77,7 @@ func (s *Service) Create(
 			return Response{}, apperror.NewConflict("number is already being acquired")
 		}
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Response{}, apperror.NewNotFound("active organization or provider not found")
+			return Response{}, apperror.NewNotFound("active organization or managed provider not found")
 		}
 		return Response{}, apperror.NewInternal("create number order", err)
 	}
@@ -109,6 +109,12 @@ func (s *Service) Get(
 func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.ProviderOperation) error {
 	if operation.OperationType != "number_order" || operation.NumberOrderID == nil {
 		return nil
+	}
+	if operation.ExecutionTarget != "direct" {
+		return nil
+	}
+	if operation.CarrierProviderID == nil {
+		return s.failOperation(ctx, operation, fmt.Errorf("direct provider operation is missing carrier_provider_id"))
 	}
 
 	var request ProviderOperationRequest
@@ -234,7 +240,8 @@ func (s *Service) failOperation(ctx context.Context, operation sqlc.ProviderOper
 }
 
 func validateProviderOperationRequest(request ProviderOperationRequest) error {
-	if strings.TrimSpace(request.Provider) == "" ||
+	if strings.TrimSpace(request.SelectionID) == "" ||
+		strings.TrimSpace(request.Provider) == "" ||
 		strings.TrimSpace(request.ProviderInventoryID) == "" ||
 		strings.TrimSpace(request.ProviderProductID) == "" ||
 		strings.TrimSpace(request.Number) == "" ||
