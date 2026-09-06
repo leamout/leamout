@@ -17,11 +17,6 @@ type DIDWWConfig struct {
 	SIPEndpoints []string `env:"SIP_ENDPOINTS" envSeparator:","`
 }
 
-type TransitConfig struct {
-	BaseURL string `env:"BASE_URL"`
-	Token   string `env:"TOKEN"`
-}
-
 type SIPConfig struct {
 	PublicHost      string `env:"PUBLIC_HOST"`
 	PublicPort      int    `env:"PUBLIC_PORT" envDefault:"5060"`
@@ -29,21 +24,20 @@ type SIPConfig struct {
 }
 
 type Config struct {
-	AppEnv                string        `env:"APP_ENV" envDefault:"development"`
-	DeploymentID          string        `env:"LEAMOUT_DEPLOYMENT_ID"`
-	DatabaseURL           string        `env:"DATABASE_URL,required"`
-	RedisURL              string        `env:"REDIS_URL,required"`
-	NATSURL               string        `env:"NATS_URL,required"`
-	NATSStreamReplicas    int           `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
-	FreeSWITCHESLAddress  string        `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
-	FreeSWITCHESLPassword string        `env:"FREESWITCH_ESL_PASSWORD,required"`
-	CarrierCredentialKey  string        `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
-	DIDWW                 DIDWWConfig   `envPrefix:"DIDWW_"`
-	Transit               TransitConfig `envPrefix:"TRANSIT_"`
-	SIP                   SIPConfig     `envPrefix:"SIP_"`
-	TURNAuthSecret        string        `env:"TURN_AUTH_SECRET,required"`
-	TURNPublicURLs        []string      `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
-	CORSOrigins           []string      `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
+	DeploymentID          string      `env:"LEAMOUT_DEPLOYMENT_ID"`
+	DatabaseURL           string      `env:"DATABASE_URL,required"`
+	RedisURL              string      `env:"REDIS_URL,required"`
+	NATSURL               string      `env:"NATS_URL,required"`
+	NATSStreamReplicas    int         `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
+	FreeSWITCHESLAddress  string      `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
+	FreeSWITCHESLPassword string      `env:"FREESWITCH_ESL_PASSWORD,required"`
+	CarrierCredentialKey  string      `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
+	DIDWW                 DIDWWConfig `envPrefix:"DIDWW_"`
+	SIP                   SIPConfig   `envPrefix:"SIP_"`
+	TURNAuthSecret        string      `env:"TURN_AUTH_SECRET,required"`
+	TURNPublicURLs        []string    `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
+	CORSOrigins           []string    `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
 }
 
 func Load() (Config, error) {
@@ -78,8 +72,6 @@ func (c *Config) normalize() {
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
 	c.DIDWW.SourceCIDRs = normalizeStrings(c.DIDWW.SourceCIDRs)
 	c.DIDWW.SIPEndpoints = normalizeStrings(c.DIDWW.SIPEndpoints)
-	c.Transit.BaseURL = strings.TrimRight(strings.TrimSpace(c.Transit.BaseURL), "/")
-	c.Transit.Token = strings.TrimSpace(c.Transit.Token)
 	c.SIP.PublicHost = strings.TrimSpace(c.SIP.PublicHost)
 	c.SIP.PublicTransport = strings.ToLower(strings.TrimSpace(c.SIP.PublicTransport))
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
