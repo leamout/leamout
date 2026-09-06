@@ -48,15 +48,15 @@ INSERT INTO phone_numbers (
     sms_enabled
 )
 SELECT
-    sqlc.arg(organization_id),
-    sqlc.arg(number),
-    sqlc.arg(country_code),
-    'managed',
-    sqlc.narg(carrier_connection_id),
-    sqlc.arg(provider_id),
-    sqlc.arg(provider_resource_id),
-    COALESCE(sqlc.narg(voice_enabled), true),
-    COALESCE(sqlc.narg(sms_enabled), false)
+    sqlc.arg(organization_id) AS organization_id,
+    sqlc.arg(number) AS number,
+    sqlc.arg(country_code) AS country_code,
+    'managed' AS provisioning_mode,
+    sqlc.narg(carrier_connection_id) AS carrier_connection_id,
+    sqlc.arg(provider_id) AS provider_id,
+    sqlc.arg(provider_resource_id) AS provider_resource_id,
+    COALESCE(sqlc.narg(voice_enabled), true) AS voice_enabled,
+    COALESCE(sqlc.narg(sms_enabled), false) AS sms_enabled
 FROM organizations AS o
 JOIN carrier_providers AS cp
   ON cp.id = sqlc.arg(provider_id)
@@ -91,16 +91,16 @@ INSERT INTO phone_numbers (
     status
 )
 SELECT
-    sqlc.arg(organization_id),
-    sqlc.arg(number),
-    sqlc.arg(country_code),
-    'managed',
-    cc.id,
-    cp.id,
-    NULL,
-    true,
-    false,
-    'provisioning'
+    sqlc.arg(organization_id) AS organization_id,
+    sqlc.arg(number) AS number,
+    sqlc.arg(country_code) AS country_code,
+    'managed' AS provisioning_mode,
+    cc.id AS carrier_connection_id,
+    cp.id AS provider_id,
+    NULL::TEXT AS provider_resource_id,
+    true AS voice_enabled,
+    false AS sms_enabled,
+    'provisioning' AS status
 FROM organizations AS o
 JOIN carrier_providers AS cp
   ON cp.id = sqlc.arg(provider_id)
