@@ -24,15 +24,101 @@ func (r *Repository) Create(ctx context.Context, arg sqlc.CreateTrunkParams) (sq
 	return r.queries.CreateTrunk(ctx, arg)
 }
 
+func (r *Repository) CreateManaged(ctx context.Context, organizationID uuid.UUID, name string, direction, status *string) (sqlc.Trunk, error) {
+	return r.queries.CreateManagedTrunk(ctx, sqlc.CreateManagedTrunkParams{
+		OrganizationID: &organizationID,
+		Name:           name,
+		Direction:      direction,
+		Status:         status,
+	})
+}
+
+func (r *Repository) InstallManaged(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	name string,
+	direction, status *string,
+	installation ManagedSIPInstallation,
+	secretCiphertext string,
+) (sqlc.Trunk, error) {
+	provider, err := r.queries.GetCarrierProviderBySlug(ctx, LeamoutCarrierProviderSlug)
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	outboundAuthMethod := "digest"
+	inboundAuthMethod := "none"
+	inboundEnabled := false
+	username := installation.Username
+	ciphertext := secretCiphertext
+	connection, err := r.queries.CreateCarrierConnection(ctx, sqlc.CreateCarrierConnectionParams{
+		OrganizationID:       &organizationID,
+		ProviderID:           provider.ID,
+		Name:                 name,
+		OutboundAuthMethod:   &outboundAuthMethod,
+		AuthUsername:         &username,
+		AuthSecretCiphertext: &ciphertext,
+		InboundEnabled:       &inboundEnabled,
+		InboundAuthMethod:    &inboundAuthMethod,
+	})
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	trunk, err := r.queries.CreateTrunk(ctx, sqlc.CreateTrunkParams{
+		OrganizationID:      &organizationID,
+		CarrierConnectionID: connection.ID,
+		ProvisioningMode:    string(ProvisioningModeManaged),
+		Name:                name,
+		Direction:           direction,
+		Status:              status,
+	})
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	endpointDirection := "outbound"
+	port := installation.Port
+	transport := installation.Transport
+	if _, err := r.queries.CreateTrunkEndpoint(ctx, sqlc.CreateTrunkEndpointParams{
+		OrganizationID: &organizationID,
+		TrunkID:        trunk.ID,
+		Host:           installation.Host,
+		Port:           &port,
+		Transport:      &transport,
+		Direction:      &endpointDirection,
+	}); err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	return trunk, nil
+}
+
+func (r *Repository) CreateCredential(ctx context.Context, organizationID, trunkID uuid.UUID, username, realm, ha1 string) (sqlc.TrunkCredential, error) {
+	return r.queries.CreateTrunkCredential(ctx, sqlc.CreateTrunkCredentialParams{
+		TrunkID:        trunkID,
+		OrganizationID: &organizationID,
+		Username:       username,
+		Realm:          realm,
+		Ha1Md5:         ha1,
+	})
+}
+
+func (r *Repository) RotateCredential(ctx context.Context, organizationID, trunkID uuid.UUID, username, realm, ha1 string) (sqlc.TrunkCredential, error) {
+	return r.queries.RotateTrunkCredential(ctx, sqlc.RotateTrunkCredentialParams{
+		TrunkID:        trunkID,
+		OrganizationID: organizationID,
+		Username:       username,
+		Realm:          realm,
+		Ha1Md5:         ha1,
+	})
+}
+
 func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.Trunk, error) {
 	return r.queries.ListTrunksByOrganizationID(ctx, &organizationID)
 }
 
-func (r *Repository) Get(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.Trunk, error) {
+func (r *Repository) Get(ctx context.Context, organizationID uuid.UUID, id uuid.UUID) (sqlc.Trunk, error) {
 	return r.queries.GetTrunkByID(ctx, sqlc.GetTrunkByIDParams{
 		ID:             id,
 		OrganizationID: &organizationID,
@@ -43,41 +129,25 @@ func (r *Repository) Update(ctx context.Context, arg sqlc.UpdateTrunkParams) (sq
 	return r.queries.UpdateTrunk(ctx, arg)
 }
 
-func (r *Repository) Disable(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.Trunk, error) {
+func (r *Repository) Disable(ctx context.Context, organizationID uuid.UUID, id uuid.UUID) (sqlc.Trunk, error) {
 	return r.queries.DisableTrunk(ctx, sqlc.DisableTrunkParams{
 		ID:             id,
 		OrganizationID: &organizationID,
 	})
 }
 
-func (r *Repository) CreateEndpoint(
-	ctx context.Context,
-	arg sqlc.CreateTrunkEndpointParams,
-) (sqlc.TrunkEndpoint, error) {
+func (r *Repository) CreateEndpoint(ctx context.Context, arg sqlc.CreateTrunkEndpointParams) (sqlc.TrunkEndpoint, error) {
 	return r.queries.CreateTrunkEndpoint(ctx, arg)
 }
 
-func (r *Repository) ListEndpoints(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	trunkID uuid.UUID,
-) ([]sqlc.TrunkEndpoint, error) {
+func (r *Repository) ListEndpoints(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
 	return r.queries.ListTrunkEndpoints(ctx, sqlc.ListTrunkEndpointsParams{
 		TrunkID:        trunkID,
 		OrganizationID: &organizationID,
 	})
 }
 
-func (r *Repository) GetEndpoint(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	trunkID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.TrunkEndpoint, error) {
+func (r *Repository) GetEndpoint(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
 	return r.queries.GetTrunkEndpointByID(ctx, sqlc.GetTrunkEndpointByIDParams{
 		ID:             id,
 		TrunkID:        trunkID,
@@ -85,19 +155,11 @@ func (r *Repository) GetEndpoint(
 	})
 }
 
-func (r *Repository) UpdateEndpoint(
-	ctx context.Context,
-	arg sqlc.UpdateTrunkEndpointParams,
-) (sqlc.TrunkEndpoint, error) {
+func (r *Repository) UpdateEndpoint(ctx context.Context, arg sqlc.UpdateTrunkEndpointParams) (sqlc.TrunkEndpoint, error) {
 	return r.queries.UpdateTrunkEndpoint(ctx, arg)
 }
 
-func (r *Repository) DeleteEndpoint(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	trunkID uuid.UUID,
-	id uuid.UUID,
-) (sqlc.TrunkEndpoint, error) {
+func (r *Repository) DeleteEndpoint(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
 	return r.queries.DeleteTrunkEndpoint(ctx, sqlc.DeleteTrunkEndpointParams{
 		ID:             id,
 		TrunkID:        trunkID,
