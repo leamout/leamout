@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS number_orders (
 );
 
 COMMENT ON TABLE number_orders IS
-    'Customer-visible managed-number acquisition intent. Upstream provider or Transit execution details live in provider_operations.';
+    'Customer-visible managed-number acquisition intent. Upstream provider execution details live in provider_operations.';
 
 -- An E.164 number cannot be acquired concurrently through two managed-carrier
 -- selections while an order is still live.
