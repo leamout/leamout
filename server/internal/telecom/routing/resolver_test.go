@@ -156,30 +156,57 @@ func TestResolveExplicitBYOCNeverFallsBackToManaged(t *testing.T) {
 	}
 }
 
-func TestResolveExplicitManagedTrunkDoesNotEnterBYOCOrFallback(t *testing.T) {
+func TestResolveExplicitCloudManagedTrunkUsesManagedRoute(t *testing.T) {
 	organizationID := uuid.New()
 	trunkID := uuid.New()
+	managedConnectionID := uuid.New()
+	internalManagedTrunkID := uuid.New()
+	managedEndpointID := uuid.New()
 	store := &fakeRouteStore{
 		trunk: sqlc.Trunk{
 			ID:               trunkID,
 			OrganizationID:   uuidPtr(organizationID),
 			ProvisioningMode: "managed",
 		},
-		managedRoutes: []managedRouteCandidate{{EndpointID: uuid.New()}},
+		phone: sqlc.PhoneNumber{
+			OrganizationID: organizationID,
+			Number:         "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+		},
+		managedRoutes: []managedRouteCandidate{{
+			CarrierConnectionID: managedConnectionID,
+			MaxCPS:              20,
+			MaxConcurrentCalls:  200,
+			TrunkID:             internalManagedTrunkID,
+			EndpointID:          managedEndpointID,
+			Host:                "managed.carrier.example",
+			Port:                5060,
+			Transport:           "udp",
+			Priority:            10,
+			Weight:              100,
+		}},
 	}
-	resolver := &Resolver{repo: store}
+	resolver := &Resolver{repo: store, pickWeight: func(int64) (int64, error) { return 0, nil }}
 
-	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
+	decision, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
 		OrganizationID: organizationID,
 		TrunkID:        uuidPtr(trunkID),
 		From:           "+233200000001",
 		To:             "+14155550100",
 	})
-	if !errors.Is(err, ErrNoRoute) {
-		t.Fatalf("error = %v, want %v", err, ErrNoRoute)
+	if err != nil {
+		t.Fatalf("resolve explicit managed outbound: %v", err)
 	}
-	if store.listManagedCalls != 0 {
-		t.Fatalf("managed route lookup count = %d, want 0 for explicit managed trunk before provisioning exists", store.listManagedCalls)
+	if !decision.Managed {
+		t.Fatal("explicit managed route was not marked for commercial admission")
+	}
+	if decision.TrunkID != trunkID {
+		t.Fatalf("customer-facing trunk attribution = %s, want %s", decision.TrunkID, trunkID)
+	}
+	if decision.CarrierConnectionID != managedConnectionID || decision.EndpointID != managedEndpointID {
+		t.Fatalf("unexpected managed execution route: %+v", decision)
+	}
+	if store.listManagedCalls != 1 {
+		t.Fatalf("managed route lookup count = %d, want 1", store.listManagedCalls)
 	}
 }
 
