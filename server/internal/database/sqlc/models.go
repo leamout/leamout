@@ -188,6 +188,20 @@ type Deployment struct {
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type DeploymentCredential struct {
+	ID           uuid.UUID          `db:"id" json:"id"`
+	DeploymentID uuid.UUID          `db:"deployment_id" json:"deployment_id"`
+	Purpose      string             `db:"purpose" json:"purpose"`
+	TokenHash    string             `db:"token_hash" json:"token_hash"`
+	TokenPrefix  string             `db:"token_prefix" json:"token_prefix"`
+	Scopes       []byte             `db:"scopes" json:"scopes"`
+	ExpiresAt    pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	LastUsedAt   pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
+	DisabledAt   pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Entitlement struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	PlanID         *uuid.UUID         `db:"plan_id" json:"plan_id"`

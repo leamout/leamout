@@ -1,4 +1,4 @@
-h1:LQZcVKSivBnPCwt42zPy06hn4mdoUSo8wBsWTBJmdnA=
+h1:sVG6wO7EdVMe+J+ZT178lXS8zILio3GDYNW8bGgmaWI=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -41,3 +41,4 @@ h1:LQZcVKSivBnPCwt42zPy06hn4mdoUSo8wBsWTBJmdnA=
 040_create_number_orders.sql h1:k4UwmHAtgJxdVj3VNSeBsi27BTL5upeH3e63J/JtS3s=
 041_create_provider_cdrs.sql h1:a+RM/Xi6s8wiiKlC4b5epAypcFZG3chWIf6vTiXkj24=
 042_create_managed_number_operations.sql h1:5qTURRL49i4J4yyxb8zI8mgLlY33mBSU0+J8gBbH8GA=
+043_create_deployment_credentials.sql h1:KwQuKywGroMbWgiJTjzm8ipVRoccshUl4eYD3IpxtCg=
