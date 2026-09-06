@@ -301,7 +301,7 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 	if !found {
 		providerOrder, err = provider.CreateNumberOrder(ctx, ProviderOrderRequest{
 			ProviderInventoryID: request.ProviderInventoryID,
-			ProviderProductID: request.ProviderProductID,
+			ProviderProductID:   request.ProviderProductID,
 			ExternalReferenceID: externalReferenceID,
 		})
 		if err != nil {

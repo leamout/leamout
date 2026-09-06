@@ -27,7 +27,7 @@ func (h *Handler) SearchAvailable(w http.ResponseWriter, r *http.Request) {
 	}
 	items, err := h.service.SearchAvailable(r.Context(), organizationID, AvailableSearchRequest{
 		CountryCode: r.URL.Query().Get("country_code"),
-		Contains: r.URL.Query().Get("contains"),
+		Contains:    r.URL.Query().Get("contains"),
 	})
 	if err != nil {
 		httputil.Error(w, err)
