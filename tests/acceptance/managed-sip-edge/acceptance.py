@@ -20,17 +20,19 @@ def digest_challenge(response):
     if not match: raise Failure("407 response did not contain a Digest challenge")
     return {key: quoted or bare for key, quoted, bare in re.findall(r'(\w+)=(?:"([^"]*)"|([^,\s]+))', match.group(1))}
 
+def new_branch(): return f"z9hG4bK{random.getrandbits(64):x}"
+
 def invite(caller=CALLER, password=PASSWORD, authenticate=True):
     destination = ("127.0.0.1", 5060); call_id = f"{random.getrandbits(96):x}@acceptance"
-    branch = f"z9hG4bK{random.getrandbits(64):x}"; tag = f"{random.getrandbits(48):x}"
+    tag = f"{random.getrandbits(48):x}"
     uri = f"sip:{DESTINATION}@{REALM}"
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM); sock.bind(("127.0.0.1", 0)); sock.settimeout(5)
     port = sock.getsockname()[1]
-    def message(auth=""):
-        return (f"INVITE {uri} SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:{port};branch={branch}\r\n"
+    def message(branch, cseq, auth=""):
+        return (f"INVITE {uri} SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:{port};branch={branch};rport\r\n"
                 f"Max-Forwards: 10\r\nFrom: <sip:{caller}@{REALM}>;tag={tag}\r\nTo: <{uri}>\r\n"
-                f"Call-ID: {call_id}\r\nCSeq: 1 INVITE\r\nContact: <sip:test@127.0.0.1:{port}>\r\n{auth}Content-Length: 0\r\n\r\n")
-    sock.sendto(message().encode(), destination); first = sock.recv(65535).decode(errors="replace")
+                f"Call-ID: {call_id}\r\nCSeq: {cseq} INVITE\r\nContact: <sip:test@127.0.0.1:{port}>\r\n{auth}Content-Length: 0\r\n\r\n")
+    sock.sendto(message(new_branch(), 1).encode(), destination); first = sock.recv(65535).decode(errors="replace")
     if not authenticate: return int(first.split()[1]), first
     if int(first.split()[1]) != 407: raise Failure("initial INVITE was not challenged: " + first.splitlines()[0])
     challenge = digest_challenge(first); nonce = challenge["nonce"]
@@ -44,7 +46,7 @@ def invite(caller=CALLER, password=PASSWORD, authenticate=True):
     else:
         response = hashlib.md5(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest(); extra = ""
     auth = f'Proxy-Authorization: Digest username="{USER}", realm="{REALM}", nonce="{nonce}", uri="{uri}", response="{response}", algorithm=MD5{extra}\r\n'
-    sock.sendto(message(auth).encode(), destination)
+    sock.sendto(message(new_branch(), 2, auth).encode(), destination)
     final = sock.recv(65535).decode(errors="replace"); return int(final.split()[1]), final
 
 def assert_no_wholesale(before):
