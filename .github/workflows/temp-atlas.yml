@@ -4,9 +4,6 @@ on:
   pull_request:
     paths:
       - ".github/workflows/temp-atlas.yml"
-      - "server/migrations/*.sql"
-      - "server/internal/database/queries/**"
-      - "server/sqlc.yaml"
 permissions:
   contents: write
 
@@ -26,32 +23,90 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
-      - name: Format Go sources
+      - name: Refresh managed routing expectation
         run: |
-          find server/internal/telecom/numbers -name '*.go' -print0 | xargs -0 gofmt -w
-          find server/internal/commercial/usage_rating -name '*.go' -print0 | xargs -0 gofmt -w
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
 
-      - name: Regenerate sqlc
+          path = Path("server/internal/telecom/routing/resolver_test.go")
+          text = path.read_text()
+          pattern = re.compile(
+              r"func TestResolveExplicitManagedTrunkDoesNotEnterBYOCOrFallback\(t \*testing\.T\) \{.*?\n\}\n\n(?=func TestResolveManagedOutboundWithoutTrunk)",
+              re.S,
+          )
+          replacement = '''func TestResolveExplicitCloudManagedTrunkUsesManagedRoute(t *testing.T) {
+          \torganizationID := uuid.New()
+          \ttrunkID := uuid.New()
+          \tmanagedConnectionID := uuid.New()
+          \tinternalManagedTrunkID := uuid.New()
+          \tmanagedEndpointID := uuid.New()
+          \tstore := &fakeRouteStore{
+          \t\ttrunk: sqlc.Trunk{
+          \t\t\tID:               trunkID,
+          \t\t\tOrganizationID:   uuidPtr(organizationID),
+          \t\t\tProvisioningMode: "managed",
+          \t\t},
+          \t\tphone: sqlc.PhoneNumber{
+          \t\t\tOrganizationID: organizationID,
+          \t\t\tNumber:         "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+          \t\t},
+          \t\tmanagedRoutes: []managedRouteCandidate{{
+          \t\t\tCarrierConnectionID: managedConnectionID,
+          \t\t\tMaxCPS:              20,
+          \t\t\tMaxConcurrentCalls:  200,
+          \t\t\tTrunkID:             internalManagedTrunkID,
+          \t\t\tEndpointID:          managedEndpointID,
+          \t\t\tHost:                "managed.carrier.example",
+          \t\t\tPort:                5060,
+          \t\t\tTransport:           "udp",
+          \t\t\tPriority:            10,
+          \t\t\tWeight:              100,
+          \t\t}},
+          \t}
+          \tresolver := &Resolver{repo: store, pickWeight: func(int64) (int64, error) { return 0, nil }}
+
+          \tdecision, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
+          \t\tOrganizationID: organizationID,
+          \t\tTrunkID:        uuidPtr(trunkID),
+          \t\tFrom:           "+233200000001",
+          \t\tTo:             "+14155550100",
+          \t})
+          \tif err != nil {
+          \t\tt.Fatalf("resolve explicit managed outbound: %v", err)
+          \t}
+          \tif !decision.Managed {
+          \t\tt.Fatal("explicit managed route was not marked for commercial admission")
+          \t}
+          \tif decision.TrunkID != trunkID {
+          \t\tt.Fatalf("customer-facing trunk attribution = %s, want %s", decision.TrunkID, trunkID)
+          \t}
+          \tif decision.CarrierConnectionID != managedConnectionID || decision.EndpointID != managedEndpointID {
+          \t\tt.Fatalf("unexpected managed execution route: %+v", decision)
+          \t}
+          \tif store.listManagedCalls != 1 {
+          \t\tt.Fatalf("managed route lookup count = %d, want 1", store.listManagedCalls)
+          \t}
+          }
+
+          '''
+          text, count = pattern.subn(replacement, text)
+          if count != 1:
+              raise SystemExit(f"expected to replace one obsolete managed routing test, replaced {count}")
+          path.write_text(text)
+          PY
+          gofmt -w server/internal/telecom/routing/resolver_test.go
+
+      - name: Run routing tests with race detector
         working-directory: server
-        run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
+        run: go test -race ./internal/telecom/routing
 
-      - name: Regenerate Atlas checksum
-        run: |
-          docker run --rm \
-            -v "${PWD}/server/migrations:/migrations" \
-            arigaio/atlas:1.3.0-alpine \
-            migrate hash --dir file:///migrations
-
-      - name: Commit generated artifacts
+      - name: Commit test fix
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            server/migrations/atlas.sum \
-            server/internal/database/sqlc \
-            server/internal/telecom/numbers \
-            server/internal/commercial/usage_rating
+          git add server/internal/telecom/routing/resolver_test.go
           if ! git diff --cached --quiet; then
-            git commit -m "regenerate domain artifacts"
+            git commit -m "test: align explicit managed trunk routing expectation"
             git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
           fi
