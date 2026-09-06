@@ -73,7 +73,7 @@ func (r *Repository) Create(
 		return sqlc.NumberOrder{}, err
 	}
 
-	carrierConnectionID, providerRoutingResourceID, err := resolveProviderRoutingTarget(ctx, tx, provider.ID)
+	carrierConnectionID, providerRoutingResourceID, err := resolveProviderRoutingTarget(ctx, queries, provider.ID)
 	if err != nil {
 		return sqlc.NumberOrder{}, err
 	}
@@ -121,45 +121,19 @@ func (r *Repository) Create(
 	return order, nil
 }
 
-func resolveProviderRoutingTarget(ctx context.Context, tx pgx.Tx, providerID uuid.UUID) (uuid.UUID, string, error) {
-	rows, err := tx.Query(ctx, `
-SELECT cc.id, resource.provider_resource_id
-FROM carrier_connections AS cc
-JOIN carrier_connection_provider_resources AS resource
-  ON resource.carrier_connection_id = cc.id
- AND resource.provider_id = cc.provider_id
- AND resource.resource_type = 'voice_in_trunk'
-WHERE cc.provider_id = $1
-  AND cc.scope = 'platform'
-  AND cc.organization_id IS NULL
-  AND cc.status = 'active'
-  AND cc.inbound_enabled = true
-ORDER BY cc.created_at ASC
-LIMIT 2`, providerID)
+func resolveProviderRoutingTarget(
+	ctx context.Context,
+	queries *sqlc.Queries,
+	providerID uuid.UUID,
+) (uuid.UUID, string, error) {
+	targets, err := queries.ListProviderRoutingTargets(ctx, providerID)
 	if err != nil {
-		return uuid.Nil, "", err
-	}
-	defer rows.Close()
-
-	type target struct {
-		connectionID uuid.UUID
-		resourceID   string
-	}
-	var targets []target
-	for rows.Next() {
-		var item target
-		if err := rows.Scan(&item.connectionID, &item.resourceID); err != nil {
-			return uuid.Nil, "", err
-		}
-		targets = append(targets, item)
-	}
-	if err := rows.Err(); err != nil {
 		return uuid.Nil, "", err
 	}
 	if len(targets) != 1 {
 		return uuid.Nil, "", ErrProviderRoutingUnavailable
 	}
-	return targets[0].connectionID, targets[0].resourceID, nil
+	return targets[0].CarrierConnectionID, targets[0].ProviderResourceID, nil
 }
 
 func (r *Repository) Get(
@@ -182,8 +156,9 @@ func (r *Repository) TryProviderOperationLock(ctx context.Context, id uuid.UUID)
 	if err != nil {
 		return nil, false, err
 	}
-	var locked bool
-	if err := conn.QueryRow(ctx, `SELECT pg_try_advisory_lock(hashtextextended($1, 0))`, id.String()).Scan(&locked); err != nil {
+	queries := sqlc.New(conn)
+	locked, err := queries.TryProviderOperationAdvisoryLock(ctx, id.String())
+	if err != nil {
 		conn.Release()
 		return nil, false, err
 	}
@@ -192,7 +167,7 @@ func (r *Repository) TryProviderOperationLock(ctx context.Context, id uuid.UUID)
 		return nil, false, nil
 	}
 	release := func() {
-		_, _ = conn.Exec(context.Background(), `SELECT pg_advisory_unlock(hashtextextended($1, 0))`, id.String())
+		_ = queries.ReleaseProviderOperationAdvisoryLock(context.Background(), id.String())
 		conn.Release()
 	}
 	return release, true, nil
@@ -255,26 +230,19 @@ func (r *Repository) FailProviderOperation(ctx context.Context, operation sqlc.P
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
 
-	if _, err := tx.Exec(ctx, `
-UPDATE provider_operations
-SET state = 'failed',
-    attempts = attempts + 1,
-    last_error = $2,
-    next_attempt_at = NULL,
-    completed_at = now()
-WHERE id = $1
-  AND state IN ('pending', 'provider_accepted')`, operation.ID, message); err != nil {
+	if err := queries.MarkProviderOperationFailed(ctx, sqlc.MarkProviderOperationFailedParams{
+		LastError: &message,
+		ID:        operation.ID,
+	}); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `
-UPDATE number_orders
-SET status = 'failed',
-    error_code = 'provider_order_failed',
-    error_message = $3
-WHERE id = $1
-  AND organization_id = $2
-  AND status IN ('pending', 'processing')`, *operation.NumberOrderID, operation.OrganizationID, message); err != nil {
+	if err := queries.MarkNumberOrderFailed(ctx, sqlc.MarkNumberOrderFailedParams{
+		ErrorMessage:   &message,
+		ID:             *operation.NumberOrderID,
+		OrganizationID: operation.OrganizationID,
+	}); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -337,6 +305,89 @@ func (r *Repository) CompleteProviderOperation(
 	}
 
 	phoneNumberID := phoneNumber.ID
+	if _, err := queries.MarkNumberOrderProviderOperationSucceeded(ctx, sqlc.MarkNumberOrderProviderOperationSucceededParams{
+		ProviderResourceID: &providerResourceID,
+		PhoneNumberID:      &phoneNumberID,
+		Response:           response,
+		ID:                 operation.ID,
+		OrganizationID:     operation.OrganizationID,
+		NumberOrderID:      operation.NumberOrderID,
+	}); err != nil {
+		return err
+	}
+	if _, err := queries.MarkNumberOrderCompleted(ctx, sqlc.MarkNumberOrderCompletedParams{
+		PhoneNumberID:  &phoneNumberID,
+		ID:             order.ID,
+		OrganizationID: order.OrganizationID,
+	}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) CompleteTransitProviderOperation(
+	ctx context.Context,
+	operation sqlc.ProviderOperation,
+	selectionID string,
+	number string,
+	countryCode string,
+	managedResourceID string,
+	response []byte,
+) error {
+	if operation.NumberOrderID == nil {
+		return fmt.Errorf("transit number order provider operation is missing number_order_id")
+	}
+	if operation.ExecutionTarget != "transit" || operation.CarrierProviderID != nil {
+		return fmt.Errorf("transit number order provider operation has invalid execution target")
+	}
+	if managedResourceID == "" {
+		return fmt.Errorf("transit managed resource id is required")
+	}
+
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+
+	order, err := queries.LockNumberOrderForProviderOperation(ctx, sqlc.LockNumberOrderForProviderOperationParams{
+		ID:             *operation.NumberOrderID,
+		OrganizationID: operation.OrganizationID,
+		SelectionID:    selectionID,
+		Number:         number,
+		CountryCode:    countryCode,
+	})
+	if err != nil {
+		return err
+	}
+	if order.Status == "completed" {
+		return tx.Commit(ctx)
+	}
+	if order.Status == "pending" {
+		order, err = queries.MarkNumberOrderProcessing(ctx, sqlc.MarkNumberOrderProcessingParams{
+			ID:             order.ID,
+			OrganizationID: order.OrganizationID,
+		})
+		if err != nil {
+			return err
+		}
+	}
+
+	phoneNumber, err := queries.EnsureTransitManagedPhoneNumberForProviderOperation(ctx, sqlc.EnsureTransitManagedPhoneNumberForProviderOperationParams{
+		OrganizationID: operation.OrganizationID,
+		Number:         number,
+		CountryCode:    countryCode,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("transit managed number conflicts with an existing phone number: %w", err)
+		}
+		return err
+	}
+
+	phoneNumberID := phoneNumber.ID
+	providerResourceID := managedResourceID
 	if _, err := queries.MarkNumberOrderProviderOperationSucceeded(ctx, sqlc.MarkNumberOrderProviderOperationSucceededParams{
 		ProviderResourceID: &providerResourceID,
 		PhoneNumberID:      &phoneNumberID,
