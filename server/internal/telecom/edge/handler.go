@@ -37,7 +37,8 @@ func (h *Handler) Admit(w http.ResponseWriter, r *http.Request) {
 	decision, err := h.service.Admit(r.Context(), req)
 	if err != nil {
 		if errors.Is(err, ErrDenied) {
-			http.Error(w, "forbidden", http.StatusForbidden)
+			w.Header().Set("Cache-Control", "no-store")
+			httputil.JSON(w, http.StatusForbidden, map[string]bool{"allowed": false})
 			return
 		}
 		http.Error(w, "admission unavailable", http.StatusServiceUnavailable)

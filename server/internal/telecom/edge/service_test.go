@@ -49,6 +49,9 @@ func TestAdmitAuthorizesManagedIdentityAndRoute(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if !decision.Allowed {
+		t.Fatal("authorized decision was not marked allowed")
+	}
 	if decision.TrunkID != trunkID || decision.CarrierConnectionID != connectionID {
 		t.Fatalf("decision = %#v", decision)
 	}

@@ -198,6 +198,8 @@ trunk, validates an active managed caller ID owned by that tenant, requires
 active commercial standing plus `voice.managed.enabled`, enforces the positive
 `voice.managed.daily_spend_micros` entitlement against reconciled wholesale
 charges, and returns only the platform `managed_default` route.
+Successful responses explicitly set `allowed` and include the internal route;
+policy denials return `allowed: false` without exposing routing metadata.
 
 The edge and API share `MANAGED_SIP_ADMISSION_SECRET`. An absent/invalid secret,
 an unavailable entitlement or spend lookup, an unknown caller ID, and a missing

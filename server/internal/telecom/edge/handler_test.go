@@ -1,6 +1,7 @@
 package edge
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -25,5 +26,14 @@ func TestHandlerReturnsForbiddenWhenRouteDoesNotAuthorize(t *testing.T) {
 
 	if recorder.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusForbidden)
+	}
+	var response struct {
+		Allowed bool `json:"allowed"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&response); err != nil {
+		t.Fatal(err)
+	}
+	if response.Allowed {
+		t.Fatal("denied response was marked allowed")
 	}
 }

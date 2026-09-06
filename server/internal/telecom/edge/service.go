@@ -26,6 +26,7 @@ type Request struct {
 }
 
 type Decision struct {
+	Allowed             bool      `json:"allowed"`
 	OrganizationID      uuid.UUID `json:"organization_id"`
 	TrunkID             uuid.UUID `json:"trunk_id"`
 	CarrierConnectionID uuid.UUID `json:"carrier_connection_id"`
@@ -89,6 +90,7 @@ func (s *Service) Admit(ctx context.Context, req Request) (Decision, error) {
 		return Decision{}, ErrDenied
 	}
 	return Decision{
+		Allowed:        true,
 		OrganizationID: route.OrganizationID, TrunkID: route.TrunkID,
 		CarrierConnectionID: route.CarrierConnectionID,
 		RouteURI:            fmt.Sprintf("sip:%s@%s:%d;transport=%s", req.To, route.Host, route.Port, route.Transport),
