@@ -29,7 +29,7 @@ const (
 
 const (
 	MaxDeploymentsEntitlement = "max.deployments"
-	ManagedVoiceEntitlement    = "voice.managed.enabled"
+	ManagedVoiceEntitlement   = "voice.managed.enabled"
 
 	ManagedCarrierPurpose      = "managed_carrier"
 	ManagedCarrierTransitScope = "managed_carrier:transit"

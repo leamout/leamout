@@ -374,15 +374,15 @@ func (r *Repository) GetDeploymentCredentialByTokenHash(ctx context.Context, tok
 		return deploymentCredentialAuthentication{}, err
 	}
 	return deploymentCredentialAuthentication{
-		CredentialID:      row.CredentialID,
-		OrganizationID:    row.OrganizationID,
-		LicenseID:         row.LicenseID,
-		DeploymentID:      row.DeploymentID,
-		DeploymentStatus:  row.DeploymentStatus,
-		LicenseStatus:     row.LicenseStatus,
-		LicenseExpiresAt:  pgconv.TimestamptzToTimePtr(row.LicenseExpiresAt),
-		Purpose:           row.Purpose,
-		Scopes:            scopes,
+		CredentialID:     row.CredentialID,
+		OrganizationID:   row.OrganizationID,
+		LicenseID:        row.LicenseID,
+		DeploymentID:     row.DeploymentID,
+		DeploymentStatus: row.DeploymentStatus,
+		LicenseStatus:    row.LicenseStatus,
+		LicenseExpiresAt: pgconv.TimestamptzToTimePtr(row.LicenseExpiresAt),
+		Purpose:          row.Purpose,
+		Scopes:           scopes,
 	}, nil
 }
 
