@@ -245,6 +245,7 @@ def configure_provider():
     _, trunk = api(
         "POST", "/v1/trunks/",
         {
+            "type": "byoc",
             "carrier_connection_id": connection["id"],
             "name": "voice-v1-trunk",
             "direction": "bidirectional",
@@ -252,6 +253,10 @@ def configure_provider():
         expected={201},
     )
     STATE["trunk_id"] = trunk["id"]
+    if trunk.get("type") != "byoc":
+        raise AcceptanceError("test trunk was not created as a BYOC trunk")
+    if trunk.get("carrier_connection_id") != connection["id"]:
+        raise AcceptanceError("test trunk was not created on the carrier connection")
 
     _, endpoint = api(
         "POST",
@@ -272,36 +277,39 @@ def configure_provider():
 def create_voice_application():
     _, number = api(
         "POST", "/v1/numbers/",
-        {"number": DID, "country_code": "US", "voice_enabled": True},
+        {
+            "type": "byoc",
+            "number": DID,
+            "country_code": "US",
+            "carrier_connection_id": STATE["connection_id"],
+            "voice_enabled": True,
+        },
         expected={201},
     )
     STATE["number_id"] = number["id"]
-
-    _, assigned = api(
-        "PUT",
-        f"/v1/numbers/{number['id']}/carrier-connection",
-        {"carrier_connection_id": STATE["connection_id"]},
-        expected={200},
-    )
-    if assigned.get("carrier_connection_id") != STATE["connection_id"]:
-        raise AcceptanceError("failed to assign test DID to carrier connection")
+    if number.get("type") != "byoc":
+        raise AcceptanceError("test DID was not created as a BYOC number")
+    if number.get("carrier_connection_id") != STATE["connection_id"]:
+        raise AcceptanceError("test DID was not created on the carrier connection")
 
     # Current outbound routing requires the caller identity itself to be an
     # owned, voice-enabled number on the same carrier connection as the trunk.
     _, caller_number = api(
         "POST", "/v1/numbers/",
-        {"number": CALLER, "country_code": "US", "voice_enabled": True},
+        {
+            "type": "byoc",
+            "number": CALLER,
+            "country_code": "US",
+            "carrier_connection_id": STATE["connection_id"],
+            "voice_enabled": True,
+        },
         expected={201},
     )
     STATE["caller_number_id"] = caller_number["id"]
-    _, caller_assigned = api(
-        "PUT",
-        f"/v1/numbers/{caller_number['id']}/carrier-connection",
-        {"carrier_connection_id": STATE["connection_id"]},
-        expected={200},
-    )
-    if caller_assigned.get("carrier_connection_id") != STATE["connection_id"]:
-        raise AcceptanceError("failed to authorize outbound caller identity")
+    if caller_number.get("type") != "byoc":
+        raise AcceptanceError("caller identity was not created as a BYOC number")
+    if caller_number.get("carrier_connection_id") != STATE["connection_id"]:
+        raise AcceptanceError("caller identity was not created on the carrier connection")
 
     _, application = api(
         "POST", "/v1/voice-applications/",
