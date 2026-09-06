@@ -48,15 +48,15 @@ INSERT INTO phone_numbers (
     sms_enabled
 )
 SELECT
-    sqlc.arg(organization_id) AS organization_id,
-    sqlc.arg(number) AS number,
-    sqlc.arg(country_code) AS country_code,
-    'managed' AS provisioning_mode,
-    sqlc.narg(carrier_connection_id) AS carrier_connection_id,
-    sqlc.arg(provider_id) AS provider_id,
-    sqlc.arg(provider_resource_id) AS provider_resource_id,
-    COALESCE(sqlc.narg(voice_enabled), true) AS voice_enabled,
-    COALESCE(sqlc.narg(sms_enabled), false) AS sms_enabled
+    sqlc.arg(organization_id),
+    sqlc.arg(number),
+    sqlc.arg(country_code),
+    'managed',
+    sqlc.narg(carrier_connection_id),
+    sqlc.arg(provider_id),
+    sqlc.arg(provider_resource_id),
+    COALESCE(sqlc.narg(voice_enabled), true),
+    COALESCE(sqlc.narg(sms_enabled), false)
 FROM organizations AS o
 JOIN carrier_providers AS cp
   ON cp.id = sqlc.arg(provider_id)
@@ -77,7 +77,7 @@ WHERE o.id = sqlc.arg(organization_id)
   )
 RETURNING *;
 
--- name: EnsureManagedPhoneNumberForProviderOperation :one
+-- name: CreateProvisioningManagedPhoneNumber :one
 INSERT INTO phone_numbers (
     organization_id,
     number,
@@ -96,22 +96,64 @@ SELECT
     sqlc.arg(country_code),
     'managed',
     cc.id,
-    sqlc.arg(provider_id),
-    sqlc.arg(provider_resource_id),
+    cp.id,
+    NULL,
     true,
     false,
-    'active'
-FROM carrier_connections AS cc
-WHERE cc.id = sqlc.arg(carrier_connection_id)
-  AND cc.scope = 'platform'
-  AND cc.provider_id = sqlc.arg(provider_id)
-  AND cc.status = 'active'
-ON CONFLICT (provider_id, provider_resource_id)
-    WHERE provider_id IS NOT NULL AND provider_resource_id IS NOT NULL
-DO UPDATE SET updated_at = phone_numbers.updated_at
-WHERE phone_numbers.organization_id = EXCLUDED.organization_id
-  AND phone_numbers.status <> 'released'
+    'provisioning'
+FROM organizations AS o
+JOIN carrier_providers AS cp
+  ON cp.id = sqlc.arg(provider_id)
+ AND cp.status = 'active'
+JOIN carrier_connections AS cc
+  ON cc.id = sqlc.arg(carrier_connection_id)
+ AND cc.scope = 'platform'
+ AND cc.organization_id IS NULL
+ AND cc.provider_id = cp.id
+ AND cc.status = 'active'
+WHERE o.id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
 RETURNING *;
+
+-- name: LockManagedPhoneNumberForProviderOperation :one
+SELECT *
+FROM phone_numbers
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND provider_id = sqlc.arg(provider_id)
+  AND provisioning_mode = 'managed'
+  AND number = sqlc.arg(number)
+  AND country_code = sqlc.arg(country_code)
+FOR UPDATE;
+
+-- name: MarkManagedPhoneNumberActive :one
+UPDATE phone_numbers
+SET
+    provider_resource_id = sqlc.arg(provider_resource_id),
+    status = 'active',
+    error_code = NULL,
+    error_message = NULL
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND provider_id = sqlc.arg(provider_id)
+  AND provisioning_mode = 'managed'
+  AND status = 'provisioning'
+RETURNING *;
+
+-- name: MarkManagedPhoneNumberFailed :exec
+UPDATE phone_numbers
+SET
+    status = 'failed',
+    voice_enabled = false,
+    sms_enabled = false,
+    error_code = 'provider_provision_failed',
+    error_message = sqlc.arg(error_message)
+WHERE id = sqlc.arg(id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND provider_id = sqlc.arg(provider_id)
+  AND provisioning_mode = 'managed'
+  AND status = 'provisioning';
 
 -- name: GetPhoneNumberByID :one
 SELECT pn.*
@@ -119,7 +161,7 @@ FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.id = sqlc.arg(id)
   AND pn.organization_id = sqlc.arg(organization_id)
-  AND pn.status = 'active'
+  AND pn.status <> 'released'
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 LIMIT 1;
@@ -150,7 +192,7 @@ LIMIT 1;
 SELECT pn.*
 FROM phone_numbers AS pn
 WHERE pn.organization_id = sqlc.arg(organization_id)
-  AND pn.status = 'active'
+  AND pn.status <> 'released'
 ORDER BY pn.created_at DESC;
 
 -- name: ListPhoneNumbersByCountry :many
@@ -158,7 +200,7 @@ SELECT pn.*
 FROM phone_numbers AS pn
 WHERE pn.organization_id = sqlc.arg(organization_id)
   AND pn.country_code = sqlc.arg(country_code)
-  AND pn.status = 'active'
+  AND pn.status <> 'released'
 ORDER BY pn.number ASC;
 
 -- name: UpdatePhoneNumber :one

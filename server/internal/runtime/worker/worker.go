@@ -23,7 +23,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/telecom/calls"
-	"github.com/leamout/leamout/internal/telecom/number_orders"
+	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
 )
@@ -38,7 +38,7 @@ type Worker struct {
 	callReconciliation      *calls.ReconciliationJob
 	endpointHealth          *routing.EndpointHealthJob
 	recordingReconciliation *recordings.ReconciliationJob
-	providerOperations      *number_orders.ProviderOperationJob
+	providerOperations      *numbers.ProviderOperationJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
@@ -94,9 +94,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("provision worker NATS streams: %w", err)
 	}
 
-	freeSwitch, err := freeswitch.New(
-		freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword),
-	)
+	freeSwitch, err := freeswitch.New(freeswitch.DefaultConfig(cfg.FreeSWITCHESLAddress, cfg.FreeSWITCHESLPassword))
 	if err != nil {
 		_ = redisClient.Close()
 		_ = natsClient.Close()
@@ -146,10 +144,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize call reconciliation job: %w", err)
 	}
 	callReconciliation.SetMetrics(telecomMetrics)
-	endpointHealth, err := routing.NewEndpointHealthJob(
-		queries,
-		routing.NewSIPOptionsProber(),
-	)
+	endpointHealth, err := routing.NewEndpointHealthJob(queries, routing.NewSIPOptionsProber())
 	if err != nil {
 		_ = redisClient.Close()
 		_ = freeSwitch.Close()
@@ -159,10 +154,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 	endpointHealth.SetMetrics(telecomMetrics)
 
-	recordingReconciliation, err := recordings.NewReconciliationJob(
-		recordingsRepository,
-		recordings.DefaultReconciliationJobConfig(),
-	)
+	recordingReconciliation, err := recordings.NewReconciliationJob(recordingsRepository, recordings.DefaultReconciliationJobConfig())
 	if err != nil {
 		_ = redisClient.Close()
 		_ = freeSwitch.Close()
@@ -171,13 +163,10 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize recording reconciliation job: %w", err)
 	}
 
-	numberOrdersRepository := number_orders.NewRepository(db, redisClient)
-	numberOrdersService := number_orders.NewService(numberOrdersRepository)
+	numbersRepository := numbers.NewRepository(db, redisClient)
+	numbersService := numbers.NewService(numbersRepository)
 	if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
-		didwwClient, err := didww.NewClient(didww.Config{
-			BaseURL: cfg.DIDWW.APIBaseURL,
-			APIKey:  cfg.DIDWW.APIKey,
-		})
+		didwwClient, err := didww.NewClient(didww.Config{BaseURL: cfg.DIDWW.APIBaseURL, APIKey: cfg.DIDWW.APIKey})
 		if err != nil {
 			_ = redisClient.Close()
 			_ = freeSwitch.Close()
@@ -185,12 +174,12 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 			db.Close()
 			return nil, fmt.Errorf("initialize DIDWW provider executor: %w", err)
 		}
-		numberOrdersService.SetManagedProvider("didww", didwwClient)
+		numbersService.SetManagedProvider("didww", didwwClient)
 	}
-	providerOperations, err := number_orders.NewProviderOperationJob(
-		numberOrdersRepository,
-		numberOrdersService,
-		number_orders.DefaultProviderOperationJobConfig(),
+	providerOperations, err := numbers.NewProviderOperationJob(
+		numbersRepository,
+		numbersService,
+		numbers.DefaultProviderOperationJobConfig(),
 	)
 	if err != nil {
 		_ = redisClient.Close()
@@ -202,11 +191,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 
 	outboxRepository := outbox.NewRepository(queries)
 	outboxPublisher := outbox.NewPublisher(natsClient)
-	outboxJob, err := outbox.NewPublisherJob(
-		outboxRepository,
-		outboxPublisher,
-		outbox.DefaultPublisherJobConfig("worker-"+uuid.NewString()),
-	)
+	outboxJob, err := outbox.NewPublisherJob(outboxRepository, outboxPublisher, outbox.DefaultPublisherJobConfig("worker-"+uuid.NewString()))
 	if err != nil {
 		_ = redisClient.Close()
 		_ = freeSwitch.Close()
@@ -218,11 +203,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	webhookRepository := webhooks.NewRepository(queries)
 	webhookService := webhooks.NewService(webhookRepository, db)
 	webhookConsumer := webhooks.NewConsumer(natsClient, webhookService)
-	webhookDelivery, err := webhooks.NewDeliveryJob(
-		webhookRepository,
-		webhooks.NewHTTPSender(),
-		webhooks.DefaultDeliveryJobConfig("worker-"+uuid.NewString()),
-	)
+	webhookDelivery, err := webhooks.NewDeliveryJob(webhookRepository, webhooks.NewHTTPSender(), webhooks.DefaultDeliveryJobConfig("worker-"+uuid.NewString()))
 	if err != nil {
 		_ = redisClient.Close()
 		_ = freeSwitch.Close()
@@ -240,22 +221,22 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 
 	return &Worker{
-		db:                      db,
-		freeSwitch:              freeSwitch,
-		nats:                    natsClient,
-		redis:                   redisClient,
-		calls:                   calls.NewConsumer(callsService),
-		recordings:              recordings.NewConsumer(recordingsService),
-		callReconciliation:      callReconciliation,
-		endpointHealth:          endpointHealth,
+		db: db,
+		freeSwitch: freeSwitch,
+		nats: natsClient,
+		redis: redisClient,
+		calls: calls.NewConsumer(callsService),
+		recordings: recordings.NewConsumer(recordingsService),
+		callReconciliation: callReconciliation,
+		endpointHealth: endpointHealth,
 		recordingReconciliation: recordingReconciliation,
-		providerOperations:      providerOperations,
-		outbox:                  outboxJob,
-		webhookConsumer:         webhookConsumer,
-		webhookDelivery:         webhookDelivery,
-		idempotencyCleanup:      idempotencyCleanup,
-		health:                  newHealthState(componentNames...),
-		logger:                  logging.New(),
+		providerOperations: providerOperations,
+		outbox: outboxJob,
+		webhookConsumer: webhookConsumer,
+		webhookDelivery: webhookDelivery,
+		idempotencyCleanup: idempotencyCleanup,
+		health: newHealthState(componentNames...),
+		logger: logging.New(),
 	}, nil
 }
 
@@ -292,12 +273,12 @@ func (w *Worker) Run(ctx context.Context) error {
 	w.logger.Info(ctx, "worker subscribed to FreeSWITCH lifecycle events")
 
 	healthServer := &http.Server{
-		Addr:              workerHealthAddress,
-		Handler:           healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
+		Addr: workerHealthAddress,
+		Handler: healthHandler(w.db, w.nats, w.redis, w.freeSwitch, w.health),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       5 * time.Second,
-		WriteTimeout:      5 * time.Second,
-		IdleTimeout:       30 * time.Second,
+		ReadTimeout: 5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+		IdleTimeout: 30 * time.Second,
 	}
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

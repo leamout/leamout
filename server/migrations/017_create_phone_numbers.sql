@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     voice_enabled BOOLEAN NOT NULL DEFAULT true,
     sms_enabled BOOLEAN NOT NULL DEFAULT false,
     status TEXT NOT NULL DEFAULT 'active',
+    error_code TEXT,
+    error_message TEXT,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -29,30 +31,48 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     CONSTRAINT chk_phone_numbers_provisioning_mode CHECK (
         provisioning_mode IN ('byoc', 'managed')
     ),
+    CONSTRAINT chk_phone_numbers_status CHECK (
+        status IN ('provisioning', 'active', 'disabled', 'porting', 'failed', 'released')
+    ),
     CONSTRAINT chk_phone_numbers_provider_ownership CHECK (
         (
             provisioning_mode = 'byoc'
             AND provider_id IS NULL
             AND provider_resource_id IS NULL
+            AND status NOT IN ('provisioning', 'failed')
         )
         OR (
             provisioning_mode = 'managed'
             AND provider_id IS NOT NULL
-            AND provider_resource_id IS NOT NULL
-            AND length(btrim(provider_resource_id)) > 0
+            AND (
+                provider_resource_id IS NULL
+                OR length(btrim(provider_resource_id)) > 0
+            )
+            AND (
+                status IN ('provisioning', 'failed')
+                OR provider_resource_id IS NOT NULL
+            )
         )
     ),
-    CONSTRAINT chk_phone_numbers_status CHECK (
-        status IN ('active', 'disabled', 'porting', 'released')
+    CONSTRAINT chk_phone_numbers_error_state CHECK (
+        (
+            status = 'failed'
+            AND error_message IS NOT NULL
+            AND length(btrim(error_message)) > 0
+        )
+        OR (
+            status <> 'failed'
+            AND error_code IS NULL
+            AND error_message IS NULL
+        )
     )
 );
 
--- A released number is historical ownership, not a permanent reservation.
--- This allows a recycled E.164 number to be acquired again later while still
--- preventing two live ownership records for the same number.
+-- Failed/released rows are historical attempts or ownership. They must not
+-- permanently reserve an E.164 number for a later acquisition.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_numbers_number_live
     ON phone_numbers (number)
-    WHERE status <> 'released';
+    WHERE status NOT IN ('failed', 'released');
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_phone_numbers_provider_resource
     ON phone_numbers (provider_id, provider_resource_id)
@@ -76,8 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_phone_numbers_carrier_connection_id
 
 -- BYOC numbers may bind only to their organization's carrier connection.
 -- Managed numbers may bind only to a Leamout platform connection owned by the
--- same upstream provider as the number. A NULL carrier_connection_id is valid
--- while provisioning is incomplete or when the number does not use SIP voice.
+-- same upstream provider as the number.
 CREATE FUNCTION validate_phone_number_carrier_scope()
 RETURNS TRIGGER
 LANGUAGE plpgsql
