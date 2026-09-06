@@ -557,7 +557,8 @@ type Subscription struct {
 type Trunk struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProvisioningMode    string             `db:"provisioning_mode" json:"provisioning_mode"`
 	Name                string             `db:"name" json:"name"`
 	Direction           string             `db:"direction" json:"direction"`
 	Status              string             `db:"status" json:"status"`

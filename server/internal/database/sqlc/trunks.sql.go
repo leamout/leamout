@@ -16,6 +16,7 @@ const createPlatformTrunk = `-- name: CreatePlatformTrunk :one
 INSERT INTO trunks (
     organization_id,
     carrier_connection_id,
+    provisioning_mode,
     name,
     direction,
     status,
@@ -24,6 +25,7 @@ INSERT INTO trunks (
 SELECT
     NULL::UUID AS organization_id,
     cc.id AS carrier_connection_id,
+    'managed' AS provisioning_mode,
     $1 AS name,
     COALESCE($2, 'bidirectional') AS direction,
     COALESCE($3, 'active') AS status,
@@ -33,7 +35,7 @@ WHERE cc.id = $5
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
   AND cc.status = 'active'
-RETURNING id, organization_id, carrier_connection_id, name, direction, status, managed_default, created_at, updated_at
+RETURNING id, organization_id, carrier_connection_id, provisioning_mode, name, direction, status, managed_default, created_at, updated_at
 `
 
 type CreatePlatformTrunkParams struct {
@@ -57,6 +59,7 @@ func (q *Queries) CreatePlatformTrunk(ctx context.Context, arg CreatePlatformTru
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -93,6 +96,7 @@ FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = $8
   AND t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
 RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
@@ -149,6 +153,7 @@ const createTrunk = `-- name: CreateTrunk :one
 INSERT INTO trunks (
     organization_id,
     carrier_connection_id,
+    provisioning_mode,
     name,
     direction,
     status,
@@ -157,6 +162,7 @@ INSERT INTO trunks (
 SELECT
     cc.organization_id AS organization_id,
     cc.id AS carrier_connection_id,
+    'byoc' AS provisioning_mode,
     $1 AS name,
     COALESCE($2, 'bidirectional') AS direction,
     COALESCE($3, 'active') AS status,
@@ -166,7 +172,7 @@ WHERE cc.id = $4
   AND cc.scope = 'organization'
   AND cc.organization_id = $5
   AND cc.status = 'active'
-RETURNING id, organization_id, carrier_connection_id, name, direction, status, managed_default, created_at, updated_at
+RETURNING id, organization_id, carrier_connection_id, provisioning_mode, name, direction, status, managed_default, created_at, updated_at
 `
 
 type CreateTrunkParams struct {
@@ -190,6 +196,7 @@ func (q *Queries) CreateTrunk(ctx context.Context, arg CreateTrunkParams) (Trunk
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -226,6 +233,7 @@ FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = $8
   AND t.organization_id = $9
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
 RETURNING id, organization_id, trunk_id, host, port, transport, direction, priority, weight, enabled, health_status, consecutive_failures, last_checked_at, last_response_code, last_latency_ms, last_error, cooldown_until, created_at, updated_at
@@ -288,6 +296,7 @@ WHERE te.id = $1
   AND te.organization_id = $3
   AND t.id = te.trunk_id
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.id = t.carrier_connection_id
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
@@ -332,14 +341,10 @@ UPDATE trunks AS t
 SET
     status = 'disabled',
     updated_at = NOW()
-FROM carrier_connections AS cc
 WHERE t.id = $1
   AND t.organization_id = $2
   AND t.status = 'active'
-  AND cc.id = t.carrier_connection_id
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
-RETURNING t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+RETURNING t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 `
 
 type DisableTrunkParams struct {
@@ -354,6 +359,7 @@ func (q *Queries) DisableTrunk(ctx context.Context, arg DisableTrunkParams) (Tru
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -369,13 +375,9 @@ UPDATE trunks AS t
 SET
     status = 'active',
     updated_at = NOW()
-FROM carrier_connections AS cc
 WHERE t.id = $1
   AND t.organization_id = $2
   AND t.status = 'disabled'
-  AND cc.id = t.carrier_connection_id
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 `
 
 type EnableTrunkParams struct {
@@ -389,11 +391,12 @@ func (q *Queries) EnableTrunk(ctx context.Context, arg EnableTrunkParams) error 
 }
 
 const getPlatformTrunkByID = `-- name: GetPlatformTrunkByID :one
-SELECT t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = $1
   AND t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
 LIMIT 1
@@ -406,6 +409,7 @@ func (q *Queries) GetPlatformTrunkByID(ctx context.Context, id uuid.UUID) (Trunk
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -417,13 +421,10 @@ func (q *Queries) GetPlatformTrunkByID(ctx context.Context, id uuid.UUID) (Trunk
 }
 
 const getTrunkByID = `-- name: GetTrunkByID :one
-SELECT t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
-JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = $1
   AND t.organization_id = $2
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 LIMIT 1
 `
 
@@ -439,6 +440,7 @@ func (q *Queries) GetTrunkByID(ctx context.Context, arg GetTrunkByIDParams) (Tru
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -458,6 +460,7 @@ WHERE te.id = $1
   AND te.trunk_id = $2
   AND te.organization_id = $3
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
 LIMIT 1
@@ -503,6 +506,7 @@ JOIN trunks AS t ON t.id = te.trunk_id
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.id = $1
   AND t.organization_id = $2
+  AND t.provisioning_mode = 'byoc'
   AND t.status = 'active'
   AND t.direction IN ('outbound', 'bidirectional')
   AND cc.scope = 'organization'
@@ -560,10 +564,11 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 }
 
 const listPlatformTrunks = `-- name: ListPlatformTrunks :many
-SELECT t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
 ORDER BY t.created_at DESC
@@ -582,6 +587,7 @@ func (q *Queries) ListPlatformTrunks(ctx context.Context) ([]Trunk, error) {
 			&i.ID,
 			&i.OrganizationID,
 			&i.CarrierConnectionID,
+			&i.ProvisioningMode,
 			&i.Name,
 			&i.Direction,
 			&i.Status,
@@ -607,6 +613,7 @@ JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE te.trunk_id = $1
   AND te.organization_id = $2
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC
@@ -728,18 +735,19 @@ func (q *Queries) ListTrunkEndpointsForHealthCheck(ctx context.Context, arg List
 }
 
 const listTrunksByCarrierConnectionID = `-- name: ListTrunksByCarrierConnectionID :many
-SELECT t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.carrier_connection_id = $1
   AND t.organization_id = $2
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
 ORDER BY t.created_at DESC
 `
 
 type ListTrunksByCarrierConnectionIDParams struct {
-	CarrierConnectionID uuid.UUID  `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
 	OrganizationID      *uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
@@ -756,6 +764,7 @@ func (q *Queries) ListTrunksByCarrierConnectionID(ctx context.Context, arg ListT
 			&i.ID,
 			&i.OrganizationID,
 			&i.CarrierConnectionID,
+			&i.ProvisioningMode,
 			&i.Name,
 			&i.Direction,
 			&i.Status,
@@ -774,12 +783,9 @@ func (q *Queries) ListTrunksByCarrierConnectionID(ctx context.Context, arg ListT
 }
 
 const listTrunksByOrganizationID = `-- name: ListTrunksByOrganizationID :many
-SELECT t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
-JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 WHERE t.organization_id = $1
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
 ORDER BY t.created_at DESC
 `
 
@@ -796,6 +802,7 @@ func (q *Queries) ListTrunksByOrganizationID(ctx context.Context, organizationID
 			&i.ID,
 			&i.OrganizationID,
 			&i.CarrierConnectionID,
+			&i.ProvisioningMode,
 			&i.Name,
 			&i.Direction,
 			&i.Status,
@@ -945,6 +952,7 @@ FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
 JOIN trunk_endpoints AS te ON te.trunk_id = t.id
 WHERE t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND t.managed_default = true
   AND t.status = 'active'
   AND t.direction IN ('outbound', 'bidirectional')
@@ -1016,10 +1024,11 @@ SET
 FROM carrier_connections AS cc
 WHERE t.id = $5
   AND t.organization_id IS NULL
+  AND t.provisioning_mode = 'managed'
   AND cc.id = t.carrier_connection_id
   AND cc.scope = 'platform'
   AND cc.organization_id IS NULL
-RETURNING t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+RETURNING t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 `
 
 type UpdatePlatformTrunkParams struct {
@@ -1043,6 +1052,7 @@ func (q *Queries) UpdatePlatformTrunk(ctx context.Context, arg UpdatePlatformTru
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -1060,13 +1070,9 @@ SET
     direction = COALESCE($2, t.direction),
     status = COALESCE($3, t.status),
     updated_at = NOW()
-FROM carrier_connections AS cc
 WHERE t.id = $4
   AND t.organization_id = $5
-  AND cc.id = t.carrier_connection_id
-  AND cc.scope = 'organization'
-  AND cc.organization_id = t.organization_id
-RETURNING t.id, t.organization_id, t.carrier_connection_id, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
+RETURNING t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 `
 
 type UpdateTrunkParams struct {
@@ -1090,6 +1096,7 @@ func (q *Queries) UpdateTrunk(ctx context.Context, arg UpdateTrunkParams) (Trunk
 		&i.ID,
 		&i.OrganizationID,
 		&i.CarrierConnectionID,
+		&i.ProvisioningMode,
 		&i.Name,
 		&i.Direction,
 		&i.Status,
@@ -1135,6 +1142,7 @@ WHERE te.id = $8
   AND te.organization_id = $10
   AND t.id = te.trunk_id
   AND t.organization_id = te.organization_id
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = te.organization_id
 RETURNING te.id, te.organization_id, te.trunk_id, te.host, te.port, te.transport, te.direction, te.priority, te.weight, te.enabled, te.health_status, te.consecutive_failures, te.last_checked_at, te.last_response_code, te.last_latency_ms, te.last_error, te.cooldown_until, te.created_at, te.updated_at
