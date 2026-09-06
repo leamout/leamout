@@ -15,10 +15,6 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_phone_numbers_id_org UNIQUE (
-        id,
-        organization_id
-    ),
     CONSTRAINT uq_phone_numbers_id_org_provider UNIQUE (
         id,
         organization_id,
@@ -41,17 +37,9 @@ CREATE TABLE IF NOT EXISTS phone_numbers (
         )
         OR (
             provisioning_mode = 'managed'
-            AND (
-                (
-                    provider_id IS NULL
-                    AND provider_resource_id IS NULL
-                )
-                OR (
-                    provider_id IS NOT NULL
-                    AND provider_resource_id IS NOT NULL
-                    AND length(btrim(provider_resource_id)) > 0
-                )
-            )
+            AND provider_id IS NOT NULL
+            AND provider_resource_id IS NOT NULL
+            AND length(btrim(provider_resource_id)) > 0
         )
     ),
     CONSTRAINT chk_phone_numbers_status CHECK (
@@ -87,11 +75,9 @@ CREATE INDEX IF NOT EXISTS idx_phone_numbers_carrier_connection_id
     WHERE carrier_connection_id IS NOT NULL;
 
 -- BYOC numbers may bind only to their organization's carrier connection.
--- Direct managed numbers may bind only to a Leamout platform connection owned
--- by the same upstream provider as the number. Transit-managed numbers keep
--- provider identity and carrier binding out of the customer deployment, so all
--- three fields remain NULL locally. A NULL carrier_connection_id is also valid
--- while direct provisioning is incomplete or when the number does not use SIP.
+-- Managed numbers may bind only to a Leamout platform connection owned by the
+-- same upstream provider as the number. A NULL carrier_connection_id is valid
+-- while provisioning is incomplete or when the number does not use SIP voice.
 CREATE FUNCTION validate_phone_number_carrier_scope()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -117,8 +103,7 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
     ELSIF NEW.provisioning_mode = 'managed' THEN
-        IF NEW.provider_id IS NULL
-           OR connection_scope <> 'platform'
+        IF connection_scope <> 'platform'
            OR connection_provider_id IS DISTINCT FROM NEW.provider_id THEN
             RAISE EXCEPTION 'managed phone number must use a platform carrier connection for the same provider'
                 USING ERRCODE = '23514';
