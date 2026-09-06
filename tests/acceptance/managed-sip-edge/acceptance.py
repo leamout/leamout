@@ -32,9 +32,15 @@ def invite(caller=CALLER, password=PASSWORD, authenticate=True):
         return (f"INVITE {uri} SIP/2.0\r\nVia: SIP/2.0/UDP 127.0.0.1:{port};branch={branch};rport\r\n"
                 f"Max-Forwards: 10\r\nFrom: <sip:{caller}@{REALM}>;tag={tag}\r\nTo: <{uri}>\r\n"
                 f"Call-ID: {call_id}\r\nCSeq: {cseq} INVITE\r\nContact: <sip:test@127.0.0.1:{port}>\r\n{auth}Content-Length: 0\r\n\r\n")
-    sock.sendto(message(new_branch(), 1).encode(), destination); first = sock.recv(65535).decode(errors="replace")
-    if not authenticate: return int(first.split()[1]), first
-    if int(first.split()[1]) != 407: raise Failure("initial INVITE was not challenged: " + first.splitlines()[0])
+    def final_response():
+        while True:
+            response = sock.recv(65535).decode(errors="replace")
+            status = int(response.split()[1])
+            if status >= 200:
+                return status, response
+    sock.sendto(message(new_branch(), 1).encode(), destination); first_status, first = final_response()
+    if not authenticate: return first_status, first
+    if first_status != 407: raise Failure("initial INVITE was not challenged: " + first.splitlines()[0])
     challenge = digest_challenge(first); nonce = challenge["nonce"]
     ha1 = hashlib.md5(f"{USER}:{REALM}:{password}".encode()).hexdigest()
     ha2 = hashlib.md5(f"INVITE:{uri}".encode()).hexdigest()
@@ -47,7 +53,7 @@ def invite(caller=CALLER, password=PASSWORD, authenticate=True):
         response = hashlib.md5(f"{ha1}:{nonce}:{ha2}".encode()).hexdigest(); extra = ""
     auth = f'Proxy-Authorization: Digest username="{USER}", realm="{REALM}", nonce="{nonce}", uri="{uri}", response="{response}", algorithm=MD5{extra}\r\n'
     sock.sendto(message(new_branch(), 2, auth).encode(), destination)
-    final = sock.recv(65535).decode(errors="replace"); return int(final.split()[1]), final
+    return final_response()
 
 def assert_no_wholesale(before):
     time.sleep(.5)
