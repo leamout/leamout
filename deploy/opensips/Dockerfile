@@ -18,9 +18,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         "opensips=$package_version" \
         "opensips-auth-modules=$package_version" \
-        "opensips-http-modules=$package_version" \
         "opensips-json-module=$package_version" \
         "opensips-postgres-module=$package_version" \
+        "opensips-restclient-module=$package_version" \
         "opensips-tls-module=$package_version" \
         "opensips-wss-module=$package_version" \
     && installed_version="$(dpkg-query -W -f='${Version}' opensips)" \
