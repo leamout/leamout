@@ -38,6 +38,8 @@ type Response struct {
 // ProviderOperationRequest is the internal request used by direct managed-
 // provider execution. Provider inventory, product, and routing identifiers stay
 // in the durable operation journal rather than the customer number_orders row.
+// Transit execution uses its opaque selection contract instead of these
+// provider-specific fields.
 type ProviderOperationRequest struct {
 	SelectionID               string    `json:"selection_id"`
 	Provider                  string    `json:"provider"`
