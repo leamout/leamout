@@ -1,6 +1,7 @@
 -- name: CreateNumberOrderProviderOperation :one
 INSERT INTO provider_operations (
     organization_id,
+    execution_target,
     carrier_provider_id,
     operation_type,
     number_order_id,
@@ -9,22 +10,25 @@ INSERT INTO provider_operations (
 )
 VALUES (
     sqlc.arg(organization_id),
-    sqlc.arg(carrier_provider_id),
+    sqlc.arg(execution_target),
+    sqlc.narg(carrier_provider_id),
     'number_order',
     sqlc.arg(number_order_id),
     sqlc.arg(idempotency_key),
     sqlc.arg(request)
 )
-ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
+ON CONFLICT (organization_id, execution_target, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
 WHERE provider_operations.operation_type = EXCLUDED.operation_type
   AND provider_operations.number_order_id = EXCLUDED.number_order_id
+  AND provider_operations.carrier_provider_id IS NOT DISTINCT FROM EXCLUDED.carrier_provider_id
   AND provider_operations.request = EXCLUDED.request
 RETURNING *;
 
 -- name: CreateNumberReleaseProviderOperation :one
 INSERT INTO provider_operations (
     organization_id,
+    execution_target,
     carrier_provider_id,
     operation_type,
     idempotency_key,
@@ -34,6 +38,7 @@ INSERT INTO provider_operations (
 )
 SELECT
     sqlc.arg(organization_id),
+    'direct',
     sqlc.arg(carrier_provider_id),
     'number_release',
     sqlc.arg(idempotency_key),
@@ -47,10 +52,11 @@ WHERE pn.id = sqlc.arg(phone_number_id)
   AND pn.provider_resource_id = sqlc.arg(provider_resource_id)
   AND pn.provisioning_mode = 'managed'
   AND pn.status IN ('active', 'disabled')
-ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
+ON CONFLICT (organization_id, execution_target, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
 WHERE provider_operations.operation_type = EXCLUDED.operation_type
   AND provider_operations.phone_number_id = EXCLUDED.phone_number_id
+  AND provider_operations.carrier_provider_id = EXCLUDED.carrier_provider_id
   AND provider_operations.provider_resource_id = EXCLUDED.provider_resource_id
   AND provider_operations.request = EXCLUDED.request
 RETURNING *;
@@ -91,7 +97,6 @@ SET
     next_attempt_at = NULL
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND carrier_provider_id = sqlc.arg(carrier_provider_id)
   AND operation_type = 'number_order'
   AND number_order_id = sqlc.arg(number_order_id)
   AND state = 'provider_accepted'
