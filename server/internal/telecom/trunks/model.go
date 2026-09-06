@@ -11,10 +11,10 @@ import (
 type ProvisioningMode string
 
 const (
-	ProvisioningModeBYOC    ProvisioningMode = "byoc"
-	ProvisioningModeManaged ProvisioningMode = "managed"
-	ManagedVoiceEntitlement                  = "voice.managed.enabled"
-	LeamoutCarrierProviderSlug                = "leamout"
+	ProvisioningModeBYOC       ProvisioningMode = "byoc"
+	ProvisioningModeManaged    ProvisioningMode = "managed"
+	ManagedVoiceEntitlement                     = "voice.managed.enabled"
+	LeamoutCarrierProviderSlug                  = "leamout"
 )
 
 type CreateRequest struct {
