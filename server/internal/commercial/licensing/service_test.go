@@ -24,9 +24,36 @@ func TestGenerateDeploymentToken(t *testing.T) {
 	}
 }
 
+func TestGenerateDeploymentTokenProducesDistinctCredentials(t *testing.T) {
+	first, _, firstHash, err := generateDeploymentToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, _, secondHash, err := generateDeploymentToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == second || firstHash == secondHash {
+		t.Fatal("expected independently generated deployment credentials")
+	}
+}
+
 func TestParseDeploymentTokenPrefixRejectsOrganizationToken(t *testing.T) {
 	if _, err := parseDeploymentTokenPrefix("lm_org_12345678_secret"); err == nil {
 		t.Fatal("expected organization token to be rejected")
+	}
+}
+
+func TestParseDeploymentTokenPrefixRejectsMalformedCredential(t *testing.T) {
+	for _, token := range []string{
+		"",
+		"lm_dep_",
+		"lm_dep_12345678",
+		"lm_dep_12345678_",
+	} {
+		if _, err := parseDeploymentTokenPrefix(token); err == nil {
+			t.Fatalf("expected %q to be rejected", token)
+		}
 	}
 }
 
