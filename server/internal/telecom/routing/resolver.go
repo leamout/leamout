@@ -42,21 +42,14 @@ func NewResolver(repo *Repository) *Resolver {
 	return &Resolver{repo: repo, pickWeight: secureWeightPick}
 }
 
-func (r *Resolver) resolveOutbound(
-	ctx context.Context,
-	req OutboundRequest,
-) (OutboundDecision, error) {
+func (r *Resolver) resolveOutbound(ctx context.Context, req OutboundRequest) (OutboundDecision, error) {
 	if req.TrunkID != nil {
-		return r.resolveBYOCOutbound(ctx, req, *req.TrunkID)
+		return r.resolveExplicitOutbound(ctx, req, *req.TrunkID)
 	}
 	return r.resolveManagedOutbound(ctx, req)
 }
 
-func (r *Resolver) resolveBYOCOutbound(
-	ctx context.Context,
-	req OutboundRequest,
-	trunkID uuid.UUID,
-) (OutboundDecision, error) {
+func (r *Resolver) resolveExplicitOutbound(ctx context.Context, req OutboundRequest, trunkID uuid.UUID) (OutboundDecision, error) {
 	trunk, err := r.repo.GetTrunk(ctx, req.OrganizationID, trunkID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -64,8 +57,25 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if trunk.OrganizationID == nil || *trunk.OrganizationID != req.OrganizationID ||
-		trunk.ProvisioningMode != "byoc" || trunk.CarrierConnectionID == nil {
+	if trunk.OrganizationID == nil || *trunk.OrganizationID != req.OrganizationID {
+		return OutboundDecision{}, ErrNoRoute
+	}
+
+	switch trunk.ProvisioningMode {
+	case provisioningModeBYOC:
+		return r.resolveExplicitTenantTrunk(ctx, req, trunk, false)
+	case provisioningModeManaged:
+		if trunk.CarrierConnectionID == nil {
+			return r.resolveCloudManagedTrunk(ctx, req, trunk)
+		}
+		return r.resolveExplicitTenantTrunk(ctx, req, trunk, true)
+	default:
+		return OutboundDecision{}, ErrNoRoute
+	}
+}
+
+func (r *Resolver) resolveExplicitTenantTrunk(ctx context.Context, req OutboundRequest, trunk sqlc.Trunk, managed bool) (OutboundDecision, error) {
+	if trunk.CarrierConnectionID == nil {
 		return OutboundDecision{}, ErrNoRoute
 	}
 	connectionID := *trunk.CarrierConnectionID
@@ -88,11 +98,15 @@ func (r *Resolver) resolveBYOCOutbound(
 		}
 		return OutboundDecision{}, err
 	}
-	if err := authorizeBYOCCallerIdentity(caller, req.OrganizationID, connectionID); err != nil {
+	if managed {
+		if err := authorizeManagedCallerIdentity(caller, req.OrganizationID); err != nil {
+			return OutboundDecision{}, err
+		}
+	} else if err := authorizeBYOCCallerIdentity(caller, req.OrganizationID, connectionID); err != nil {
 		return OutboundDecision{}, err
 	}
 
-	endpoints, err := r.repo.ListOutboundEndpoints(ctx, req.OrganizationID, trunkID)
+	endpoints, err := r.repo.ListOutboundEndpoints(ctx, req.OrganizationID, trunk.ID)
 	if err != nil {
 		return OutboundDecision{}, err
 	}
@@ -106,6 +120,7 @@ func (r *Resolver) resolveBYOCOutbound(
 	}
 	r.recordEndpointSelection(ctx, connectionID, trunk.ID, endpoint, endpoints)
 	return OutboundDecision{
+		Managed:             managed,
 		OrganizationID:      req.OrganizationID,
 		CarrierConnectionID: connectionID,
 		TrunkID:             trunk.ID,
@@ -121,10 +136,19 @@ func (r *Resolver) resolveBYOCOutbound(
 	}, nil
 }
 
-func (r *Resolver) resolveManagedOutbound(
-	ctx context.Context,
-	req OutboundRequest,
-) (OutboundDecision, error) {
+func (r *Resolver) resolveCloudManagedTrunk(ctx context.Context, req OutboundRequest, trunk sqlc.Trunk) (OutboundDecision, error) {
+	decision, err := r.resolveManagedOutbound(ctx, req)
+	if err != nil {
+		return OutboundDecision{}, err
+	}
+	// Keep the tenant-managed trunk as the customer-facing route attribution.
+	// The selected carrier connection and endpoint still describe the internal
+	// platform wholesale route used to execute the call.
+	decision.TrunkID = trunk.ID
+	return decision, nil
+}
+
+func (r *Resolver) resolveManagedOutbound(ctx context.Context, req OutboundRequest) (OutboundDecision, error) {
 	caller, err := r.repo.GetPhoneNumber(ctx, req.OrganizationID, req.From)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -192,13 +216,7 @@ func (r *Resolver) resolveManagedOutbound(
 	}, nil
 }
 
-func (r *Resolver) recordEndpointSelection(
-	ctx context.Context,
-	connectionID uuid.UUID,
-	trunkID uuid.UUID,
-	endpoint sqlc.TrunkEndpoint,
-	endpoints []sqlc.TrunkEndpoint,
-) {
+func (r *Resolver) recordEndpointSelection(ctx context.Context, connectionID uuid.UUID, trunkID uuid.UUID, endpoint sqlc.TrunkEndpoint, endpoints []sqlc.TrunkEndpoint) {
 	if r.metrics == nil {
 		return
 	}
@@ -206,10 +224,6 @@ func (r *Resolver) recordEndpointSelection(
 	r.metrics.EndpointSelection(ctx, connectionID, trunkID, endpoint.ID, failover)
 }
 
-// selectOutboundEndpoint restricts routing to the best available priority and
-// distributes calls by weight within that priority. Lower-priority endpoints
-// are failover targets and must not receive traffic while a better priority is
-// eligible.
 func (r *Resolver) selectOutboundEndpoint(endpoints []sqlc.TrunkEndpoint) (sqlc.TrunkEndpoint, error) {
 	if len(endpoints) == 0 {
 		return sqlc.TrunkEndpoint{}, ErrNoRoute
@@ -273,11 +287,7 @@ func secureWeightPick(total int64) (int64, error) {
 	return pick.Int64(), nil
 }
 
-func (r *Resolver) resolveInbound(
-	ctx context.Context,
-	req InboundRequest,
-	sourceIP netip.Addr,
-) (InboundDecision, error) {
+func (r *Resolver) resolveInbound(ctx context.Context, req InboundRequest, sourceIP netip.Addr) (InboundDecision, error) {
 	connection, err := r.repo.ResolveInboundCarrier(ctx, sourceIP)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
