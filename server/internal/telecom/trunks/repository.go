@@ -33,6 +33,67 @@ func (r *Repository) CreateManaged(ctx context.Context, organizationID uuid.UUID
 	})
 }
 
+func (r *Repository) InstallManaged(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	name string,
+	direction, status *string,
+	installation ManagedSIPInstallation,
+	secretCiphertext string,
+) (sqlc.Trunk, error) {
+	provider, err := r.queries.GetCarrierProviderBySlug(ctx, LeamoutCarrierProviderSlug)
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	outboundAuthMethod := "digest"
+	inboundAuthMethod := "none"
+	inboundEnabled := false
+	username := installation.Username
+	ciphertext := secretCiphertext
+	connection, err := r.queries.CreateCarrierConnection(ctx, sqlc.CreateCarrierConnectionParams{
+		OrganizationID:       &organizationID,
+		ProviderID:           provider.ID,
+		Name:                 name,
+		OutboundAuthMethod:   &outboundAuthMethod,
+		AuthUsername:         &username,
+		AuthSecretCiphertext: &ciphertext,
+		InboundEnabled:       &inboundEnabled,
+		InboundAuthMethod:    &inboundAuthMethod,
+	})
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	trunk, err := r.queries.CreateTrunk(ctx, sqlc.CreateTrunkParams{
+		OrganizationID:      &organizationID,
+		CarrierConnectionID: connection.ID,
+		ProvisioningMode:    string(ProvisioningModeManaged),
+		Name:                name,
+		Direction:           direction,
+		Status:              status,
+	})
+	if err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	endpointDirection := "outbound"
+	port := installation.Port
+	transport := installation.Transport
+	if _, err := r.queries.CreateTrunkEndpoint(ctx, sqlc.CreateTrunkEndpointParams{
+		OrganizationID: &organizationID,
+		TrunkID:        trunk.ID,
+		Host:           installation.Host,
+		Port:           &port,
+		Transport:      &transport,
+		Direction:      &endpointDirection,
+	}); err != nil {
+		return sqlc.Trunk{}, err
+	}
+
+	return trunk, nil
+}
+
 func (r *Repository) CreateCredential(ctx context.Context, organizationID, trunkID uuid.UUID, username, realm, ha1 string) (sqlc.TrunkCredential, error) {
 	return r.queries.CreateTrunkCredential(ctx, sqlc.CreateTrunkCredentialParams{
 		TrunkID:        trunkID,
