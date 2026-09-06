@@ -30,6 +30,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Generate temporary managed SIP admission secret
+        run: echo "MANAGED_SIP_ADMISSION_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
       - name: Validate Compose network topology
         env:
           CARRIER_CREDENTIAL_ENCRYPTION_KEY: test-key
