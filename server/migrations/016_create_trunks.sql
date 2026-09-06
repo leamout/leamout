@@ -1,8 +1,9 @@
 CREATE TABLE IF NOT EXISTS trunks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID,
-    carrier_connection_id UUID NOT NULL REFERENCES carrier_connections(id) ON DELETE RESTRICT,
+    carrier_connection_id UUID REFERENCES carrier_connections(id) ON DELETE RESTRICT,
 
+    provisioning_mode TEXT NOT NULL DEFAULT 'byoc',
     name TEXT NOT NULL,
     direction TEXT NOT NULL DEFAULT 'bidirectional',
     status TEXT NOT NULL DEFAULT 'active',
@@ -13,6 +14,34 @@ CREATE TABLE IF NOT EXISTS trunks (
 
     CONSTRAINT uq_trunks_org_name UNIQUE (organization_id, name),
     CONSTRAINT uq_trunks_id_org UNIQUE (id, organization_id),
+    CONSTRAINT chk_trunks_provisioning_mode CHECK (
+        provisioning_mode IN ('byoc', 'managed')
+    ),
+    CONSTRAINT chk_trunks_ownership CHECK (
+        (
+            organization_id IS NOT NULL
+            AND provisioning_mode = 'byoc'
+            AND carrier_connection_id IS NOT NULL
+        )
+        OR (
+            organization_id IS NOT NULL
+            AND provisioning_mode = 'managed'
+            AND carrier_connection_id IS NULL
+        )
+        OR (
+            organization_id IS NULL
+            AND provisioning_mode = 'managed'
+            AND carrier_connection_id IS NOT NULL
+        )
+    ),
+    CONSTRAINT chk_trunks_managed_default CHECK (
+        managed_default = false
+        OR (
+            organization_id IS NULL
+            AND provisioning_mode = 'managed'
+            AND carrier_connection_id IS NOT NULL
+        )
+    ),
     CONSTRAINT chk_trunks_name CHECK (
         length(btrim(name)) > 0
     ),
@@ -36,7 +65,12 @@ CREATE INDEX IF NOT EXISTS idx_trunks_organization_status
     ON trunks (organization_id, status);
 
 CREATE INDEX IF NOT EXISTS idx_trunks_connection_id
-    ON trunks (carrier_connection_id);
+    ON trunks (carrier_connection_id)
+    WHERE carrier_connection_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_trunks_organization_mode
+    ON trunks (organization_id, provisioning_mode, status)
+    WHERE organization_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS trunk_endpoints (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -107,18 +141,20 @@ CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_health_probe
     ON trunk_endpoints (health_status, cooldown_until, last_checked_at)
     WHERE enabled = true;
 
--- Trunks and endpoints inherit organization ownership from their carrier
--- connection. Platform-owned connections therefore produce NULL organization
--- IDs on their managed trunks/endpoints.
+-- BYOC and internal platform trunks inherit ownership from their carrier
+-- connection. Tenant-managed trunks intentionally have no carrier connection;
+-- their organization ownership is supplied directly and preserved here.
 CREATE FUNCTION derive_trunk_organization_id()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    SELECT organization_id
-    INTO NEW.organization_id
-    FROM carrier_connections
-    WHERE id = NEW.carrier_connection_id;
+    IF NEW.carrier_connection_id IS NOT NULL THEN
+        SELECT organization_id
+        INTO NEW.organization_id
+        FROM carrier_connections
+        WHERE id = NEW.carrier_connection_id;
+    END IF;
     RETURN NEW;
 END;
 $$;
