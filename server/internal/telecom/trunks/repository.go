@@ -26,7 +26,7 @@ func (r *Repository) Create(ctx context.Context, arg sqlc.CreateTrunkParams) (sq
 
 func (r *Repository) CreateManaged(ctx context.Context, organizationID uuid.UUID, name string, direction, status *string) (sqlc.Trunk, error) {
 	return r.queries.CreateManagedTrunk(ctx, sqlc.CreateManagedTrunkParams{
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 		Name:           name,
 		Direction:      direction,
 		Status:         status,
@@ -36,7 +36,7 @@ func (r *Repository) CreateManaged(ctx context.Context, organizationID uuid.UUID
 func (r *Repository) CreateCredential(ctx context.Context, organizationID, trunkID uuid.UUID, username, realm, ha1 string) (sqlc.TrunkCredential, error) {
 	return r.queries.CreateTrunkCredential(ctx, sqlc.CreateTrunkCredentialParams{
 		TrunkID:        trunkID,
-		OrganizationID: organizationID,
+		OrganizationID: &organizationID,
 		Username:       username,
 		Realm:          realm,
 		Ha1Md5:         ha1,
