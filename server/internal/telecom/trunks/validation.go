@@ -27,10 +27,6 @@ func normalizeProvisioningMode(value ProvisioningMode) (ProvisioningMode, error)
 }
 
 func normalizeManagedSIPConfig(config ManagedSIPConfig) (ManagedSIPConfig, error) {
-	if !config.Enabled {
-		return ManagedSIPConfig{}, nil
-	}
-
 	host, err := normalizeHost(config.Host)
 	if err != nil {
 		return ManagedSIPConfig{}, apperror.NewBadRequest("managed SIP host is invalid")
@@ -51,6 +47,43 @@ func normalizeManagedSIPConfig(config ManagedSIPConfig) (ManagedSIPConfig, error
 	config.Realm = realm
 	config.Transport = transport
 	return config, nil
+}
+
+func normalizeManagedSIPInstallation(value ManagedSIPInstallation, expected ManagedSIPConfig) (ManagedSIPInstallation, error) {
+	host, err := normalizeHost(value.Host)
+	if err != nil {
+		return ManagedSIPInstallation{}, apperror.NewBadRequest("sip.host is invalid")
+	}
+	realm, err := normalizeHost(value.Realm)
+	if err != nil {
+		return ManagedSIPInstallation{}, apperror.NewBadRequest("sip.realm is invalid")
+	}
+	if err := validatePort(value.Port); err != nil {
+		return ManagedSIPInstallation{}, err
+	}
+	transport, err := normalizeChoice(value.Transport, transports, "sip.transport")
+	if err != nil {
+		return ManagedSIPInstallation{}, err
+	}
+	username := strings.TrimSpace(value.Username)
+	password := strings.TrimSpace(value.Password)
+	if username == "" {
+		return ManagedSIPInstallation{}, apperror.NewBadRequest("sip.username is required")
+	}
+	if password == "" {
+		return ManagedSIPInstallation{}, apperror.NewBadRequest("sip.password is required")
+	}
+
+	if host != expected.Host || realm != expected.Realm || value.Port != expected.Port || transport != expected.Transport {
+		return ManagedSIPInstallation{}, apperror.NewBadRequest("sip endpoint must match the configured Leamout Carrier endpoint")
+	}
+
+	value.Host = host
+	value.Realm = realm
+	value.Transport = transport
+	value.Username = username
+	value.Password = password
+	return value, nil
 }
 
 func normalizeName(value string) (string, error) {
