@@ -62,9 +62,10 @@ WHERE dc.token_hash = sqlc.arg(token_hash)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
--- name: TouchDeploymentCredential :exec
+-- name: TouchDeploymentCredential :one
 UPDATE deployment_credentials
 SET last_used_at = now()
 WHERE id = sqlc.arg(id)
   AND disabled_at IS NULL
-  AND (expires_at IS NULL OR expires_at > now());
+  AND (expires_at IS NULL OR expires_at > now())
+RETURNING id;
