@@ -2,31 +2,89 @@
 
 **Leamout** is a programmable communications control plane for building and operating voice, messaging, numbering, routing, and carrier-connected telecom products.
 
-Leamout starts with self-hosted programmable voice and BYOC, then grows toward managed deployments, multi-carrier orchestration, number provisioning, direct carrier connectivity, messaging, realtime media, and AI communications.
+Leamout starts with self-hosted programmable voice and BYOC, then grows toward managed carrier connectivity, Leamout Cloud runtimes, multi-carrier orchestration, number provisioning, messaging, realtime media, and AI communications.
 
 The goal is to give applications a stable communications API without forcing customers to give up control of their telecom infrastructure or carrier relationships.
 
 ## Platform model
 
+Leamout separates the customer-facing control plane from communications resources, runtime placement, carrier connectivity, and telecom execution.
+
+`console.leamout.com` is the planned shared management surface for both self-hosted and Leamout Cloud customers. Runtime placement and carrier ownership are independent choices: customers can run Leamout themselves or use Leamout Cloud, and they can bring their own carriers or use Leamout-managed connectivity.
+
 ```text
-                         Leamout
-                            │
-             ┌──────────────┼──────────────┐
-             │              │              │
-           Voice           SMS           Numbers
-             │              │              │
-             └──────────────┼──────────────┘
-                            │
-                     Routing engine
-                            │
-          ┌─────────────────┼─────────────────┐
-          │                 │                 │
-     Customer BYOC       Leamout       Other carrier
-          │                 │                 │
-          └─────────────────┼─────────────────┘
-                            │
-                       Telecom networks
+                            console.leamout.com
+                                   │
+                                   ▼
+                         Leamout Control Plane
+                                   │
+             ┌─────────────────────┼─────────────────────┐
+             │                     │                     │
+          Identity             Commercial              Fleet
+             │                     │                     │
+             └─────────────────────┼─────────────────────┘
+                                   │
+                             Organizations
+                                   │
+                    Communications Resources
+                                   │
+          ┌────────────────────────┼────────────────────────┐
+          │                        │                        │
+        Voice                    Messaging               Numbers
+          │                        │                        │
+          └────────────────────────┼────────────────────────┘
+                                   │
+                              Applications
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+                  Calls         Messages       Number Flows
+                    │              │              │
+                    └──────────────┼──────────────┘
+                                   │
+                           Routing / Policy Engine
+                                   │
+                ┌──────────────────┴──────────────────┐
+                │                                     │
+             Runtime                             Connectivity
+                │                                     │
+        ┌───────┴────────┐                   ┌────────┴────────┐
+        │                │                   │                 │
+   Self-Hosted      Leamout Cloud          BYOC           Managed
+        │                │                   │                 │
+        │                │              Customer          Leamout
+        │                │              carriers          carriers
+        │                │                   │                 │
+        └──────────────┬─┘                   └────────┬────────┘
+                       │                              │
+                       └──────────┬───────────────────┘
+                                  │
+                          Telecom Execution
+                                  │
+              ┌───────────────────┼────────────────────┐
+              │                   │                    │
+             SIP                 Media              Realtime
+          OpenSIPS          RTPengine/FS             Coturn
+              │                   │                    │
+              └───────────────────┼────────────────────┘
+                                  │
+                           Telecom Networks
+                                  │
+                     ┌────────────┼────────────┐
+                     │            │            │
+                    PSTN         Mobile       SIP/VoIP
 ```
+
+This produces four product delivery modes without creating four separate communications platforms:
+
+| Runtime | Connectivity | Delivery mode |
+| --- | --- | --- |
+| Self-Hosted | Customer BYOC | **Self-Hosted + BYOC** |
+| Self-Hosted | Leamout-managed carrier | **Self-Hosted + Managed Carrier** |
+| Leamout Cloud | Customer BYOC | **Leamout Cloud + BYOC** |
+| Leamout Cloud | Leamout-managed carrier | **Leamout Cloud + Managed Carrier** |
+
+The API and communications-resource model should remain stable across these modes. Moving a workload between self-hosted and Leamout Cloud should primarily change runtime placement; moving between BYOC and managed connectivity should primarily change carrier and routing policy.
 
 BYOC remains a first-class model. Carrier-specific behavior belongs behind adapters so the same control plane can work with customer-owned carriers, Leamout-managed connectivity, and multiple markets.
 
@@ -89,6 +147,8 @@ Browser media ── TURN/STUN via Coturn ──► RTPengine
 
 ## Core principles
 
+- **One control plane, multiple delivery modes.** Self-hosted and Leamout Cloud runtimes should expose the same communications model and be managed through the same Leamout control-plane experience.
+- **Runtime and connectivity are independent.** Runtime placement must not dictate whether connectivity is BYOC or Leamout-managed.
 - **BYOC stays open.** Customers should not be forced onto Leamout carrier connectivity.
 - **The control plane owns business logic.** Routing, policy, usage, rating, billing, provisioning, and events should not be delegated to upstream carriers.
 - **Carrier integrations stay behind adapters.** Market-specific connectivity should not leak into core platform APIs.
@@ -101,17 +161,19 @@ Browser media ── TURN/STUN via Coturn ──► RTPengine
 ```text
 0. Control-plane primitives
         ↓
-1. Self-hosted programmable voice + BYOC
+1. Self-Hosted + BYOC
         ↓
-2. Managed programmable voice
+2. Self-Hosted + Managed Carrier
         ↓
-3. Multi-carrier orchestration
+3. Leamout Cloud + BYOC
         ↓
-4. Number provisioning + lifecycle
+4. Leamout Cloud + Managed Carrier
         ↓
-5. Direct carrier connectivity
+5. Multi-carrier orchestration
         ↓
-6. Messaging + realtime media + AI
+6. Number provisioning + lifecycle
         ↓
-7. Hosted carrier products / full CPaaS
+7. Messaging + realtime media + AI
+        ↓
+8. Direct carrier connectivity / full CPaaS
 ```
