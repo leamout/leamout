@@ -22,6 +22,7 @@ type routeStore interface {
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	ResolveInboundPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error)
+	ResolveManagedInboundRuntimeAttachment(context.Context, uuid.UUID) (sqlc.ResolveManagedInboundRuntimeAttachmentRow, error)
 }
 
 type Resolver struct {
@@ -331,12 +332,33 @@ func (r *Resolver) resolveInbound(ctx context.Context, req InboundRequest, sourc
 		return InboundDecision{}, ErrTenantMismatch
 	}
 
-	return InboundDecision{
+	decision := InboundDecision{
 		OrganizationID:      organizationID,
 		CarrierConnectionID: connection.ID,
 		PhoneNumberID:       phoneNumber.ID,
 		VoiceApplicationID:  binding.VoiceApplicationID,
 		CalledNumber:        req.CalledNumber,
 		CallerNumber:        req.CallerNumber,
-	}, nil
+	}
+
+	// A platform ingress terminates at the managed edge, so delivery must be
+	// explicitly attached to one healthy, verified customer runtime. BYOC
+	// ingress is already local and does not use this attachment hop.
+	if connection.Scope == "platform" {
+		attachment, err := r.repo.ResolveManagedInboundRuntimeAttachment(ctx, organizationID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return InboundDecision{}, ErrNoRoute
+			}
+			return InboundDecision{}, err
+		}
+		decision.RuntimeAttachmentID = &attachment.RuntimeAttachmentID
+		decision.DeploymentID = &attachment.DeploymentID
+		decision.DeploymentIdentity = attachment.DeploymentIdentity
+		decision.IngressHost = attachment.IngressHost
+		decision.IngressPort = attachment.IngressPort
+		decision.IngressTransport = attachment.Transport
+	}
+
+	return decision, nil
 }

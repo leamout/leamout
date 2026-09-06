@@ -221,6 +221,7 @@ Managed inbound private-alpha foundations now include:
 - [x] Detect inactive provider resources and repair Voice IN routing drift.
 - [x] Keep managed inbound tenant resolution on the called DID rather than the
       shared platform carrier connection.
+- [x] Require one healthy, verified runtime attachment before managed inbound delivery.
 - [ ] Schedule provider-operation reconciliation and expose operator diagnostics.
 - [ ] Prove purchase, routing, inbound calling, drift repair, and release against
       a production DIDWW account.

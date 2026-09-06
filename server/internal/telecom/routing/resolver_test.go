@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -18,6 +19,8 @@ type fakeRouteStore struct {
 	phone            sqlc.PhoneNumber
 	inboundPhone     sqlc.PhoneNumber
 	binding          sqlc.GetVoiceBindingByNumberRow
+	attachment       sqlc.ResolveManagedInboundRuntimeAttachmentRow
+	attachmentErr    error
 	getTrunkCalls    int
 	listManagedCalls int
 }
@@ -64,6 +67,10 @@ func (f *fakeRouteStore) ResolveInboundPhoneNumber(context.Context, uuid.UUID, s
 
 func (f *fakeRouteStore) GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error) {
 	return f.binding, nil
+}
+
+func (f *fakeRouteStore) ResolveManagedInboundRuntimeAttachment(context.Context, uuid.UUID) (sqlc.ResolveManagedInboundRuntimeAttachmentRow, error) {
+	return f.attachment, f.attachmentErr
 }
 
 func uuidPtr(v uuid.UUID) *uuid.UUID { return &v }
@@ -403,6 +410,8 @@ func TestResolveInboundPlatformConnectionDerivesTenantFromDID(t *testing.T) {
 	connectionID := uuid.New()
 	phoneNumberID := uuid.New()
 	applicationID := uuid.New()
+	attachmentID := uuid.New()
+	deploymentID := uuid.New()
 
 	resolver := &Resolver{repo: &fakeRouteStore{
 		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: nil, Scope: "platform"},
@@ -414,6 +423,11 @@ func TestResolveInboundPlatformConnectionDerivesTenantFromDID(t *testing.T) {
 			VoiceApplicationID: applicationID, PhoneNumberID: phoneNumberID,
 			Number: "+233200000001", OrganizationID: organizationID,
 		},
+		attachment: sqlc.ResolveManagedInboundRuntimeAttachmentRow{
+			RuntimeAttachmentID: attachmentID, DeploymentID: deploymentID,
+			DeploymentIdentity: "customer-prod", IngressHost: "sip.customer.example",
+			IngressPort: 5061, Transport: "tls",
+		},
 	}}
 
 	decision, err := resolver.resolveInbound(context.Background(), InboundRequest{
@@ -424,6 +438,35 @@ func TestResolveInboundPlatformConnectionDerivesTenantFromDID(t *testing.T) {
 	}
 	if decision.OrganizationID != organizationID {
 		t.Fatalf("organization = %s, want DID owner %s", decision.OrganizationID, organizationID)
+	}
+	if decision.RuntimeAttachmentID == nil || *decision.RuntimeAttachmentID != attachmentID ||
+		decision.IngressHost != "sip.customer.example" || decision.IngressTransport != "tls" {
+		t.Fatalf("unexpected runtime attachment: %+v", decision)
+	}
+}
+
+func TestResolveInboundPlatformFailsClosedWithoutRuntimeAttachment(t *testing.T) {
+	organizationID := uuid.New()
+	connectionID := uuid.New()
+	phoneNumberID := uuid.New()
+	resolver := &Resolver{repo: &fakeRouteStore{
+		connection: sqlc.CarrierConnection{ID: connectionID, Scope: "platform"},
+		inboundPhone: sqlc.PhoneNumber{
+			ID: phoneNumberID, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
+			Number: "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+		},
+		binding: sqlc.GetVoiceBindingByNumberRow{
+			VoiceApplicationID: uuid.New(), PhoneNumberID: phoneNumberID,
+			Number: "+233200000001", OrganizationID: organizationID,
+		},
+		attachmentErr: pgx.ErrNoRows,
+	}}
+
+	_, err := resolver.resolveInbound(context.Background(), InboundRequest{
+		CalledNumber: "+233200000001", CallerNumber: "+14155550100",
+	}, netip.MustParseAddr("203.0.113.10"))
+	if !errors.Is(err, ErrNoRoute) {
+		t.Fatalf("error = %v, want %v", err, ErrNoRoute)
 	}
 }
 

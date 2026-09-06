@@ -125,3 +125,10 @@ func (r *Repository) GetVoiceBinding(
 ) (sqlc.GetVoiceBindingByNumberRow, error) {
 	return r.queries.GetVoiceBindingByNumber(ctx, number)
 }
+
+func (r *Repository) ResolveManagedInboundRuntimeAttachment(
+	ctx context.Context,
+	organizationID uuid.UUID,
+) (sqlc.ResolveManagedInboundRuntimeAttachmentRow, error) {
+	return r.queries.ResolveManagedInboundRuntimeAttachment(ctx, organizationID)
+}

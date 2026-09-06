@@ -50,4 +50,10 @@ type InboundDecision struct {
 	VoiceApplicationID  uuid.UUID
 	CalledNumber        string
 	CallerNumber        string
+	RuntimeAttachmentID *uuid.UUID
+	DeploymentID        *uuid.UUID
+	DeploymentIdentity  string
+	IngressHost         string
+	IngressPort         int32
+	IngressTransport    string
 }
