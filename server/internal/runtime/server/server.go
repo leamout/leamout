@@ -121,6 +121,12 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
 	}
+	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.CommercialState.Service); err != nil {
+		_ = freeSwitch.Close()
+		_ = redisClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize managed SIP authority: %w", err)
+	}
 
 	router := chi.NewRouter()
 	router.Use(
@@ -256,6 +262,19 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 	}
 	service.SetManagedAcquisition(client)
 	return nil
+}
+
+func configureManagedSIP(cfg config.Config, service *trunks.Service, state *commercialstate.Service) error {
+	if cfg.ManagedSIP.Enabled && (cfg.ManagedSIP.Port < 1 || cfg.ManagedSIP.Port > 65535) {
+		return fmt.Errorf("managed SIP port must be between 1 and 65535")
+	}
+	return service.SetManagedSIP(trunks.ManagedSIPConfig{
+		Enabled: cfg.ManagedSIP.Enabled,
+		Host: cfg.ManagedSIP.Host,
+		Port: int32(cfg.ManagedSIP.Port),
+		Transport: cfg.ManagedSIP.Transport,
+		Realm: cfg.ManagedSIP.Realm,
+	}, state)
 }
 
 func (s *Server) Close() {
