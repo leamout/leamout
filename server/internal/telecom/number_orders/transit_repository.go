@@ -2,6 +2,7 @@ package number_orders
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -102,7 +103,7 @@ RETURNING id`,
 		countryCode,
 	).Scan(&phoneNumberID)
 	if err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return fmt.Errorf("transit managed number conflicts with an existing phone number: %w", err)
 		}
 		return err
