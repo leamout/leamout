@@ -79,4 +79,8 @@ if [ "$ready" -ne 1 ]; then
     exit 1
 fi
 
+$COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
+    -p "$FREESWITCH_ESL_PASSWORD" -x "console loglevel debug" >/dev/null
+$COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
+    -p "$FREESWITCH_ESL_PASSWORD" -x "sofia global siptrace on" >/dev/null
 python3 tests/acceptance/self-hosted-managed/acceptance.py
