@@ -66,18 +66,19 @@ def originate_inbound():
     # Use the cloud edge's public-signaling address so carrier source-IP
     # authentication observes this simulator's fixed public-signaling IP.
     sock.sendto(message.encode(), ("172.30.0.10", 5060))
-    statuses = []
+    responses = []
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:
         try:
             reply = sock.recv(65535).decode(errors="replace")
         except socket.timeout:
             break
-        status = int(reply.split()[1])
-        statuses.append(status)
+        status_line = reply.splitlines()[0]
+        status = int(status_line.split()[1])
+        responses.append(status_line)
         if status == 180 or status >= 200:
             break
-    return {"call_id": call_id, "statuses": statuses}
+    return {\n        "call_id": call_id,\n        "statuses": [int(item.split()[1]) for item in responses],\n        "responses": responses,\n    }
 
 
 class Status(BaseHTTPRequestHandler):
