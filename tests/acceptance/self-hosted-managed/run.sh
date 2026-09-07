@@ -39,17 +39,21 @@ $COMPOSE config --quiet
 $COMPOSE up -d --build postgres redis nats rtpengine freeswitch
 until $COMPOSE exec -T postgres pg_isready -U leamout -d leamout >/dev/null 2>&1; do sleep 1; done
 for _ in $(seq 1 90); do
-    if $COMPOSE exec -T freeswitch fs_cli \
-        -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
-        -x "sofia status profile internal" 2>/dev/null | grep -q 'RUNNING'; then
+    if $COMPOSE exec -T freeswitch sh -c '
+        fs_cli -H 127.0.0.1 -P 8021 \
+            -p "$FREESWITCH_ESL_PASSWORD" \
+            -x status >/dev/null 2>&1
+    '; then
         break
     fi
     sleep 1
 done
-if ! $COMPOSE exec -T freeswitch fs_cli \
-    -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
-    -x "sofia status profile internal" 2>/dev/null | grep -q 'RUNNING'; then
-    echo "FreeSWITCH internal SIP profile did not become ready" >&2
+if ! $COMPOSE exec -T freeswitch sh -c '
+    fs_cli -H 127.0.0.1 -P 8021 \
+        -p "$FREESWITCH_ESL_PASSWORD" \
+        -x status >/dev/null 2>&1
+'; then
+    echo "FreeSWITCH ESL did not become ready/authenticated" >&2
     exit 1
 fi
 $COMPOSE up --build migrate
