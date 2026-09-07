@@ -35,12 +35,25 @@ def invite(timeout=6):
     sock.bind(("127.0.0.1", 0))
     sock.settimeout(timeout)
     port = sock.getsockname()[1]
+    sdp = (
+        "v=0\r\n"
+        f"o=- 1 1 IN IP4 127.0.0.1\r\n"
+        "s=managed-carrier-acceptance\r\n"
+        "c=IN IP4 127.0.0.1\r\n"
+        "t=0 0\r\n"
+        "m=audio 40000 RTP/AVP 0 101\r\n"
+        "a=rtpmap:0 PCMU/8000\r\n"
+        "a=rtpmap:101 telephone-event/8000\r\n"
+        "a=fmtp:101 0-16\r\n"
+        "a=sendrecv\r\n"
+    )
     message = (
         f"INVITE sip:{DID}@managed-edge.test SIP/2.0\r\n"
         f"Via: SIP/2.0/UDP 127.0.0.1:{port};branch={branch};rport\r\n"
         f"Max-Forwards: 10\r\nFrom: <sip:+15557654321@carrier.test>;tag={tag}\r\n"
         f"To: <sip:{DID}@managed-edge.test>\r\nCall-ID: {call_id}\r\n"
-        f"CSeq: 1 INVITE\r\nContact: <sip:carrier@127.0.0.1:{port}>\r\nContent-Length: 0\r\n\r\n"
+        f"CSeq: 1 INVITE\r\nContact: <sip:carrier@127.0.0.1:{port}>\r\n"
+        f"Content-Type: application/sdp\r\nContent-Length: {len(sdp.encode())}\r\n\r\n{sdp}"
     )
     sock.sendto(message.encode(), ("127.0.0.1", 5060))
     responses = []
