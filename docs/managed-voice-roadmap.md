@@ -219,6 +219,8 @@ Managed inbound private-alpha foundations now include:
 - [x] Persist managed-number release intent and disable inbound routing before
       relinquishing the upstream DID.
 - [x] Detect inactive provider resources and repair Voice IN routing drift.
+- [x] Prove the customer managed-number search and purchase workflow against a
+      deterministic provider in the Cloud + Managed acceptance topology.
 - [x] Keep managed inbound tenant resolution on the called DID rather than the
       shared platform carrier connection.
 - [x] Require one healthy, verified runtime attachment before managed inbound
