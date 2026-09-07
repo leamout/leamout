@@ -55,13 +55,26 @@ def originate_inbound():
     inbound_sockets.append(sock)
     call_id = f"{random.getrandbits(96):x}@cloud-managed-wholesale"
     port = sock.getsockname()[1]
+    sdp = (
+        "v=0\r\n"
+        f"o=- 1 1 IN IP4 {SIGNALING_IP}\r\n"
+        "s=cloud-managed-acceptance\r\n"
+        f"c=IN IP4 {SIGNALING_IP}\r\n"
+        "t=0 0\r\n"
+        "m=audio 40000 RTP/AVP 0 101\r\n"
+        "a=rtpmap:0 PCMU/8000\r\n"
+        "a=rtpmap:101 telephone-event/8000\r\n"
+        "a=fmtp:101 0-16\r\n"
+        "a=sendrecv\r\n"
+    )
     message = (
         "INVITE sip:+15551236001@cloud-managed.local SIP/2.0\r\n"
         f"Via: SIP/2.0/UDP cloud-managed-wholesale:{port};branch=z9hG4bK{random.getrandbits(64):x};rport\r\n"
         "Max-Forwards: 10\r\nFrom: <sip:+15557654321@wholesale.test>;tag=inbound\r\n"
         "To: <sip:+15551236001@cloud-managed.local>\r\n"
         f"Call-ID: {call_id}\r\nCSeq: 1 INVITE\r\n"
-        f"Contact: <sip:carrier@cloud-managed-wholesale:{port}>\r\nContent-Length: 0\r\n\r\n"
+        f"Contact: <sip:carrier@cloud-managed-wholesale:{port}>\r\n"
+        f"Content-Type: application/sdp\r\nContent-Length: {len(sdp.encode())}\r\n\r\n{sdp}"
     )
     # Use the cloud edge's public-signaling address so carrier source-IP
     # authentication observes this simulator's fixed public-signaling IP.
