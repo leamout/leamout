@@ -50,8 +50,20 @@ type InboundDecision struct {
 	VoiceApplicationID  uuid.UUID
 	CalledNumber        string
 	CallerNumber        string
-	RuntimeAttachmentID *uuid.UUID
-	DeploymentID        *uuid.UUID
+}
+
+// ManagedInboundDeliveryDecision is the hosted managed-edge decision for a
+// call that must be forwarded to a customer-operated Leamout runtime.
+// Cloud-managed calls do not use runtime attachments and remain on the cloud
+// runtime's local InboundDecision path.
+type ManagedInboundDeliveryDecision struct {
+	OrganizationID      uuid.UUID
+	CarrierConnectionID uuid.UUID
+	PhoneNumberID       uuid.UUID
+	CalledNumber        string
+	CallerNumber        string
+	RuntimeAttachmentID uuid.UUID
+	DeploymentID        uuid.UUID
 	DeploymentIdentity  string
 	IngressHost         string
 	IngressPort         int32
