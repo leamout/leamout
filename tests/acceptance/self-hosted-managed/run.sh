@@ -47,7 +47,8 @@ for _ in $(seq 1 90); do
         && $COMPOSE exec -T freeswitch sh -c '
             fs_cli -H 127.0.0.1 -P 8021 \
                 -p "$FREESWITCH_ESL_PASSWORD" \
-                -x status >/dev/null 2>&1
+                -x "sofia status profile internal" 2>/dev/null \
+                | grep -q RUNNING
         '; then
         python3 tests/acceptance/self-hosted-managed/acceptance.py
         exit
