@@ -85,7 +85,8 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(201, {"data": order})
 
     def do_PATCH(self):
-        if not self.authorized() or self.path != "/v3/dids/did-1":
+        parsed = urlparse(self.path)
+        if not self.authorized() or parsed.path != "/v3/dids/did-1":
             self.reply(401 if not self.authorized() else 404)
             return
         payload = json.loads(self.rfile.read(int(self.headers.get("Content-Length", "0"))))
