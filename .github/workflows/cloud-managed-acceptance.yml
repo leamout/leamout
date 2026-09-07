@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   acceptance:
-    name: Managed number purchase on cloud topology
+    name: Cloud managed coexistence and isolation gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:

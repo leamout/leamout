@@ -11,6 +11,7 @@ API = os.getenv("CLOUD_MANAGED_API_BASE", "http://127.0.0.1:8080")
 PROVIDER = os.getenv("CLOUD_MANAGED_PROVIDER_STATE", "http://127.0.0.1:18090/__state")
 WHOLESALE = os.getenv("CLOUD_MANAGED_WHOLESALE", "http://127.0.0.1:18091")
 TOKEN = os.getenv("CLOUD_MANAGED_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
+TOKEN_B = os.getenv("CLOUD_MANAGED_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnopqrstuvwx")
 EDGE_SECRET = os.environ["MANAGED_SIP_ADMISSION_SECRET"]
 DID = "+15551236001"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
@@ -30,9 +31,9 @@ def topology():
         raise Failure("cloud-managed topology is missing: " + ", ".join(sorted(missing)))
 
 
-def api(method, path, payload=None, expected=(200,)):
+def api(method, path, payload=None, expected=(200,), token=TOKEN):
     data = None if payload is None else json.dumps(payload).encode()
-    headers = {"Accept": "application/json", "Authorization": f"Bearer {TOKEN}"}
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
     if data is not None:
         headers["Content-Type"] = "application/json"
         headers["Idempotency-Key"] = "cloud-managed-" + hashlib.sha256((method + path).encode()).hexdigest()
@@ -48,12 +49,34 @@ def api(method, path, payload=None, expected=(200,)):
     return body["data"] if isinstance(body, dict) and body.get("success") is True else body
 
 
-def internal_post(path, payload):
+def rejected_api(method, path, payload=None, token=TOKEN):
+    data = None if payload is None else json.dumps(payload).encode()
+    headers = {"Accept": "application/json", "Authorization": f"Bearer {token}"}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(API + path, data=data, headers=headers, method=method)
+    try:
+        urllib.request.urlopen(request, timeout=10)
+    except urllib.error.HTTPError as error:
+        if 400 <= error.code < 500:
+            return error.code
+        raise Failure(f"expected policy denial, got HTTP {error.code}") from error
+    raise Failure(f"{method} {path} unexpectedly succeeded")
+
+
+def internal_post(path, payload, expected=200):
     request = urllib.request.Request(API + path, data=json.dumps(payload).encode(), headers={
         "Authorization": f"Bearer {EDGE_SECRET}", "Content-Type": "application/json"
     }, method="POST")
-    with urllib.request.urlopen(request, timeout=10) as response:
-        body = json.load(response)
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            status, body = response.status, json.load(response)
+    except urllib.error.HTTPError as error:
+        if error.code == expected:
+            return None
+        raise
+    if status != expected:
+        raise Failure(f"internal POST {path}: HTTP {status}, want {expected}")
     return body["data"] if body.get("success") is True else body
 
 
@@ -194,6 +217,67 @@ def main():
     if counts != "1,1":
         raise Failure(f"CDR replay duplicated immutable cost records: {counts}")
     print("PASS provider CDR reconciled idempotently to one call and one wholesale charge")
+
+    rejected_api("GET", f"/v1/numbers/{active['id']}", token=TOKEN_B)
+    rejected_api("GET", f"/v1/calls/{outbound['id']}", token=TOKEN_B)
+    wholesale_count = json.load(urllib.request.urlopen(WHOLESALE, timeout=5))["outbound_invites"]
+    rejected_api("POST", "/v1/calls/", {
+        "from": DID, "to": "+15551236100"
+    }, token=TOKEN_B)
+    if json.load(urllib.request.urlopen(WHOLESALE, timeout=5))["outbound_invites"] != wholesale_count:
+        raise Failure("tenant B caller-ID denial reached the wholesale carrier")
+    print("PASS tenant B cannot read tenant A resources or use tenant A managed caller ID")
+
+    rejected_api("POST", "/v1/calls/", {
+        "trunk_id": "00000000-0000-0000-0000-000000006099",
+        "from": DID, "to": "+15551236101"
+    })
+    if json.load(urllib.request.urlopen(WHOLESALE, timeout=5))["outbound_invites"] != wholesale_count:
+        raise Failure("failed explicit trunk request fell back to managed wholesale")
+
+    sql("UPDATE trunks SET status='disabled' WHERE id='00000000-0000-0000-0000-000000006021'")
+    try:
+        rejected_api("POST", "/v1/calls/", {"from": DID, "to": "+15551236102"})
+    finally:
+        sql("UPDATE trunks SET status='active' WHERE id='00000000-0000-0000-0000-000000006021'")
+    if json.load(urllib.request.urlopen(WHOLESALE, timeout=5))["outbound_invites"] != wholesale_count:
+        raise Failure("missing managed default route fell through to a tenant route")
+    print("PASS explicit-trunk failure and missing managed route both fail closed")
+
+    sql("UPDATE phone_numbers SET status='disabled' WHERE id='" + active["id"] + "'::uuid")
+    try:
+        request = urllib.request.Request(WHOLESALE + "/originate", data=b"{}", method="POST")
+        denied_inbound = json.load(urllib.request.urlopen(request, timeout=12))
+    finally:
+        sql("UPDATE phone_numbers SET status='active' WHERE id='" + active["id"] + "'::uuid")
+    if not denied_inbound["statuses"] or denied_inbound["statuses"][-1] != 404:
+        raise Failure(f"inactive managed DID did not fail closed: {denied_inbound}")
+    print("PASS inactive managed DID is denied before the Cloud media runtime")
+
+    sql("UPDATE organizations SET status='disabled' WHERE id='00000000-0000-0000-0000-000000006001'")
+    try:
+        rejected_api("POST", "/v1/calls/", {"from": DID, "to": "+15551236103"})
+        request = urllib.request.Request(WHOLESALE + "/originate", data=b"{}", method="POST")
+        disabled_org_inbound = json.load(urllib.request.urlopen(request, timeout=12))
+    finally:
+        sql("UPDATE organizations SET status='active' WHERE id='00000000-0000-0000-0000-000000006001'")
+    if not disabled_org_inbound["statuses"] or disabled_org_inbound["statuses"][-1] != 404:
+        raise Failure(f"disabled organization received managed inbound call: {disabled_org_inbound}")
+    if json.load(urllib.request.urlopen(WHOLESALE, timeout=5))["outbound_invites"] != wholesale_count:
+        raise Failure("disabled organization reached managed wholesale")
+    print("PASS disabled organization is denied on managed inbound and outbound paths")
+
+    mismatched = dict(cdr)
+    mismatched["provider_record_id"] = "cloud-managed-cdr-wrong-route"
+    mismatched["carrier_provider_id"] = "26c5448a-2540-4731-848d-9c713c19d8cd"
+    mismatched["carrier_connection_id"] = "00000000-0000-0000-0000-000000006010"
+    internal_post("/internal/v1/provider-cdrs/reconcile", mismatched, expected=404)
+    conflict = dict(cdr)
+    conflict["cost_micros"] = 999999
+    internal_post("/internal/v1/provider-cdrs/reconcile", conflict, expected=409)
+    if sql("SELECT count(*) FROM wholesale_charges WHERE call_id='" + outbound["id"] + "'::uuid") != "1":
+        raise Failure("mismatched or conflicting CDR changed wholesale accounting")
+    print("PASS wrong-provider attribution and conflicting CDR replay fail closed")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,11 @@ the platform default route to a synthetic wholesale carrier. The outbound leg
 uses the DIDWW-provisioned DID as caller ID on a CommPeak-attributed route, then
 reconciles a provider CDR idempotently to one call and one wholesale charge.
 
+The same gate also proves tenant B cannot read or use tenant A resources,
+explicit trunk failure never falls back to managed routing, a missing managed
+route cannot consume a tenant route, inactive numbers and organizations reject
+inbound delivery, and mismatched/conflicting CDRs cannot alter wholesale cost.
+
 Run it with:
 
 ```sh

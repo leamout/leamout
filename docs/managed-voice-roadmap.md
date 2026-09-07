@@ -252,6 +252,12 @@ Managed inbound private-alpha foundations now include:
 
 ## Phase 5 — coexistence gate
 
+The synthetic Cloud + Managed gate now covers managed purchase, local cloud
+inbound, trunkless outbound, cross-provider caller identity, immutable wholesale
+cost, fail-closed route behavior, and cross-tenant resource isolation. The
+production DIDWW/CommPeak gate remains separate and must not reuse synthetic
+provider results as evidence of live carrier readiness.
+
 Before multi-carrier routing, acceptance coverage must prove all of these simultaneously:
 
 - organization A places and receives calls through BYOC only;

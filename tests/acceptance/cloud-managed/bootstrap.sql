@@ -10,6 +10,17 @@ INSERT INTO organization_tokens (id, organization_id, name, token_hash, token_pr
     '["numbers:read","numbers:write","voice-applications:read","voice-applications:write","calls:read","calls:write"]'::jsonb
 );
 
+INSERT INTO organizations (id, name, status) VALUES
+('00000000-0000-0000-0000-000000006101', 'Cloud Managed Isolation Tenant', 'active');
+INSERT INTO organization_tokens (id, organization_id, name, token_hash, token_prefix, scopes) VALUES (
+    '00000000-0000-0000-0000-000000006102',
+    '00000000-0000-0000-0000-000000006101',
+    'cloud-managed-isolation',
+    'PsluPk0pxyRogrUeTi6j2Roc2WZi3zO_ac2M9Agd-ps',
+    'lm_org_v1smoke1',
+    '["numbers:read","numbers:write","voice-applications:read","voice-applications:write","calls:read","calls:write"]'::jsonb
+);
+
 INSERT INTO carrier_connections (
     id, provider_id, scope, name, status, inbound_enabled, inbound_auth_method
 ) VALUES (
