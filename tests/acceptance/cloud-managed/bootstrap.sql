@@ -24,3 +24,25 @@ INSERT INTO carrier_connection_provider_resources (
     '26c5448a-2540-4731-848d-9c713c19d8cd',
     'voice_in_trunk', 'voice-in-cloud-1'
 );
+INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
+('00000000-0000-0000-0000-000000006010', '172.30.0.60/32');
+
+INSERT INTO carrier_connections (id, provider_id, scope, name, status) VALUES (
+    '00000000-0000-0000-0000-000000006020',
+    '300e6073-fe60-4d40-ac6d-808d74749a0c',
+    'platform', 'Cloud managed wholesale', 'active'
+);
+INSERT INTO trunks (
+    id, carrier_connection_id, provisioning_mode, name, direction, status, managed_default
+) VALUES (
+    '00000000-0000-0000-0000-000000006021',
+    '00000000-0000-0000-0000-000000006020',
+    'managed', 'Cloud managed default', 'outbound', 'active', true
+);
+INSERT INTO trunk_endpoints (
+    id, trunk_id, host, port, transport, direction, health_status
+) VALUES (
+    '00000000-0000-0000-0000-000000006022',
+    '00000000-0000-0000-0000-000000006021',
+    'cloud-managed-wholesale', 5060, 'udp', 'outbound', 'healthy'
+);

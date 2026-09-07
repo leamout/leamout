@@ -20,7 +20,7 @@ cleanup() {
     status=$?; trap - EXIT INT TERM
     if [ "$status" -ne 0 ]; then
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
-        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=400 server worker cloud-managed-provider postgres redis) || true
+        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=400 server worker opensips freeswitch cloud-managed-provider cloud-managed-wholesale postgres redis) || true
     fi
     if [ "${CLOUD_MANAGED_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
@@ -36,14 +36,14 @@ cp "$CERT_DIR/fullchain.pem" "$CERT_DIR/carrier-ca.pem"
 
 cd "$REPO_ROOT"
 $COMPOSE config --quiet
-$COMPOSE up -d --build postgres redis nats rtpengine freeswitch cloud-managed-provider
+$COMPOSE up -d --build postgres redis nats rtpengine freeswitch cloud-managed-provider cloud-managed-wholesale
 until $COMPOSE exec -T postgres pg_isready -U leamout -d leamout >/dev/null 2>&1; do sleep 1; done
 $COMPOSE up --build migrate
 $COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U leamout -d leamout <tests/acceptance/cloud-managed/bootstrap.sql >/dev/null
 $COMPOSE up -d --build server worker opensips
 
 for _ in $(seq 1 90); do
-    if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204; assert urllib.request.urlopen("http://127.0.0.1:18090/__state", timeout=2).status == 200' >/dev/null 2>&1; then
+    if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204; assert urllib.request.urlopen("http://127.0.0.1:18090/__state", timeout=2).status == 200; assert urllib.request.urlopen("http://127.0.0.1:18091", timeout=2).status == 200' >/dev/null 2>&1; then
         python3 tests/acceptance/cloud-managed/acceptance.py
         exit
     fi

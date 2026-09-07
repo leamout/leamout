@@ -28,3 +28,16 @@ services:
       - "18090:8089"
     networks:
       - private-control
+
+  cloud-managed-wholesale:
+    image: python:3.13-alpine
+    command: ["python3", "/suite/wholesale.py"]
+    restart: unless-stopped
+    volumes:
+      - ${CLOUD_MANAGED_SUITE_DIR:?required}:/suite:ro
+    ports:
+      - "18091:8088"
+    networks:
+      private-control: {}
+      public-signaling:
+        ipv4_address: 172.30.0.60

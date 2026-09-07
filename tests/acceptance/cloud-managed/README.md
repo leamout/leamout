@@ -9,10 +9,12 @@ customer API -> Leamout Cloud control plane -> provider operation worker
              -> fake managed-number provider -> cloud managed ingress
 ```
 
-The current phase proves inventory search, opaque selection, durable purchase
-intent, asynchronous order execution, provider routing convergence, activation,
-and suppression of provider/platform identifiers from customer responses.
-Inbound and outbound SIP calls through this topology are the next phase.
+The suite proves inventory search, opaque selection, durable purchase intent,
+asynchronous order execution, provider routing convergence, activation, and
+suppression of provider/platform identifiers from customer responses. It then
+binds the DID to a cloud voice application, receives a managed call through
+local Cloud OpenSIPS and FreeSWITCH, and places a trunkless managed call through
+the platform default route to a synthetic wholesale carrier.
 
 Run it with:
 

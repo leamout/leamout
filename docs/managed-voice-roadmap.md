@@ -227,6 +227,8 @@ Managed inbound private-alpha foundations now include:
       delivery to a self-hosted runtime; cloud-managed delivery remains local.
 - [x] Prove synthetic managed ingress traverses the hosted edge, a verified
       attachment, self-hosted OpenSIPS, and the local FreeSWITCH runtime.
+- [x] Prove a managed DID reaches the Cloud FreeSWITCH runtime and that the
+      same DID can originate a trunkless call through the managed default route.
 - [ ] Schedule provider-operation reconciliation and expose operator diagnostics.
 - [ ] Prove purchase, routing, inbound calling, drift repair, and release against
       a production DIDWW account.

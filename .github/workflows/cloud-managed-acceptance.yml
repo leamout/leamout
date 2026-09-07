@@ -27,6 +27,6 @@ jobs:
       - name: Validate acceptance scripts
         run: |
           sh -n tests/acceptance/cloud-managed/run.sh
-          python3 -m py_compile tests/acceptance/cloud-managed/acceptance.py tests/acceptance/cloud-managed/fake_provider.py
+          python3 -m py_compile tests/acceptance/cloud-managed/acceptance.py tests/acceptance/cloud-managed/fake_provider.py tests/acceptance/cloud-managed/wholesale.py
       - name: Run Cloud + Managed Carrier acceptance
         run: sh tests/acceptance/cloud-managed/run.sh
