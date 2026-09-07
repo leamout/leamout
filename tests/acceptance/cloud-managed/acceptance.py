@@ -11,6 +11,7 @@ API = os.getenv("CLOUD_MANAGED_API_BASE", "http://127.0.0.1:8080")
 PROVIDER = os.getenv("CLOUD_MANAGED_PROVIDER_STATE", "http://127.0.0.1:18090/__state")
 WHOLESALE = os.getenv("CLOUD_MANAGED_WHOLESALE", "http://127.0.0.1:18091")
 TOKEN = os.getenv("CLOUD_MANAGED_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
+EDGE_SECRET = os.environ["MANAGED_SIP_ADMISSION_SECRET"]
 DID = "+15551236001"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
 
@@ -45,6 +46,22 @@ def api(method, path, payload=None, expected=(200,)):
         raise Failure(f"{method} {path}: HTTP {status}: {raw.decode(errors='replace')}")
     body = json.loads(raw) if raw else None
     return body["data"] if isinstance(body, dict) and body.get("success") is True else body
+
+
+def internal_post(path, payload):
+    request = urllib.request.Request(API + path, data=json.dumps(payload).encode(), headers={
+        "Authorization": f"Bearer {EDGE_SECRET}", "Content-Type": "application/json"
+    }, method="POST")
+    with urllib.request.urlopen(request, timeout=10) as response:
+        body = json.load(response)
+    return body["data"] if body.get("success") is True else body
+
+
+def sql(statement):
+    result = subprocess.run(COMPOSE + ["exec", "-T", "postgres", "psql", "-U", "leamout", "-d", "leamout", "-Atc", statement], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if result.returncode:
+        raise Failure(result.stdout)
+    return result.stdout.strip()
 
 
 def wait_for(description, probe, timeout=35):
@@ -137,6 +154,46 @@ def main():
     if wholesale["internal_route_header_seen"]:
         raise Failure("internal managed route header leaked to wholesale")
     print("PASS trunkless Cloud call selected the managed default wholesale route")
+
+    providers = sql(
+        "SELECT pn.provider_id::text || ',' || cc.provider_id::text "
+        "FROM phone_numbers pn JOIN calls c ON c.id='" + outbound["id"] + "'::uuid "
+        "JOIN carrier_connections cc ON cc.id=c.carrier_connection_id "
+        "WHERE pn.id='" + active["id"] + "'::uuid"
+    ).split(",")
+    if providers != ["26c5448a-2540-4731-848d-9c713c19d8cd", "300e6073-fe60-4d40-ac6d-808d74749a0c"]:
+        raise Failure(f"caller-ID and termination providers were not independent: {providers}")
+    if wholesale["last_call_id"] != outbound["sip_call_id"]:
+        raise Failure("wholesale SIP Call-ID does not match the persisted managed call")
+    print("PASS DIDWW managed caller-ID was authorized on the CommPeak managed route")
+
+    cdr = {
+        "carrier_provider_id": providers[1],
+        "carrier_connection_id": outbound["carrier_connection_id"],
+        "provider_record_id": "cloud-managed-cdr-1",
+        "direction": "termination",
+        "sip_call_id": outbound["sip_call_id"],
+        "started_at": "2026-09-07T00:00:00Z",
+        "duration_seconds": 30,
+        "currency": "USD",
+        "cost_micros": 12500,
+        "raw": {"provider": "commpeak", "record_id": "cloud-managed-cdr-1"},
+    }
+    reconciled = internal_post("/internal/v1/provider-cdrs/reconcile", cdr)
+    replayed = internal_post("/internal/v1/provider-cdrs/reconcile", cdr)
+    if reconciled["call_id"] != outbound["id"] or reconciled["organization_id"] != active["organization_id"]:
+        raise Failure(f"provider CDR was attributed incorrectly: {reconciled}")
+    if reconciled["amount_micros"] != 12500 or reconciled["currency"] != "USD":
+        raise Failure(f"wholesale charge has wrong cost: {reconciled}")
+    if replayed["wholesale_charge_id"] != reconciled["wholesale_charge_id"] or not replayed["replayed"]:
+        raise Failure(f"provider CDR replay was not idempotent: {replayed}")
+    counts = sql(
+        "SELECT (SELECT count(*) FROM provider_cdrs WHERE provider_record_id='cloud-managed-cdr-1')::text || ',' || "
+        "(SELECT count(*) FROM wholesale_charges WHERE call_id='" + outbound["id"] + "'::uuid)::text"
+    )
+    if counts != "1,1":
+        raise Failure(f"CDR replay duplicated immutable cost records: {counts}")
+    print("PASS provider CDR reconciled idempotently to one call and one wholesale charge")
 
 
 if __name__ == "__main__":

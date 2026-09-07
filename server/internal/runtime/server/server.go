@@ -41,6 +41,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
+	"github.com/leamout/leamout/internal/telecom/wholesale"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
@@ -129,6 +130,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		return nil, fmt.Errorf("initialize managed SIP: %w", err)
 	}
 	modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, modules.Routing, cfg.ManagedSIP.AdmissionSecret)
+	modules.Wholesale.Handler = wholesale.NewHandler(modules.Wholesale.Service, cfg.ManagedSIP.AdmissionSecret)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -217,6 +219,8 @@ func NewModules(
 	trunksService.SetManagedSIPClientCipher(credentialCipher)
 	edgeRepository := edge.NewRepository(db)
 	edgeService := edge.NewService(edgeRepository, commercialStateService)
+	wholesaleRepository := wholesale.NewRepository(db)
+	wholesaleService := wholesale.NewService(wholesaleRepository)
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
 	auditRepository := audit.NewRepository(db)
@@ -254,6 +258,7 @@ func NewModules(
 		Realtime:             RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
 		Edge:                 EdgeModule{Repository: edgeRepository, Service: edgeService},
 		Routing:              routingService,
+		Wholesale:            WholesaleModule{Repository: wholesaleRepository, Service: wholesaleService},
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil

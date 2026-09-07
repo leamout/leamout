@@ -34,6 +34,9 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		r.Post("/internal/v1/sip-edge/authorize", modules.Edge.Handler.Admit)
 		r.Post("/internal/v1/sip-edge/resolve-inbound", modules.Edge.Handler.ResolveInbound)
 	}
+	if modules.Wholesale.Handler != nil {
+		r.Post("/internal/v1/provider-cdrs/reconcile", modules.Wholesale.Handler.Reconcile)
+	}
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			return modules.OrganizationsContext.RequireAuthenticated(modules.Authn)(modules.OrganizationsContext.RequireAccess(resource)(next))

@@ -14,7 +14,9 @@ asynchronous order execution, provider routing convergence, activation, and
 suppression of provider/platform identifiers from customer responses. It then
 binds the DID to a cloud voice application, receives a managed call through
 local Cloud OpenSIPS and FreeSWITCH, and places a trunkless managed call through
-the platform default route to a synthetic wholesale carrier.
+the platform default route to a synthetic wholesale carrier. The outbound leg
+uses the DIDWW-provisioned DID as caller ID on a CommPeak-attributed route, then
+reconciles a provider CDR idempotently to one call and one wholesale charge.
 
 Run it with:
 

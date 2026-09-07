@@ -229,6 +229,8 @@ Managed inbound private-alpha foundations now include:
       attachment, self-hosted OpenSIPS, and the local FreeSWITCH runtime.
 - [x] Prove a managed DID reaches the Cloud FreeSWITCH runtime and that the
       same DID can originate a trunkless call through the managed default route.
+- [x] Assert cross-provider managed caller ID and idempotent CDR-to-call
+      wholesale-charge reconciliation in the Cloud + Managed acceptance gate.
 - [ ] Schedule provider-operation reconciliation and expose operator diagnostics.
 - [ ] Prove purchase, routing, inbound calling, drift repair, and release against
       a production DIDWW account.

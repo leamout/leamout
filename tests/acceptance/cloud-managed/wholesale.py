@@ -6,7 +6,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-state = {"outbound_invites": 0, "last_destination": "", "internal_route_header_seen": False}
+state = {"outbound_invites": 0, "last_destination": "", "last_call_id": "", "internal_route_header_seen": False}
 inbound_sockets = []
 
 
@@ -42,6 +42,7 @@ def sip_server():
         elif message.startswith("INVITE "):
             state["outbound_invites"] += 1
             state["last_destination"] = message.split()[1]
+            state["last_call_id"] = request_headers.get("call-id", "")
             state["internal_route_header_seen"] |= "\nX-Leamout-Route-URI:" in "\n" + message
             sock.sendto(response(200, "OK", request_headers), peer)
 
