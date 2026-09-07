@@ -78,7 +78,11 @@ def originate_inbound():
         responses.append(status_line)
         if status == 180 or status >= 200:
             break
-    return {\n        "call_id": call_id,\n        "statuses": [int(item.split()[1]) for item in responses],\n        "responses": responses,\n    }
+    return {
+        "call_id": call_id,
+        "statuses": [int(item.split()[1]) for item in responses],
+        "responses": responses,
+    }
 
 
 class Status(BaseHTTPRequestHandler):
