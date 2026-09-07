@@ -22,7 +22,8 @@ INSERT INTO carrier_connections (
     'platform', 'Managed inbound acceptance', 'active', true, 'ip'
 );
 INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
-('00000000-0000-0000-0000-000000005020', '172.30.0.0/24');
+('00000000-0000-0000-0000-000000005020', '172.32.0.1/32'),
+('00000000-0000-0000-0000-000000005020', '172.30.0.10/32');
 
 INSERT INTO phone_numbers (
     id, organization_id, number, country_code, provisioning_mode,
