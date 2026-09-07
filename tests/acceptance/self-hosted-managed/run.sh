@@ -38,30 +38,17 @@ cd "$REPO_ROOT"
 $COMPOSE config --quiet
 $COMPOSE up -d --build postgres redis nats rtpengine freeswitch
 until $COMPOSE exec -T postgres pg_isready -U leamout -d leamout >/dev/null 2>&1; do sleep 1; done
-for _ in $(seq 1 90); do
-    if $COMPOSE exec -T freeswitch sh -c '
-        fs_cli -H 127.0.0.1 -P 8021 \
-            -p "$FREESWITCH_ESL_PASSWORD" \
-            -x status >/dev/null 2>&1
-    '; then
-        break
-    fi
-    sleep 1
-done
-if ! $COMPOSE exec -T freeswitch sh -c '
-    fs_cli -H 127.0.0.1 -P 8021 \
-        -p "$FREESWITCH_ESL_PASSWORD" \
-        -x status >/dev/null 2>&1
-'; then
-    echo "FreeSWITCH ESL did not become ready/authenticated" >&2
-    exit 1
-fi
 $COMPOSE up --build migrate
 $COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U leamout -d leamout <tests/acceptance/self-hosted-managed/bootstrap.sql >/dev/null
 $COMPOSE up -d --build server opensips self-hosted-opensips
 
 for _ in $(seq 1 90); do
-    if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204' >/dev/null 2>&1; then
+    if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204' >/dev/null 2>&1 \
+        && $COMPOSE exec -T freeswitch sh -c '
+            fs_cli -H 127.0.0.1 -P 8021 \
+                -p "$FREESWITCH_ESL_PASSWORD" \
+                -x status >/dev/null 2>&1
+        '; then
         python3 tests/acceptance/self-hosted-managed/acceptance.py
         exit
     fi
