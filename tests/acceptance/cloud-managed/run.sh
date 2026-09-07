@@ -44,9 +44,11 @@ $COMPOSE up -d --build server worker opensips
 
 for _ in $(seq 1 90); do
     if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204; assert urllib.request.urlopen("http://127.0.0.1:18090/__state", timeout=2).status == 200; assert urllib.request.urlopen("http://127.0.0.1:18091", timeout=2).status == 200' >/dev/null 2>&1 \
-        && $COMPOSE exec -T freeswitch fs_cli \
-            -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" \
-            -x "sofia status profile internal" 2>/dev/null | grep -q 'RUNNING'; then
+        && $COMPOSE exec -T freeswitch sh -c '
+            fs_cli -H 127.0.0.1 -P 8021 \
+                -p "$FREESWITCH_ESL_PASSWORD" \
+                -x status >/dev/null 2>&1
+        '; then
         python3 tests/acceptance/cloud-managed/acceptance.py
         exit
     fi
