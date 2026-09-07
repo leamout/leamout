@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS runtime_attachments (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_runtime_attachments_deployment UNIQUE (deployment_id),
-    CONSTRAINT chk_runtime_attachments_host CHECK (length(trim(ingress_host)) > 0),
+    CONSTRAINT chk_runtime_attachments_host CHECK (
+        ingress_host ~ '^[A-Za-z0-9][A-Za-z0-9.-]*$'
+    ),
     CONSTRAINT chk_runtime_attachments_port CHECK (ingress_port BETWEEN 1 AND 65535),
     CONSTRAINT chk_runtime_attachments_transport CHECK (transport IN ('tcp', 'tls')),
     CONSTRAINT chk_runtime_attachments_verification CHECK (

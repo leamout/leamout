@@ -128,7 +128,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize managed SIP: %w", err)
 	}
-	modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, cfg.ManagedSIP.AdmissionSecret)
+	modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, modules.Routing, cfg.ManagedSIP.AdmissionSecret)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -253,6 +253,7 @@ func NewModules(
 		Conferences:          ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
 		Realtime:             RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
 		Edge:                 EdgeModule{Repository: edgeRepository, Service: edgeService},
+		Routing:              routingService,
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil

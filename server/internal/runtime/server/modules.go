@@ -19,6 +19,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
+	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/trunks"
@@ -53,6 +54,7 @@ type Modules struct {
 	Carriers             CarriersModule
 	Realtime             RealtimeModule
 	Edge                 EdgeModule
+	Routing              *routing.Service
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }

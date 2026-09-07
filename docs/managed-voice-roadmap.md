@@ -223,6 +223,8 @@ Managed inbound private-alpha foundations now include:
       shared platform carrier connection.
 - [x] Require one healthy, verified runtime attachment before managed inbound
       delivery to a self-hosted runtime; cloud-managed delivery remains local.
+- [x] Prove synthetic managed ingress traverses the hosted edge, a verified
+      attachment, self-hosted OpenSIPS, and the local FreeSWITCH runtime.
 - [ ] Schedule provider-operation reconciliation and expose operator diagnostics.
 - [ ] Prove purchase, routing, inbound calling, drift repair, and release against
       a production DIDWW account.

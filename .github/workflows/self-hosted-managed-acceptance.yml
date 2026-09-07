@@ -1,0 +1,32 @@
+name: Self-Hosted managed carrier acceptance
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "server/**"
+      - "tests/acceptance/self-hosted-managed/**"
+      - ".github/workflows/self-hosted-managed-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-hosted-managed-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: Managed inbound runtime attachment
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Validate acceptance scripts
+        run: |
+          sh -n tests/acceptance/self-hosted-managed/run.sh
+          python3 -m py_compile tests/acceptance/self-hosted-managed/acceptance.py
+      - name: Run Self-Hosted + Managed Carrier acceptance
+        run: sh tests/acceptance/self-hosted-managed/run.sh

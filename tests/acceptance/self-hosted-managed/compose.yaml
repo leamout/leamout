@@ -1,0 +1,41 @@
+services:
+  opensips:
+    environment:
+      OPENSIPS_ADVERTISED_ADDRESS: managed-edge.test
+      MANAGED_INBOUND_EDGE_ENABLED: "true"
+    volumes:
+      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+
+  self-hosted-opensips:
+    image: leamout/opensips:4.0.1
+    build:
+      context: ../../../deploy/opensips
+      dockerfile: Dockerfile
+      args:
+        OPENSIPS_VERSION: 4.0.1
+    restart: unless-stopped
+    environment:
+      OPENSIPS_DATABASE_PASSWORD: leamout
+      OPENSIPS_ADVERTISED_ADDRESS: self-hosted-opensips
+      MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?required}
+      MANAGED_INBOUND_EDGE_ENABLED: "false"
+    volumes:
+      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rtpengine:
+        condition: service_started
+      freeswitch:
+        condition: service_started
+    networks:
+      private-control: {}
+      public-signaling:
+        ipv4_address: 172.30.0.11
+
+  rtpengine:
+    ports: !reset []
