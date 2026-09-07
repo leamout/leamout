@@ -16,16 +16,20 @@ import (
 
 type Handler struct {
 	service        *Service
-	inboundRouting interface {
-		ResolveManagedInboundDelivery(context.Context, routing.InboundRequest) (routing.ManagedInboundDeliveryDecision, error)
-	}
-	secret string
+	inboundRouting managedInboundResolver
+	secret         string
 }
 
-func NewHandler(service *Service, inboundRouting interface {
+type managedInboundResolver interface {
 	ResolveManagedInboundDelivery(context.Context, routing.InboundRequest) (routing.ManagedInboundDeliveryDecision, error)
-}, secret string) *Handler {
-	return &Handler{service: service, inboundRouting: inboundRouting, secret: strings.TrimSpace(secret)}
+}
+
+func NewHandler(service *Service, inboundRouting managedInboundResolver, secret string) *Handler {
+	return &Handler{
+		service:        service,
+		inboundRouting: inboundRouting,
+		secret:         strings.TrimSpace(secret),
+	}
 }
 
 func (h *Handler) Admit(w http.ResponseWriter, r *http.Request) {
@@ -91,7 +95,9 @@ func (h *Handler) ResolveInbound(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	decision, err := h.inboundRouting.ResolveManagedInboundDelivery(r.Context(), routing.InboundRequest{
-		SourceIP: req.SourceIP, CalledNumber: req.CalledNumber, CallerNumber: req.CallerNumber,
+		SourceIP:     req.SourceIP,
+		CalledNumber: req.CalledNumber,
+		CallerNumber: req.CallerNumber,
 	})
 	if err != nil {
 		if errors.Is(err, routing.ErrNoRoute) || errors.Is(err, routing.ErrTenantMismatch) {
@@ -104,11 +110,20 @@ func (h *Handler) ResolveInbound(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	httputil.JSON(w, http.StatusOK, inboundResponse{
-		Allowed: true, OrganizationID: decision.OrganizationID,
-		CarrierConnectionID: decision.CarrierConnectionID, PhoneNumberID: decision.PhoneNumberID,
-		RuntimeAttachmentID: decision.RuntimeAttachmentID, DeploymentID: decision.DeploymentID,
-		DeploymentIdentity: decision.DeploymentIdentity,
-		RouteURI:           fmt.Sprintf("sip:%s@%s:%d;transport=%s", decision.CalledNumber, decision.IngressHost, decision.IngressPort, decision.IngressTransport),
+		Allowed:             true,
+		OrganizationID:      decision.OrganizationID,
+		CarrierConnectionID: decision.CarrierConnectionID,
+		PhoneNumberID:       decision.PhoneNumberID,
+		RuntimeAttachmentID: decision.RuntimeAttachmentID,
+		DeploymentID:        decision.DeploymentID,
+		DeploymentIdentity:  decision.DeploymentIdentity,
+		RouteURI: fmt.Sprintf(
+			"sip:%s@%s:%d;transport=%s",
+			decision.CalledNumber,
+			decision.IngressHost,
+			decision.IngressPort,
+			decision.IngressTransport,
+		),
 	})
 }
 

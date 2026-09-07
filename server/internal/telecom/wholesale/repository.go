@@ -38,10 +38,16 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 
 	inserted := true
 	record, err := queries.InsertProviderCDR(ctx, sqlc.InsertProviderCDRParams{
-		CarrierProviderID: cdr.CarrierProviderID, CarrierConnectionID: cdr.CarrierConnectionID,
-		ProviderRecordID: cdr.ProviderRecordID, Direction: cdr.Direction, SipCallID: &sipCallID,
-		StartedAt: startedAt, DurationSeconds: cdr.DurationSeconds, Currency: cdr.Currency,
-		CostMicros: cdr.CostMicros, Raw: raw,
+		CarrierProviderID:   cdr.CarrierProviderID,
+		CarrierConnectionID: cdr.CarrierConnectionID,
+		ProviderRecordID:    cdr.ProviderRecordID,
+		Direction:           cdr.Direction,
+		SipCallID:           &sipCallID,
+		StartedAt:           startedAt,
+		DurationSeconds:     cdr.DurationSeconds,
+		Currency:            cdr.Currency,
+		CostMicros:          cdr.CostMicros,
+		Raw:                 raw,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		inserted = false
@@ -49,7 +55,9 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 		return Result{}, err
 	}
 	record, err = queries.GetProviderCDRForUpdate(ctx, sqlc.GetProviderCDRForUpdateParams{
-		CarrierProviderID: cdr.CarrierProviderID, Direction: cdr.Direction, ProviderRecordID: cdr.ProviderRecordID,
+		CarrierProviderID: cdr.CarrierProviderID,
+		Direction:         cdr.Direction,
+		ProviderRecordID:  cdr.ProviderRecordID,
 	})
 	if err != nil {
 		return Result{}, err
@@ -69,7 +77,9 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 	}
 
 	call, err := queries.FindManagedCallForProviderCDR(ctx, sqlc.FindManagedCallForProviderCDRParams{
-		SipCallID: &sipCallID, CarrierConnectionID: &cdr.CarrierConnectionID, CarrierProviderID: cdr.CarrierProviderID,
+		SipCallID:           &sipCallID,
+		CarrierConnectionID: &cdr.CarrierConnectionID,
+		CarrierProviderID:   cdr.CarrierProviderID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		if commitErr := tx.Commit(ctx); commitErr != nil {
@@ -81,13 +91,19 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 		return Result{}, err
 	}
 	if _, err := queries.MarkProviderCDRReconciled(ctx, sqlc.MarkProviderCDRReconciledParams{
-		CallID: &call.ID, OrganizationID: &call.OrganizationID, ID: record.ID,
+		CallID:         &call.ID,
+		OrganizationID: &call.OrganizationID,
+		ID:             record.ID,
 	}); err != nil {
 		return Result{}, err
 	}
 	charge, err := queries.CreateWholesaleCharge(ctx, sqlc.CreateWholesaleChargeParams{
-		ProviderCdrID: record.ID, OrganizationID: call.OrganizationID, CallID: call.ID,
-		AmountMicros: cdr.CostMicros, Currency: cdr.Currency, OccurredAt: startedAt,
+		ProviderCdrID:  record.ID,
+		OrganizationID: call.OrganizationID,
+		CallID:         call.ID,
+		AmountMicros:   cdr.CostMicros,
+		Currency:       cdr.Currency,
+		OccurredAt:     startedAt,
 	})
 	if err != nil {
 		return Result{}, err
@@ -111,6 +127,13 @@ func sameCDR(record sqlc.ProviderCdr, cdr CDR) bool {
 }
 
 func result(cdrID, callID, organizationID uuid.UUID, charge sqlc.WholesaleCharge, replayed bool) Result {
-	return Result{ProviderCDRID: cdrID, CallID: callID, OrganizationID: organizationID,
-		ChargeID: charge.ID, AmountMicros: charge.AmountMicros, Currency: charge.Currency, Replayed: replayed}
+	return Result{
+		ProviderCDRID:  cdrID,
+		CallID:         callID,
+		OrganizationID: organizationID,
+		ChargeID:       charge.ID,
+		AmountMicros:   charge.AmountMicros,
+		Currency:       charge.Currency,
+		Replayed:       replayed,
+	}
 }

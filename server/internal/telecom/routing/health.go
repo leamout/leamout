@@ -30,7 +30,10 @@ type EndpointProber interface {
 }
 
 type endpointHealthStore interface {
-	ListTrunkEndpointsForHealthCheck(context.Context, sqlc.ListTrunkEndpointsForHealthCheckParams) ([]sqlc.TrunkEndpoint, error)
+	ListTrunkEndpointsForHealthCheck(
+		context.Context,
+		sqlc.ListTrunkEndpointsForHealthCheckParams,
+	) ([]sqlc.TrunkEndpoint, error)
 	MarkTrunkEndpointHealthy(context.Context, sqlc.MarkTrunkEndpointHealthyParams) (sqlc.TrunkEndpoint, error)
 	MarkTrunkEndpointProbeFailed(context.Context, sqlc.MarkTrunkEndpointProbeFailedParams) (sqlc.TrunkEndpoint, error)
 }
@@ -174,10 +177,13 @@ func (p *SIPOptionsProber) Probe(ctx context.Context, endpoint sqlc.TrunkEndpoin
 	case "udp", "tcp":
 		conn, err = p.dialer.DialContext(ctx, endpoint.Transport, address)
 	case "tls":
-		tlsDialer := tls.Dialer{NetDialer: &p.dialer, Config: &tls.Config{ // #nosec G402 -- certificate verification remains enabled.
-			MinVersion: tls.VersionTLS12,
-			ServerName: endpoint.Host,
-		}}
+		tlsDialer := tls.Dialer{
+			NetDialer: &p.dialer,
+			Config: &tls.Config{ // #nosec G402 -- certificate verification remains enabled.
+				MinVersion: tls.VersionTLS12,
+				ServerName: endpoint.Host,
+			},
+		}
 		conn, err = tlsDialer.DialContext(ctx, "tcp", address)
 	default:
 		return ProbeResult{}, fmt.Errorf("unsupported SIP transport %q", endpoint.Transport)
@@ -225,8 +231,16 @@ func (p *SIPOptionsProber) optionsRequest(endpoint sqlc.TrunkEndpoint, local net
 	}
 	transport := strings.ToUpper(endpoint.Transport)
 	target := net.JoinHostPort(endpoint.Host, strconv.Itoa(int(endpoint.Port)))
+	const requestFormat = "OPTIONS sip:%s SIP/2.0\r\n" +
+		"Via: SIP/2.0/%s %s;branch=z9hG4bK-%s;rport\r\n" +
+		"From: <sip:health@leamout.invalid>;tag=%s\r\n" +
+		"To: <sip:%s>\r\n" +
+		"Call-ID: %s@%s\r\n" +
+		"CSeq: 1 OPTIONS\r\n" +
+		"Max-Forwards: 1\r\n" +
+		"Content-Length: 0\r\n\r\n"
 	return fmt.Sprintf(
-		"OPTIONS sip:%s SIP/2.0\r\nVia: SIP/2.0/%s %s;branch=z9hG4bK-%s;rport\r\nFrom: <sip:health@leamout.invalid>;tag=%s\r\nTo: <sip:%s>\r\nCall-ID: %s@%s\r\nCSeq: 1 OPTIONS\r\nMax-Forwards: 1\r\nContent-Length: 0\r\n\r\n",
+		requestFormat,
 		target, transport, net.JoinHostPort(localHost, localPort), token, token, target, token, localHost,
 	), nil
 }

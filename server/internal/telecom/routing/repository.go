@@ -42,15 +42,26 @@ func (r *Repository) GetTrunk(
 	})
 }
 
-func (r *Repository) GetCarrierConnection(ctx context.Context, organizationID, id uuid.UUID) (sqlc.CarrierConnection, error) {
-	row, err := r.queries.GetCarrierConnectionByID(ctx, sqlc.GetCarrierConnectionByIDParams{ID: id, OrganizationID: &organizationID})
+func (r *Repository) GetCarrierConnection(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+) (sqlc.CarrierConnection, error) {
+	row, err := r.queries.GetCarrierConnectionByID(ctx, sqlc.GetCarrierConnectionByIDParams{
+		ID:             id,
+		OrganizationID: &organizationID,
+	})
 	if err != nil {
 		return sqlc.CarrierConnection{}, err
 	}
 	return sqlc.CarrierConnection{
-		ID: row.ID, OrganizationID: row.OrganizationID, ProviderID: row.ProviderID, Scope: row.Scope,
-		Status: row.Status, MaxCps: row.MaxCps, MaxConcurrentCalls: row.MaxConcurrentCalls,
-		MaxDailyMinutes: row.MaxDailyMinutes,
+		ID:                 row.ID,
+		OrganizationID:     row.OrganizationID,
+		ProviderID:         row.ProviderID,
+		Scope:              row.Scope,
+		Status:             row.Status,
+		MaxCps:             row.MaxCps,
+		MaxConcurrentCalls: row.MaxConcurrentCalls,
+		MaxDailyMinutes:    row.MaxDailyMinutes,
 	}, nil
 }
 

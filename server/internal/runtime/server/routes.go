@@ -39,36 +39,62 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	}
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
-			return modules.OrganizationsContext.RequireAuthenticated(modules.Authn)(modules.OrganizationsContext.RequireAccess(resource)(next))
+			requireAuthenticated := modules.OrganizationsContext.RequireAuthenticated(modules.Authn)
+			requireAccess := modules.OrganizationsContext.RequireAccess(resource)
+			return requireAuthenticated(requireAccess(next))
 		}
 	}
 	sessionOrganizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
-			return modules.Authn.RequireSession(modules.OrganizationsContext.Require(modules.OrganizationsContext.RequireAccess(resource)(next)))
+			requireAccess := modules.OrganizationsContext.RequireAccess(resource)
+			return modules.Authn.RequireSession(
+				modules.OrganizationsContext.Require(requireAccess(next)),
+			)
 		}
 	}
 	organizationContextAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
-			return modules.OrganizationsContext.Require(modules.OrganizationsContext.RequireAccess(resource)(next))
+			requireAccess := modules.OrganizationsContext.RequireAccess(resource)
+			return modules.OrganizationsContext.Require(requireAccess(next))
 		}
 	}
 
 	r.Route("/v1", func(r chi.Router) {
 		catalog.RegisterRoutes(r, modules.Catalog.Handler, modules.Authn.RequireSession)
-		licensing.RegisterRoutes(r, modules.Licensing.Handler, organizationAccess("licensing"), modules.Idempotency.Middleware.Handle)
+		licensing.RegisterRoutes(
+			r,
+			modules.Licensing.Handler,
+			organizationAccess("licensing"),
+			modules.Idempotency.Middleware.Handle,
+		)
 		commercialstate.RegisterRoutes(r, modules.CommercialState.Handler, organizationAccess("commercial-state"))
-		subscriptions.RegisterRoutes(r, modules.Subscriptions.Handler, organizationAccess("subscriptions"), modules.Idempotency.Middleware.Handle)
+		subscriptions.RegisterRoutes(
+			r,
+			modules.Subscriptions.Handler,
+			organizationAccess("subscriptions"),
+			modules.Idempotency.Middleware.Handle,
+		)
 		auth.RegisterRoutes(r, modules.Auth.Handler, modules.Authn.RequireSession)
 		session.RegisterRoutes(r, modules.Session.Handler, modules.Authn.RequireSession)
 		users.RegisterRoutes(r, modules.Users.Handler, modules.Authn.RequireSession)
-		organization.RegisterRoutes(r, modules.Organizations.Handler, modules.Authn.RequireSession, organizationContextAccess("organization"))
+		organization.RegisterRoutes(
+			r,
+			modules.Organizations.Handler,
+			modules.Authn.RequireSession,
+			organizationContextAccess("organization"),
+		)
 		members.RegisterRoutes(r, modules.Members.Handler, sessionOrganizationAccess("members"))
 		credentials.RegisterRoutes(r, modules.Credentials.Handler, sessionOrganizationAccess("credentials"))
 		voice.RegisterRoutes(r, modules.Voice.Handler, organizationAccess("voice-applications"))
 		calls.RegisterRoutes(r, modules.Calls.Handler, organizationAccess("calls"))
 		recordings.RegisterRoutes(r, modules.Recordings.Handler, organizationAccess("recordings"))
 		subscribers.RegisterRoutes(r, modules.Subscribers.Handler, organizationAccess("subscribers"))
-		numbers.RegisterRoutes(r, modules.Numbers.Handler, organizationAccess("numbers"), modules.Idempotency.Middleware.Handle)
+		numbers.RegisterRoutes(
+			r,
+			modules.Numbers.Handler,
+			organizationAccess("numbers"),
+			modules.Idempotency.Middleware.Handle,
+		)
 		sip_domains.RegisterRoutes(r, modules.SIPDomains.Handler, organizationAccess("sip-domains"))
 		trunks.RegisterRoutes(r, modules.Trunks.Handler, organizationAccess("trunks"))
 		carriers.RegisterRoutes(r, modules.Carriers.Handler, organizationAccess("carriers"))
