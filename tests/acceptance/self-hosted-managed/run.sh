@@ -9,7 +9,7 @@ export MANAGED_SIP_ADMISSION_SECRET="${MANAGED_SIP_ADMISSION_SECRET:-$(openssl r
 export MANAGED_INBOUND_EDGE_ENABLED=true
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-self-hosted-managed-esl}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
-export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-self-hosted-managed-turn-secret}"
+export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-$(openssl rand -hex 32)}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export TURN_REALM="${TURN_REALM:-self-hosted-managed.local}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
@@ -38,6 +38,16 @@ cd "$REPO_ROOT"
 $COMPOSE config --quiet
 $COMPOSE up -d --build postgres redis nats rtpengine freeswitch
 until $COMPOSE exec -T postgres pg_isready -U leamout -d leamout >/dev/null 2>&1; do sleep 1; done
+for _ in $(seq 1 90); do
+    if $COMPOSE exec -T freeswitch fs_cli -x "sofia status profile internal" 2>/dev/null | grep -q 'RUNNING'; then
+        break
+    fi
+    sleep 1
+done
+if ! $COMPOSE exec -T freeswitch fs_cli -x "sofia status profile internal" 2>/dev/null | grep -q 'RUNNING'; then
+    echo "FreeSWITCH internal SIP profile did not become ready" >&2
+    exit 1
+fi
 $COMPOSE up --build migrate
 $COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U leamout -d leamout <tests/acceptance/self-hosted-managed/bootstrap.sql >/dev/null
 $COMPOSE up -d --build server opensips self-hosted-opensips

@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS provider_operations (
 
     attempts INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
-    next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    next_attempt_at TIMESTAMPTZ DEFAULT now(),
     completed_at TIMESTAMPTZ,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

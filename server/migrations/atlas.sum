@@ -1,4 +1,4 @@
-h1:SG7nDQK5UTrvMSf2YdLQfl+bnlWxYhV/UsIUaRJw2lU=
+h1:CsAzzRrKss8QYS108PHFR1IEgRIZVm3TPeb25jyRIQc=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -38,7 +38,7 @@ h1:SG7nDQK5UTrvMSf2YdLQfl+bnlWxYhV/UsIUaRJw2lU=
 037_create_carrier_digest_credentials.sql h1:oWsO5QwwQrLNCdFIr6ECXsiR+GmcjB8L9zxGrYn4wio=
 038_create_audit_events.sql h1:u06cI0xXmC5hXbYe3C6GsCA3p4k9PJhuYRgbM1ugBfE=
 039_create_idempotency.sql h1:5+/QetxJcUG0pgxcqGDjzJxZVTpl8CSXpvZfYkdYOBQ=
-041_create_provider_cdrs.sql h1:q2nT7zueUbuAnpklEd0dt1gkY5cVQKN+ZaqMfUImIGs=
-042_create_managed_number_operations.sql h1:h/CkBMT0KHcOWXRNlp51B2kCagUYtHWiP7/XHmE/3vA=
-043_create_trunk_credentials.sql h1:tvU9+Y/T2erALNEmnA4SD+w3E2Y/ZHUAZ8CmOWpI5XQ=
-044_create_runtime_attachments.sql h1:Rz7VCjOp+VEWOAcNdnvfjip/mtXmJ2AiUwreUg75fCs=
+040_create_provider_cdrs.sql h1:ok5hvhgdA4Zzj1J39W1Oy3oT8WViHvFAoG2oxVSLmH4=
+041_create_managed_number_operations.sql h1:7O11Xloni4DXX6pY613Bs5w0wZtuGZBKGP4Er9v77Z4=
+042_create_trunk_credentials.sql h1:BuWWKSXxEWzhnXAqPAMLm7AUD5v/cvAlpBkpGSdWun4=
+043_create_runtime_attachments.sql h1:QMWvLbud4PLEipcpBa73nZeeQpXCu6h+nJ0m5GzgWPU=
