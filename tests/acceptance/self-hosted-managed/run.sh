@@ -22,7 +22,7 @@ freeswitch_sip_ready() {
             -p "$FREESWITCH_ESL_PASSWORD" \
             -x "sofia status profile internal" 2>&1) || exit 1
         case "$output" in
-            *RUNNING*) exit 0 ;;
+            *BIND-URL*":5060"*) exit 0 ;;
             *) exit 1 ;;
         esac
     '
