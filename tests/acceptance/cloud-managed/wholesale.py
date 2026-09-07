@@ -6,6 +6,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+SIGNALING_IP = "172.30.0.60"
 state = {"outbound_invites": 0, "last_destination": "", "last_call_id": "", "internal_route_header_seen": False}
 inbound_sockets = []
 
@@ -32,7 +33,7 @@ def response(status, reason, request_headers):
 
 def sip_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", 5060))
+    sock.bind((SIGNALING_IP, 5060))
     while True:
         data, peer = sock.recvfrom(65535)
         message = data.decode(errors="replace")
@@ -49,7 +50,7 @@ def sip_server():
 
 def originate_inbound():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", 0))
+    sock.bind((SIGNALING_IP, 0))
     sock.settimeout(8)
     inbound_sockets.append(sock)
     call_id = f"{random.getrandbits(96):x}@cloud-managed-wholesale"
