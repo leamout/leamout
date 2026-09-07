@@ -17,7 +17,7 @@ func TestHandlerReconcilesAuthenticatedCDR(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodPost, "/internal/v1/provider-cdrs/reconcile", bytes.NewReader(body))
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/v1/provider-cdrs/reconcile", bytes.NewReader(body))
 	request.Header.Set("Authorization", "Bearer edge-secret")
 	recorder := httptest.NewRecorder()
 
@@ -30,7 +30,7 @@ func TestHandlerReconcilesAuthenticatedCDR(t *testing.T) {
 
 func TestHandlerRejectsUnauthenticatedCDR(t *testing.T) {
 	handler := NewHandler(NewService(&fakeStore{}), "edge-secret")
-	request := httptest.NewRequest(http.MethodPost, "/internal/v1/provider-cdrs/reconcile", bytes.NewReader([]byte(`{}`)))
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/v1/provider-cdrs/reconcile", bytes.NewReader([]byte(`{}`)))
 	recorder := httptest.NewRecorder()
 
 	handler.Reconcile(recorder, request)
