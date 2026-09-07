@@ -43,20 +43,21 @@ def invite(timeout=6):
         f"CSeq: 1 INVITE\r\nContact: <sip:carrier@127.0.0.1:{port}>\r\nContent-Length: 0\r\n\r\n"
     )
     sock.sendto(message.encode(), ("127.0.0.1", 5060))
-    statuses = []
+    responses = []
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
             response = sock.recv(65535).decode(errors="replace")
         except socket.timeout:
             break
-        status = int(response.split()[1])
-        statuses.append(status)
+        status_line = response.splitlines()[0]
+        status = int(status_line.split()[1])
+        responses.append(status_line)
         if status >= 200:
             break
         if status == 180:
             break
-    return call_id, statuses
+    return call_id, responses
 
 
 def wait_for_channel(call_id):
@@ -70,16 +71,18 @@ def wait_for_channel(call_id):
 
 
 def main():
-    call_id, statuses = invite()
+    call_id, responses = invite()
+    statuses = [int(response.split()[1]) for response in responses]
     if 180 not in statuses:
-        raise Failure(f"healthy attachment did not reach self-hosted runtime: statuses={statuses}")
+        raise Failure(f"healthy attachment did not reach self-hosted runtime: responses={responses}")
     wait_for_channel(call_id)
     print("PASS managed edge forwarded the DID to the self-hosted OpenSIPS and FreeSWITCH runtime")
 
     sql("UPDATE runtime_attachments SET health_status='unhealthy', last_checked_at=now() WHERE deployment_id='00000000-0000-0000-0000-000000005011'")
-    _, statuses = invite()
+    _, responses = invite()
+    statuses = [int(response.split()[1]) for response in responses]
     if not statuses or statuses[-1] != 404:
-        raise Failure(f"unhealthy attachment did not fail closed: statuses={statuses}")
+        raise Failure(f"unhealthy attachment did not fail closed: responses={responses}")
     print("PASS unhealthy runtime attachment failed closed at the managed edge")
 
 
