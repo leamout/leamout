@@ -2,6 +2,7 @@
 import json
 import pathlib
 import sys
+import xml.etree.ElementTree as ET
 
 
 def fail(message: str) -> None:
@@ -82,11 +83,24 @@ for (service, network), wanted in expected_addresses.items():
     if actual != wanted:
         fail(f"{service} on {network} has {actual!r}, expected {wanted!r}")
 
-acl_path = pathlib.Path("deploy/freeswitch/autoload_configs/acl.conf.xml")
-acl = acl_path.read_text(encoding="utf-8")
-if 'cidr="172.32.0.0/24"' not in acl:
-    fail("FreeSWITCH leamout-esl ACL does not allow the private-control subnet")
-if 'cidr="172.30.0.0/24"' in acl:
-    fail("FreeSWITCH leamout-esl ACL still allows the public-signaling subnet")
+acl_root = ET.parse("deploy/freeswitch/autoload_configs/acl.conf.xml").getroot()
+for list_name in ("leamout-esl", "leamout-sip"):
+    acl_list = acl_root.find(f"./network-lists/list[@name='{list_name}']")
+    if acl_list is None or acl_list.get("default") != "deny":
+        fail(f"FreeSWITCH {list_name} ACL is missing or does not default-deny")
+    cidrs = {node.get("cidr") for node in acl_list.findall("node") if node.get("type") == "allow"}
+    if "172.32.0.0/24" not in cidrs:
+        fail(f"FreeSWITCH {list_name} ACL does not allow the private-control subnet")
+    if "172.30.0.0/24" in cidrs:
+        fail(f"FreeSWITCH {list_name} ACL allows the public-signaling subnet")
+
+profile_root = ET.parse("deploy/freeswitch/sip_profiles/internal.xml").getroot()
+settings = {
+    param.get("name"): param.get("value")
+    for param in profile_root.findall("./settings/param")
+}
+for setting in ("apply-inbound-acl", "local-network-acl"):
+    if settings.get(setting) != "leamout-sip":
+        fail(f"FreeSWITCH {setting} is not pinned to leamout-sip")
 
 print("network-zone topology is valid")
