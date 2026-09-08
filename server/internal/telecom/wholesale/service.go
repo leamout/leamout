@@ -5,8 +5,6 @@ import (
 	"errors"
 	"regexp"
 	"strings"
-
-	"github.com/google/uuid"
 )
 
 var currencyPattern = regexp.MustCompile(`^[A-Z]{3}$`)
@@ -25,8 +23,7 @@ func (s *Service) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 	cdr.Direction = strings.ToLower(strings.TrimSpace(cdr.Direction))
 	cdr.SIPCallID = strings.TrimSpace(cdr.SIPCallID)
 	cdr.Currency = strings.ToUpper(strings.TrimSpace(cdr.Currency))
-	if cdr.Provider == "" || cdr.CarrierConnectionID == uuid.Nil ||
-		cdr.ProviderRecordID == "" || cdr.Direction != "termination" || cdr.SIPCallID == "" ||
+	if cdr.Provider == "" || cdr.ProviderRecordID == "" || cdr.Direction != "termination" || cdr.SIPCallID == "" ||
 		cdr.StartedAt.IsZero() || cdr.DurationSeconds < 0 || cdr.CostMicros < 0 ||
 		!currencyPattern.MatchString(cdr.Currency) || cdr.Raw == nil {
 		return Result{}, ErrInvalidCDR
