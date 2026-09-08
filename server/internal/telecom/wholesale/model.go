@@ -1,6 +1,8 @@
 package wholesale
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -34,4 +36,34 @@ type Result struct {
 	AmountMicros   int64     `json:"amount_micros"`
 	Currency       string    `json:"currency"`
 	Replayed       bool      `json:"replayed"`
+}
+
+type CDRPageSource interface {
+	PollCDRs(context.Context, string, time.Time, int, int) (json.RawMessage, int, error)
+}
+
+type CDRPollCursor struct {
+	Provider      string
+	Direction     string
+	WindowDate    time.Time
+	Page          int
+	AttemptCount  int
+	NextAttemptAt time.Time
+}
+
+type CDRPollStore interface {
+	Cursor(context.Context, string, string, time.Time) (CDRPollCursor, error)
+	StorePageAndAdvance(context.Context, CDRPollCursor, json.RawMessage, int, time.Time, int, time.Time) error
+	Fail(context.Context, CDRPollCursor, error, time.Time) error
+}
+
+type CDRPollJobConfig struct {
+	Provider        string
+	Directions      []string
+	PerPage         int
+	TickInterval    time.Duration
+	CurrentDayDelay time.Duration
+	RetryBase       time.Duration
+	RetryMax        time.Duration
+	InitialLookback time.Duration
 }
