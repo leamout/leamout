@@ -55,5 +55,5 @@ INSERT INTO trunk_endpoints (
 ) VALUES (
     '00000000-0000-0000-0000-000000006022',
     '00000000-0000-0000-0000-000000006021',
-    'cloud-managed-wholesale', 5060, 'udp', 'outbound', 'healthy'
+    '172.32.0.60', 5060, 'udp', 'outbound', 'healthy'
 );
