@@ -400,15 +400,7 @@ func configureManagedSIP(cfg config.Config, service *trunks.Service, state *comm
 	if strings.TrimSpace(cfg.ManagedSIP.AdmissionSecret) == "" {
 		return nil
 	}
-	if cfg.ManagedSIP.Port < 1 || cfg.ManagedSIP.Port > 65535 {
-		return fmt.Errorf("managed SIP port must be between 1 and 65535")
-	}
-	return service.SetManagedSIP(trunks.ManagedSIPConfig{
-		Host:      cfg.ManagedSIP.Host,
-		Port:      int32(cfg.ManagedSIP.Port),
-		Transport: cfg.ManagedSIP.Transport,
-		Realm:     cfg.ManagedSIP.Realm,
-	}, state)
+	return service.SetManagedSIPAuthority(state)
 }
 
 func (s *Server) Close() {
