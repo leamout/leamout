@@ -456,7 +456,7 @@ type Product struct {
 // Immutable upstream call-detail records reconciled to Leamout-managed calls for wholesale cost accounting.
 type ProviderCdr struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
 	ProviderRecordID    string             `db:"provider_record_id" json:"provider_record_id"`
 	Direction           string             `db:"direction" json:"direction"`
 	SipCallID           *string            `db:"sip_call_id" json:"sip_call_id"`
@@ -499,15 +499,6 @@ type ProviderCdrPollCursor struct {
 	LastSuccessAt pgtype.Timestamptz `db:"last_success_at" json:"last_success_at"`
 	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type ProviderCdrRoute struct {
-	Provider            string             `db:"provider" json:"provider"`
-	Direction           string             `db:"direction" json:"direction"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
-	Status              string             `db:"status" json:"status"`
-	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 // Internal durable journal for managed-number provider side effects. Customer lifecycle state remains on phone_numbers.
