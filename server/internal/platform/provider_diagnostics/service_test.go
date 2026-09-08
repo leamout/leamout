@@ -5,14 +5,6 @@ import (
 	"testing"
 )
 
-type diagnosticsStoreStub struct {
-	limit int32
-}
-
-func (s *diagnosticsStoreStub) Snapshot(context.Context, int32) (Snapshot, error) {
-	return Snapshot{}, nil
-}
-
 func TestServiceSnapshotUsesDefaultLimit(t *testing.T) {
 	store := &diagnosticsStoreCapture{}
 	service := NewService(store)
