@@ -22,8 +22,7 @@ func (f *fakeStore) Reconcile(_ context.Context, cdr CDR) (Result, error) {
 
 func validCDR() CDR {
 	return CDR{
-		Provider: " COMMPEAK ", CarrierConnectionID: uuid.New(),
-		ProviderRecordID: " cdr-1 ", Direction: " TERMINATION ", SIPCallID: " call-1 ",
+		Provider: " COMMPEAK ", ProviderRecordID: " cdr-1 ", Direction: " TERMINATION ", SIPCallID: " call-1 ",
 		StartedAt: time.Now().UTC(), DurationSeconds: 12, Currency: " usd ", CostMicros: 2500,
 		Raw: map[string]any{"id": "cdr-1"},
 	}
