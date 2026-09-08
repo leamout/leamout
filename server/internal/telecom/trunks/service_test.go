@@ -49,7 +49,7 @@ func TestManagedSIPAuthorityRequiresCommercialEntitlement(t *testing.T) {
 	organizationID := uuid.New()
 	service := NewService(nil)
 	if err := service.SetManagedSIP(ManagedSIPConfig{
-		Enabled: true, Host: "sip.leamout.com", Port: 5061, Transport: "tls", Realm: "sip.leamout.com",
+		Host: "sip.leamout.com", Port: 5061, Transport: "tls", Realm: "sip.leamout.com",
 	}, fakeManagedSIPState{state: commercialstate.OrganizationState{
 		OrganizationID: organizationID,
 		Standing:       commercialstate.StandingActive,
@@ -66,7 +66,7 @@ func TestManagedSIPCredentialIsOneWayDigestMaterial(t *testing.T) {
 	organizationID := uuid.New()
 	service := NewService(nil)
 	if err := service.SetManagedSIP(ManagedSIPConfig{
-		Enabled: true, Host: "SIP.LEAMOUT.COM", Port: 5061, Transport: "TLS", Realm: "sip.leamout.com",
+		Host: "SIP.LEAMOUT.COM", Port: 5061, Transport: "TLS", Realm: "sip.leamout.com",
 	}, fakeManagedSIPState{state: commercialstate.OrganizationState{
 		OrganizationID: organizationID,
 		Standing:       commercialstate.StandingActive,
