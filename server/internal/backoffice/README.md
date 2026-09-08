@@ -1,6 +1,6 @@
 # Leamout Backoffice
 
-The Backoffice is a separate operator-facing HTTP runtime built with Go, Templ, HTMX, TailwindCSS, and DaisyUI.
+The Backoffice is a separate operator-facing HTTP runtime built with Go, Templ, HTMX, TailwindCSS, DaisyUI, and Hyperscript.
 
 Build the local UI assets from `server/internal/backoffice`:
 
