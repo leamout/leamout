@@ -28,10 +28,26 @@ def headers(message):
     return result
 
 
-def response(status, reason, request_headers, body="", contact=False):
+def header_values(message, name):
+    prefix = name.lower()
+    return [
+        value.strip()
+        for line in message.splitlines()[1:]
+        if ":" in line
+        for key, value in [line.split(":", 1)]
+        if key.lower() == prefix
+    ]
+
+
+def response(status, reason, request_headers, vias, record_routes, body="", contact=False):
     content_headers = ""
-    if request_headers.get("record-route"):
-        content_headers += f"Record-Route: {request_headers['record-route']}\r\n"
+    # A UAS must copy every Via from the request. OpenSIPS removes its own top
+    # Via before forwarding the response; dropping FreeSWITCH's lower Via here
+    # leaves the proxy with no upstream destination and strands the originate.
+    via_headers = "".join(f"Via: {value}\r\n" for value in vias)
+    record_route_headers = "".join(
+        f"Record-Route: {value}\r\n" for value in record_routes
+    )
     if body:
         content_headers += "Content-Type: application/sdp\r\n"
     if contact:
@@ -41,12 +57,12 @@ def response(status, reason, request_headers, body="", contact=False):
         content_headers += f"Contact: <sip:wholesale@{PRIVATE_SIGNALING_IP}:5060>\r\n"
     return (
         f"SIP/2.0 {status} {reason}\r\n"
-        f"Via: {request_headers.get('via', '')}\r\n"
+        f"{via_headers}"
         f"From: {request_headers.get('from', '')}\r\n"
         f"To: {request_headers.get('to', '')};tag=cloud-wholesale\r\n"
         f"Call-ID: {request_headers.get('call-id', '')}\r\n"
         f"CSeq: {request_headers.get('cseq', '')}\r\n"
-        f"{content_headers}Content-Length: {len(body.encode())}\r\n\r\n{body}"
+        f"{record_route_headers}{content_headers}Content-Length: {len(body.encode())}\r\n\r\n{body}"
     ).encode()
 
 
@@ -60,8 +76,10 @@ def sip_server():
         data, peer = sock.recvfrom(65535)
         message = data.decode(errors="replace")
         request_headers = headers(message)
+        vias = header_values(message, "via")
+        record_routes = header_values(message, "record-route")
         if message.startswith("OPTIONS "):
-            sock.sendto(response(200, "OK", request_headers), peer)
+            sock.sendto(response(200, "OK", request_headers, vias, record_routes), peer)
         elif message.startswith("INVITE "):
             state["outbound_invites"] += 1
             state["last_destination"] = message.split()[1]
@@ -79,7 +97,18 @@ def sip_server():
                 "a=fmtp:101 0-16\r\n"
                 "a=sendrecv\r\n"
             )
-            sock.sendto(response(200, "OK", request_headers, answer, contact=True), peer)
+            sock.sendto(
+                response(
+                    200,
+                    "OK",
+                    request_headers,
+                    vias,
+                    record_routes,
+                    answer,
+                    contact=True,
+                ),
+                peer,
+            )
             state["outbound_answers"] += 1
         elif message.startswith("ACK "):
             state["outbound_acks"] += 1
