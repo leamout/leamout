@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import random
+import os
 import socket
 import subprocess
 import time
 
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/self-hosted-managed/compose.yaml"]
 DID = "+15551235001"
+ESL_PASSWORD = os.environ["FREESWITCH_ESL_PASSWORD"]
 
 
 class Failure(RuntimeError):
@@ -76,7 +78,11 @@ def invite(timeout=6):
 def wait_for_channel(call_id):
     deadline = time.monotonic() + 8
     while time.monotonic() < deadline:
-        channels = compose("exec", "-T", "freeswitch", "fs_cli", "-x", "show channels")
+        channels = compose(
+            "exec", "-T", "freeswitch", "fs_cli",
+            "-H", "127.0.0.1", "-P", "8021", "-p", ESL_PASSWORD,
+            "-x", "show channels",
+        )
         if DID in channels:
             return
         time.sleep(0.2)
