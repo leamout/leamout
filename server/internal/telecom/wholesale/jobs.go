@@ -195,26 +195,21 @@ func (j *CDRReconciliationJob) processPage(ctx context.Context, page CDRPageWork
 	if normalizer == nil {
 		return fmt.Errorf("no CDR normalizer registered for provider %q", provider)
 	}
-	connectionID, err := j.store.ResolveCDRRoute(ctx, provider, page.Direction)
-	if err != nil {
-		return err
-	}
 	records, err := normalizer.NormalizeCDRs(ctx, page.Direction, page.Raw)
 	if err != nil {
 		return err
 	}
 	for _, record := range records {
 		_, err := j.service.Reconcile(ctx, CDR{
-			Provider:            provider,
-			CarrierConnectionID: connectionID,
-			ProviderRecordID:    record.ProviderRecordID,
-			Direction:           page.Direction,
-			SIPCallID:           record.SIPCallID,
-			StartedAt:           record.StartedAt,
-			DurationSeconds:     record.DurationSeconds,
-			Currency:            record.Currency,
-			CostMicros:          record.CostMicros,
-			Raw:                 record.Raw,
+			Provider:         provider,
+			ProviderRecordID: record.ProviderRecordID,
+			Direction:        page.Direction,
+			SIPCallID:        record.SIPCallID,
+			StartedAt:        record.StartedAt,
+			DurationSeconds:  record.DurationSeconds,
+			Currency:         record.Currency,
+			CostMicros:       record.CostMicros,
+			Raw:              record.Raw,
 		})
 		if err != nil {
 			return err
