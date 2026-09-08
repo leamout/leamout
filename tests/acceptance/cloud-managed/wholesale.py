@@ -7,6 +7,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SIGNALING_IP = "172.30.0.60"
+PRIVATE_SIGNALING_IP = "172.32.0.60"
 state = {
     "outbound_invites": 0,
     "outbound_answers": 0,
@@ -37,7 +38,7 @@ def response(status, reason, request_headers, body="", contact=False):
         # FreeSWITCH intentionally has no public-signaling attachment. Use the
         # carrier service's private-control DNS address for in-dialog SIP;
         # RTPengine still rewrites the public SDP address independently.
-        content_headers += "Contact: <sip:wholesale@cloud-managed-wholesale:5060>\r\n"
+        content_headers += f"Contact: <sip:wholesale@{PRIVATE_SIGNALING_IP}:5060>\r\n"
     return (
         f"SIP/2.0 {status} {reason}\r\n"
         f"Via: {request_headers.get('via', '')}\r\n"
@@ -51,10 +52,10 @@ def response(status, reason, request_headers, body="", contact=False):
 
 def sip_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # Receive public carrier OPTIONS and private-control outbound INVITEs.
-    # Binding only SIGNALING_IP leaves the service's Compose DNS address with
-    # no listener and makes correctly routed outbound calls time out.
-    sock.bind(("0.0.0.0", 5060))
+    # Outbound termination has a dedicated, deterministic private-control
+    # address. The separate originate socket below retains SIGNALING_IP as the
+    # carrier-authenticated public ingress source.
+    sock.bind((PRIVATE_SIGNALING_IP, 5060))
     while True:
         data, peer = sock.recvfrom(65535)
         message = data.decode(errors="replace")
