@@ -200,28 +200,23 @@ def main():
     print("PASS trunkless Cloud call selected the managed default wholesale route")
 
     provider_state = sql(
-        "SELECT pnp.slug || ',' || ccp.slug || ',' || pcr.provider "
+        "SELECT pnp.slug || ',' || ccp.slug "
         "FROM phone_numbers pn "
         "JOIN carrier_providers pnp ON pnp.id=pn.provider_id "
         "JOIN calls c ON c.id='" + outbound["id"] + "'::uuid "
         "JOIN carrier_connections cc ON cc.id=c.carrier_connection_id "
         "JOIN carrier_providers ccp ON ccp.id=cc.provider_id "
-        "JOIN provider_cdr_routes pcr ON pcr.carrier_connection_id=cc.id AND pcr.direction='termination' "
         "WHERE pn.id='" + active["id"] + "'::uuid"
     ).split(",")
-    if provider_state != ["didww", "generic-sip", "commpeak"]:
-        raise Failure(f"API provider identity was coupled to SIP provider identity: {provider_state}")
-    # calls.sip_call_id is the FreeSWITCH channel UUID used by the control
-    # APIs. Correlate the wholesale SIP dialog through that live channel's
-    # actual wire Call-ID instead of incorrectly equating the two identifiers.
+    if provider_state != ["didww", "generic-sip"]:
+        raise Failure(f"adapter identity leaked into SIP carrier identity: {provider_state}")
     wire_call_id = fs_cli(f"uuid_getvar {outbound['sip_call_id']} sip_call_id")
     if wholesale["last_call_id"] != wire_call_id:
         raise Failure("wholesale SIP Call-ID does not match the persisted managed call")
-    print("PASS DIDWW caller-ID, generic SIP termination, and CommPeak CDR identity are independent")
+    print("PASS provider adapters remain independent from generic SIP termination")
 
     cdr = {
         "provider": "commpeak",
-        "carrier_connection_id": outbound["carrier_connection_id"],
         "provider_record_id": "cloud-managed-cdr-1",
         "direction": "termination",
         "sip_call_id": outbound["sip_call_id"],
@@ -239,13 +234,20 @@ def main():
         raise Failure(f"wholesale charge has wrong cost: {reconciled}")
     if replayed["wholesale_charge_id"] != reconciled["wholesale_charge_id"] or not replayed["replayed"]:
         raise Failure(f"provider CDR replay was not idempotent: {replayed}")
+    cdr_state = sql(
+        "SELECT pc.carrier_connection_id::text || ',' || c.carrier_connection_id::text "
+        "FROM provider_cdrs pc JOIN calls c ON c.id=pc.call_id "
+        "WHERE pc.provider='commpeak' AND pc.provider_record_id='cloud-managed-cdr-1'"
+    ).split(",")
+    if len(cdr_state) != 2 or cdr_state[0] != cdr_state[1]:
+        raise Failure(f"CDR did not derive its carrier connection from the matched call: {cdr_state}")
     counts = sql(
         "SELECT (SELECT count(*) FROM provider_cdrs WHERE provider='commpeak' AND provider_record_id='cloud-managed-cdr-1')::text || ',' || "
         "(SELECT count(*) FROM wholesale_charges WHERE call_id='" + outbound["id"] + "'::uuid)::text"
     )
     if counts != "1,1":
         raise Failure(f"CDR replay duplicated immutable cost records: {counts}")
-    print("PASS provider CDR reconciled idempotently to one call and one wholesale charge")
+    print("PASS generic provider CDR matched the call and derived carrier state idempotently")
 
     rejected_api("GET", f"/v1/numbers/{active['id']}", token=TOKEN_B)
     rejected_api("GET", f"/v1/calls/{outbound['id']}", token=TOKEN_B)
@@ -296,16 +298,16 @@ def main():
         raise Failure("disabled organization reached managed wholesale")
     print("PASS disabled organization is denied on managed inbound and outbound paths")
 
-    mismatched = dict(cdr)
-    mismatched["provider_record_id"] = "cloud-managed-cdr-wrong-route"
-    mismatched["provider"] = "didww"
-    internal_post("/internal/v1/provider-cdrs/reconcile", mismatched, expected=404)
+    unmatched = dict(cdr)
+    unmatched["provider_record_id"] = "cloud-managed-cdr-unmatched"
+    unmatched["sip_call_id"] = "missing-managed-call"
+    internal_post("/internal/v1/provider-cdrs/reconcile", unmatched, expected=404)
     conflict = dict(cdr)
     conflict["cost_micros"] = 999999
     internal_post("/internal/v1/provider-cdrs/reconcile", conflict, expected=409)
     if sql("SELECT count(*) FROM wholesale_charges WHERE call_id='" + outbound["id"] + "'::uuid") != "1":
-        raise Failure("mismatched or conflicting CDR changed wholesale accounting")
-    print("PASS wrong-provider attribution and conflicting CDR replay fail closed")
+        raise Failure("unmatched or conflicting CDR changed wholesale accounting")
+    print("PASS unmatched calls and conflicting CDR replay fail closed")
 
 
 if __name__ == "__main__":
