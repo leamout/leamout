@@ -28,8 +28,8 @@
     <param name="auth-subscriptions" value="false"/>
     <param name="manage-presence" value="false"/>
 
-    <param name="apply-inbound-acl" value="localnet.auto"/>
-    <param name="local-network-acl" value="localnet.auto"/>
+    <param name="apply-inbound-acl" value="leamout-sip"/>
+    <param name="local-network-acl" value="leamout-sip"/>
 
     <param name="rtp-timer-name" value="soft"/>
     <param name="rfc2833-pt" value="101"/>

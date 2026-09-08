@@ -13,6 +13,7 @@ WHOLESALE = os.getenv("CLOUD_MANAGED_WHOLESALE", "http://127.0.0.1:18091")
 TOKEN = os.getenv("CLOUD_MANAGED_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
 TOKEN_B = os.getenv("CLOUD_MANAGED_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnopqrstuvwx")
 EDGE_SECRET = os.environ["MANAGED_SIP_ADMISSION_SECRET"]
+ESL_PASSWORD = os.environ["FREESWITCH_ESL_PASSWORD"]
 DID = "+15551236001"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
 
@@ -82,6 +83,17 @@ def internal_post(path, payload, expected=200):
 
 def sql(statement):
     result = subprocess.run(COMPOSE + ["exec", "-T", "postgres", "psql", "-U", "leamout", "-d", "leamout", "-Atc", statement], text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    if result.returncode:
+        raise Failure(result.stdout)
+    return result.stdout.strip()
+
+
+def fs_cli(command):
+    result = subprocess.run(
+        COMPOSE + ["exec", "-T", "freeswitch", "fs_cli", "-H", "127.0.0.1",
+                   "-P", "8021", "-p", ESL_PASSWORD, "-x", command],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
     if result.returncode:
         raise Failure(result.stdout)
     return result.stdout.strip()
@@ -159,11 +171,20 @@ def main():
     print("PASS managed DID reached the local Cloud OpenSIPS and FreeSWITCH application")
 
     wholesale_before = json.load(urllib.request.urlopen(WHOLESALE, timeout=5))["outbound_invites"]
-    outbound = api("POST", "/v1/calls/", {
-        "application_id": application["id"],
-        "from": DID,
-        "to": "+15551236099",
-    }, (201,))
+    try:
+        outbound = api("POST", "/v1/calls/", {
+            "application_id": application["id"],
+            "from": DID,
+            "to": "+15551236099",
+        }, (201,))
+    except Failure as error:
+        wholesale_state = json.load(urllib.request.urlopen(WHOLESALE, timeout=5))
+        channels = subprocess.run(
+            COMPOSE + ["exec", "-T", "freeswitch", "fs_cli", "-H", "127.0.0.1",
+                       "-P", "8021", "-p", ESL_PASSWORD, "-x", "show channels"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        ).stdout.strip()
+        raise Failure(f"{error}; wholesale={wholesale_state}; FreeSWITCH channels={channels}") from error
     if outbound["direction"] != "outbound" or outbound["state"] not in {"answered", "active"}:
         raise Failure(f"trunkless managed outbound call did not connect: {outbound}")
 
@@ -186,7 +207,11 @@ def main():
     ).split(",")
     if providers != ["26c5448a-2540-4731-848d-9c713c19d8cd", "300e6073-fe60-4d40-ac6d-808d74749a0c"]:
         raise Failure(f"caller-ID and termination providers were not independent: {providers}")
-    if wholesale["last_call_id"] != outbound["sip_call_id"]:
+    # calls.sip_call_id is the FreeSWITCH channel UUID used by the control
+    # APIs. Correlate the wholesale SIP dialog through that live channel's
+    # actual wire Call-ID instead of incorrectly equating the two identifiers.
+    wire_call_id = fs_cli(f"uuid_getvar {outbound['sip_call_id']} sip_call_id")
+    if wholesale["last_call_id"] != wire_call_id:
         raise Failure("wholesale SIP Call-ID does not match the persisted managed call")
     print("PASS DIDWW managed caller-ID was authorized on the CommPeak managed route")
 

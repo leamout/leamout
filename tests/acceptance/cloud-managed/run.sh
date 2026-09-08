@@ -16,6 +16,26 @@ export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/cloud-managed/compose.yaml"
 
+freeswitch_sip_ready() {
+    $COMPOSE exec -T freeswitch sh -c '
+        output=$(fs_cli -H 127.0.0.1 -P 8021 \
+            -p "$FREESWITCH_ESL_PASSWORD" \
+            -x "sofia status profile internal" 2>&1) || exit 1
+        case "$output" in
+            *BIND-URL*":5060"*) exit 0 ;;
+            *) exit 1 ;;
+        esac
+    '
+}
+
+show_freeswitch_sip_status() {
+    $COMPOSE exec -T freeswitch sh -c '
+        fs_cli -H 127.0.0.1 -P 8021 \
+            -p "$FREESWITCH_ESL_PASSWORD" \
+            -x "sofia status profile internal" 2>&1
+    ' || true
+}
+
 cleanup() {
     status=$?; trap - EXIT INT TERM
     if [ "$status" -ne 0 ]; then
@@ -42,12 +62,24 @@ $COMPOSE up --build migrate
 $COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U leamout -d leamout <tests/acceptance/cloud-managed/bootstrap.sql >/dev/null
 $COMPOSE up -d --build server worker opensips
 
+ready=0
 for _ in $(seq 1 90); do
-    if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204; assert urllib.request.urlopen("http://127.0.0.1:18090/__state", timeout=2).status == 200; assert urllib.request.urlopen("http://127.0.0.1:18091", timeout=2).status == 200' >/dev/null 2>&1; then
-        python3 tests/acceptance/cloud-managed/acceptance.py
-        exit
+    if python3 -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8080/readyz", timeout=2).status == 204; assert urllib.request.urlopen("http://127.0.0.1:18090/__state", timeout=2).status == 200; assert urllib.request.urlopen("http://127.0.0.1:18091", timeout=2).status == 200' >/dev/null 2>&1 \
+        && freeswitch_sip_ready \
+        && $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status >/dev/null 2>&1; then
+        ready=1
+        break
     fi
     sleep 1
 done
-echo "cloud-managed acceptance topology did not become ready" >&2
-exit 1
+if [ "$ready" -ne 1 ]; then
+    echo "cloud-managed acceptance topology did not become ready" >&2
+    show_freeswitch_sip_status >&2
+    exit 1
+fi
+
+$COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
+    -p "$FREESWITCH_ESL_PASSWORD" -x "console loglevel debug" >/dev/null
+$COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
+    -p "$FREESWITCH_ESL_PASSWORD" -x "sofia global siptrace on" >/dev/null
+python3 tests/acceptance/cloud-managed/acceptance.py
