@@ -22,10 +22,6 @@ type routeStore interface {
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	ResolveInboundPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error)
-	ResolveManagedInboundRuntimeAttachment(
-		context.Context,
-		uuid.UUID,
-	) (sqlc.ResolveManagedInboundRuntimeAttachmentRow, error)
 }
 
 type Resolver struct {
@@ -160,9 +156,6 @@ func (r *Resolver) resolveCloudManagedTrunk(
 	if err != nil {
 		return OutboundDecision{}, err
 	}
-	// Keep the tenant-managed trunk as the customer-facing route attribution.
-	// The selected carrier connection and endpoint still describe the internal
-	// platform wholesale route used to execute the call.
 	decision.TrunkID = trunk.ID
 	return decision, nil
 }
@@ -380,39 +373,4 @@ func (r *Resolver) resolveInboundOwnership(
 		return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
 	}
 	return connection, phoneNumber, nil
-}
-
-func (r *Resolver) resolveManagedInboundDelivery(
-	ctx context.Context,
-	req InboundRequest,
-	sourceIP netip.Addr,
-) (ManagedInboundDeliveryDecision, error) {
-	connection, phoneNumber, err := r.resolveInboundOwnership(ctx, req, sourceIP)
-	if err != nil {
-		return ManagedInboundDeliveryDecision{}, err
-	}
-	if connection.Scope != "platform" {
-		return ManagedInboundDeliveryDecision{}, ErrNoRoute
-	}
-
-	attachment, err := r.repo.ResolveManagedInboundRuntimeAttachment(ctx, phoneNumber.OrganizationID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ManagedInboundDeliveryDecision{}, ErrNoRoute
-		}
-		return ManagedInboundDeliveryDecision{}, err
-	}
-	return ManagedInboundDeliveryDecision{
-		OrganizationID:      phoneNumber.OrganizationID,
-		CarrierConnectionID: connection.ID,
-		PhoneNumberID:       phoneNumber.ID,
-		CalledNumber:        req.CalledNumber,
-		CallerNumber:        req.CallerNumber,
-		RuntimeAttachmentID: attachment.RuntimeAttachmentID,
-		DeploymentID:        attachment.DeploymentID,
-		DeploymentIdentity:  attachment.DeploymentIdentity,
-		IngressHost:         attachment.IngressHost,
-		IngressPort:         attachment.IngressPort,
-		IngressTransport:    attachment.Transport,
-	}, nil
 }
