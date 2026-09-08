@@ -5,6 +5,7 @@ config=${OPENSIPS_CONFIG:-/etc/opensips/opensips.cfg}
 advertised_address=${OPENSIPS_ADVERTISED_ADDRESS:-}
 database_password=${OPENSIPS_DATABASE_PASSWORD:-}
 admission_secret=${MANAGED_SIP_ADMISSION_SECRET:-}
+managed_inbound_edge=${MANAGED_INBOUND_EDGE_ENABLED:-false}
 
 [ -n "$database_password" ] || {
   echo "OPENSIPS_DATABASE_PASSWORD is required" >&2
@@ -15,6 +16,11 @@ case "$database_password" in
     echo "OPENSIPS_DATABASE_PASSWORD must be alphanumeric" >&2
     exit 1
     ;;
+esac
+
+case "$managed_inbound_edge" in
+  true|false) ;;
+  *) echo "MANAGED_INBOUND_EDGE_ENABLED must be true or false" >&2; exit 1 ;;
 esac
 
 [ -n "$admission_secret" ] || {
@@ -38,6 +44,11 @@ rm -f "$tmp"
 
 tmp=$(mktemp)
 sed "s#__MANAGED_SIP_ADMISSION_SECRET__#${admission_secret}#g" "$config" > "$tmp"
+cat "$tmp" > "$config"
+rm -f "$tmp"
+
+tmp=$(mktemp)
+sed "s#__MANAGED_INBOUND_EDGE_ENABLED__#${managed_inbound_edge}#g" "$config" > "$tmp"
 cat "$tmp" > "$config"
 rm -f "$tmp"
 

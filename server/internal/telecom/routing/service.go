@@ -30,3 +30,17 @@ func (s *Service) ResolveInbound(
 	}
 	return s.resolver.resolveInbound(ctx, req, sourceIP)
 }
+
+// ResolveManagedInboundDelivery resolves the extra hosted-edge hop used only
+// by Self-Hosted + Managed connectivity. Cloud + Managed and both BYOC modes
+// resolve calls in their local runtime with ResolveInbound.
+func (s *Service) ResolveManagedInboundDelivery(
+	ctx context.Context,
+	req InboundRequest,
+) (ManagedInboundDeliveryDecision, error) {
+	sourceIP, err := validateInboundRequest(req)
+	if err != nil {
+		return ManagedInboundDeliveryDecision{}, err
+	}
+	return s.resolver.resolveManagedInboundDelivery(ctx, req, sourceIP)
+}

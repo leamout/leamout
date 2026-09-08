@@ -22,6 +22,10 @@ type routeStore interface {
 	GetPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	ResolveInboundPhoneNumber(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
 	GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error)
+	ResolveManagedInboundRuntimeAttachment(
+		context.Context,
+		uuid.UUID,
+	) (sqlc.ResolveManagedInboundRuntimeAttachmentRow, error)
 }
 
 type Resolver struct {
@@ -49,7 +53,11 @@ func (r *Resolver) resolveOutbound(ctx context.Context, req OutboundRequest) (Ou
 	return r.resolveManagedOutbound(ctx, req)
 }
 
-func (r *Resolver) resolveExplicitOutbound(ctx context.Context, req OutboundRequest, trunkID uuid.UUID) (OutboundDecision, error) {
+func (r *Resolver) resolveExplicitOutbound(
+	ctx context.Context,
+	req OutboundRequest,
+	trunkID uuid.UUID,
+) (OutboundDecision, error) {
 	trunk, err := r.repo.GetTrunk(ctx, req.OrganizationID, trunkID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -74,7 +82,12 @@ func (r *Resolver) resolveExplicitOutbound(ctx context.Context, req OutboundRequ
 	}
 }
 
-func (r *Resolver) resolveExplicitTenantTrunk(ctx context.Context, req OutboundRequest, trunk sqlc.Trunk, managed bool) (OutboundDecision, error) {
+func (r *Resolver) resolveExplicitTenantTrunk(
+	ctx context.Context,
+	req OutboundRequest,
+	trunk sqlc.Trunk,
+	managed bool,
+) (OutboundDecision, error) {
 	if trunk.CarrierConnectionID == nil {
 		return OutboundDecision{}, ErrNoRoute
 	}
@@ -87,7 +100,9 @@ func (r *Resolver) resolveExplicitTenantTrunk(ctx context.Context, req OutboundR
 		}
 		return OutboundDecision{}, err
 	}
-	if connection.Scope != "organization" || connection.OrganizationID == nil || *connection.OrganizationID != req.OrganizationID {
+	if connection.Scope != "organization" ||
+		connection.OrganizationID == nil ||
+		*connection.OrganizationID != req.OrganizationID {
 		return OutboundDecision{}, ErrNoRoute
 	}
 
@@ -136,7 +151,11 @@ func (r *Resolver) resolveExplicitTenantTrunk(ctx context.Context, req OutboundR
 	}, nil
 }
 
-func (r *Resolver) resolveCloudManagedTrunk(ctx context.Context, req OutboundRequest, trunk sqlc.Trunk) (OutboundDecision, error) {
+func (r *Resolver) resolveCloudManagedTrunk(
+	ctx context.Context,
+	req OutboundRequest,
+	trunk sqlc.Trunk,
+) (OutboundDecision, error) {
 	decision, err := r.resolveManagedOutbound(ctx, req)
 	if err != nil {
 		return OutboundDecision{}, err
@@ -216,7 +235,13 @@ func (r *Resolver) resolveManagedOutbound(ctx context.Context, req OutboundReque
 	}, nil
 }
 
-func (r *Resolver) recordEndpointSelection(ctx context.Context, connectionID uuid.UUID, trunkID uuid.UUID, endpoint sqlc.TrunkEndpoint, endpoints []sqlc.TrunkEndpoint) {
+func (r *Resolver) recordEndpointSelection(
+	ctx context.Context,
+	connectionID uuid.UUID,
+	trunkID uuid.UUID,
+	endpoint sqlc.TrunkEndpoint,
+	endpoints []sqlc.TrunkEndpoint,
+) {
 	if r.metrics == nil {
 		return
 	}
@@ -287,37 +312,14 @@ func secureWeightPick(total int64) (int64, error) {
 	return pick.Int64(), nil
 }
 
-func (r *Resolver) resolveInbound(ctx context.Context, req InboundRequest, sourceIP netip.Addr) (InboundDecision, error) {
-	connection, err := r.repo.ResolveInboundCarrier(ctx, sourceIP)
+func (r *Resolver) resolveInbound(
+	ctx context.Context,
+	req InboundRequest,
+	sourceIP netip.Addr,
+) (InboundDecision, error) {
+	connection, phoneNumber, err := r.resolveInboundOwnership(ctx, req, sourceIP)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return InboundDecision{}, ErrNoRoute
-		}
 		return InboundDecision{}, err
-	}
-
-	phoneNumber, err := r.repo.ResolveInboundPhoneNumber(ctx, connection.ID, req.CalledNumber)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return InboundDecision{}, ErrNoRoute
-		}
-		return InboundDecision{}, err
-	}
-	organizationID := phoneNumber.OrganizationID
-
-	switch connection.Scope {
-	case "organization":
-		if connection.OrganizationID == nil ||
-			*connection.OrganizationID != organizationID ||
-			phoneNumber.ProvisioningMode != provisioningModeBYOC {
-			return InboundDecision{}, ErrTenantMismatch
-		}
-	case "platform":
-		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != provisioningModeManaged {
-			return InboundDecision{}, ErrTenantMismatch
-		}
-	default:
-		return InboundDecision{}, ErrTenantMismatch
 	}
 
 	binding, err := r.repo.GetVoiceBinding(ctx, req.CalledNumber)
@@ -327,16 +329,90 @@ func (r *Resolver) resolveInbound(ctx context.Context, req InboundRequest, sourc
 		}
 		return InboundDecision{}, err
 	}
-	if binding.OrganizationID != organizationID {
+	if binding.OrganizationID != phoneNumber.OrganizationID {
 		return InboundDecision{}, ErrTenantMismatch
 	}
 
 	return InboundDecision{
-		OrganizationID:      organizationID,
+		OrganizationID:      phoneNumber.OrganizationID,
 		CarrierConnectionID: connection.ID,
 		PhoneNumberID:       phoneNumber.ID,
 		VoiceApplicationID:  binding.VoiceApplicationID,
 		CalledNumber:        req.CalledNumber,
 		CallerNumber:        req.CallerNumber,
+	}, nil
+}
+
+func (r *Resolver) resolveInboundOwnership(
+	ctx context.Context,
+	req InboundRequest,
+	sourceIP netip.Addr,
+) (sqlc.CarrierConnection, sqlc.PhoneNumber, error) {
+	connection, err := r.repo.ResolveInboundCarrier(ctx, sourceIP)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrNoRoute
+		}
+		return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, err
+	}
+
+	phoneNumber, err := r.repo.ResolveInboundPhoneNumber(ctx, connection.ID, req.CalledNumber)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrNoRoute
+		}
+		return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, err
+	}
+	organizationID := phoneNumber.OrganizationID
+
+	switch connection.Scope {
+	case "organization":
+		if connection.OrganizationID == nil ||
+			*connection.OrganizationID != organizationID ||
+			phoneNumber.ProvisioningMode != provisioningModeBYOC {
+			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
+		}
+	case "platform":
+		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != provisioningModeManaged {
+			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
+		}
+	default:
+		return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
+	}
+	return connection, phoneNumber, nil
+}
+
+func (r *Resolver) resolveManagedInboundDelivery(
+	ctx context.Context,
+	req InboundRequest,
+	sourceIP netip.Addr,
+) (ManagedInboundDeliveryDecision, error) {
+	connection, phoneNumber, err := r.resolveInboundOwnership(ctx, req, sourceIP)
+	if err != nil {
+		return ManagedInboundDeliveryDecision{}, err
+	}
+	if connection.Scope != "platform" {
+		return ManagedInboundDeliveryDecision{}, ErrNoRoute
+	}
+
+	attachment, err := r.repo.ResolveManagedInboundRuntimeAttachment(ctx, phoneNumber.OrganizationID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ManagedInboundDeliveryDecision{}, ErrNoRoute
+		}
+		return ManagedInboundDeliveryDecision{}, err
+	}
+	return ManagedInboundDeliveryDecision{
+		OrganizationID:      phoneNumber.OrganizationID,
+		CarrierConnectionID: connection.ID,
+		PhoneNumberID:       phoneNumber.ID,
+		CalledNumber:        req.CalledNumber,
+		CallerNumber:        req.CallerNumber,
+		RuntimeAttachmentID: attachment.RuntimeAttachmentID,
+		DeploymentID:        attachment.DeploymentID,
+		DeploymentIdentity:  attachment.DeploymentIdentity,
+		IngressHost:         attachment.IngressHost,
+		IngressPort:         attachment.IngressPort,
+		IngressTransport:    attachment.Transport,
 	}, nil
 }

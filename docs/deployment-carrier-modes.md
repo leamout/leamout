@@ -14,6 +14,30 @@ Do not infer carrier mode from hosting mode, or hosting mode from carrier mode.
 | Self-Hosted | Managed Carrier | Customer runs Leamout while using Leamout-managed carrier connectivity. |
 | Leamout Cloud | BYOC | Leamout runs the control plane while the customer connects customer-owned carriers. |
 
+The routing rule is two-dimensional:
+
+```text
+Runtime = where Leamout executes
+Connectivity = whose carrier network Leamout uses
+```
+
+Consequently, a runtime attachment is not a generic managed-carrier
+requirement. It is the extra network hop used only for **Self-Hosted + Managed
+Carrier** inbound delivery:
+
+| Mode | Runtime | Carrier path |
+| --- | --- | --- |
+| Self-Hosted + BYOC | Customer-operated | Directly between the customer runtime and customer carrier. |
+| Self-Hosted + Managed Carrier | Customer-operated | Outbound through the managed edge; inbound from the managed edge through a verified runtime attachment. |
+| Leamout Cloud + BYOC | Leamout-operated | Between the cloud runtime and the customer's carrier. |
+| Leamout Cloud + Managed Carrier | Leamout-operated | Remains within Leamout-operated SIP and media infrastructure. |
+
+The ordinary local inbound resolver is used by every runtime. The hosted
+managed edge invokes the separate managed-inbound delivery resolver only when
+forwarding a call to a self-hosted runtime. Cloud-managed inbound must not be
+routed through a self-hosted deployment attachment merely because its carrier
+connection is platform-scoped.
+
 ## Model invariants
 
 ### Hosting mode

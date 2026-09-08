@@ -59,3 +59,7 @@ docker-compose.override.yml
 *.db
 *.sqlite
 *.sqlite3
+
+# Python generated artifacts
+__pycache__/
+*.py[cod]

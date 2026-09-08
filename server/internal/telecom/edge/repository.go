@@ -47,9 +47,14 @@ LIMIT 1`, req.Username, req.Realm, req.From).Scan(
 
 func (r *Repository) DailyWholesaleSpend(ctx context.Context, organizationID uuid.UUID, day time.Time) (int64, error) {
 	var spent int64
-	err := r.db.QueryRow(ctx, `
+	err := r.db.QueryRow(
+		ctx,
+		`
 SELECT COALESCE(sum(amount_micros), 0)::BIGINT
 FROM wholesale_charges
-WHERE organization_id = $1 AND occurred_at >= $2 AND occurred_at < $2 + interval '1 day'`, organizationID, day).Scan(&spent)
+WHERE organization_id = $1 AND occurred_at >= $2 AND occurred_at < $2 + interval '1 day'`,
+		organizationID,
+		day,
+	).Scan(&spent)
 	return spent, err
 }

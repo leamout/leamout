@@ -63,8 +63,13 @@ jobs:
           WEBRTC_V1_CERT_DIR: /tmp/webrtc-certs
           WEBRTC_V1_TURN_MIN_PORT: "62000"
           WEBRTC_V1_TURN_MAX_PORT: "62007"
+          SELF_HOSTED_MANAGED_CERT_DIR: /tmp/self-hosted-managed-certs
+          CLOUD_MANAGED_CERT_DIR: /tmp/cloud-managed-certs
+          CLOUD_MANAGED_SUITE_DIR: ${{ github.workspace }}/tests/acceptance/cloud-managed
         run: |
           docker compose -f deploy/compose.yaml -f tests/acceptance/byoc-v1/compose.yaml config --quiet
           docker compose -f deploy/compose.yaml -f tests/acceptance/voice-v1/compose.yaml config --quiet
           docker compose -f deploy/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml config --quiet
           docker compose -f deploy/compose.yaml -f tests/acceptance/webrtc-v1/compose.yaml config --quiet
+          docker compose -f deploy/compose.yaml -f tests/acceptance/self-hosted-managed/compose.yaml config --quiet
+          docker compose -f deploy/compose.yaml -f tests/acceptance/cloud-managed/compose.yaml config --quiet

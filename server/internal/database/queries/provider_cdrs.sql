@@ -84,3 +84,9 @@ FROM wholesale_charges
 WHERE organization_id = sqlc.arg(organization_id)
   AND occurred_at >= sqlc.arg(day)::TIMESTAMPTZ
   AND occurred_at < sqlc.arg(day)::TIMESTAMPTZ + interval '1 day';
+
+-- name: GetWholesaleChargeByProviderCDR :one
+SELECT *
+FROM wholesale_charges
+WHERE provider_cdr_id = sqlc.arg(provider_cdr_id)
+LIMIT 1;

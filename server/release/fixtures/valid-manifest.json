@@ -17,7 +17,7 @@
     }
   ],
   "database": {
-    "migration": "042_create_managed_number_operations.sql"
+    "migration": "043_create_runtime_attachments.sql"
   },
   "cli_artifacts": [
     {

@@ -19,6 +19,7 @@ x-leamout-environment: &leamout-environment
   TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
   MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?MANAGED_SIP_ADMISSION_SECRET is required}
+  MANAGED_INBOUND_EDGE_ENABLED: ${MANAGED_INBOUND_EDGE_ENABLED:-false}
 
 services:
   postgres:
@@ -100,7 +101,7 @@ services:
       nats:
         condition: service_healthy
       freeswitch:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
       interval: 5s
@@ -172,6 +173,7 @@ services:
     environment:
       OPENSIPS_DATABASE_PASSWORD: leamout
       MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?MANAGED_SIP_ADMISSION_SECRET is required}
+      MANAGED_INBOUND_EDGE_ENABLED: ${MANAGED_INBOUND_EDGE_ENABLED:-false}
     ports:
       - "5060:5060/udp"
       - "5060:5060/tcp"
@@ -231,6 +233,11 @@ services:
       - "5060/udp"
       - "5060/tcp"
       - "8021/tcp"
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -H 127.0.0.1 -P 8021 -p \"$$FREESWITCH_ESL_PASSWORD\" -x status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
     networks:
       private-control:
         ipv4_address: 172.32.0.20

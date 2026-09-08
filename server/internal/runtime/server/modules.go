@@ -19,10 +19,12 @@ import (
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
+	"github.com/leamout/leamout/internal/telecom/routing"
 	"github.com/leamout/leamout/internal/telecom/sip_domains"
 	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
+	"github.com/leamout/leamout/internal/telecom/wholesale"
 	"github.com/leamout/leamout/internal/tenancy/credentials"
 	"github.com/leamout/leamout/internal/tenancy/members"
 	"github.com/leamout/leamout/internal/tenancy/organization"
@@ -53,8 +55,15 @@ type Modules struct {
 	Carriers             CarriersModule
 	Realtime             RealtimeModule
 	Edge                 EdgeModule
+	Routing              *routing.Service
+	Wholesale            WholesaleModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
+}
+type WholesaleModule struct {
+	Repository *wholesale.Repository
+	Service    *wholesale.Service
+	Handler    *wholesale.Handler
 }
 type EdgeModule struct {
 	Repository *edge.Repository

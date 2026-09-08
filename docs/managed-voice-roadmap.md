@@ -219,8 +219,18 @@ Managed inbound private-alpha foundations now include:
 - [x] Persist managed-number release intent and disable inbound routing before
       relinquishing the upstream DID.
 - [x] Detect inactive provider resources and repair Voice IN routing drift.
+- [x] Prove the customer managed-number search and purchase workflow against a
+      deterministic provider in the Cloud + Managed acceptance topology.
 - [x] Keep managed inbound tenant resolution on the called DID rather than the
       shared platform carrier connection.
+- [x] Require one healthy, verified runtime attachment before managed inbound
+      delivery to a self-hosted runtime; cloud-managed delivery remains local.
+- [x] Prove synthetic managed ingress traverses the hosted edge, a verified
+      attachment, self-hosted OpenSIPS, and the local FreeSWITCH runtime.
+- [x] Prove a managed DID reaches the Cloud FreeSWITCH runtime and that the
+      same DID can originate a trunkless call through the managed default route.
+- [x] Assert cross-provider managed caller ID and idempotent CDR-to-call
+      wholesale-charge reconciliation in the Cloud + Managed acceptance gate.
 - [ ] Schedule provider-operation reconciliation and expose operator diagnostics.
 - [ ] Prove purchase, routing, inbound calling, drift repair, and release against
       a production DIDWW account.
@@ -241,6 +251,12 @@ Managed inbound private-alpha foundations now include:
 5. ingest wholesale rates only after the upstream-cost model exists.
 
 ## Phase 5 — coexistence gate
+
+The synthetic Cloud + Managed gate now covers managed purchase, local cloud
+inbound, trunkless outbound, cross-provider caller identity, immutable wholesale
+cost, fail-closed route behavior, and cross-tenant resource isolation. The
+production DIDWW/CommPeak gate remains separate and must not reuse synthetic
+provider results as evidence of live carrier readiness.
 
 Before multi-carrier routing, acceptance coverage must prove all of these simultaneously:
 

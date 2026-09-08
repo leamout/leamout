@@ -135,6 +135,29 @@ func (q *Queries) GetProviderCDRForUpdate(ctx context.Context, arg GetProviderCD
 	return i, err
 }
 
+const getWholesaleChargeByProviderCDR = `-- name: GetWholesaleChargeByProviderCDR :one
+SELECT id, provider_cdr_id, organization_id, call_id, amount_micros, currency, occurred_at, created_at
+FROM wholesale_charges
+WHERE provider_cdr_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetWholesaleChargeByProviderCDR(ctx context.Context, providerCdrID uuid.UUID) (WholesaleCharge, error) {
+	row := q.db.QueryRow(ctx, getWholesaleChargeByProviderCDR, providerCdrID)
+	var i WholesaleCharge
+	err := row.Scan(
+		&i.ID,
+		&i.ProviderCdrID,
+		&i.OrganizationID,
+		&i.CallID,
+		&i.AmountMicros,
+		&i.Currency,
+		&i.OccurredAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const insertProviderCDR = `-- name: InsertProviderCDR :one
 INSERT INTO provider_cdrs (
     carrier_provider_id,

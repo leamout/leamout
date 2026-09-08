@@ -511,6 +511,20 @@ type Recording struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type RuntimeAttachment struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	DeploymentID       uuid.UUID          `db:"deployment_id" json:"deployment_id"`
+	IngressHost        string             `db:"ingress_host" json:"ingress_host"`
+	IngressPort        int32              `db:"ingress_port" json:"ingress_port"`
+	Transport          string             `db:"transport" json:"transport"`
+	VerificationStatus string             `db:"verification_status" json:"verification_status"`
+	HealthStatus       string             `db:"health_status" json:"health_status"`
+	VerifiedAt         pgtype.Timestamptz `db:"verified_at" json:"verified_at"`
+	LastCheckedAt      pgtype.Timestamptz `db:"last_checked_at" json:"last_checked_at"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Session struct {
 	ID         uuid.UUID          `db:"id" json:"id"`
 	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
