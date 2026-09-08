@@ -27,13 +27,6 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
-	connectionID, err := r.ResolveCDRRoute(ctx, cdr.Provider, cdr.Direction)
-	if err != nil {
-		return Result{}, err
-	}
-	if connectionID != cdr.CarrierConnectionID {
-		return Result{}, ErrCDRRouteNotFound
-	}
 	raw, err := json.Marshal(cdr.Raw)
 	if err != nil {
 		return Result{}, err
@@ -49,16 +42,15 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 
 	inserted := true
 	record, err := queries.InsertProviderCDR(ctx, sqlc.InsertProviderCDRParams{
-		Provider:            cdr.Provider,
-		CarrierConnectionID: cdr.CarrierConnectionID,
-		ProviderRecordID:    cdr.ProviderRecordID,
-		Direction:           cdr.Direction,
-		SipCallID:           &sipCallID,
-		StartedAt:           startedAt,
-		DurationSeconds:     cdr.DurationSeconds,
-		Currency:            cdr.Currency,
-		CostMicros:          cdr.CostMicros,
-		Raw:                 raw,
+		Provider:         cdr.Provider,
+		ProviderRecordID: cdr.ProviderRecordID,
+		Direction:        cdr.Direction,
+		SipCallID:        &sipCallID,
+		StartedAt:        startedAt,
+		DurationSeconds:  cdr.DurationSeconds,
+		Currency:         cdr.Currency,
+		CostMicros:       cdr.CostMicros,
+		Raw:              raw,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		inserted = false
@@ -87,10 +79,7 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 		return result(record.ID, *record.CallID, *record.OrganizationID, charge, true), nil
 	}
 
-	call, err := queries.FindManagedCallForProviderCDR(ctx, sqlc.FindManagedCallForProviderCDRParams{
-		SipCallID:           &sipCallID,
-		CarrierConnectionID: &cdr.CarrierConnectionID,
-	})
+	call, err := queries.FindManagedCallForProviderCDR(ctx, &sipCallID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if commitErr := tx.Commit(ctx); commitErr != nil {
 			return Result{}, commitErr
@@ -100,10 +89,14 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	if call.CarrierConnectionID == nil {
+		return Result{}, ErrCallNotFound
+	}
 	if _, err := queries.MarkProviderCDRReconciled(ctx, sqlc.MarkProviderCDRReconciledParams{
-		CallID:         &call.ID,
-		OrganizationID: &call.OrganizationID,
-		ID:             record.ID,
+		CarrierConnectionID: call.CarrierConnectionID,
+		CallID:              &call.ID,
+		OrganizationID:      &call.OrganizationID,
+		ID:                  record.ID,
 	}); err != nil {
 		return Result{}, err
 	}
@@ -204,17 +197,6 @@ func (r *Repository) ClaimCDRPages(ctx context.Context, limit int32) ([]CDRPageW
 	return pages, nil
 }
 
-func (r *Repository) ResolveCDRRoute(ctx context.Context, provider, direction string) (uuid.UUID, error) {
-	connectionID, err := r.queries.GetProviderCDRRoute(ctx, sqlc.GetProviderCDRRouteParams{
-		Provider:  provider,
-		Direction: direction,
-	})
-	if errors.Is(err, pgx.ErrNoRows) {
-		return uuid.Nil, ErrCDRRouteNotFound
-	}
-	return connectionID, err
-}
-
 func (r *Repository) MarkCDRPageProcessed(ctx context.Context, id uuid.UUID) error {
 	_, err := r.queries.MarkProviderCDRPageProcessed(ctx, id)
 	return err
@@ -235,11 +217,11 @@ func sameCDR(record sqlc.ProviderCdr, cdr CDR) bool {
 	if err := json.Unmarshal(record.Raw, &raw); err != nil {
 		return false
 	}
-	return record.Provider == cdr.Provider && record.CarrierConnectionID == cdr.CarrierConnectionID &&
-		record.ProviderRecordID == cdr.ProviderRecordID && record.Direction == cdr.Direction &&
-		record.SipCallID != nil && *record.SipCallID == cdr.SIPCallID && record.StartedAt.Valid &&
-		record.StartedAt.Time.Equal(cdr.StartedAt) && record.DurationSeconds == cdr.DurationSeconds &&
-		record.Currency == cdr.Currency && record.CostMicros == cdr.CostMicros && reflect.DeepEqual(raw, cdr.Raw)
+	return record.Provider == cdr.Provider && record.ProviderRecordID == cdr.ProviderRecordID &&
+		record.Direction == cdr.Direction && record.SipCallID != nil && *record.SipCallID == cdr.SIPCallID &&
+		record.StartedAt.Valid && record.StartedAt.Time.Equal(cdr.StartedAt) &&
+		record.DurationSeconds == cdr.DurationSeconds && record.Currency == cdr.Currency &&
+		record.CostMicros == cdr.CostMicros && reflect.DeepEqual(raw, cdr.Raw)
 }
 
 func truncateError(err error) string {
