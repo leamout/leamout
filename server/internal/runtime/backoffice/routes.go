@@ -11,9 +11,11 @@ import (
 
 func registerRoutes(router chi.Router) {
 	router.Get("/healthz", health)
+	public := http.FileServer(http.Dir("internal/backoffice/assets/public"))
 	router.Get("/", component(components.Dashboard()))
 	router.Get("/fragments/runtime-status", component(components.RuntimeStatus()))
-	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("internal/backoffice/static"))))
+	router.Handle("/favicon.ico", public)
+	router.Handle("/static/*", public)
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {
