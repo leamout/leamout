@@ -62,7 +62,7 @@ EXECUTE FUNCTION set_updated_at();
 
 ALTER TABLE provider_cdr_pages
     ADD COLUMN process_attempts INTEGER NOT NULL DEFAULT 0,
-    ADD COLUMN next_process_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    ADD COLUMN next_process_at TIMESTAMPTZ DEFAULT now(),
     ADD COLUMN last_process_error TEXT,
     ADD COLUMN processed_at TIMESTAMPTZ,
     ADD CONSTRAINT chk_provider_cdr_pages_process_attempts CHECK (process_attempts >= 0),
