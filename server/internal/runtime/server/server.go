@@ -26,6 +26,7 @@ import (
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
+	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/security/encryption"
@@ -140,6 +141,10 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		modules.Wholesale.Service,
 		cfg.ManagedSIP.AdmissionSecret,
 	)
+	modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(
+		modules.ProviderDiagnostics.Service,
+		cfg.OperatorAPISecret,
+	)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -235,6 +240,8 @@ func NewModules(
 	edgeService := edge.NewService(edgeRepository, commercialStateService)
 	wholesaleRepository := wholesale.NewRepository(db)
 	wholesaleService := wholesale.NewService(wholesaleRepository)
+	providerDiagnosticsRepository := providerdiagnostics.NewRepository(queries)
+	providerDiagnosticsService := providerdiagnostics.NewService(providerDiagnosticsRepository)
 	webhooksRepository := webhooks.NewRepository(queries)
 	webhooksService := webhooks.NewService(webhooksRepository)
 	auditRepository := audit.NewRepository(db)
@@ -368,6 +375,10 @@ func NewModules(
 		Wholesale: WholesaleModule{
 			Repository: wholesaleRepository,
 			Service:    wholesaleService,
+		},
+		ProviderDiagnostics: ProviderDiagnosticsModule{
+			Repository: providerDiagnosticsRepository,
+			Service:    providerDiagnosticsService,
 		},
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
