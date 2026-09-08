@@ -23,17 +23,11 @@ type managedSIPStateResolver interface {
 	Resolve(context.Context, uuid.UUID) (commercialstate.OrganizationState, error)
 }
 
-type managedSIPClientCipher interface {
-	Encrypt(string) (string, error)
-}
-
 type Service struct {
-	repo                   *Repository
-	db                     *pgxpool.Pool
-	outbox                 *outbox.Repository
-	managedSIP             ManagedSIPConfig
-	commercialState        managedSIPStateResolver
-	managedSIPClientCipher managedSIPClientCipher
+	repo            *Repository
+	db              *pgxpool.Pool
+	outbox          *outbox.Repository
+	commercialState managedSIPStateResolver
 }
 
 func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
@@ -45,21 +39,12 @@ func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
 	return service
 }
 
-func (s *Service) SetManagedSIP(config ManagedSIPConfig, state managedSIPStateResolver) error {
-	normalized, err := normalizeManagedSIPConfig(config)
-	if err != nil {
-		return err
-	}
-	if normalized.Enabled && state == nil {
+func (s *Service) SetManagedSIPAuthority(state managedSIPStateResolver) error {
+	if state == nil {
 		return errors.New("managed SIP commercial state resolver is required")
 	}
-	s.managedSIP = normalized
 	s.commercialState = state
 	return nil
-}
-
-func (s *Service) SetManagedSIPClientCipher(cipher managedSIPClientCipher) {
-	s.managedSIPClientCipher = cipher
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (CreateResult, error) {
@@ -98,31 +83,6 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		if req.CarrierConnectionID != nil {
 			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is not accepted for managed trunks")
 		}
-
-		if req.SIP != nil {
-			if s.managedSIP.Enabled {
-				return CreateResult{}, apperror.NewConflict("managed SIP installation bundles are only accepted by client runtimes")
-			}
-			if s.managedSIPClientCipher == nil {
-				return CreateResult{}, apperror.NewServiceUnavailable("managed SIP client credential encryption is unavailable", nil)
-			}
-			installation, err := normalizeManagedSIPInstallation(*req.SIP, s.managedSIP)
-			if err != nil {
-				return CreateResult{}, err
-			}
-			ciphertext, err := s.managedSIPClientCipher.Encrypt(installation.Password)
-			if err != nil {
-				return CreateResult{}, apperror.NewInternal("encrypt managed SIP client credential", err)
-			}
-			item, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
-				return repo.InstallManaged(ctx, organizationID, name, req.Direction, req.Status, installation, ciphertext)
-			})
-			if err != nil {
-				return CreateResult{}, writeError(err, "managed trunk installation", "Leamout Carrier provider is unavailable")
-			}
-			return CreateResult{Trunk: item}, nil
-		}
-
 		if err := s.authorizeManagedSIP(ctx, organizationID); err != nil {
 			return CreateResult{}, err
 		}
@@ -146,9 +106,6 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		return CreateResult{Trunk: item, Credential: &credential}, nil
 
 	case ProvisioningModeBYOC:
-		if req.SIP != nil {
-			return CreateResult{}, apperror.NewBadRequest("sip installation credentials are only valid for managed trunks")
-		}
 		if req.CarrierConnectionID == nil {
 			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is required for BYOC trunks")
 		}
@@ -423,11 +380,8 @@ func (s *Service) requireBYOCTrunk(ctx context.Context, organizationID, trunkID 
 }
 
 func (s *Service) authorizeManagedSIP(ctx context.Context, organizationID uuid.UUID) error {
-	if !s.managedSIP.Enabled {
-		return apperror.NewServiceUnavailable("managed SIP trunk provisioning is not available on this control plane", nil)
-	}
 	if s.commercialState == nil {
-		return apperror.NewServiceUnavailable("managed SIP commercial state is unavailable", nil)
+		return apperror.NewServiceUnavailable("managed SIP trunk provisioning is not available on this control plane", nil)
 	}
 	state, err := s.commercialState.Resolve(ctx, organizationID)
 	if err != nil {
@@ -454,8 +408,8 @@ func (s *Service) newManagedSIPCredential() (SIPCredential, string, error) {
 	username := "lm_sip_" + base64.RawURLEncoding.EncodeToString(usernameEntropy)
 	password := "lm_sip_" + base64.RawURLEncoding.EncodeToString(passwordEntropy)
 	credential := SIPCredential{
-		Host: s.managedSIP.Host, Port: s.managedSIP.Port, Transport: s.managedSIP.Transport,
-		Realm: s.managedSIP.Realm, Username: username, Password: password,
+		Host: ManagedSIPHost, Port: ManagedSIPPort, Transport: ManagedSIPTransport,
+		Realm: ManagedSIPRealm, Username: username, Password: password,
 	}
 	return credential, hasher.ComputeHA1MD5(username, credential.Realm, password), nil
 }

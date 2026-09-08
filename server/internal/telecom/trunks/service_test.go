@@ -48,14 +48,12 @@ func TestCreateManagedTrunkRejectsCarrierConnection(t *testing.T) {
 func TestManagedSIPAuthorityRequiresCommercialEntitlement(t *testing.T) {
 	organizationID := uuid.New()
 	service := NewService(nil)
-	if err := service.SetManagedSIP(ManagedSIPConfig{
-		Enabled: true, Host: "sip.leamout.com", Port: 5061, Transport: "tls", Realm: "sip.leamout.com",
-	}, fakeManagedSIPState{state: commercialstate.OrganizationState{
+	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialstate.OrganizationState{
 		OrganizationID: organizationID,
 		Standing:       commercialstate.StandingActive,
 		Features:       map[string]bool{},
 	}}); err != nil {
-		t.Fatalf("configure managed SIP: %v", err)
+		t.Fatalf("configure managed SIP authority: %v", err)
 	}
 	if err := service.authorizeManagedSIP(context.Background(), organizationID); err == nil {
 		t.Fatal("managed SIP authority accepted an organization without voice.managed.enabled")
@@ -65,14 +63,12 @@ func TestManagedSIPAuthorityRequiresCommercialEntitlement(t *testing.T) {
 func TestManagedSIPCredentialIsOneWayDigestMaterial(t *testing.T) {
 	organizationID := uuid.New()
 	service := NewService(nil)
-	if err := service.SetManagedSIP(ManagedSIPConfig{
-		Enabled: true, Host: "SIP.LEAMOUT.COM", Port: 5061, Transport: "TLS", Realm: "sip.leamout.com",
-	}, fakeManagedSIPState{state: commercialstate.OrganizationState{
+	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialstate.OrganizationState{
 		OrganizationID: organizationID,
 		Standing:       commercialstate.StandingActive,
 		Features:       map[string]bool{ManagedVoiceEntitlement: true},
 	}}); err != nil {
-		t.Fatalf("configure managed SIP: %v", err)
+		t.Fatalf("configure managed SIP authority: %v", err)
 	}
 	if err := service.authorizeManagedSIP(context.Background(), organizationID); err != nil {
 		t.Fatalf("authorize managed SIP: %v", err)
@@ -82,7 +78,7 @@ func TestManagedSIPCredentialIsOneWayDigestMaterial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate managed SIP credential: %v", err)
 	}
-	if credential.Host != "sip.leamout.com" || credential.Transport != "tls" || credential.Port != 5061 {
+	if credential.Host != ManagedSIPHost || credential.Transport != ManagedSIPTransport || credential.Port != ManagedSIPPort || credential.Realm != ManagedSIPRealm {
 		t.Fatalf("unexpected managed SIP endpoint: %+v", credential)
 	}
 	if !strings.HasPrefix(credential.Username, "lm_sip_") || !strings.HasPrefix(credential.Password, "lm_sip_") {
