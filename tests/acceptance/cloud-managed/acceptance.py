@@ -200,27 +200,27 @@ def main():
     print("PASS trunkless Cloud call selected the managed default wholesale route")
 
     provider_state = sql(
-        "SELECT pn.provider_id::text || ',' || pnp.slug || ',' || cc.provider_id::text || ',' || ccp.slug "
+        "SELECT pnp.slug || ',' || ccp.slug || ',' || pcr.provider "
         "FROM phone_numbers pn "
         "JOIN carrier_providers pnp ON pnp.id=pn.provider_id "
         "JOIN calls c ON c.id='" + outbound["id"] + "'::uuid "
         "JOIN carrier_connections cc ON cc.id=c.carrier_connection_id "
         "JOIN carrier_providers ccp ON ccp.id=cc.provider_id "
+        "JOIN provider_cdr_routes pcr ON pcr.carrier_connection_id=cc.id AND pcr.direction='termination' "
         "WHERE pn.id='" + active["id"] + "'::uuid"
     ).split(",")
-    didww_provider_id, didww_slug, commpeak_provider_id, commpeak_slug = provider_state
-    if [didww_slug, commpeak_slug] != ["didww", "commpeak"]:
-        raise Failure(f"caller-ID and termination providers were not independent: {provider_state}")
+    if provider_state != ["didww", "generic-sip", "commpeak"]:
+        raise Failure(f"API provider identity was coupled to SIP provider identity: {provider_state}")
     # calls.sip_call_id is the FreeSWITCH channel UUID used by the control
     # APIs. Correlate the wholesale SIP dialog through that live channel's
     # actual wire Call-ID instead of incorrectly equating the two identifiers.
     wire_call_id = fs_cli(f"uuid_getvar {outbound['sip_call_id']} sip_call_id")
     if wholesale["last_call_id"] != wire_call_id:
         raise Failure("wholesale SIP Call-ID does not match the persisted managed call")
-    print("PASS DIDWW managed caller-ID was authorized on the CommPeak managed route")
+    print("PASS DIDWW caller-ID, generic SIP termination, and CommPeak CDR identity are independent")
 
     cdr = {
-        "carrier_provider_id": commpeak_provider_id,
+        "provider": "commpeak",
         "carrier_connection_id": outbound["carrier_connection_id"],
         "provider_record_id": "cloud-managed-cdr-1",
         "direction": "termination",
@@ -240,7 +240,7 @@ def main():
     if replayed["wholesale_charge_id"] != reconciled["wholesale_charge_id"] or not replayed["replayed"]:
         raise Failure(f"provider CDR replay was not idempotent: {replayed}")
     counts = sql(
-        "SELECT (SELECT count(*) FROM provider_cdrs WHERE provider_record_id='cloud-managed-cdr-1')::text || ',' || "
+        "SELECT (SELECT count(*) FROM provider_cdrs WHERE provider='commpeak' AND provider_record_id='cloud-managed-cdr-1')::text || ',' || "
         "(SELECT count(*) FROM wholesale_charges WHERE call_id='" + outbound["id"] + "'::uuid)::text"
     )
     if counts != "1,1":
@@ -298,8 +298,7 @@ def main():
 
     mismatched = dict(cdr)
     mismatched["provider_record_id"] = "cloud-managed-cdr-wrong-route"
-    mismatched["carrier_provider_id"] = didww_provider_id
-    mismatched["carrier_connection_id"] = "00000000-0000-0000-0000-000000006010"
+    mismatched["provider"] = "didww"
     internal_post("/internal/v1/provider-cdrs/reconcile", mismatched, expected=404)
     conflict = dict(cdr)
     conflict["cost_micros"] = 999999
