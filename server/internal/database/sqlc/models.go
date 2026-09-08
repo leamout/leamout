@@ -472,6 +472,31 @@ type ProviderCdr struct {
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type ProviderCdrPage struct {
+	ID            uuid.UUID          `db:"id" json:"id"`
+	Provider      string             `db:"provider" json:"provider"`
+	Direction     string             `db:"direction" json:"direction"`
+	WindowDate    pgtype.Date        `db:"window_date" json:"window_date"`
+	Page          int32              `db:"page" json:"page"`
+	RecordCount   int32              `db:"record_count" json:"record_count"`
+	PayloadSha256 string             `db:"payload_sha256" json:"payload_sha256"`
+	Raw           []byte             `db:"raw" json:"raw"`
+	ReceivedAt    pgtype.Timestamptz `db:"received_at" json:"received_at"`
+}
+
+type ProviderCdrPollCursor struct {
+	Provider      string             `db:"provider" json:"provider"`
+	Direction     string             `db:"direction" json:"direction"`
+	WindowDate    pgtype.Date        `db:"window_date" json:"window_date"`
+	Page          int32              `db:"page" json:"page"`
+	AttemptCount  int32              `db:"attempt_count" json:"attempt_count"`
+	NextAttemptAt pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	LastError     *string            `db:"last_error" json:"last_error"`
+	LastSuccessAt pgtype.Timestamptz `db:"last_success_at" json:"last_success_at"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 // Internal durable journal for managed-number provider side effects. Customer lifecycle state remains on phone_numbers.
 type ProviderOperation struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
