@@ -6,13 +6,13 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
-	backofficeui "github.com/leamout/leamout/internal/backoffice"
+	"github.com/leamout/leamout/internal/backoffice/components"
 )
 
 func registerRoutes(router chi.Router) {
 	router.Get("/healthz", health)
-	router.Get("/", component(backofficeui.Dashboard()))
-	router.Get("/fragments/runtime-status", component(backofficeui.RuntimeStatus()))
+	router.Get("/", component(components.Dashboard()))
+	router.Get("/fragments/runtime-status", component(components.RuntimeStatus()))
 	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("internal/backoffice/static"))))
 }
 
