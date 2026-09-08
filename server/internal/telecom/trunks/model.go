@@ -11,13 +11,13 @@ import (
 type ProvisioningMode string
 
 const (
-	ProvisioningModeBYOC       ProvisioningMode = "byoc"
-	ProvisioningModeManaged    ProvisioningMode = "managed"
-	ManagedVoiceEntitlement                     = "voice.managed.enabled"
-	ManagedSIPHost                              = "sip.leamout.com"
-	ManagedSIPPort                      int32     = 5061
-	ManagedSIPTransport                          = "tls"
-	ManagedSIPRealm                              = "sip.leamout.com"
+	ProvisioningModeBYOC    ProvisioningMode = "byoc"
+	ProvisioningModeManaged ProvisioningMode = "managed"
+	ManagedVoiceEntitlement                  = "voice.managed.enabled"
+	ManagedSIPHost                           = "sip.leamout.com"
+	ManagedSIPPort          int32            = 5061
+	ManagedSIPTransport                      = "tls"
+	ManagedSIPRealm                          = "sip.leamout.com"
 )
 
 type CreateRequest struct {
