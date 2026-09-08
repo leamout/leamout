@@ -20,14 +20,20 @@ def headers(message):
     return result
 
 
-def response(status, reason, request_headers):
+def response(status, reason, request_headers, body="", contact=False):
+    content_headers = ""
+    if body:
+        content_headers = "Content-Type: application/sdp\r\n"
+    if contact:
+        content_headers += f"Contact: <sip:wholesale@{SIGNALING_IP}:5060>\r\n"
     return (
         f"SIP/2.0 {status} {reason}\r\n"
         f"Via: {request_headers.get('via', '')}\r\n"
         f"From: {request_headers.get('from', '')}\r\n"
         f"To: {request_headers.get('to', '')};tag=cloud-wholesale\r\n"
         f"Call-ID: {request_headers.get('call-id', '')}\r\n"
-        f"CSeq: {request_headers.get('cseq', '')}\r\nContent-Length: 0\r\n\r\n"
+        f"CSeq: {request_headers.get('cseq', '')}\r\n"
+        f"{content_headers}Content-Length: {len(body.encode())}\r\n\r\n{body}"
     ).encode()
 
 
@@ -48,7 +54,19 @@ def sip_server():
             state["last_destination"] = message.split()[1]
             state["last_call_id"] = request_headers.get("call-id", "")
             state["internal_route_header_seen"] |= "\nX-Leamout-Route-URI:" in "\n" + message
-            sock.sendto(response(200, "OK", request_headers), peer)
+            answer = (
+                "v=0\r\n"
+                f"o=- 2 2 IN IP4 {SIGNALING_IP}\r\n"
+                "s=cloud-managed-wholesale\r\n"
+                f"c=IN IP4 {SIGNALING_IP}\r\n"
+                "t=0 0\r\n"
+                "m=audio 40000 RTP/AVP 0 101\r\n"
+                "a=rtpmap:0 PCMU/8000\r\n"
+                "a=rtpmap:101 telephone-event/8000\r\n"
+                "a=fmtp:101 0-16\r\n"
+                "a=sendrecv\r\n"
+            )
+            sock.sendto(response(200, "OK", request_headers, answer, contact=True), peer)
 
 
 def originate_inbound():
