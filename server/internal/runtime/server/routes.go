@@ -87,7 +87,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		members.RegisterRoutes(r, modules.Members.Handler, sessionOrganizationAccess("members"))
 		credentials.RegisterRoutes(r, modules.Credentials.Handler, sessionOrganizationAccess("credentials"))
 		voice.RegisterRoutes(r, modules.Voice.Handler, organizationAccess("voice-applications"))
-		calls.RegisterRoutes(r, modules.Calls.Handler, organizationAccess("calls"))
+		calls.RegisterRoutes(r, modules.Calls.Handler, organizationAccess("calls"), modules.RateLimit.CallCreate)
 		recordings.RegisterRoutes(r, modules.Recordings.Handler, organizationAccess("recordings"))
 		subscribers.RegisterRoutes(r, modules.Subscribers.Handler, organizationAccess("subscribers"))
 		numbers.RegisterRoutes(
