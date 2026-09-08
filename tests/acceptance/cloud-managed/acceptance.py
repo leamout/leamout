@@ -88,6 +88,17 @@ def sql(statement):
     return result.stdout.strip()
 
 
+def fs_cli(command):
+    result = subprocess.run(
+        COMPOSE + ["exec", "-T", "freeswitch", "fs_cli", "-H", "127.0.0.1",
+                   "-P", "8021", "-p", ESL_PASSWORD, "-x", command],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    )
+    if result.returncode:
+        raise Failure(result.stdout)
+    return result.stdout.strip()
+
+
 def wait_for(description, probe, timeout=35):
     deadline = time.monotonic() + timeout
     last = None
@@ -196,7 +207,11 @@ def main():
     ).split(",")
     if providers != ["26c5448a-2540-4731-848d-9c713c19d8cd", "300e6073-fe60-4d40-ac6d-808d74749a0c"]:
         raise Failure(f"caller-ID and termination providers were not independent: {providers}")
-    if wholesale["last_call_id"] != outbound["sip_call_id"]:
+    # calls.sip_call_id is the FreeSWITCH channel UUID used by the control
+    # APIs. Correlate the wholesale SIP dialog through that live channel's
+    # actual wire Call-ID instead of incorrectly equating the two identifiers.
+    wire_call_id = fs_cli(f"uuid_getvar {outbound['sip_call_id']} sip_call_id")
+    if wholesale["last_call_id"] != wire_call_id:
         raise Failure("wholesale SIP Call-ID does not match the persisted managed call")
     print("PASS DIDWW managed caller-ID was authorized on the CommPeak managed route")
 
