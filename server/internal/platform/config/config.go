@@ -11,16 +11,8 @@ import (
 )
 
 type DIDWWConfig struct {
-	APIKey       string   `env:"API_KEY"`
-	APIBaseURL   string   `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
-	SourceCIDRs  []string `env:"SOURCE_CIDRS" envSeparator:","`
-	SIPEndpoints []string `env:"SIP_ENDPOINTS" envSeparator:","`
-}
-
-type SIPConfig struct {
-	PublicHost      string `env:"PUBLIC_HOST"`
-	PublicPort      int    `env:"PUBLIC_PORT" envDefault:"5060"`
-	PublicTransport string `env:"PUBLIC_TRANSPORT" envDefault:"udp"`
+	APIKey     string `env:"API_KEY"`
+	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
 }
 
 type ManagedSIPConfig struct {
@@ -43,7 +35,6 @@ type Config struct {
 	FreeSWITCHESLPassword string           `env:"FREESWITCH_ESL_PASSWORD,required"`
 	CarrierCredentialKey  string           `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
 	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
-	SIP                   SIPConfig        `envPrefix:"SIP_"`
 	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
 	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
@@ -80,10 +71,6 @@ func (c *Config) normalize() {
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
-	c.DIDWW.SourceCIDRs = normalizeStrings(c.DIDWW.SourceCIDRs)
-	c.DIDWW.SIPEndpoints = normalizeStrings(c.DIDWW.SIPEndpoints)
-	c.SIP.PublicHost = strings.TrimSpace(c.SIP.PublicHost)
-	c.SIP.PublicTransport = strings.ToLower(strings.TrimSpace(c.SIP.PublicTransport))
 	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
 	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
 	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)

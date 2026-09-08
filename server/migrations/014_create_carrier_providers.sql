@@ -31,11 +31,6 @@ BEFORE UPDATE ON carrier_providers
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
 
--- Built-in provider definitions establish stable provider identities for
--- generic SIP connectivity, Leamout Carrier, and provider-specific managed
--- integrations. The `leamout` provider is the client-side identity used when a
--- Leamout-managed SIP trunk is installed on a runtime; it never represents a
--- wholesale carrier behind the Leamout Carrier Edge.
 INSERT INTO carrier_providers (id, slug, name, adapter, status)
 VALUES
     (
@@ -50,20 +45,6 @@ VALUES
         'leamout',
         'Leamout Carrier',
         'sip',
-        'active'
-    ),
-    (
-        '26c5448a-2540-4731-848d-9c713c19d8cd',
-        'didww',
-        'DIDWW',
-        'didww',
-        'active'
-    ),
-    (
-        '300e6073-fe60-4d40-ac6d-808d74749a0c',
-        'commpeak',
-        'CommPeak',
-        'commpeak',
         'active'
     )
 ON CONFLICT (slug) DO NOTHING;

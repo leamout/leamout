@@ -1,3 +1,7 @@
+INSERT INTO carrier_providers (slug, name, adapter, status) VALUES
+('didww', 'DIDWW', 'didww', 'active')
+ON CONFLICT (slug) DO NOTHING;
+
 INSERT INTO organizations (id, name, status) VALUES
 ('00000000-0000-0000-0000-000000005001', 'Self Hosted Managed Acceptance', 'active');
 
@@ -18,7 +22,7 @@ INSERT INTO carrier_connections (
     id, provider_id, scope, name, status, inbound_enabled, inbound_auth_method
 ) VALUES (
     '00000000-0000-0000-0000-000000005020',
-    '26c5448a-2540-4731-848d-9c713c19d8cd',
+    (SELECT id FROM carrier_providers WHERE slug = 'didww'),
     'platform', 'Managed inbound acceptance', 'active', true, 'ip'
 );
 INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
@@ -32,7 +36,7 @@ INSERT INTO phone_numbers (
     '00000000-0000-0000-0000-000000005030',
     '00000000-0000-0000-0000-000000005001', '+15551235001', 'US', 'managed',
     '00000000-0000-0000-0000-000000005020',
-    '26c5448a-2540-4731-848d-9c713c19d8cd', 'acceptance-managed-did', true, 'active'
+    (SELECT id FROM carrier_providers WHERE slug = 'didww'), 'acceptance-managed-did', true, 'active'
 );
 INSERT INTO voice_applications (id, organization_id, name, status) VALUES
 ('00000000-0000-0000-0000-000000005040', '00000000-0000-0000-0000-000000005001', 'Inbound Acceptance', 'active');

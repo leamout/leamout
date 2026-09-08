@@ -199,14 +199,18 @@ def main():
         raise Failure("internal managed route header leaked to wholesale")
     print("PASS trunkless Cloud call selected the managed default wholesale route")
 
-    providers = sql(
-        "SELECT pn.provider_id::text || ',' || cc.provider_id::text "
-        "FROM phone_numbers pn JOIN calls c ON c.id='" + outbound["id"] + "'::uuid "
+    provider_state = sql(
+        "SELECT pn.provider_id::text || ',' || pnp.slug || ',' || cc.provider_id::text || ',' || ccp.slug "
+        "FROM phone_numbers pn "
+        "JOIN carrier_providers pnp ON pnp.id=pn.provider_id "
+        "JOIN calls c ON c.id='" + outbound["id"] + "'::uuid "
         "JOIN carrier_connections cc ON cc.id=c.carrier_connection_id "
+        "JOIN carrier_providers ccp ON ccp.id=cc.provider_id "
         "WHERE pn.id='" + active["id"] + "'::uuid"
     ).split(",")
-    if providers != ["26c5448a-2540-4731-848d-9c713c19d8cd", "300e6073-fe60-4d40-ac6d-808d74749a0c"]:
-        raise Failure(f"caller-ID and termination providers were not independent: {providers}")
+    didww_provider_id, didww_slug, commpeak_provider_id, commpeak_slug = provider_state
+    if [didww_slug, commpeak_slug] != ["didww", "commpeak"]:
+        raise Failure(f"caller-ID and termination providers were not independent: {provider_state}")
     # calls.sip_call_id is the FreeSWITCH channel UUID used by the control
     # APIs. Correlate the wholesale SIP dialog through that live channel's
     # actual wire Call-ID instead of incorrectly equating the two identifiers.
@@ -216,7 +220,7 @@ def main():
     print("PASS DIDWW managed caller-ID was authorized on the CommPeak managed route")
 
     cdr = {
-        "carrier_provider_id": providers[1],
+        "carrier_provider_id": commpeak_provider_id,
         "carrier_connection_id": outbound["carrier_connection_id"],
         "provider_record_id": "cloud-managed-cdr-1",
         "direction": "termination",
@@ -294,7 +298,7 @@ def main():
 
     mismatched = dict(cdr)
     mismatched["provider_record_id"] = "cloud-managed-cdr-wrong-route"
-    mismatched["carrier_provider_id"] = "26c5448a-2540-4731-848d-9c713c19d8cd"
+    mismatched["carrier_provider_id"] = didww_provider_id
     mismatched["carrier_connection_id"] = "00000000-0000-0000-0000-000000006010"
     internal_post("/internal/v1/provider-cdrs/reconcile", mismatched, expected=404)
     conflict = dict(cdr)
