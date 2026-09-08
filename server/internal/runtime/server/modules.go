@@ -11,6 +11,7 @@ import (
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/webhooks"
+	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
@@ -57,9 +58,17 @@ type Modules struct {
 	Edge                 EdgeModule
 	Routing              *routing.Service
 	Wholesale            WholesaleModule
+	ProviderDiagnostics  ProviderDiagnosticsModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
+
+type ProviderDiagnosticsModule struct {
+	Repository *providerdiagnostics.Repository
+	Service    *providerdiagnostics.Service
+	Handler    *providerdiagnostics.Handler
+}
+
 type WholesaleModule struct {
 	Repository *wholesale.Repository
 	Service    *wholesale.Service
