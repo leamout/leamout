@@ -67,7 +67,8 @@ RETURNING *;
 WITH ready AS (
     SELECT id
     FROM provider_cdr_pages
-    WHERE processed_at IS NULL
+    WHERE direction = 'termination'
+      AND processed_at IS NULL
       AND next_process_at IS NOT NULL
       AND next_process_at <= now()
     ORDER BY received_at ASC
