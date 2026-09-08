@@ -16,8 +16,8 @@ type DIDWWConfig struct {
 }
 
 type CommPeakConfig struct {
-	APIAuthorization string `env:"API_AUTHORIZATION"`
-	APIBaseURL       string `env:"API_BASE_URL" envDefault:"https://api.commpeak.com"`
+	Authorization string `env:"API_AUTHORIZATION"`
+	APIBaseURL    string `env:"API_BASE_URL" envDefault:"https://api.commpeak.com"`
 }
 
 type ManagedSIPConfig struct {
@@ -77,7 +77,7 @@ func (c *Config) normalize() {
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
-	c.CommPeak.APIAuthorization = strings.TrimSpace(c.CommPeak.APIAuthorization)
+	c.CommPeak.Authorization = strings.TrimSpace(c.CommPeak.Authorization)
 	c.CommPeak.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.CommPeak.APIBaseURL), "/")
 	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
 	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
