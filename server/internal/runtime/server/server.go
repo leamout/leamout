@@ -235,7 +235,6 @@ func NewModules(
 	carriersService := carriers.NewService(carriersRepository, credentialCipher)
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
-	trunksService.SetManagedSIPClientCipher(credentialCipher)
 	edgeRepository := edge.NewRepository(db)
 	edgeService := edge.NewService(edgeRepository, commercialStateService)
 	wholesaleRepository := wholesale.NewRepository(db)
@@ -316,7 +315,7 @@ func NewModules(
 		Recordings: RecordingsModule{
 			Repository: recordingsRepository,
 			Service:    recordingsService,
-			Handler:    recordings.NewHandler(recordingsService),
+			Handler:    recordings.NewHandler(recordingsService, nil),
 		},
 		Subscribers: SubscribersModule{
 			Repository: subscribersRepository,
@@ -398,11 +397,13 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 }
 
 func configureManagedSIP(cfg config.Config, service *trunks.Service, state *commercialstate.Service) error {
+	if strings.TrimSpace(cfg.ManagedSIP.AdmissionSecret) == "" {
+		return nil
+	}
 	if cfg.ManagedSIP.Port < 1 || cfg.ManagedSIP.Port > 65535 {
 		return fmt.Errorf("managed SIP port must be between 1 and 65535")
 	}
 	return service.SetManagedSIP(trunks.ManagedSIPConfig{
-		Enabled:   cfg.ManagedSIP.Enabled,
 		Host:      cfg.ManagedSIP.Host,
 		Port:      int32(cfg.ManagedSIP.Port),
 		Transport: cfg.ManagedSIP.Transport,
