@@ -134,7 +134,6 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	}
 	modules.Edge.Handler = edge.NewHandler(
 		modules.Edge.Service,
-		modules.Routing,
 		cfg.ManagedSIP.AdmissionSecret,
 	)
 	modules.Wholesale.Handler = wholesale.NewHandler(

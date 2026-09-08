@@ -32,7 +32,6 @@ import (
 func RegisterRoutes(r *chi.Mux, modules Modules) {
 	if modules.Edge.Handler != nil {
 		r.Post("/internal/v1/sip-edge/authorize", modules.Edge.Handler.Admit)
-		r.Post("/internal/v1/sip-edge/resolve-inbound", modules.Edge.Handler.ResolveInbound)
 	}
 	if modules.Wholesale.Handler != nil {
 		r.Post("/internal/v1/provider-cdrs/reconcile", modules.Wholesale.Handler.Reconcile)

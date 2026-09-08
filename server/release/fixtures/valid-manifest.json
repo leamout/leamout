@@ -17,7 +17,7 @@
     }
   ],
   "database": {
-    "migration": "043_create_runtime_attachments.sql"
+    "migration": "042_create_trunk_credentials.sql"
   },
   "cli_artifacts": [
     {
