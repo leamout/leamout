@@ -1,3 +1,8 @@
+INSERT INTO carrier_providers (slug, name, adapter, status) VALUES
+('didww', 'DIDWW', 'didww', 'active'),
+('commpeak', 'CommPeak', 'commpeak', 'active')
+ON CONFLICT (slug) DO NOTHING;
+
 INSERT INTO organizations (id, name, status) VALUES
 ('00000000-0000-0000-0000-000000006001', 'Cloud Managed Acceptance', 'active');
 
@@ -25,14 +30,14 @@ INSERT INTO carrier_connections (
     id, provider_id, scope, name, status, inbound_enabled, inbound_auth_method
 ) VALUES (
     '00000000-0000-0000-0000-000000006010',
-    '26c5448a-2540-4731-848d-9c713c19d8cd',
+    (SELECT id FROM carrier_providers WHERE slug = 'didww'),
     'platform', 'Cloud managed DID ingress', 'active', true, 'ip'
 );
 INSERT INTO carrier_connection_provider_resources (
     carrier_connection_id, provider_id, resource_type, provider_resource_id
 ) VALUES (
     '00000000-0000-0000-0000-000000006010',
-    '26c5448a-2540-4731-848d-9c713c19d8cd',
+    (SELECT id FROM carrier_providers WHERE slug = 'didww'),
     'voice_in_trunk', 'voice-in-cloud-1'
 );
 INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
@@ -40,7 +45,7 @@ INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
 
 INSERT INTO carrier_connections (id, provider_id, scope, name, status) VALUES (
     '00000000-0000-0000-0000-000000006020',
-    '300e6073-fe60-4d40-ac6d-808d74749a0c',
+    (SELECT id FROM carrier_providers WHERE slug = 'commpeak'),
     'platform', 'Cloud managed wholesale', 'active'
 );
 INSERT INTO trunks (
