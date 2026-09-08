@@ -101,7 +101,7 @@ services:
       nats:
         condition: service_healthy
       freeswitch:
-        condition: service_started
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
       interval: 5s
@@ -233,6 +233,11 @@ services:
       - "5060/udp"
       - "5060/tcp"
       - "8021/tcp"
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -H 127.0.0.1 -P 8021 -p \"$$FREESWITCH_ESL_PASSWORD\" -x status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
     networks:
       private-control:
         ipv4_address: 172.32.0.20
