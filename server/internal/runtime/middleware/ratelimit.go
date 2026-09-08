@@ -33,21 +33,41 @@ func NewRateLimitMiddleware(store limiter.Store) (*RateLimitMiddleware, error) {
 func (m *RateLimitMiddleware) Handle(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet || r.Method == http.MethodHead {
-			m.handle(next, "read", limiter.Rate{Period: time.Minute, Limit: 1200}, limiter.Rate{Period: time.Minute, Limit: 600}).ServeHTTP(w, r)
+			m.handle(
+				next,
+				"read",
+				limiter.Rate{Period: time.Minute, Limit: 1200},
+				limiter.Rate{Period: time.Minute, Limit: 600},
+			).ServeHTTP(w, r)
 			return
 		}
 
-		m.handle(next, "write", limiter.Rate{Period: time.Minute, Limit: 600}, limiter.Rate{Period: time.Minute, Limit: 300}).ServeHTTP(w, r)
+		m.handle(
+			next,
+			"write",
+			limiter.Rate{Period: time.Minute, Limit: 600},
+			limiter.Rate{Period: time.Minute, Limit: 300},
+		).ServeHTTP(w, r)
 	})
 }
 
 // CallCreate adds a short-window budget to call origination requests. Carrier
 // CPS and concurrent-call admission remain independently enforced downstream.
 func (m *RateLimitMiddleware) CallCreate(next http.Handler) http.Handler {
-	return m.handle(next, "call-create", limiter.Rate{Period: time.Second, Limit: 50}, limiter.Rate{Period: time.Second, Limit: 25})
+	return m.handle(
+		next,
+		"call-create",
+		limiter.Rate{Period: time.Second, Limit: 50},
+		limiter.Rate{Period: time.Second, Limit: 25},
+	)
 }
 
-func (m *RateLimitMiddleware) handle(next http.Handler, class string, organizationRate, credentialRate limiter.Rate) http.Handler {
+func (m *RateLimitMiddleware) handle(
+	next http.Handler,
+	class string,
+	organizationRate limiter.Rate,
+	credentialRate limiter.Rate,
+) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		organizationID, ok := OrganizationIDFromContext(r.Context())
 		if !ok {
