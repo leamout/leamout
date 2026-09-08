@@ -33,7 +33,10 @@ def response(status, reason, request_headers):
 
 def sip_server():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((SIGNALING_IP, 5060))
+    # Receive public carrier OPTIONS and private-control outbound INVITEs.
+    # Binding only SIGNALING_IP leaves the service's Compose DNS address with
+    # no listener and makes correctly routed outbound calls time out.
+    sock.bind(("0.0.0.0", 5060))
     while True:
         data, peer = sock.recvfrom(65535)
         message = data.decode(errors="replace")
