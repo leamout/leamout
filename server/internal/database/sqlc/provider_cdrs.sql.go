@@ -29,6 +29,13 @@ VALUES (
     $5,
     $6
 )
+ON CONFLICT (provider_cdr_id)
+DO UPDATE SET provider_cdr_id = wholesale_charges.provider_cdr_id
+WHERE wholesale_charges.organization_id = EXCLUDED.organization_id
+  AND wholesale_charges.call_id = EXCLUDED.call_id
+  AND wholesale_charges.amount_micros = EXCLUDED.amount_micros
+  AND wholesale_charges.currency = EXCLUDED.currency
+  AND wholesale_charges.occurred_at = EXCLUDED.occurred_at
 RETURNING id, provider_cdr_id, organization_id, call_id, amount_micros, currency, occurred_at, created_at
 `
 
@@ -75,14 +82,12 @@ WHERE c.sip_call_id = $1
   AND c.direction = 'outbound'
   AND c.carrier_connection_id = $2
   AND cc.scope = 'platform'
-  AND cc.provider_id = $3
 LIMIT 1
 `
 
 type FindManagedCallForProviderCDRParams struct {
 	SipCallID           *string    `db:"sip_call_id" json:"sip_call_id"`
 	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
-	CarrierProviderID   uuid.UUID  `db:"carrier_provider_id" json:"carrier_provider_id"`
 }
 
 type FindManagedCallForProviderCDRRow struct {
@@ -91,33 +96,32 @@ type FindManagedCallForProviderCDRRow struct {
 }
 
 func (q *Queries) FindManagedCallForProviderCDR(ctx context.Context, arg FindManagedCallForProviderCDRParams) (FindManagedCallForProviderCDRRow, error) {
-	row := q.db.QueryRow(ctx, findManagedCallForProviderCDR, arg.SipCallID, arg.CarrierConnectionID, arg.CarrierProviderID)
+	row := q.db.QueryRow(ctx, findManagedCallForProviderCDR, arg.SipCallID, arg.CarrierConnectionID)
 	var i FindManagedCallForProviderCDRRow
 	err := row.Scan(&i.ID, &i.OrganizationID)
 	return i, err
 }
 
 const getProviderCDRForUpdate = `-- name: GetProviderCDRForUpdate :one
-SELECT id, carrier_provider_id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
+SELECT id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at, provider
 FROM provider_cdrs
-WHERE carrier_provider_id = $1
+WHERE provider = $1
   AND direction = $2
   AND provider_record_id = $3
 FOR UPDATE
 `
 
 type GetProviderCDRForUpdateParams struct {
-	CarrierProviderID uuid.UUID `db:"carrier_provider_id" json:"carrier_provider_id"`
-	Direction         string    `db:"direction" json:"direction"`
-	ProviderRecordID  string    `db:"provider_record_id" json:"provider_record_id"`
+	Provider         string `db:"provider" json:"provider"`
+	Direction        string `db:"direction" json:"direction"`
+	ProviderRecordID string `db:"provider_record_id" json:"provider_record_id"`
 }
 
 func (q *Queries) GetProviderCDRForUpdate(ctx context.Context, arg GetProviderCDRForUpdateParams) (ProviderCdr, error) {
-	row := q.db.QueryRow(ctx, getProviderCDRForUpdate, arg.CarrierProviderID, arg.Direction, arg.ProviderRecordID)
+	row := q.db.QueryRow(ctx, getProviderCDRForUpdate, arg.Provider, arg.Direction, arg.ProviderRecordID)
 	var i ProviderCdr
 	err := row.Scan(
 		&i.ID,
-		&i.CarrierProviderID,
 		&i.CarrierConnectionID,
 		&i.ProviderRecordID,
 		&i.Direction,
@@ -131,8 +135,30 @@ func (q *Queries) GetProviderCDRForUpdate(ctx context.Context, arg GetProviderCD
 		&i.CostMicros,
 		&i.Raw,
 		&i.CreatedAt,
+		&i.Provider,
 	)
 	return i, err
+}
+
+const getProviderCDRRoute = `-- name: GetProviderCDRRoute :one
+SELECT carrier_connection_id
+FROM provider_cdr_routes
+WHERE provider = $1
+  AND direction = $2
+  AND status = 'active'
+LIMIT 1
+`
+
+type GetProviderCDRRouteParams struct {
+	Provider  string `db:"provider" json:"provider"`
+	Direction string `db:"direction" json:"direction"`
+}
+
+func (q *Queries) GetProviderCDRRoute(ctx context.Context, arg GetProviderCDRRouteParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getProviderCDRRoute, arg.Provider, arg.Direction)
+	var carrier_connection_id uuid.UUID
+	err := row.Scan(&carrier_connection_id)
+	return carrier_connection_id, err
 }
 
 const getWholesaleChargeByProviderCDR = `-- name: GetWholesaleChargeByProviderCDR :one
@@ -160,7 +186,7 @@ func (q *Queries) GetWholesaleChargeByProviderCDR(ctx context.Context, providerC
 
 const insertProviderCDR = `-- name: InsertProviderCDR :one
 INSERT INTO provider_cdrs (
-    carrier_provider_id,
+    provider,
     carrier_connection_id,
     provider_record_id,
     direction,
@@ -183,13 +209,13 @@ VALUES (
     $9,
     $10
 )
-ON CONFLICT (carrier_provider_id, direction, provider_record_id)
+ON CONFLICT (provider, direction, provider_record_id)
 DO NOTHING
-RETURNING id, carrier_provider_id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
+RETURNING id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at, provider
 `
 
 type InsertProviderCDRParams struct {
-	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
+	Provider            string             `db:"provider" json:"provider"`
 	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
 	ProviderRecordID    string             `db:"provider_record_id" json:"provider_record_id"`
 	Direction           string             `db:"direction" json:"direction"`
@@ -203,7 +229,7 @@ type InsertProviderCDRParams struct {
 
 func (q *Queries) InsertProviderCDR(ctx context.Context, arg InsertProviderCDRParams) (ProviderCdr, error) {
 	row := q.db.QueryRow(ctx, insertProviderCDR,
-		arg.CarrierProviderID,
+		arg.Provider,
 		arg.CarrierConnectionID,
 		arg.ProviderRecordID,
 		arg.Direction,
@@ -217,7 +243,6 @@ func (q *Queries) InsertProviderCDR(ctx context.Context, arg InsertProviderCDRPa
 	var i ProviderCdr
 	err := row.Scan(
 		&i.ID,
-		&i.CarrierProviderID,
 		&i.CarrierConnectionID,
 		&i.ProviderRecordID,
 		&i.Direction,
@@ -231,6 +256,7 @@ func (q *Queries) InsertProviderCDR(ctx context.Context, arg InsertProviderCDRPa
 		&i.CostMicros,
 		&i.Raw,
 		&i.CreatedAt,
+		&i.Provider,
 	)
 	return i, err
 }
@@ -243,7 +269,7 @@ SET
     reconciled_at = now()
 WHERE id = $3
   AND reconciled_at IS NULL
-RETURNING id, carrier_provider_id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
+RETURNING id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at, provider
 `
 
 type MarkProviderCDRReconciledParams struct {
@@ -257,7 +283,6 @@ func (q *Queries) MarkProviderCDRReconciled(ctx context.Context, arg MarkProvide
 	var i ProviderCdr
 	err := row.Scan(
 		&i.ID,
-		&i.CarrierProviderID,
 		&i.CarrierConnectionID,
 		&i.ProviderRecordID,
 		&i.Direction,
@@ -271,6 +296,7 @@ func (q *Queries) MarkProviderCDRReconciled(ctx context.Context, arg MarkProvide
 		&i.CostMicros,
 		&i.Raw,
 		&i.CreatedAt,
+		&i.Provider,
 	)
 	return i, err
 }
