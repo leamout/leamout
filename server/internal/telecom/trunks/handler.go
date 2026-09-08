@@ -31,10 +31,8 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	if result.Credential != nil || req.SIP != nil {
-		w.Header().Set("Cache-Control", "no-store")
-	}
 	if result.Credential != nil {
+		w.Header().Set("Cache-Control", "no-store")
 		httputil.Created(w, ManagedCreateResponse{Response: response(result.Trunk), SIP: *result.Credential})
 		return
 	}
