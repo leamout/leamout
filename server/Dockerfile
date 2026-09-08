@@ -49,7 +49,7 @@ RUN apk add --no-cache \
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
 COPY --from=build /out/backoffice /leamout/backoffice
-COPY --from=build /src/internal/backoffice/static /leamout/internal/backoffice/static
+COPY --from=build /src/internal/backoffice/assets/public /leamout/internal/backoffice/assets/public
 
 USER leamout
 
