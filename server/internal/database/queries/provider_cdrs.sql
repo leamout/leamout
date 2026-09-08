@@ -1,15 +1,6 @@
--- name: GetProviderCDRRoute :one
-SELECT carrier_connection_id
-FROM provider_cdr_routes
-WHERE provider = sqlc.arg(provider)
-  AND direction = sqlc.arg(direction)
-  AND status = 'active'
-LIMIT 1;
-
 -- name: InsertProviderCDR :one
 INSERT INTO provider_cdrs (
     provider,
-    carrier_connection_id,
     provider_record_id,
     direction,
     sip_call_id,
@@ -21,7 +12,6 @@ INSERT INTO provider_cdrs (
 )
 VALUES (
     sqlc.arg(provider),
-    sqlc.arg(carrier_connection_id),
     sqlc.arg(provider_record_id),
     sqlc.arg(direction),
     sqlc.arg(sip_call_id),
@@ -46,19 +36,20 @@ FOR UPDATE;
 -- name: FindManagedCallForProviderCDR :one
 SELECT
     c.id,
-    c.organization_id
+    c.organization_id,
+    c.carrier_connection_id
 FROM calls AS c
 JOIN carrier_connections AS cc
   ON cc.id = c.carrier_connection_id
 WHERE c.sip_call_id = sqlc.arg(sip_call_id)
   AND c.direction = 'outbound'
-  AND c.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'platform'
 LIMIT 1;
 
 -- name: MarkProviderCDRReconciled :one
 UPDATE provider_cdrs
 SET
+    carrier_connection_id = sqlc.arg(carrier_connection_id),
     call_id = sqlc.arg(call_id),
     organization_id = sqlc.arg(organization_id),
     reconciled_at = now()
