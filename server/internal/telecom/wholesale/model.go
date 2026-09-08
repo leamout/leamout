@@ -13,20 +13,18 @@ var (
 	ErrCallNotFound = errors.New("managed call not found for provider CDR")
 	ErrCDRConflict  = errors.New("provider CDR identity conflicts with existing record")
 	ErrInvalidCDR   = errors.New("invalid provider CDR")
-	ErrCDRRouteNotFound = errors.New("provider CDR route not found")
 )
 
 type CDR struct {
-	Provider            string         `json:"provider"`
-	CarrierConnectionID uuid.UUID      `json:"carrier_connection_id"`
-	ProviderRecordID    string         `json:"provider_record_id"`
-	Direction           string         `json:"direction"`
-	SIPCallID           string         `json:"sip_call_id"`
-	StartedAt           time.Time      `json:"started_at"`
-	DurationSeconds     int64          `json:"duration_seconds"`
-	Currency            string         `json:"currency"`
-	CostMicros          int64          `json:"cost_micros"`
-	Raw                 map[string]any `json:"raw"`
+	Provider         string         `json:"provider"`
+	ProviderRecordID string         `json:"provider_record_id"`
+	Direction        string         `json:"direction"`
+	SIPCallID        string         `json:"sip_call_id"`
+	StartedAt        time.Time      `json:"started_at"`
+	DurationSeconds  int64          `json:"duration_seconds"`
+	Currency         string         `json:"currency"`
+	CostMicros       int64          `json:"cost_micros"`
+	Raw              map[string]any `json:"raw"`
 }
 
 type NormalizedCDR struct {
@@ -82,7 +80,6 @@ type CDRPollStore interface {
 
 type CDRProcessingStore interface {
 	ClaimCDRPages(context.Context, int32) ([]CDRPageWork, error)
-	ResolveCDRRoute(context.Context, string, string) (uuid.UUID, error)
 	MarkCDRPageProcessed(context.Context, uuid.UUID) error
 	FailCDRPage(context.Context, uuid.UUID, error, time.Time) error
 }
