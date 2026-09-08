@@ -45,10 +45,7 @@ INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
 INSERT INTO carrier_connections (id, provider_id, scope, name, status) VALUES (
     '00000000-0000-0000-0000-000000006020',
     (SELECT id FROM carrier_providers WHERE slug = 'generic-sip'),
-    'platform', 'CommPeak managed wholesale', 'active'
-);
-INSERT INTO provider_cdr_routes (provider, direction, carrier_connection_id) VALUES (
-    'commpeak', 'termination', '00000000-0000-0000-0000-000000006020'
+    'platform', 'Managed wholesale termination', 'active'
 );
 INSERT INTO trunks (
     id, carrier_connection_id, provisioning_mode, name, direction, status, managed_default
