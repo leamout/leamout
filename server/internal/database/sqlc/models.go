@@ -456,6 +456,7 @@ type Product struct {
 // Immutable upstream call-detail records reconciled to Leamout-managed calls for wholesale cost accounting.
 type ProviderCdr struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
+	Provider            string             `db:"provider" json:"provider"`
 	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
 	ProviderRecordID    string             `db:"provider_record_id" json:"provider_record_id"`
 	Direction           string             `db:"direction" json:"direction"`
@@ -469,7 +470,6 @@ type ProviderCdr struct {
 	CostMicros          int64              `db:"cost_micros" json:"cost_micros"`
 	Raw                 []byte             `db:"raw" json:"raw"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	Provider            string             `db:"provider" json:"provider"`
 }
 
 type ProviderCdrPage struct {

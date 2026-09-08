@@ -99,7 +99,7 @@ func (q *Queries) FindManagedCallForProviderCDR(ctx context.Context, sipCallID *
 }
 
 const getProviderCDRForUpdate = `-- name: GetProviderCDRForUpdate :one
-SELECT id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at, provider
+SELECT id, provider, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
 FROM provider_cdrs
 WHERE provider = $1
   AND direction = $2
@@ -118,6 +118,7 @@ func (q *Queries) GetProviderCDRForUpdate(ctx context.Context, arg GetProviderCD
 	var i ProviderCdr
 	err := row.Scan(
 		&i.ID,
+		&i.Provider,
 		&i.CarrierConnectionID,
 		&i.ProviderRecordID,
 		&i.Direction,
@@ -131,7 +132,6 @@ func (q *Queries) GetProviderCDRForUpdate(ctx context.Context, arg GetProviderCD
 		&i.CostMicros,
 		&i.Raw,
 		&i.CreatedAt,
-		&i.Provider,
 	)
 	return i, err
 }
@@ -184,7 +184,7 @@ VALUES (
 )
 ON CONFLICT (provider, direction, provider_record_id)
 DO NOTHING
-RETURNING id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at, provider
+RETURNING id, provider, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
 `
 
 type InsertProviderCDRParams struct {
@@ -214,6 +214,7 @@ func (q *Queries) InsertProviderCDR(ctx context.Context, arg InsertProviderCDRPa
 	var i ProviderCdr
 	err := row.Scan(
 		&i.ID,
+		&i.Provider,
 		&i.CarrierConnectionID,
 		&i.ProviderRecordID,
 		&i.Direction,
@@ -227,7 +228,6 @@ func (q *Queries) InsertProviderCDR(ctx context.Context, arg InsertProviderCDRPa
 		&i.CostMicros,
 		&i.Raw,
 		&i.CreatedAt,
-		&i.Provider,
 	)
 	return i, err
 }
@@ -241,7 +241,7 @@ SET
     reconciled_at = now()
 WHERE id = $4
   AND reconciled_at IS NULL
-RETURNING id, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at, provider
+RETURNING id, provider, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
 `
 
 type MarkProviderCDRReconciledParams struct {
@@ -261,6 +261,7 @@ func (q *Queries) MarkProviderCDRReconciled(ctx context.Context, arg MarkProvide
 	var i ProviderCdr
 	err := row.Scan(
 		&i.ID,
+		&i.Provider,
 		&i.CarrierConnectionID,
 		&i.ProviderRecordID,
 		&i.Direction,
@@ -274,7 +275,6 @@ func (q *Queries) MarkProviderCDRReconciled(ctx context.Context, arg MarkProvide
 		&i.CostMicros,
 		&i.Raw,
 		&i.CreatedAt,
-		&i.Provider,
 	)
 	return i, err
 }
