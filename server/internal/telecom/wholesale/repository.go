@@ -27,6 +27,13 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
+	connectionID, err := r.ResolveCDRRoute(ctx, cdr.Provider, cdr.Direction)
+	if err != nil {
+		return Result{}, err
+	}
+	if connectionID != cdr.CarrierConnectionID {
+		return Result{}, ErrCDRRouteNotFound
+	}
 	raw, err := json.Marshal(cdr.Raw)
 	if err != nil {
 		return Result{}, err
