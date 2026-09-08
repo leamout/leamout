@@ -35,8 +35,6 @@ func (h *Handler) Reconcile(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case errors.Is(err, ErrCallNotFound):
 			http.Error(w, "managed call not found", http.StatusNotFound)
-		case errors.Is(err, ErrCDRRouteNotFound):
-			http.Error(w, "provider CDR route not found", http.StatusNotFound)
 		case errors.Is(err, ErrCDRConflict):
 			http.Error(w, "provider CDR conflict", http.StatusConflict)
 		case errors.Is(err, ErrInvalidCDR):
