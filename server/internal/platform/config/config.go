@@ -21,10 +21,6 @@ type CommPeakConfig struct {
 }
 
 type ManagedSIPConfig struct {
-	Host            string `env:"HOST" envDefault:"sip.leamout.com"`
-	Port            int    `env:"PORT" envDefault:"5061"`
-	Transport       string `env:"TRANSPORT" envDefault:"tls"`
-	Realm           string `env:"REALM" envDefault:"sip.leamout.com"`
 	AdmissionSecret string `env:"ADMISSION_SECRET"`
 }
 
@@ -79,9 +75,6 @@ func (c *Config) normalize() {
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
 	c.CommPeak.Authorization = strings.TrimSpace(c.CommPeak.Authorization)
 	c.CommPeak.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.CommPeak.APIBaseURL), "/")
-	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
-	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
-	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)
 	c.ManagedSIP.AdmissionSecret = strings.TrimSpace(c.ManagedSIP.AdmissionSecret)
 	c.OperatorAPISecret = strings.TrimSpace(c.OperatorAPISecret)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
