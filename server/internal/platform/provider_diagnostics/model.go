@@ -34,7 +34,7 @@ type CDRPollDiagnostic struct {
 }
 
 type Snapshot struct {
-	Operations      OperationSummary       `json:"operations"`
-	Problematic     []OperationDiagnostic  `json:"problematic_operations"`
-	CDRPolling      []CDRPollDiagnostic    `json:"cdr_polling"`
+	Operations  OperationSummary      `json:"operations"`
+	Problematic []OperationDiagnostic `json:"problematic_operations"`
+	CDRPolling  []CDRPollDiagnostic   `json:"cdr_polling"`
 }
