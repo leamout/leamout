@@ -15,6 +15,11 @@ type DIDWWConfig struct {
 	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
 }
 
+type CommPeakConfig struct {
+	APIAuthorization string `env:"API_AUTHORIZATION"`
+	APIBaseURL       string `env:"API_BASE_URL" envDefault:"https://api.commpeak.com"`
+}
+
 type ManagedSIPConfig struct {
 	Enabled         bool   `env:"ENABLED" envDefault:"false"`
 	Host            string `env:"HOST" envDefault:"sip.leamout.com"`
@@ -35,6 +40,7 @@ type Config struct {
 	FreeSWITCHESLPassword string           `env:"FREESWITCH_ESL_PASSWORD,required"`
 	CarrierCredentialKey  string           `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
 	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
+	CommPeak              CommPeakConfig   `envPrefix:"COMMPEAK_"`
 	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
 	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
@@ -71,6 +77,8 @@ func (c *Config) normalize() {
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
+	c.CommPeak.APIAuthorization = strings.TrimSpace(c.CommPeak.APIAuthorization)
+	c.CommPeak.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.CommPeak.APIBaseURL), "/")
 	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
 	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
 	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)
