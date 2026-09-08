@@ -14,6 +14,7 @@ import (
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
+	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
@@ -36,6 +37,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	if modules.Wholesale.Handler != nil {
 		r.Post("/internal/v1/provider-cdrs/reconcile", modules.Wholesale.Handler.Reconcile)
 	}
+	providerdiagnostics.RegisterRoutes(r, modules.ProviderDiagnostics.Handler)
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			requireAuthenticated := modules.OrganizationsContext.RequireAuthenticated(modules.Authn)
