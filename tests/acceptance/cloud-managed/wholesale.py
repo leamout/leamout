@@ -22,8 +22,10 @@ def headers(message):
 
 def response(status, reason, request_headers, body="", contact=False):
     content_headers = ""
+    if request_headers.get("record-route"):
+        content_headers += f"Record-Route: {request_headers['record-route']}\r\n"
     if body:
-        content_headers = "Content-Type: application/sdp\r\n"
+        content_headers += "Content-Type: application/sdp\r\n"
     if contact:
         # FreeSWITCH intentionally has no public-signaling attachment. Use the
         # carrier service's private-control DNS address for in-dialog SIP;
