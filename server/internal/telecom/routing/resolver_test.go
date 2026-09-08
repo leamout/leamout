@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -19,12 +18,9 @@ type fakeRouteStore struct {
 	phone            sqlc.PhoneNumber
 	inboundPhone     sqlc.PhoneNumber
 	binding          sqlc.GetVoiceBindingByNumberRow
-	attachment       sqlc.ResolveManagedInboundRuntimeAttachmentRow
-	attachmentErr    error
 	getTrunkCalls    int
 	listManagedCalls int
 	getBindingCalls  int
-	attachmentCalls  int
 }
 
 func (f *fakeRouteStore) GetTrunk(context.Context, uuid.UUID, uuid.UUID) (sqlc.Trunk, error) {
@@ -70,11 +66,6 @@ func (f *fakeRouteStore) ResolveInboundPhoneNumber(context.Context, uuid.UUID, s
 func (f *fakeRouteStore) GetVoiceBinding(context.Context, string) (sqlc.GetVoiceBindingByNumberRow, error) {
 	f.getBindingCalls++
 	return f.binding, nil
-}
-
-func (f *fakeRouteStore) ResolveManagedInboundRuntimeAttachment(context.Context, uuid.UUID) (sqlc.ResolveManagedInboundRuntimeAttachmentRow, error) {
-	f.attachmentCalls++
-	return f.attachment, f.attachmentErr
 }
 
 func uuidPtr(v uuid.UUID) *uuid.UUID { return &v }
@@ -410,71 +401,6 @@ func TestResolveInboundOrganizationConnection(t *testing.T) {
 	}
 }
 
-func TestResolveManagedInboundDeliveryAttachesSelfHostedRuntime(t *testing.T) {
-	organizationID := uuid.New()
-	connectionID := uuid.New()
-	phoneNumberID := uuid.New()
-	attachmentID := uuid.New()
-	deploymentID := uuid.New()
-
-	store := &fakeRouteStore{
-		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: nil, Scope: "platform"},
-		inboundPhone: sqlc.PhoneNumber{
-			ID: phoneNumberID, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
-			Number: "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
-		},
-		attachment: sqlc.ResolveManagedInboundRuntimeAttachmentRow{
-			RuntimeAttachmentID: attachmentID, DeploymentID: deploymentID,
-			DeploymentIdentity: "customer-prod", IngressHost: "sip.customer.example",
-			IngressPort: 5061, Transport: "tls",
-		},
-	}
-	resolver := &Resolver{repo: store}
-
-	decision, err := resolver.resolveManagedInboundDelivery(context.Background(), InboundRequest{
-		SourceIP: "203.0.113.10", CalledNumber: "+233200000001", CallerNumber: "+14155550100",
-	}, netip.MustParseAddr("203.0.113.10"))
-	if err != nil {
-		t.Fatalf("resolve platform inbound: %v", err)
-	}
-	if decision.OrganizationID != organizationID {
-		t.Fatalf("organization = %s, want DID owner %s", decision.OrganizationID, organizationID)
-	}
-	if decision.RuntimeAttachmentID != attachmentID || decision.DeploymentID != deploymentID ||
-		decision.IngressHost != "sip.customer.example" || decision.IngressTransport != "tls" {
-		t.Fatalf("unexpected runtime attachment: %+v", decision)
-	}
-	if store.getBindingCalls != 0 {
-		t.Fatalf("local voice binding lookups = %d, want 0 at managed edge", store.getBindingCalls)
-	}
-}
-
-func TestResolveInboundPlatformFailsClosedWithoutRuntimeAttachment(t *testing.T) {
-	organizationID := uuid.New()
-	connectionID := uuid.New()
-	phoneNumberID := uuid.New()
-	store := &fakeRouteStore{
-		connection: sqlc.CarrierConnection{ID: connectionID, Scope: "platform"},
-		inboundPhone: sqlc.PhoneNumber{
-			ID: phoneNumberID, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
-			Number: "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
-		},
-		binding: sqlc.GetVoiceBindingByNumberRow{
-			VoiceApplicationID: uuid.New(), PhoneNumberID: phoneNumberID,
-			Number: "+233200000001", OrganizationID: organizationID,
-		},
-		attachmentErr: pgx.ErrNoRows,
-	}
-	resolver := &Resolver{repo: store}
-
-	_, err := resolver.resolveManagedInboundDelivery(context.Background(), InboundRequest{
-		CalledNumber: "+233200000001", CallerNumber: "+14155550100",
-	}, netip.MustParseAddr("203.0.113.10"))
-	if !errors.Is(err, ErrNoRoute) {
-		t.Fatalf("error = %v, want %v", err, ErrNoRoute)
-	}
-}
-
 func TestResolveInboundCloudManagedStaysOnLocalRuntimePath(t *testing.T) {
 	organizationID := uuid.New()
 	connectionID := uuid.New()
@@ -489,7 +415,6 @@ func TestResolveInboundCloudManagedStaysOnLocalRuntimePath(t *testing.T) {
 			VoiceApplicationID: uuid.New(), PhoneNumberID: phoneNumberID,
 			Number: "+233200000001", OrganizationID: organizationID,
 		},
-		attachmentErr: pgx.ErrNoRows,
 	}
 	resolver := &Resolver{repo: store}
 
@@ -501,35 +426,6 @@ func TestResolveInboundCloudManagedStaysOnLocalRuntimePath(t *testing.T) {
 	}
 	if decision.OrganizationID != organizationID {
 		t.Fatalf("organization = %s, want %s", decision.OrganizationID, organizationID)
-	}
-	if store.attachmentCalls != 0 {
-		t.Fatalf("runtime attachment lookups = %d, want 0 on cloud local path", store.attachmentCalls)
-	}
-}
-
-func TestResolveManagedInboundDeliveryRejectsBYOCIngress(t *testing.T) {
-	organizationID := uuid.New()
-	connectionID := uuid.New()
-	phoneNumberID := uuid.New()
-	resolver := &Resolver{repo: &fakeRouteStore{
-		connection: sqlc.CarrierConnection{
-			ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization",
-		},
-		inboundPhone: sqlc.PhoneNumber{
-			ID: phoneNumberID, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
-			Number: "+233200000001", ProvisioningMode: "byoc", VoiceEnabled: true,
-		},
-		binding: sqlc.GetVoiceBindingByNumberRow{
-			VoiceApplicationID: uuid.New(), PhoneNumberID: phoneNumberID,
-			Number: "+233200000001", OrganizationID: organizationID,
-		},
-	}}
-
-	_, err := resolver.resolveManagedInboundDelivery(context.Background(), InboundRequest{
-		CalledNumber: "+233200000001", CallerNumber: "+14155550100",
-	}, netip.MustParseAddr("203.0.113.10"))
-	if !errors.Is(err, ErrNoRoute) {
-		t.Fatalf("error = %v, want %v", err, ErrNoRoute)
 	}
 }
 
