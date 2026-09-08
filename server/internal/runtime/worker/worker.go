@@ -107,6 +107,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 	if err := freeSwitch.Connect(ctx); err != nil {
 		_ = redisClient.Close()
+		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("connect worker FreeSWITCH: %w", err)
@@ -209,7 +210,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		commpeakSource = commpeakClient
 	}
 	commpeakCDRPolling, err := wholesale.NewCDRPollJob(
-		wholesale.NewCDRPollRepository(db),
+		wholesale.NewRepository(db),
 		commpeakSource,
 		wholesale.DefaultCDRPollJobConfig("commpeak"),
 	)
