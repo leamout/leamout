@@ -251,6 +251,14 @@ func NewModules(
 	resolver := authn.NewResolver(sessionService, credentialsService)
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)
 	organizationMiddleware := middleware.NewOrganizationMiddleware(queries)
+	rateLimitStore, err := redisClient.NewRateLimitStore()
+	if err != nil {
+		return Modules{}, fmt.Errorf("initialize rate limit store: %w", err)
+	}
+	rateLimitMiddleware, err := middleware.NewRateLimitMiddleware(rateLimitStore)
+	if err != nil {
+		return Modules{}, fmt.Errorf("initialize rate limit middleware: %w", err)
+	}
 
 	return Modules{
 		Catalog: CatalogModule{
@@ -357,6 +365,7 @@ func NewModules(
 			Service:    idempotencyService,
 			Middleware: middleware.NewIdempotencyMiddleware(idempotencyService),
 		},
+		RateLimit: rateLimitMiddleware,
 		Conferences: ConferencesModule{
 			Repository: conferencesRepository,
 			Service:    conferencesService,

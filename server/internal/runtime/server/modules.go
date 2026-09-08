@@ -49,6 +49,7 @@ type Modules struct {
 	Webhooks             WebhooksModule
 	Audit                AuditModule
 	Idempotency          IdempotencyModule
+	RateLimit            *middleware.RateLimitMiddleware
 	SIPDomains           SIPDomainsModule
 	Numbers              NumbersModule
 	Subscribers          SubscribersModule

@@ -42,21 +42,21 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		return func(next http.Handler) http.Handler {
 			requireAuthenticated := modules.OrganizationsContext.RequireAuthenticated(modules.Authn)
 			requireAccess := modules.OrganizationsContext.RequireAccess(resource)
-			return requireAuthenticated(requireAccess(next))
+			return requireAuthenticated(modules.RateLimit.Handle(requireAccess(next)))
 		}
 	}
 	sessionOrganizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			requireAccess := modules.OrganizationsContext.RequireAccess(resource)
 			return modules.Authn.RequireSession(
-				modules.OrganizationsContext.Require(requireAccess(next)),
+				modules.OrganizationsContext.Require(modules.RateLimit.Handle(requireAccess(next))),
 			)
 		}
 	}
 	organizationContextAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			requireAccess := modules.OrganizationsContext.RequireAccess(resource)
-			return modules.OrganizationsContext.Require(requireAccess(next))
+			return modules.OrganizationsContext.Require(modules.RateLimit.Handle(requireAccess(next)))
 		}
 	}
 
