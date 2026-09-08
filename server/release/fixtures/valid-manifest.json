@@ -17,7 +17,7 @@
     }
   ],
   "database": {
-    "migration": "044_decouple_provider_cdr_routing.sql"
+    "migration": "043_create_provider_cdr_polling.sql"
   },
   "cli_artifacts": [
     {
