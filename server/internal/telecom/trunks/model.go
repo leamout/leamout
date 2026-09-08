@@ -50,7 +50,7 @@ type EndpointUpdateRequest struct {
 	Enabled   *bool   `json:"enabled,omitempty"`
 }
 
-type ManagedSIPEdgeConfig struct {
+type ManagedSIPConfig struct {
 	Host      string
 	Port      int32
 	Transport string
