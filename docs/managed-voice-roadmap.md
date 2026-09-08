@@ -223,10 +223,10 @@ Managed inbound private-alpha foundations now include:
       deterministic provider in the Cloud + Managed acceptance topology.
 - [x] Keep managed inbound tenant resolution on the called DID rather than the
       shared platform carrier connection.
-- [x] Require one healthy, verified runtime attachment before managed inbound
-      delivery to a self-hosted runtime; cloud-managed delivery remains local.
-- [x] Prove synthetic managed ingress traverses the hosted edge, a verified
-      attachment, self-hosted OpenSIPS, and the local FreeSWITCH runtime.
+- [x] Keep Self-Hosted + Managed Carrier on an ordinary organization-scoped SIP
+      carrier connection; no hosted-edge runtime attachment is required.
+- [x] Prove synthetic Leamout Managed Carrier ingress reaches self-hosted
+      OpenSIPS and FreeSWITCH through the generic carrier-ingress path.
 - [x] Prove a managed DID reaches the Cloud FreeSWITCH runtime and that the
       same DID can originate a trunkless call through the managed default route.
 - [x] Assert cross-provider managed caller ID and idempotent CDR-to-call
