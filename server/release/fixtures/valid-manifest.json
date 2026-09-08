@@ -17,7 +17,7 @@
     }
   ],
   "database": {
-    "migration": "042_create_trunk_credentials.sql"
+    "migration": "043_create_provider_cdr_polling.sql"
   },
   "cli_artifacts": [
     {

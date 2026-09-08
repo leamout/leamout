@@ -1,7 +1,6 @@
 -- name: InsertProviderCDR :one
 INSERT INTO provider_cdrs (
-    carrier_provider_id,
-    carrier_connection_id,
+    provider,
     provider_record_id,
     direction,
     sip_call_id,
@@ -12,8 +11,7 @@ INSERT INTO provider_cdrs (
     raw
 )
 VALUES (
-    sqlc.arg(carrier_provider_id),
-    sqlc.arg(carrier_connection_id),
+    sqlc.arg(provider),
     sqlc.arg(provider_record_id),
     sqlc.arg(direction),
     sqlc.arg(sip_call_id),
@@ -23,14 +21,14 @@ VALUES (
     sqlc.arg(cost_micros),
     sqlc.arg(raw)
 )
-ON CONFLICT (carrier_provider_id, direction, provider_record_id)
+ON CONFLICT (provider, direction, provider_record_id)
 DO NOTHING
 RETURNING *;
 
 -- name: GetProviderCDRForUpdate :one
 SELECT *
 FROM provider_cdrs
-WHERE carrier_provider_id = sqlc.arg(carrier_provider_id)
+WHERE provider = sqlc.arg(provider)
   AND direction = sqlc.arg(direction)
   AND provider_record_id = sqlc.arg(provider_record_id)
 FOR UPDATE;
@@ -38,20 +36,20 @@ FOR UPDATE;
 -- name: FindManagedCallForProviderCDR :one
 SELECT
     c.id,
-    c.organization_id
+    c.organization_id,
+    c.carrier_connection_id
 FROM calls AS c
 JOIN carrier_connections AS cc
   ON cc.id = c.carrier_connection_id
 WHERE c.sip_call_id = sqlc.arg(sip_call_id)
   AND c.direction = 'outbound'
-  AND c.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'platform'
-  AND cc.provider_id = sqlc.arg(carrier_provider_id)
 LIMIT 1;
 
 -- name: MarkProviderCDRReconciled :one
 UPDATE provider_cdrs
 SET
+    carrier_connection_id = sqlc.arg(carrier_connection_id),
     call_id = sqlc.arg(call_id),
     organization_id = sqlc.arg(organization_id),
     reconciled_at = now()
@@ -76,6 +74,13 @@ VALUES (
     sqlc.arg(currency),
     sqlc.arg(occurred_at)
 )
+ON CONFLICT (provider_cdr_id)
+DO UPDATE SET provider_cdr_id = wholesale_charges.provider_cdr_id
+WHERE wholesale_charges.organization_id = EXCLUDED.organization_id
+  AND wholesale_charges.call_id = EXCLUDED.call_id
+  AND wholesale_charges.amount_micros = EXCLUDED.amount_micros
+  AND wholesale_charges.currency = EXCLUDED.currency
+  AND wholesale_charges.occurred_at = EXCLUDED.occurred_at
 RETURNING *;
 
 -- name: SumWholesaleChargesForDay :one

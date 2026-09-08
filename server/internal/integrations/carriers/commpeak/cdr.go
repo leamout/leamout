@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (c *Client) ListTerminationCDRs(ctx context.Context, request CDRRequest) (CDRPage, error) {
@@ -37,6 +38,57 @@ func (c *Client) ListOriginationCDRs(ctx context.Context, request CDRRequest) (C
 		return CDRPage{}, fmt.Errorf("commpeak: origination CDR response is not valid JSON")
 	}
 	return CDRPage{Direction: CDRDirectionOrigination, Raw: json.RawMessage(payload)}, nil
+}
+
+// PollCDRs exposes CommPeak's paginated CDR endpoints through the provider-neutral
+// polling contract. CommPeak documents date-range filters at day granularity, so
+// each cursor window is one UTC calendar day and current-day windows are replayed
+// safely by the durable polling inbox.
+func (c *Client) PollCDRs(ctx context.Context, direction string, windowDate time.Time, page, perPage int) (json.RawMessage, int, error) {
+	date := windowDate.UTC().Format("2006-01-02")
+	request := CDRRequest{
+		TimeRange: date + " - " + date,
+		Page:      page,
+		PerPage:   perPage,
+	}
+
+	var (
+		result CDRPage
+		err    error
+	)
+	switch CDRDirection(strings.ToLower(strings.TrimSpace(direction))) {
+	case CDRDirectionTermination:
+		result, err = c.ListTerminationCDRs(ctx, request)
+	case CDRDirectionOrigination:
+		result, err = c.ListOriginationCDRs(ctx, request)
+	default:
+		return nil, 0, fmt.Errorf("commpeak: unsupported CDR direction %q", direction)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+	count, err := cdrRecordCount(result.Raw)
+	if err != nil {
+		return nil, 0, err
+	}
+	return result.Raw, count, nil
+}
+
+func cdrRecordCount(payload json.RawMessage) (int, error) {
+	var records []json.RawMessage
+	if err := json.Unmarshal(payload, &records); err == nil {
+		return len(records), nil
+	}
+	var envelope struct {
+		Data []json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return 0, fmt.Errorf("commpeak: unsupported CDR response shape: %w", err)
+	}
+	if envelope.Data == nil {
+		return 0, fmt.Errorf("commpeak: CDR response does not contain a data array")
+	}
+	return len(envelope.Data), nil
 }
 
 func cdrQuery(request CDRRequest, direction CDRDirection) (url.Values, error) {

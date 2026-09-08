@@ -15,6 +15,11 @@ type DIDWWConfig struct {
 	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.didww.com/v3"`
 }
 
+type CommPeakConfig struct {
+	Authorization string `env:"API_AUTHORIZATION"`
+	APIBaseURL    string `env:"API_BASE_URL" envDefault:"https://api.commpeak.com"`
+}
+
 type ManagedSIPConfig struct {
 	Enabled         bool   `env:"ENABLED" envDefault:"false"`
 	Host            string `env:"HOST" envDefault:"sip.leamout.com"`
@@ -35,7 +40,9 @@ type Config struct {
 	FreeSWITCHESLPassword string           `env:"FREESWITCH_ESL_PASSWORD,required"`
 	CarrierCredentialKey  string           `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
 	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
+	CommPeak              CommPeakConfig   `envPrefix:"COMMPEAK_"`
 	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
+	OperatorAPISecret     string           `env:"OPERATOR_API_SECRET"`
 	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
 	CORSOrigins           []string         `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
@@ -71,10 +78,13 @@ func (c *Config) normalize() {
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
+	c.CommPeak.Authorization = strings.TrimSpace(c.CommPeak.Authorization)
+	c.CommPeak.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.CommPeak.APIBaseURL), "/")
 	c.ManagedSIP.Host = strings.TrimSpace(c.ManagedSIP.Host)
 	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
 	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)
 	c.ManagedSIP.AdmissionSecret = strings.TrimSpace(c.ManagedSIP.AdmissionSecret)
+	c.OperatorAPISecret = strings.TrimSpace(c.OperatorAPISecret)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)

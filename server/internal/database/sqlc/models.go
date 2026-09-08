@@ -456,8 +456,8 @@ type Product struct {
 // Immutable upstream call-detail records reconciled to Leamout-managed calls for wholesale cost accounting.
 type ProviderCdr struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	Provider            string             `db:"provider" json:"provider"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
 	ProviderRecordID    string             `db:"provider_record_id" json:"provider_record_id"`
 	Direction           string             `db:"direction" json:"direction"`
 	SipCallID           *string            `db:"sip_call_id" json:"sip_call_id"`
@@ -470,6 +470,35 @@ type ProviderCdr struct {
 	CostMicros          int64              `db:"cost_micros" json:"cost_micros"`
 	Raw                 []byte             `db:"raw" json:"raw"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type ProviderCdrPage struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	Provider         string             `db:"provider" json:"provider"`
+	Direction        string             `db:"direction" json:"direction"`
+	WindowDate       pgtype.Date        `db:"window_date" json:"window_date"`
+	Page             int32              `db:"page" json:"page"`
+	RecordCount      int32              `db:"record_count" json:"record_count"`
+	PayloadSha256    string             `db:"payload_sha256" json:"payload_sha256"`
+	Raw              []byte             `db:"raw" json:"raw"`
+	ReceivedAt       pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	ProcessAttempts  int32              `db:"process_attempts" json:"process_attempts"`
+	NextProcessAt    pgtype.Timestamptz `db:"next_process_at" json:"next_process_at"`
+	LastProcessError *string            `db:"last_process_error" json:"last_process_error"`
+	ProcessedAt      pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
+}
+
+type ProviderCdrPollCursor struct {
+	Provider      string             `db:"provider" json:"provider"`
+	Direction     string             `db:"direction" json:"direction"`
+	WindowDate    pgtype.Date        `db:"window_date" json:"window_date"`
+	Page          int32              `db:"page" json:"page"`
+	AttemptCount  int32              `db:"attempt_count" json:"attempt_count"`
+	NextAttemptAt pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	LastError     *string            `db:"last_error" json:"last_error"`
+	LastSuccessAt pgtype.Timestamptz `db:"last_success_at" json:"last_success_at"`
+	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 // Internal durable journal for managed-number provider side effects. Customer lifecycle state remains on phone_numbers.

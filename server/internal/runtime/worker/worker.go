@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/database/sqlc"
+	"github.com/leamout/leamout/internal/integrations/carriers/commpeak"
 	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	natsintegration "github.com/leamout/leamout/internal/integrations/nats"
@@ -26,6 +27,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
+	"github.com/leamout/leamout/internal/telecom/wholesale"
 )
 
 type Worker struct {
@@ -39,6 +41,7 @@ type Worker struct {
 	endpointHealth          *routing.EndpointHealthJob
 	recordingReconciliation *recordings.ReconciliationJob
 	providerOperations      *numbers.ProviderOperationJob
+	commpeakCDRPolling      *wholesale.CDRPollJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
@@ -55,6 +58,7 @@ var componentNames = []string{
 	"carrier-endpoint-health",
 	"recording-reconciliation",
 	"provider-operations",
+	"commpeak-cdr-polling",
 	"outbox-publisher",
 	"webhook-consumer",
 	"webhook-delivery",
@@ -103,6 +107,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 	if err := freeSwitch.Connect(ctx); err != nil {
 		_ = redisClient.Close()
+		_ = freeSwitch.Close()
 		_ = natsClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("connect worker FreeSWITCH: %w", err)
@@ -189,6 +194,34 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize provider operation job: %w", err)
 	}
 
+	var commpeakSource wholesale.CDRPageSource
+	if strings.TrimSpace(cfg.CommPeak.Authorization) != "" {
+		commpeakClient, err := commpeak.NewClient(commpeak.Config{
+			BaseURL:       cfg.CommPeak.APIBaseURL,
+			Authorization: cfg.CommPeak.Authorization,
+		})
+		if err != nil {
+			_ = redisClient.Close()
+			_ = freeSwitch.Close()
+			_ = natsClient.Close()
+			db.Close()
+			return nil, fmt.Errorf("initialize CommPeak CDR client: %w", err)
+		}
+		commpeakSource = commpeakClient
+	}
+	commpeakCDRPolling, err := wholesale.NewCDRPollJob(
+		wholesale.NewRepository(db),
+		commpeakSource,
+		wholesale.DefaultCDRPollJobConfig("commpeak"),
+	)
+	if err != nil {
+		_ = redisClient.Close()
+		_ = freeSwitch.Close()
+		_ = natsClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize CommPeak CDR polling job: %w", err)
+	}
+
 	outboxRepository := outbox.NewRepository(queries)
 	outboxPublisher := outbox.NewPublisher(natsClient)
 	outboxJob, err := outbox.NewPublisherJob(outboxRepository, outboxPublisher, outbox.DefaultPublisherJobConfig("worker-"+uuid.NewString()))
@@ -231,6 +264,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		endpointHealth:          endpointHealth,
 		recordingReconciliation: recordingReconciliation,
 		providerOperations:      providerOperations,
+		commpeakCDRPolling:      commpeakCDRPolling,
 		outbox:                  outboxJob,
 		webhookConsumer:         webhookConsumer,
 		webhookDelivery:         webhookDelivery,
@@ -297,6 +331,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	go w.runComponent(ctx, errCh, "carrier-endpoint-health", w.endpointHealth.Run)
 	go w.runComponent(ctx, errCh, "recording-reconciliation", w.recordingReconciliation.Run)
 	go w.runComponent(ctx, errCh, "provider-operations", w.providerOperations.Run)
+	go w.runComponent(ctx, errCh, "commpeak-cdr-polling", w.commpeakCDRPolling.Run)
 	go w.runComponent(ctx, errCh, "outbox-publisher", w.outbox.Run)
 	go w.runComponent(ctx, errCh, "webhook-consumer", w.webhookConsumer.Run)
 	go w.runComponent(ctx, errCh, "webhook-delivery", w.webhookDelivery.Run)
