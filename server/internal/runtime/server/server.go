@@ -315,7 +315,7 @@ func NewModules(
 		Recordings: RecordingsModule{
 			Repository: recordingsRepository,
 			Service:    recordingsService,
-			Handler:    recordings.NewHandler(recordingsService, nil),
+			Handler:    recordings.NewHandler(recordingsService),
 		},
 		Subscribers: SubscribersModule{
 			Repository: subscribersRepository,
