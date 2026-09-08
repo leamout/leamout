@@ -117,10 +117,117 @@ func (j *CDRPollJob) RunOnce(ctx context.Context) error {
 }
 
 func (j *CDRPollJob) retryDelay(attemptCount int) time.Duration {
+	return retryDelay(j.config.RetryBase, j.config.RetryMax, attemptCount)
+}
+
+func DefaultCDRReconciliationJobConfig() CDRReconciliationJobConfig {
+	return CDRReconciliationJobConfig{
+		BatchSize:    25,
+		TickInterval: 10 * time.Second,
+		RetryBase:    time.Minute,
+		RetryMax:     time.Hour,
+	}
+}
+
+type CDRReconciliationJob struct {
+	store       CDRProcessingStore
+	service     *Service
+	normalizers map[string]CDRNormalizer
+	config      CDRReconciliationJobConfig
+	now         func() time.Time
+}
+
+func NewCDRReconciliationJob(
+	store CDRProcessingStore,
+	service *Service,
+	normalizers map[string]CDRNormalizer,
+	config CDRReconciliationJobConfig,
+) (*CDRReconciliationJob, error) {
+	if store == nil || service == nil {
+		return nil, errors.New("provider CDR reconciliation dependencies are required")
+	}
+	if config.BatchSize <= 0 || config.TickInterval <= 0 || config.RetryBase <= 0 || config.RetryMax < config.RetryBase {
+		return nil, errors.New("invalid provider CDR reconciliation configuration")
+	}
+	return &CDRReconciliationJob{
+		store:       store,
+		service:     service,
+		normalizers: normalizers,
+		config:      config,
+		now:         time.Now,
+	}, nil
+}
+
+func (j *CDRReconciliationJob) Run(ctx context.Context) error {
+	ticker := time.NewTicker(j.config.TickInterval)
+	defer ticker.Stop()
+	for {
+		_ = j.RunOnce(ctx)
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+		}
+	}
+}
+
+func (j *CDRReconciliationJob) RunOnce(ctx context.Context) error {
+	pages, err := j.store.ClaimCDRPages(ctx, j.config.BatchSize)
+	if err != nil {
+		return err
+	}
+	var errs []error
+	for _, page := range pages {
+		if err := j.processPage(ctx, page); err != nil {
+			next := j.now().UTC().Add(retryDelay(j.config.RetryBase, j.config.RetryMax, page.ProcessAttempts))
+			if storeErr := j.store.FailCDRPage(ctx, page.ID, err, next); storeErr != nil {
+				errs = append(errs, fmt.Errorf("record page failure: %w", storeErr))
+			}
+			errs = append(errs, fmt.Errorf("process %s/%s page %s: %w", page.Provider, page.Direction, page.ID, err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func (j *CDRReconciliationJob) processPage(ctx context.Context, page CDRPageWork) error {
+	provider := strings.ToLower(strings.TrimSpace(page.Provider))
+	normalizer := j.normalizers[provider]
+	if normalizer == nil {
+		return fmt.Errorf("no CDR normalizer registered for provider %q", provider)
+	}
+	connectionID, err := j.store.ResolveCDRRoute(ctx, provider, page.Direction)
+	if err != nil {
+		return err
+	}
+	records, err := normalizer.NormalizeCDRs(ctx, page.Direction, page.Raw)
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		_, err := j.service.Reconcile(ctx, CDR{
+			Provider:            provider,
+			CarrierConnectionID: connectionID,
+			ProviderRecordID:    record.ProviderRecordID,
+			Direction:           page.Direction,
+			SIPCallID:           record.SIPCallID,
+			StartedAt:           record.StartedAt,
+			DurationSeconds:     record.DurationSeconds,
+			Currency:            record.Currency,
+			CostMicros:          record.CostMicros,
+			Raw:                 record.Raw,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return j.store.MarkCDRPageProcessed(ctx, page.ID)
+}
+
+func retryDelay(base, max time.Duration, attemptCount int) time.Duration {
 	exponent := math.Min(float64(attemptCount), 10)
-	delay := time.Duration(float64(j.config.RetryBase) * math.Pow(2, exponent))
-	if delay > j.config.RetryMax {
-		return j.config.RetryMax
+	delay := time.Duration(float64(base) * math.Pow(2, exponent))
+	if delay > max {
+		return max
 	}
 	return delay
 }
