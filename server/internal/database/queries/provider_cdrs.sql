@@ -1,6 +1,14 @@
+-- name: GetProviderCDRRoute :one
+SELECT carrier_connection_id
+FROM provider_cdr_routes
+WHERE provider = sqlc.arg(provider)
+  AND direction = sqlc.arg(direction)
+  AND status = 'active'
+LIMIT 1;
+
 -- name: InsertProviderCDR :one
 INSERT INTO provider_cdrs (
-    carrier_provider_id,
+    provider,
     carrier_connection_id,
     provider_record_id,
     direction,
@@ -12,7 +20,7 @@ INSERT INTO provider_cdrs (
     raw
 )
 VALUES (
-    sqlc.arg(carrier_provider_id),
+    sqlc.arg(provider),
     sqlc.arg(carrier_connection_id),
     sqlc.arg(provider_record_id),
     sqlc.arg(direction),
@@ -23,14 +31,14 @@ VALUES (
     sqlc.arg(cost_micros),
     sqlc.arg(raw)
 )
-ON CONFLICT (carrier_provider_id, direction, provider_record_id)
+ON CONFLICT (provider, direction, provider_record_id)
 DO NOTHING
 RETURNING *;
 
 -- name: GetProviderCDRForUpdate :one
 SELECT *
 FROM provider_cdrs
-WHERE carrier_provider_id = sqlc.arg(carrier_provider_id)
+WHERE provider = sqlc.arg(provider)
   AND direction = sqlc.arg(direction)
   AND provider_record_id = sqlc.arg(provider_record_id)
 FOR UPDATE;
@@ -46,7 +54,6 @@ WHERE c.sip_call_id = sqlc.arg(sip_call_id)
   AND c.direction = 'outbound'
   AND c.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'platform'
-  AND cc.provider_id = sqlc.arg(carrier_provider_id)
 LIMIT 1;
 
 -- name: MarkProviderCDRReconciled :one
@@ -76,6 +83,13 @@ VALUES (
     sqlc.arg(currency),
     sqlc.arg(occurred_at)
 )
+ON CONFLICT (provider_cdr_id)
+DO UPDATE SET provider_cdr_id = wholesale_charges.provider_cdr_id
+WHERE wholesale_charges.organization_id = EXCLUDED.organization_id
+  AND wholesale_charges.call_id = EXCLUDED.call_id
+  AND wholesale_charges.amount_micros = EXCLUDED.amount_micros
+  AND wholesale_charges.currency = EXCLUDED.currency
+  AND wholesale_charges.occurred_at = EXCLUDED.occurred_at
 RETURNING *;
 
 -- name: SumWholesaleChargesForDay :one
