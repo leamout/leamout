@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-import random
 import os
+import random
 import socket
 import subprocess
 import time
@@ -39,8 +39,8 @@ def invite(timeout=6):
     port = sock.getsockname()[1]
     sdp = (
         "v=0\r\n"
-        f"o=- 1 1 IN IP4 127.0.0.1\r\n"
-        "s=managed-carrier-acceptance\r\n"
+        "o=- 1 1 IN IP4 127.0.0.1\r\n"
+        "s=leamout-managed-carrier-acceptance\r\n"
         "c=IN IP4 127.0.0.1\r\n"
         "t=0 0\r\n"
         "m=audio 40000 RTP/AVP 0 101\r\n"
@@ -50,14 +50,18 @@ def invite(timeout=6):
         "a=sendrecv\r\n"
     )
     message = (
-        f"INVITE sip:{DID}@managed-edge.test SIP/2.0\r\n"
+        f"INVITE sip:{DID}@self-hosted.test SIP/2.0\r\n"
         f"Via: SIP/2.0/UDP 127.0.0.1:{port};branch={branch};rport\r\n"
-        f"Max-Forwards: 10\r\nFrom: <sip:+15557654321@carrier.test>;tag={tag}\r\n"
-        f"To: <sip:{DID}@managed-edge.test>\r\nCall-ID: {call_id}\r\n"
-        f"CSeq: 1 INVITE\r\nContact: <sip:carrier@127.0.0.1:{port}>\r\n"
-        f"Content-Type: application/sdp\r\nContent-Length: {len(sdp.encode())}\r\n\r\n{sdp}"
+        "Max-Forwards: 10\r\n"
+        f"From: <sip:+15557654321@sip.leamout.com>;tag={tag}\r\n"
+        f"To: <sip:{DID}@self-hosted.test>\r\n"
+        f"Call-ID: {call_id}\r\n"
+        "CSeq: 1 INVITE\r\n"
+        f"Contact: <sip:carrier@127.0.0.1:{port}>\r\n"
+        "Content-Type: application/sdp\r\n"
+        f"Content-Length: {len(sdp.encode())}\r\n\r\n{sdp}"
     )
-    sock.sendto(message.encode(), ("127.0.0.1", 5060))
+    sock.sendto(message.encode(), ("127.0.0.1", 5070))
     responses = []
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
@@ -68,9 +72,7 @@ def invite(timeout=6):
         status_line = response.splitlines()[0]
         status = int(status_line.split()[1])
         responses.append(status_line)
-        if status >= 200:
-            break
-        if status == 180:
+        if status >= 200 or status == 180:
             break
     return call_id, responses
 
@@ -86,23 +88,37 @@ def wait_for_channel(call_id):
         if DID in channels:
             return
         time.sleep(0.2)
-    raise Failure(f"FreeSWITCH did not receive attached call {call_id}")
+    raise Failure(f"FreeSWITCH did not receive ordinary carrier call {call_id}")
 
 
 def main():
+    shape = sql(
+        "SELECT cp.slug || ',' || cc.scope || ',' || pn.provisioning_mode "
+        "FROM carrier_connections cc "
+        "JOIN carrier_providers cp ON cp.id=cc.provider_id "
+        "JOIN phone_numbers pn ON pn.carrier_connection_id=cc.id "
+        "WHERE cc.id='00000000-0000-0000-0000-000000005020'::uuid"
+    )
+    if shape != "leamout,organization,byoc":
+        raise Failure(f"self-hosted managed carrier is not ordinary SIP/BYOC state: {shape}")
+    print("PASS self-hosted runtime models Leamout Managed Carrier as an ordinary SIP carrier connection")
+
     call_id, responses = invite()
     statuses = [int(response.split()[1]) for response in responses]
     if 180 not in statuses:
-        raise Failure(f"healthy attachment did not reach self-hosted runtime: responses={responses}")
+        raise Failure(f"ordinary Leamout carrier ingress did not reach self-hosted runtime: responses={responses}")
     wait_for_channel(call_id)
-    print("PASS managed edge forwarded the DID to the self-hosted OpenSIPS and FreeSWITCH runtime")
+    print("PASS Leamout Managed Carrier reached self-hosted OpenSIPS and FreeSWITCH through normal carrier ingress")
 
-    sql("UPDATE runtime_attachments SET health_status='unhealthy', last_checked_at=now() WHERE deployment_id='00000000-0000-0000-0000-000000005011'")
-    _, responses = invite()
+    sql("UPDATE carrier_connections SET status='disabled' WHERE id='00000000-0000-0000-0000-000000005020'")
+    try:
+        _, responses = invite()
+    finally:
+        sql("UPDATE carrier_connections SET status='active' WHERE id='00000000-0000-0000-0000-000000005020'")
     statuses = [int(response.split()[1]) for response in responses]
-    if not statuses or statuses[-1] != 404:
-        raise Failure(f"unhealthy attachment did not fail closed: responses={responses}")
-    print("PASS unhealthy runtime attachment failed closed at the managed edge")
+    if 180 in statuses:
+        raise Failure(f"disabled ordinary carrier connection still reached the self-hosted runtime: responses={responses}")
+    print("PASS self-hosted managed-carrier ingress is controlled by the generic carrier connection state")
 
 
 if __name__ == "__main__":
