@@ -7,7 +7,14 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 SIGNALING_IP = "172.30.0.60"
-state = {"outbound_invites": 0, "last_destination": "", "last_call_id": "", "internal_route_header_seen": False}
+state = {
+    "outbound_invites": 0,
+    "outbound_answers": 0,
+    "outbound_acks": 0,
+    "last_destination": "",
+    "last_call_id": "",
+    "internal_route_header_seen": False,
+}
 inbound_sockets = []
 
 
@@ -72,6 +79,9 @@ def sip_server():
                 "a=sendrecv\r\n"
             )
             sock.sendto(response(200, "OK", request_headers, answer, contact=True), peer)
+            state["outbound_answers"] += 1
+        elif message.startswith("ACK "):
+            state["outbound_acks"] += 1
 
 
 def originate_inbound():
