@@ -42,6 +42,7 @@ type Config struct {
 	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
 	CommPeak              CommPeakConfig   `envPrefix:"COMMPEAK_"`
 	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
+	OperatorAPISecret     string           `env:"OPERATOR_API_SECRET"`
 	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
 	CORSOrigins           []string         `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
@@ -83,6 +84,7 @@ func (c *Config) normalize() {
 	c.ManagedSIP.Transport = strings.ToLower(strings.TrimSpace(c.ManagedSIP.Transport))
 	c.ManagedSIP.Realm = strings.TrimSpace(c.ManagedSIP.Realm)
 	c.ManagedSIP.AdmissionSecret = strings.TrimSpace(c.ManagedSIP.AdmissionSecret)
+	c.OperatorAPISecret = strings.TrimSpace(c.OperatorAPISecret)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
