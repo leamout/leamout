@@ -44,18 +44,14 @@ SELECT
     c.next_attempt_at,
     c.last_error,
     c.last_success_at,
-    MAX(p.received_at) AS last_page_received_at
+    last_page.received_at AS last_page_received_at
 FROM provider_cdr_poll_cursors AS c
-LEFT JOIN provider_cdr_pages AS p
-  ON p.provider = c.provider
- AND p.direction = c.direction
-GROUP BY
-    c.provider,
-    c.direction,
-    c.window_date,
-    c.page,
-    c.attempt_count,
-    c.next_attempt_at,
-    c.last_error,
-    c.last_success_at
+LEFT JOIN LATERAL (
+    SELECT p.received_at
+    FROM provider_cdr_pages AS p
+    WHERE p.provider = c.provider
+      AND p.direction = c.direction
+    ORDER BY p.received_at DESC
+    LIMIT 1
+) AS last_page ON TRUE
 ORDER BY c.provider, c.direction;
