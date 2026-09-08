@@ -2,9 +2,13 @@ package wholesale
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"reflect"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -112,6 +116,71 @@ func (r *Repository) Reconcile(ctx context.Context, cdr CDR) (Result, error) {
 		return Result{}, err
 	}
 	return result(record.ID, call.ID, call.OrganizationID, charge, !inserted), nil
+}
+
+func (r *Repository) Cursor(ctx context.Context, provider, direction string, startDate time.Time) (CDRPollCursor, error) {
+	row, err := r.queries.EnsureProviderCDRPollCursor(ctx, sqlc.EnsureProviderCDRPollCursorParams{
+		Provider:   provider,
+		Direction:  direction,
+		WindowDate: pgtype.Date{Time: utcDate(startDate), Valid: true},
+	})
+	if err != nil {
+		return CDRPollCursor{}, err
+	}
+	return CDRPollCursor{
+		Provider:      row.Provider,
+		Direction:     row.Direction,
+		WindowDate:    row.WindowDate.Time,
+		Page:          int(row.Page),
+		AttemptCount:  int(row.AttemptCount),
+		NextAttemptAt: row.NextAttemptAt.Time,
+	}, nil
+}
+
+func (r *Repository) StorePageAndAdvance(ctx context.Context, cursor CDRPollCursor, raw json.RawMessage, count int, nextDate time.Time, nextPage int, nextAttemptAt time.Time) error {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+	hash := sha256.Sum256(raw)
+
+	if _, err := queries.InsertProviderCDRPage(ctx, sqlc.InsertProviderCDRPageParams{
+		Provider:      cursor.Provider,
+		Direction:     cursor.Direction,
+		WindowDate:    pgtype.Date{Time: utcDate(cursor.WindowDate), Valid: true},
+		Page:          int32(cursor.Page),
+		RecordCount:   int32(count),
+		PayloadSha256: hex.EncodeToString(hash[:]),
+		Raw:           raw,
+	}); err != nil {
+		return err
+	}
+	if _, err := queries.AdvanceProviderCDRPollCursor(ctx, sqlc.AdvanceProviderCDRPollCursorParams{
+		Provider:      cursor.Provider,
+		Direction:     cursor.Direction,
+		WindowDate:    pgtype.Date{Time: utcDate(nextDate), Valid: true},
+		Page:          int32(nextPage),
+		NextAttemptAt: pgtype.Timestamptz{Time: nextAttemptAt, Valid: true},
+	}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func (r *Repository) Fail(ctx context.Context, cursor CDRPollCursor, pollErr error, nextAttemptAt time.Time) error {
+	message := strings.TrimSpace(pollErr.Error())
+	if len(message) > 2048 {
+		message = message[:2048]
+	}
+	_, err := r.queries.FailProviderCDRPollCursor(ctx, sqlc.FailProviderCDRPollCursorParams{
+		Provider:      cursor.Provider,
+		Direction:     cursor.Direction,
+		NextAttemptAt: pgtype.Timestamptz{Time: nextAttemptAt, Valid: true},
+		LastError:     &message,
+	})
+	return err
 }
 
 func sameCDR(record sqlc.ProviderCdr, cdr CDR) bool {
