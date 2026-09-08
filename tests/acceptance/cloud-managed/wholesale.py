@@ -25,7 +25,10 @@ def response(status, reason, request_headers, body="", contact=False):
     if body:
         content_headers = "Content-Type: application/sdp\r\n"
     if contact:
-        content_headers += f"Contact: <sip:wholesale@{SIGNALING_IP}:5060>\r\n"
+        # FreeSWITCH intentionally has no public-signaling attachment. Use the
+        # carrier service's private-control DNS address for in-dialog SIP;
+        # RTPengine still rewrites the public SDP address independently.
+        content_headers += "Contact: <sip:wholesale@cloud-managed-wholesale:5060>\r\n"
     return (
         f"SIP/2.0 {status} {reason}\r\n"
         f"Via: {request_headers.get('via', '')}\r\n"
