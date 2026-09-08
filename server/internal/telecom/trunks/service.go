@@ -27,7 +27,6 @@ type Service struct {
 	repo            *Repository
 	db              *pgxpool.Pool
 	outbox          *outbox.Repository
-	managedSIP      ManagedSIPConfig
 	commercialState managedSIPStateResolver
 }
 
@@ -40,15 +39,10 @@ func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
 	return service
 }
 
-func (s *Service) SetManagedSIP(config ManagedSIPConfig, state managedSIPStateResolver) error {
-	normalized, err := normalizeManagedSIPConfig(config)
-	if err != nil {
-		return err
-	}
+func (s *Service) SetManagedSIPAuthority(state managedSIPStateResolver) error {
 	if state == nil {
 		return errors.New("managed SIP commercial state resolver is required")
 	}
-	s.managedSIP = normalized
 	s.commercialState = state
 	return nil
 }
@@ -414,8 +408,8 @@ func (s *Service) newManagedSIPCredential() (SIPCredential, string, error) {
 	username := "lm_sip_" + base64.RawURLEncoding.EncodeToString(usernameEntropy)
 	password := "lm_sip_" + base64.RawURLEncoding.EncodeToString(passwordEntropy)
 	credential := SIPCredential{
-		Host: s.managedSIP.Host, Port: s.managedSIP.Port, Transport: s.managedSIP.Transport,
-		Realm: s.managedSIP.Realm, Username: username, Password: password,
+		Host: ManagedSIPHost, Port: ManagedSIPPort, Transport: ManagedSIPTransport,
+		Realm: ManagedSIPRealm, Username: username, Password: password,
 	}
 	return credential, hasher.ComputeHA1MD5(username, credential.Realm, password), nil
 }
