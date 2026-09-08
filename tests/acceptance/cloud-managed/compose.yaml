@@ -43,6 +43,7 @@ services:
     ports:
       - "18091:8088"
     networks:
-      private-control: {}
+      private-control:
+        ipv4_address: 172.32.0.60
       public-signaling:
         ipv4_address: 172.30.0.60
