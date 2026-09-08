@@ -14,6 +14,10 @@ const (
 	ProvisioningModeBYOC       ProvisioningMode = "byoc"
 	ProvisioningModeManaged    ProvisioningMode = "managed"
 	ManagedVoiceEntitlement                     = "voice.managed.enabled"
+	ManagedSIPHost                              = "sip.leamout.com"
+	ManagedSIPPort                      int32     = 5061
+	ManagedSIPTransport                          = "tls"
+	ManagedSIPRealm                              = "sip.leamout.com"
 )
 
 type CreateRequest struct {
@@ -48,13 +52,6 @@ type EndpointUpdateRequest struct {
 	Priority  *int32  `json:"priority,omitempty"`
 	Weight    *int32  `json:"weight,omitempty"`
 	Enabled   *bool   `json:"enabled,omitempty"`
-}
-
-type ManagedSIPConfig struct {
-	Host      string
-	Port      int32
-	Transport string
-	Realm     string
 }
 
 type SIPCredential struct {
