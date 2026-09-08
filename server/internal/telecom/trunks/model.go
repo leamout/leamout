@@ -14,16 +14,14 @@ const (
 	ProvisioningModeBYOC       ProvisioningMode = "byoc"
 	ProvisioningModeManaged    ProvisioningMode = "managed"
 	ManagedVoiceEntitlement                     = "voice.managed.enabled"
-	LeamoutCarrierProviderSlug                  = "leamout"
 )
 
 type CreateRequest struct {
-	Type                ProvisioningMode        `json:"type"`
-	CarrierConnectionID *uuid.UUID              `json:"carrier_connection_id,omitempty"`
-	Name                string                  `json:"name"`
-	Direction           *string                 `json:"direction,omitempty"`
-	Status              *string                 `json:"status,omitempty"`
-	SIP                 *ManagedSIPInstallation `json:"sip,omitempty"`
+	Type                ProvisioningMode `json:"type"`
+	CarrierConnectionID *uuid.UUID       `json:"carrier_connection_id,omitempty"`
+	Name                string           `json:"name"`
+	Direction           *string          `json:"direction,omitempty"`
+	Status              *string          `json:"status,omitempty"`
 }
 
 type UpdateRequest struct {
@@ -52,21 +50,11 @@ type EndpointUpdateRequest struct {
 	Enabled   *bool   `json:"enabled,omitempty"`
 }
 
-type ManagedSIPConfig struct {
-	Enabled   bool
+type ManagedSIPEdgeConfig struct {
 	Host      string
 	Port      int32
 	Transport string
 	Realm     string
-}
-
-type ManagedSIPInstallation struct {
-	Host      string `json:"host"`
-	Port      int32  `json:"port"`
-	Transport string `json:"transport"`
-	Realm     string `json:"realm"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
 }
 
 type SIPCredential struct {
