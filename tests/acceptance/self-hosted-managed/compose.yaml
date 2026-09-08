@@ -1,13 +1,4 @@
 services:
-  opensips:
-    environment:
-      OPENSIPS_ADVERTISED_ADDRESS: managed-edge.test
-      MANAGED_INBOUND_EDGE_ENABLED: "true"
-    volumes:
-      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
-      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/privkey.pem:/etc/opensips/tls/privkey.pem:ro
-      - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
-
   self-hosted-opensips:
     image: leamout/opensips:4.0.1
     build:
@@ -20,7 +11,8 @@ services:
       OPENSIPS_DATABASE_PASSWORD: leamout
       OPENSIPS_ADVERTISED_ADDRESS: self-hosted-opensips
       MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?required}
-      MANAGED_INBOUND_EDGE_ENABLED: "false"
+    ports:
+      - "5070:5060/udp"
     volumes:
       - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
       - ${SELF_HOSTED_MANAGED_CERT_DIR:?required}/privkey.pem:/etc/opensips/tls/privkey.pem:ro
