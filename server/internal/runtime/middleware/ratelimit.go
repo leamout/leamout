@@ -51,17 +51,6 @@ func (m *RateLimitMiddleware) Handle(next http.Handler) http.Handler {
 	})
 }
 
-// CallCreate adds a short-window budget to call origination requests. Carrier
-// CPS and concurrent-call admission remain independently enforced downstream.
-func (m *RateLimitMiddleware) CallCreate(next http.Handler) http.Handler {
-	return m.handle(
-		next,
-		"call-create",
-		limiter.Rate{Period: time.Second, Limit: 50},
-		limiter.Rate{Period: time.Second, Limit: 25},
-	)
-}
-
 func (m *RateLimitMiddleware) handle(
 	next http.Handler,
 	class string,

@@ -91,27 +91,6 @@ func TestRateLimitEnforcesSharedOrganizationBudget(t *testing.T) {
 	}
 }
 
-func TestCallCreateHasDedicatedPerSecondBudget(t *testing.T) {
-	middleware, err := NewRateLimitMiddleware(memory.NewStore())
-	if err != nil {
-		t.Fatal(err)
-	}
-	organizationID := uuid.New()
-	credentialID := uuid.New()
-	handler := middleware.CallCreate(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-
-	for range 25 {
-		if code := serveRateLimited(handler, http.MethodPost, organizationID, credentialID).Code; code != http.StatusNoContent {
-			t.Fatalf("expected call creation within budget to receive %d, got %d", http.StatusNoContent, code)
-		}
-	}
-	if code := serveRateLimited(handler, http.MethodPost, organizationID, credentialID).Code; code != http.StatusTooManyRequests {
-		t.Fatalf("expected exhausted call-create budget to receive %d, got %d", http.StatusTooManyRequests, code)
-	}
-}
-
 func TestRateLimitFailsClosedWhenStoreIsUnavailable(t *testing.T) {
 	middleware, err := NewRateLimitMiddleware(failingRateLimitStore{})
 	if err != nil {
