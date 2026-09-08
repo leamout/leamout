@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS provider_cdrs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    carrier_provider_id UUID NOT NULL REFERENCES carrier_providers(id) ON DELETE RESTRICT,
-    carrier_connection_id UUID NOT NULL,
+    provider TEXT NOT NULL,
+    carrier_connection_id UUID REFERENCES carrier_connections(id) ON DELETE RESTRICT,
 
     provider_record_id TEXT NOT NULL,
     direction TEXT NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS provider_cdrs (
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_provider_cdr UNIQUE (
-        carrier_provider_id,
+    CONSTRAINT uq_provider_cdr_source UNIQUE (
+        provider,
         direction,
         provider_record_id
     ),
@@ -29,14 +29,13 @@ CREATE TABLE IF NOT EXISTS provider_cdrs (
         call_id,
         organization_id
     ),
-    CONSTRAINT fk_provider_cdr_connection_provider
-        FOREIGN KEY (carrier_connection_id, carrier_provider_id)
-        REFERENCES carrier_connections (id, provider_id)
-        ON DELETE RESTRICT,
     CONSTRAINT fk_provider_cdr_call_organization
         FOREIGN KEY (call_id, organization_id)
         REFERENCES calls (id, organization_id)
         ON DELETE RESTRICT,
+    CONSTRAINT chk_provider_cdr_provider CHECK (
+        provider ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+    ),
     CONSTRAINT chk_provider_cdr_direction CHECK (
         direction IN ('termination', 'origination')
     ),
@@ -73,7 +72,7 @@ COMMENT ON TABLE provider_cdrs IS
     'Immutable upstream call-detail records reconciled to Leamout-managed calls for wholesale cost accounting.';
 
 CREATE INDEX IF NOT EXISTS idx_provider_cdr_unreconciled
-    ON provider_cdrs (carrier_provider_id, started_at)
+    ON provider_cdrs (provider, started_at)
     WHERE reconciled_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS wholesale_charges (

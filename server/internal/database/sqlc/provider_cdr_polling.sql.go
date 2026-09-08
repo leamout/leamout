@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -55,6 +56,59 @@ func (q *Queries) AdvanceProviderCDRPollCursor(ctx context.Context, arg AdvanceP
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const claimProviderCDRPages = `-- name: ClaimProviderCDRPages :many
+WITH ready AS (
+    SELECT id
+    FROM provider_cdr_pages
+    WHERE direction = 'termination'
+      AND processed_at IS NULL
+      AND next_process_at IS NOT NULL
+      AND next_process_at <= now()
+    ORDER BY received_at ASC
+    FOR UPDATE SKIP LOCKED
+    LIMIT $1
+)
+UPDATE provider_cdr_pages AS p
+SET next_process_at = now() + interval '5 minutes'
+FROM ready
+WHERE p.id = ready.id
+RETURNING p.id, p.provider, p.direction, p.window_date, p.page, p.record_count, p.payload_sha256, p.raw, p.received_at, p.process_attempts, p.next_process_at, p.last_process_error, p.processed_at
+`
+
+func (q *Queries) ClaimProviderCDRPages(ctx context.Context, limitCount int32) ([]ProviderCdrPage, error) {
+	rows, err := q.db.Query(ctx, claimProviderCDRPages, limitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ProviderCdrPage{}
+	for rows.Next() {
+		var i ProviderCdrPage
+		if err := rows.Scan(
+			&i.ID,
+			&i.Provider,
+			&i.Direction,
+			&i.WindowDate,
+			&i.Page,
+			&i.RecordCount,
+			&i.PayloadSha256,
+			&i.Raw,
+			&i.ReceivedAt,
+			&i.ProcessAttempts,
+			&i.NextProcessAt,
+			&i.LastProcessError,
+			&i.ProcessedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const ensureProviderCDRPollCursor = `-- name: EnsureProviderCDRPollCursor :one
@@ -163,7 +217,7 @@ VALUES (
 )
 ON CONFLICT (provider, direction, window_date, page, payload_sha256)
 DO UPDATE SET received_at = provider_cdr_pages.received_at
-RETURNING id, provider, direction, window_date, page, record_count, payload_sha256, raw, received_at
+RETURNING id, provider, direction, window_date, page, record_count, payload_sha256, raw, received_at, process_attempts, next_process_at, last_process_error, processed_at
 `
 
 type InsertProviderCDRPageParams struct {
@@ -197,6 +251,80 @@ func (q *Queries) InsertProviderCDRPage(ctx context.Context, arg InsertProviderC
 		&i.PayloadSha256,
 		&i.Raw,
 		&i.ReceivedAt,
+		&i.ProcessAttempts,
+		&i.NextProcessAt,
+		&i.LastProcessError,
+		&i.ProcessedAt,
+	)
+	return i, err
+}
+
+const markProviderCDRPageProcessed = `-- name: MarkProviderCDRPageProcessed :one
+UPDATE provider_cdr_pages
+SET
+    processed_at = now(),
+    next_process_at = NULL,
+    last_process_error = NULL
+WHERE id = $1
+  AND processed_at IS NULL
+RETURNING id, provider, direction, window_date, page, record_count, payload_sha256, raw, received_at, process_attempts, next_process_at, last_process_error, processed_at
+`
+
+func (q *Queries) MarkProviderCDRPageProcessed(ctx context.Context, id uuid.UUID) (ProviderCdrPage, error) {
+	row := q.db.QueryRow(ctx, markProviderCDRPageProcessed, id)
+	var i ProviderCdrPage
+	err := row.Scan(
+		&i.ID,
+		&i.Provider,
+		&i.Direction,
+		&i.WindowDate,
+		&i.Page,
+		&i.RecordCount,
+		&i.PayloadSha256,
+		&i.Raw,
+		&i.ReceivedAt,
+		&i.ProcessAttempts,
+		&i.NextProcessAt,
+		&i.LastProcessError,
+		&i.ProcessedAt,
+	)
+	return i, err
+}
+
+const recordProviderCDRPageProcessFailure = `-- name: RecordProviderCDRPageProcessFailure :one
+UPDATE provider_cdr_pages
+SET
+    process_attempts = process_attempts + 1,
+    next_process_at = $1,
+    last_process_error = $2
+WHERE id = $3
+  AND processed_at IS NULL
+RETURNING id, provider, direction, window_date, page, record_count, payload_sha256, raw, received_at, process_attempts, next_process_at, last_process_error, processed_at
+`
+
+type RecordProviderCDRPageProcessFailureParams struct {
+	NextProcessAt    pgtype.Timestamptz `db:"next_process_at" json:"next_process_at"`
+	LastProcessError *string            `db:"last_process_error" json:"last_process_error"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+}
+
+func (q *Queries) RecordProviderCDRPageProcessFailure(ctx context.Context, arg RecordProviderCDRPageProcessFailureParams) (ProviderCdrPage, error) {
+	row := q.db.QueryRow(ctx, recordProviderCDRPageProcessFailure, arg.NextProcessAt, arg.LastProcessError, arg.ID)
+	var i ProviderCdrPage
+	err := row.Scan(
+		&i.ID,
+		&i.Provider,
+		&i.Direction,
+		&i.WindowDate,
+		&i.Page,
+		&i.RecordCount,
+		&i.PayloadSha256,
+		&i.Raw,
+		&i.ReceivedAt,
+		&i.ProcessAttempts,
+		&i.NextProcessAt,
+		&i.LastProcessError,
+		&i.ProcessedAt,
 	)
 	return i, err
 }

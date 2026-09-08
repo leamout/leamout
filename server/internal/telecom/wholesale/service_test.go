@@ -22,8 +22,7 @@ func (f *fakeStore) Reconcile(_ context.Context, cdr CDR) (Result, error) {
 
 func validCDR() CDR {
 	return CDR{
-		CarrierProviderID: uuid.New(), CarrierConnectionID: uuid.New(),
-		ProviderRecordID: " cdr-1 ", Direction: " TERMINATION ", SIPCallID: " call-1 ",
+		Provider: " COMMPEAK ", ProviderRecordID: " cdr-1 ", Direction: " TERMINATION ", SIPCallID: " call-1 ",
 		StartedAt: time.Now().UTC(), DurationSeconds: 12, Currency: " usd ", CostMicros: 2500,
 		Raw: map[string]any{"id": "cdr-1"},
 	}
@@ -38,7 +37,7 @@ func TestServiceNormalizesAndReconcilesTerminationCDR(t *testing.T) {
 	if result.CallID != store.result.CallID {
 		t.Fatalf("result = %+v", result)
 	}
-	if store.cdr.ProviderRecordID != "cdr-1" || store.cdr.Direction != "termination" ||
+	if store.cdr.Provider != "commpeak" || store.cdr.ProviderRecordID != "cdr-1" || store.cdr.Direction != "termination" ||
 		store.cdr.SIPCallID != "call-1" || store.cdr.Currency != "USD" {
 		t.Fatalf("CDR was not normalized: %+v", store.cdr)
 	}

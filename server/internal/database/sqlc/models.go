@@ -456,8 +456,8 @@ type Product struct {
 // Immutable upstream call-detail records reconciled to Leamout-managed calls for wholesale cost accounting.
 type ProviderCdr struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
-	CarrierProviderID   uuid.UUID          `db:"carrier_provider_id" json:"carrier_provider_id"`
-	CarrierConnectionID uuid.UUID          `db:"carrier_connection_id" json:"carrier_connection_id"`
+	Provider            string             `db:"provider" json:"provider"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
 	ProviderRecordID    string             `db:"provider_record_id" json:"provider_record_id"`
 	Direction           string             `db:"direction" json:"direction"`
 	SipCallID           *string            `db:"sip_call_id" json:"sip_call_id"`
@@ -473,15 +473,19 @@ type ProviderCdr struct {
 }
 
 type ProviderCdrPage struct {
-	ID            uuid.UUID          `db:"id" json:"id"`
-	Provider      string             `db:"provider" json:"provider"`
-	Direction     string             `db:"direction" json:"direction"`
-	WindowDate    pgtype.Date        `db:"window_date" json:"window_date"`
-	Page          int32              `db:"page" json:"page"`
-	RecordCount   int32              `db:"record_count" json:"record_count"`
-	PayloadSha256 string             `db:"payload_sha256" json:"payload_sha256"`
-	Raw           []byte             `db:"raw" json:"raw"`
-	ReceivedAt    pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	Provider         string             `db:"provider" json:"provider"`
+	Direction        string             `db:"direction" json:"direction"`
+	WindowDate       pgtype.Date        `db:"window_date" json:"window_date"`
+	Page             int32              `db:"page" json:"page"`
+	RecordCount      int32              `db:"record_count" json:"record_count"`
+	PayloadSha256    string             `db:"payload_sha256" json:"payload_sha256"`
+	Raw              []byte             `db:"raw" json:"raw"`
+	ReceivedAt       pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	ProcessAttempts  int32              `db:"process_attempts" json:"process_attempts"`
+	NextProcessAt    pgtype.Timestamptz `db:"next_process_at" json:"next_process_at"`
+	LastProcessError *string            `db:"last_process_error" json:"last_process_error"`
+	ProcessedAt      pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
 }
 
 type ProviderCdrPollCursor struct {

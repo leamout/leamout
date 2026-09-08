@@ -1,6 +1,5 @@
 INSERT INTO carrier_providers (slug, name, adapter, status) VALUES
-('didww', 'DIDWW', 'didww', 'active'),
-('commpeak', 'CommPeak', 'commpeak', 'active')
+('didww', 'DIDWW', 'didww', 'active')
 ON CONFLICT (slug) DO NOTHING;
 
 INSERT INTO organizations (id, name, status) VALUES
@@ -45,8 +44,8 @@ INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
 
 INSERT INTO carrier_connections (id, provider_id, scope, name, status) VALUES (
     '00000000-0000-0000-0000-000000006020',
-    (SELECT id FROM carrier_providers WHERE slug = 'commpeak'),
-    'platform', 'Cloud managed wholesale', 'active'
+    (SELECT id FROM carrier_providers WHERE slug = 'generic-sip'),
+    'platform', 'Managed wholesale termination', 'active'
 );
 INSERT INTO trunks (
     id, carrier_connection_id, provisioning_mode, name, direction, status, managed_default
