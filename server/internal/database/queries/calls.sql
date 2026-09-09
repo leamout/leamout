@@ -203,3 +203,24 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND state IN ('initiating', 'ringing')
 RETURNING *;
+
+-- name: ListBackofficeCalls :many
+SELECT
+    c.id::TEXT AS id,
+    o.name AS organization_name,
+    c.from_uri,
+    c.to_uri,
+    c.direction,
+    c.state,
+    GREATEST(
+        0::BIGINT,
+        COALESCE(
+            EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
+            0::BIGINT
+        )
+    ) AS duration_seconds,
+    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM calls AS c
+JOIN organizations AS o ON o.id = c.organization_id
+ORDER BY c.created_at DESC
+LIMIT 100;
