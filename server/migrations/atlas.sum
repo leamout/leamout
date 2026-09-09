@@ -1,4 +1,4 @@
-h1:40q9OYLQCfpVN+SEru2squHXvTNBPPgC43kVSgp0WQY=
+h1:5oaZjN3iaRW58BxiRDeSWYpQg5NDrhwJbw3TIQxdGyk=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:4qJ7qvHxZ3EKfC4UrbkYR3M7ggkPx4SNOuemR83zVvw=
 003_create_auth_transactions.sql h1:Kk39J8kPKweEULhpnmR4uCI1XGOGNKQOias0bVv3fjQ=
@@ -46,3 +46,4 @@ h1:40q9OYLQCfpVN+SEru2squHXvTNBPPgC43kVSgp0WQY=
 045_create_managed_number_operations.sql h1:F8aqkMPYFINM0cT6nF9JroCcaogKwLK/Z8/4nGY80O8=
 046_create_trunk_credentials.sql h1:2nzyamqixJaGzimv2e9rLyIRwOBjnWM/flLHX7LkzIo=
 047_create_provider_cdr_polling.sql h1:WsqsHIcLVDwZEw4plFVSNVGjIU+6dHkUjYdDW1tyZdw=
+048_add_backoffice_authentication.sql h1:bfettkv6e5EV9oi1hR35H8rop6DAdfWfeAMvcSJrM8M=

@@ -587,6 +587,7 @@ type Session struct {
 	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
 	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Audience   string             `db:"audience" json:"audience"`
 }
 
 type SipDomain struct {
@@ -707,14 +708,15 @@ type UsageRate struct {
 }
 
 type User struct {
-	ID            uuid.UUID          `db:"id" json:"id"`
-	Email         string             `db:"email" json:"email"`
-	EmailVerified bool               `db:"email_verified" json:"email_verified"`
-	Name          *string            `db:"name" json:"name"`
-	PasswordHash  *string            `db:"password_hash" json:"password_hash"`
-	DisabledAt    pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
-	CreatedAt     pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Email           string             `db:"email" json:"email"`
+	EmailVerified   bool               `db:"email_verified" json:"email_verified"`
+	Name            *string            `db:"name" json:"name"`
+	PasswordHash    *string            `db:"password_hash" json:"password_hash"`
+	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	IsPlatformAdmin bool               `db:"is_platform_admin" json:"is_platform_admin"`
 }
 
 type VoiceApplication struct {
