@@ -5,14 +5,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leamout/leamout/internal/backoffice/assets"
-	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
 )
+
+type accessMiddleware func(http.Handler) http.Handler
 
 func registerRoutes(
 	router chi.Router,
 	modules Modules,
-	authHandler *backofficeauth.Handler,
-	authentication authenticator,
+	access ...accessMiddleware,
 ) {
 	router.Get("/healthz", health)
 
@@ -20,15 +20,11 @@ func registerRoutes(
 	router.Handle("/favicon.ico", public)
 	router.Handle("/static/*", public)
 
-	if authHandler != nil {
-		authHandler.RegisterPublicRoutes(router)
-	}
-
 	router.Group(func(protected chi.Router) {
-		protected.Use(requireBackoffice(authentication))
-
-		if authHandler != nil {
-			authHandler.RegisterProtectedRoutes(protected)
+		for _, middleware := range access {
+			if middleware != nil {
+				protected.Use(middleware)
+			}
 		}
 
 		modules.Dashboard.Routes(protected)
