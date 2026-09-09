@@ -14,9 +14,9 @@ import (
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-func TestCreateCheckoutInitializesPaystackTransaction(t *testing.T) {
+func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/transaction/initialize" {
+		if r.Method != http.MethodPost || r.URL.Path != "/charge" {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
 		if r.Header.Get("Authorization") != "Bearer test-secret" {
@@ -24,12 +24,12 @@ func TestCreateCheckoutInitializesPaystackTransaction(t *testing.T) {
 		}
 		payload, _ := io.ReadAll(r.Body)
 		body := string(payload)
-		for _, expected := range []string{`"amount":2500`, `"currency":"GHS"`, `"reference":"invoice-1"`} {
+		for _, expected := range []string{`"amount":"2500"`, `"reference":"invoice-1"`, `"mobile_money":{"phone":"0240000000","provider":"mtn"}`} {
 			if !strings.Contains(body, expected) {
 				t.Fatalf("body %s does not contain %s", body, expected)
 			}
 		}
-		_, _ = w.Write([]byte(`{"status":true,"message":"Authorization URL created","data":{"id":42,"reference":"invoice-1","access_code":"access-1","authorization_url":"https://checkout.paystack.com/access-1"}}`))
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"invoice-1","status":"pending","message":"Authorize the payment on your phone"}}`))
 	}))
 	defer server.Close()
 
@@ -39,18 +39,19 @@ func TestCreateCheckoutInitializesPaystackTransaction(t *testing.T) {
 	}
 	session, err := client.CreateCheckout(context.Background(), paymentprovider.CheckoutRequest{
 		Reference: "invoice-1", AmountMinor: 2500, Currency: "GHS", Email: "buyer@example.com",
+		MobileMoney: &paymentprovider.MobileMoney{Phone: "0240000000", Provider: "mtn"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session.Provider != "paystack" || session.AccessCode != "access-1" || session.Reference != "invoice-1" {
+	if session.Provider != "paystack" || session.NextAction != "pending" || session.Reference != "invoice-1" {
 		t.Fatalf("session = %+v", session)
 	}
 }
 
-func TestGetPaymentVerifiesPaystackTransaction(t *testing.T) {
+func TestGetPaymentChecksPaystackCharge(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/transaction/verify/invoice-1" {
+		if r.URL.Path != "/charge/invoice-1" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
 		_, _ = w.Write([]byte(`{"status":true,"data":{"id":42,"reference":"invoice-1","amount":2500,"currency":"GHS","status":"success"}}`))
@@ -63,6 +64,18 @@ func TestGetPaymentVerifiesPaystackTransaction(t *testing.T) {
 	}
 	if payment.Status != paymentprovider.StatusSucceeded || payment.AmountMinor != 2500 || payment.Currency != "GHS" {
 		t.Fatalf("payment = %+v", payment)
+	}
+}
+
+func TestCreateCheckoutRequiresMobileMoneyFields(t *testing.T) {
+	client, _ := NewClient(Config{SecretKey: "test-secret"})
+	base := paymentprovider.CheckoutRequest{Reference: "invoice-1", AmountMinor: 2500, Currency: "GHS", Email: "buyer@example.com"}
+	if _, err := client.CreateCheckout(context.Background(), base); err == nil || !strings.Contains(err.Error(), "details are required") {
+		t.Fatalf("missing details error = %v", err)
+	}
+	base.MobileMoney = &paymentprovider.MobileMoney{Phone: "0240000000", Provider: "unknown"}
+	if _, err := client.CreateCheckout(context.Background(), base); err == nil || !strings.Contains(err.Error(), "mtn, atl, or vod") {
+		t.Fatalf("provider error = %v", err)
 	}
 }
 
