@@ -408,3 +408,33 @@ WHERE sqlc.arg(source_ip)::INET <<= src.cidr
   AND cc.inbound_auth_method = 'ip'
 ORDER BY masklen(src.cidr) DESC
 LIMIT 1;
+
+-- name: ListBackofficeCarrierConnections :many
+SELECT
+    cc.id::TEXT AS id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    cc.name,
+    cp.name AS provider_name,
+    cc.scope,
+    cc.status,
+    cc.inbound_enabled,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    COUNT(t.id)::BIGINT AS trunk_count
+FROM carrier_connections AS cc
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN organizations AS o ON o.id = cc.organization_id
+LEFT JOIN trunks AS t ON t.carrier_connection_id = cc.id
+GROUP BY
+    cc.id,
+    o.name,
+    cc.name,
+    cp.name,
+    cc.scope,
+    cc.status,
+    cc.inbound_enabled,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    cc.created_at
+ORDER BY cc.created_at DESC
+LIMIT 100;
