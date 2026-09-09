@@ -4,24 +4,43 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
 	"github.com/leamout/leamout/internal/backoffice/assets"
 )
 
-func registerRoutes(router chi.Router, modules Modules) {
+func registerRoutes(
+	router chi.Router,
+	modules Modules,
+	authHandler *backofficeauth.Handler,
+	authentication authenticator,
+) {
 	router.Get("/healthz", health)
 
 	public := http.FileServerFS(assets.Public())
 	router.Handle("/favicon.ico", public)
 	router.Handle("/static/*", public)
 
-	modules.Dashboard.Routes(router)
-	router.Mount("/organizations", modules.Organizations.Routes())
-	router.Mount("/calls", modules.Calls.Routes())
-	router.Mount("/numbers", modules.Numbers.Routes())
-	router.Mount("/trunks", modules.Trunks.Routes())
-	router.Mount("/carrier-connections", modules.CarrierConnections.Routes())
-	router.Mount("/providers", modules.Providers.Routes())
-	router.Mount("/commercial", modules.Commercial.Routes())
+	if authHandler != nil {
+		router.Get("/login", authHandler.LoginPage)
+		router.Post("/login", authHandler.Login)
+	}
+
+	router.Group(func(protected chi.Router) {
+		protected.Use(requireBackoffice(authentication))
+
+		if authHandler != nil {
+			protected.Post("/logout", authHandler.Logout)
+		}
+
+		modules.Dashboard.Routes(protected)
+		protected.Mount("/organizations", modules.Organizations.Routes())
+		protected.Mount("/calls", modules.Calls.Routes())
+		protected.Mount("/numbers", modules.Numbers.Routes())
+		protected.Mount("/trunks", modules.Trunks.Routes())
+		protected.Mount("/carrier-connections", modules.CarrierConnections.Routes())
+		protected.Mount("/providers", modules.Providers.Routes())
+		protected.Mount("/commercial", modules.Commercial.Routes())
+	})
 }
 
 func health(w http.ResponseWriter, _ *http.Request) {
