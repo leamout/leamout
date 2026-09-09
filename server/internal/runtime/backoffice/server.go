@@ -41,10 +41,11 @@ func New(ctx context.Context, cfg config.BackofficeConfig) (*Server, error) {
 	sessionService := session.NewService(sessionRepository)
 	identityAuthRepository := identityauth.NewRepository(queries)
 	identityAuthService := identityauth.NewService(identityAuthRepository)
+	backofficeAuthRepository := backofficeauth.NewRepository(queries)
 	backofficeAuthService := backofficeauth.NewService(
 		identityAuthService,
 		sessionService,
-		queries,
+		backofficeAuthRepository,
 	)
 	backofficeAuthHandler := backofficeauth.NewHandler(backofficeAuthService)
 
