@@ -1,0 +1,16 @@
+package trunks
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page() {
+	@components.Layout("SIP Trunks", "trunks", Content())
+}
+
+templ Content() {
+	<div class="mb-6">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telecom</p>
+		<h1 class="mt-2 text-3xl font-bold">SIP Trunks</h1>
+		<p class="mt-2 text-base-content/70">Inspect trunks, endpoints, authentication, and routing attachment state.</p>
+	</div>
+	<div class="alert"><span>Trunk inventory will be connected to the existing trunks repository in a follow-up.</span></div>
+}

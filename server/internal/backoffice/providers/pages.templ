@@ -1,0 +1,16 @@
+package providers
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page() {
+	@components.Layout("Managed Providers", "providers", Content())
+}
+
+templ Content() {
+	<div class="mb-6">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Managed Carrier</p>
+		<h1 class="mt-2 text-3xl font-bold">Providers</h1>
+		<p class="mt-2 text-base-content/70">Inspect managed-provider operations, CDR polling, diagnostics, and provider health.</p>
+	</div>
+	<div class="alert"><span>Provider diagnostics will move here from the public server in a follow-up.</span></div>
+}

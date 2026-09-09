@@ -60,6 +60,11 @@ func TestModulePages(t *testing.T) {
 	}{
 		{path: "/organizations", want: "Acme Communications"},
 		{path: "/calls", want: "call_01JQ8YN7"},
+		{path: "/numbers", want: "Phone Numbers"},
+		{path: "/trunks", want: "SIP Trunks"},
+		{path: "/carrier-connections", want: "Carrier Connections"},
+		{path: "/providers", want: "Managed Providers"},
+		{path: "/commercial", want: "Commercial"},
 	}
 
 	srv := New()
