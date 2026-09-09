@@ -777,6 +777,7 @@ type WalletReservation struct {
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CapturedAt     pgtype.Timestamptz `db:"captured_at" json:"captured_at"`
 	ReleasedAt     pgtype.Timestamptz `db:"released_at" json:"released_at"`
+	ExpiredAt      pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS wallet_reservations (
     expires_at TIMESTAMPTZ NOT NULL,
     captured_at TIMESTAMPTZ,
     released_at TIMESTAMPTZ,
+    expired_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
@@ -31,9 +32,34 @@ CREATE TABLE IF NOT EXISTS wallet_reservations (
     ),
     CONSTRAINT chk_wallet_reservations_expiry CHECK (expires_at > created_at),
     CONSTRAINT chk_wallet_reservations_lifecycle CHECK (
-        (status = 'active' AND captured_amount IS NULL AND captured_at IS NULL AND released_at IS NULL)
-        OR (status = 'captured' AND captured_amount IS NOT NULL AND captured_at IS NOT NULL AND released_at IS NULL)
-        OR (status IN ('released', 'expired') AND captured_amount IS NULL AND captured_at IS NULL AND released_at IS NOT NULL)
+        (
+            status = 'active'
+            AND captured_amount IS NULL
+            AND captured_at IS NULL
+            AND released_at IS NULL
+            AND expired_at IS NULL
+        )
+        OR (
+            status = 'captured'
+            AND captured_amount IS NOT NULL
+            AND captured_at IS NOT NULL
+            AND released_at IS NULL
+            AND expired_at IS NULL
+        )
+        OR (
+            status = 'released'
+            AND captured_amount IS NULL
+            AND captured_at IS NULL
+            AND released_at IS NOT NULL
+            AND expired_at IS NULL
+        )
+        OR (
+            status = 'expired'
+            AND captured_amount IS NULL
+            AND captured_at IS NULL
+            AND released_at IS NULL
+            AND expired_at IS NOT NULL
+        )
     )
 );
 
