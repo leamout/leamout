@@ -5,7 +5,7 @@ Payments record provider-independent money movement and reconcile it with Leamou
 ## Flow
 
 ```text
-Paystack / Flutterwave / external MoR / manual
+Stripe cards / Paystack Mobile Money / manual
                     ↓
               billing adapter
                     ↓
@@ -21,6 +21,37 @@ Paystack / Flutterwave / external MoR / manual
 ```
 
 Leamout is not building payment-network or Merchant-of-Record infrastructure. Those capabilities belong behind provider adapters when needed.
+
+## Collection adapters
+
+Payment collection adapters live under `server/internal/integrations/payments`.
+They expose one provider-neutral contract for initializing secure checkout,
+retrieving authoritative provider state, and authenticating webhook payloads.
+
+The initial channel boundary is explicit:
+
+```text
+card         -> Stripe PaymentIntent + Stripe Elements
+mobile money -> Paystack transaction + Paystack Popup/redirect
+```
+
+Leamout owns the amount, currency, reference, invoice, subscription, prepaid
+balance, and all commercial consequences. The browser receives only the Stripe
+client secret or Paystack access code/authorization URL needed by the provider's
+secure UI. Provider adapters must not activate subscriptions, grant entitlements,
+issue licenses, or credit balances.
+
+Both adapters require a Leamout-generated idempotent reference. Stripe receives
+that reference as both its idempotency key and PaymentIntent metadata. Paystack
+receives it as the transaction reference. Reconciliation must retrieve provider
+state and compare the provider, reference, amount, and currency with Leamout's
+commercial intent before delivering value.
+
+Webhook parsers authenticate the unmodified request body. Stripe uses the
+endpoint-specific webhook secret and a bounded timestamp tolerance. Paystack
+uses the account secret key with its HMAC-SHA512 signature. Authenticated events
+are normalized, but durable event storage and asynchronous commercial processing
+belong to the forthcoming checkout/payment orchestration layer.
 
 ## Current payment model
 

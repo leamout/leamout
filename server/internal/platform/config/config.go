@@ -24,6 +24,17 @@ type ManagedSIPConfig struct {
 	AdmissionSecret string `env:"ADMISSION_SECRET"`
 }
 
+type StripeConfig struct {
+	SecretKey     string `env:"SECRET_KEY"`
+	WebhookSecret string `env:"WEBHOOK_SECRET"`
+	APIBaseURL    string `env:"API_BASE_URL" envDefault:"https://api.stripe.com/v1"`
+}
+
+type PaystackConfig struct {
+	SecretKey  string `env:"SECRET_KEY"`
+	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.paystack.co"`
+}
+
 type Config struct {
 	AppEnv                string           `env:"APP_ENV" envDefault:"development"`
 	DeploymentID          string           `env:"LEAMOUT_DEPLOYMENT_ID"`
@@ -37,6 +48,8 @@ type Config struct {
 	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
 	CommPeak              CommPeakConfig   `envPrefix:"COMMPEAK_"`
 	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
+	Stripe                StripeConfig     `envPrefix:"STRIPE_"`
+	Paystack              PaystackConfig   `envPrefix:"PAYSTACK_"`
 	OperatorAPISecret     string           `env:"OPERATOR_API_SECRET"`
 	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
 	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
@@ -76,6 +89,11 @@ func (c *Config) normalize() {
 	c.CommPeak.Authorization = strings.TrimSpace(c.CommPeak.Authorization)
 	c.CommPeak.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.CommPeak.APIBaseURL), "/")
 	c.ManagedSIP.AdmissionSecret = strings.TrimSpace(c.ManagedSIP.AdmissionSecret)
+	c.Stripe.SecretKey = strings.TrimSpace(c.Stripe.SecretKey)
+	c.Stripe.WebhookSecret = strings.TrimSpace(c.Stripe.WebhookSecret)
+	c.Stripe.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.Stripe.APIBaseURL), "/")
+	c.Paystack.SecretKey = strings.TrimSpace(c.Paystack.SecretKey)
+	c.Paystack.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.Paystack.APIBaseURL), "/")
 	c.OperatorAPISecret = strings.TrimSpace(c.OperatorAPISecret)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
