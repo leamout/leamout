@@ -18,6 +18,10 @@ deploy/certs/*.pem
 *.dylib
 *.test
 
+# Generated Templ sources
+*_templ.go
+*_templ.txt
+
 # Go profiling / coverage
 /coverage/
 *.out

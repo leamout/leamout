@@ -11,10 +11,14 @@ RUN apk add --no-cache \
     npm \
     tzdata
 
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
+
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+RUN templ generate
 
 RUN npm ci --prefix ./internal/backoffice --no-audit --no-fund \
     && npm run --prefix ./internal/backoffice build

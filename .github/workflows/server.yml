@@ -46,6 +46,12 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@v0.3.1020
+
+      - name: Generate templ
+        run: templ generate
+
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
 
