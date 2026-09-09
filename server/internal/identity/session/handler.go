@@ -14,8 +14,6 @@ import (
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
-const sessionCookieName = "leamout-session"
-
 type Handler struct {
 	service *Service
 }
@@ -140,7 +138,7 @@ func SetCookie(
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     authn.SessionCookieName,
 		Value:    token,
 		Path:     "/",
 		Domain:   sessionCookieDomain(),
@@ -153,7 +151,7 @@ func SetCookie(
 
 func ClearCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
+		Name:     authn.SessionCookieName,
 		Value:    "",
 		Path:     "/",
 		Domain:   sessionCookieDomain(),
