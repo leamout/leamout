@@ -38,7 +38,7 @@ func TestDashboard(t *testing.T) {
 func TestStaticAssets(t *testing.T) {
 	srv := New()
 	for _, path := range []string{
-		"/static/css/custom.css",
+		"/static/css/tailwindcss.css",
 		"/static/js/htmx.min.js",
 		"/static/js/hyperscript.min.js",
 	} {
