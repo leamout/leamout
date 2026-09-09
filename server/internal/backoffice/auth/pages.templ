@@ -1,0 +1,41 @@
+package auth
+
+templ LoginPage(data LoginPageData) {
+	<!doctype html>
+	<html lang="en" data-theme="corporate">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>Sign in · Leamout Backoffice</title>
+			<link rel="icon" href="/favicon.ico"/>
+			<link rel="stylesheet" href="/static/css/tailwindcss.css"/>
+		</head>
+		<body class="min-h-screen bg-base-200 text-base-content">
+			<main class="flex min-h-screen items-center justify-center p-6">
+				<section class="card w-full max-w-md border border-base-300 bg-base-100 shadow-xl">
+					<div class="card-body gap-5">
+						<div>
+							<p class="text-sm font-medium uppercase tracking-wide opacity-60">Leamout</p>
+							<h1 class="card-title text-2xl">Backoffice</h1>
+							<p class="mt-2 text-sm opacity-70">Sign in with your platform administrator account.</p>
+						</div>
+						if data.Error != "" {
+							<div class="alert alert-error" role="alert"><span>{ data.Error }</span></div>
+						}
+						<form method="post" action="/login" class="space-y-4">
+							<label class="form-control w-full">
+								<span class="label-text mb-1">Email</span>
+								<input class="input input-bordered w-full" type="email" name="email" value={ data.Email } autocomplete="username" required autofocus/>
+							</label>
+							<label class="form-control w-full">
+								<span class="label-text mb-1">Password</span>
+								<input class="input input-bordered w-full" type="password" name="password" autocomplete="current-password" required/>
+							</label>
+							<button class="btn btn-primary w-full" type="submit">Sign in</button>
+						</form>
+					</div>
+				</section>
+			</main>
+		</body>
+	</html>
+}
