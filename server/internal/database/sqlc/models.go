@@ -581,13 +581,13 @@ type Session struct {
 	ID         uuid.UUID          `db:"id" json:"id"`
 	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
 	TokenHash  string             `db:"token_hash" json:"token_hash"`
+	Audience   string             `db:"audience" json:"audience"`
 	IpAddress  *netip.Addr        `db:"ip_address" json:"ip_address"`
 	UserAgent  *string            `db:"user_agent" json:"user_agent"`
 	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
 	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	Audience   string             `db:"audience" json:"audience"`
 }
 
 type SipDomain struct {
@@ -713,10 +713,10 @@ type User struct {
 	EmailVerified   bool               `db:"email_verified" json:"email_verified"`
 	Name            *string            `db:"name" json:"name"`
 	PasswordHash    *string            `db:"password_hash" json:"password_hash"`
+	IsPlatformAdmin bool               `db:"is_platform_admin" json:"is_platform_admin"`
 	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	IsPlatformAdmin bool               `db:"is_platform_admin" json:"is_platform_admin"`
 }
 
 type VoiceApplication struct {

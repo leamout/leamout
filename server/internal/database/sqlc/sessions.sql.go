@@ -34,7 +34,7 @@ SELECT
 FROM users AS u
 WHERE u.id = $6
   AND u.disabled_at IS NULL
-RETURNING id, user_id, token_hash, ip_address, user_agent, expires_at, last_seen_at, revoked_at, created_at, audience
+RETURNING id, user_id, token_hash, audience, ip_address, user_agent, expires_at, last_seen_at, revoked_at, created_at
 `
 
 type CreateSessionParams struct {
@@ -60,19 +60,19 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.Audience,
 		&i.IpAddress,
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
-		&i.Audience,
 	)
 	return i, err
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT s.id, s.user_id, s.token_hash, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at, s.audience
+SELECT s.id, s.user_id, s.token_hash, s.audience, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
@@ -90,24 +90,24 @@ func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (Session, er
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.Audience,
 		&i.IpAddress,
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
-		&i.Audience,
 	)
 	return i, err
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
-SELECT s.id, s.user_id, s.token_hash, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at, s.audience
+SELECT s.id, s.user_id, s.token_hash, s.audience, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
 WHERE s.token_hash = $1
-  AND s.audience = 'api'
+  AND s.audience = 'user'
   AND s.expires_at > NOW()
   AND s.revoked_at IS NULL
   AND u.disabled_at IS NULL
@@ -121,19 +121,19 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.Audience,
 		&i.IpAddress,
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
-		&i.Audience,
 	)
 	return i, err
 }
 
 const getSessionByTokenHashAndAudience = `-- name: GetSessionByTokenHashAndAudience :one
-SELECT s.id, s.user_id, s.token_hash, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at, s.audience
+SELECT s.id, s.user_id, s.token_hash, s.audience, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
@@ -157,19 +157,19 @@ func (q *Queries) GetSessionByTokenHashAndAudience(ctx context.Context, arg GetS
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.Audience,
 		&i.IpAddress,
 		&i.UserAgent,
 		&i.ExpiresAt,
 		&i.LastSeenAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
-		&i.Audience,
 	)
 	return i, err
 }
 
 const listSessionsByUserID = `-- name: ListSessionsByUserID :many
-SELECT s.id, s.user_id, s.token_hash, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at, s.audience
+SELECT s.id, s.user_id, s.token_hash, s.audience, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
@@ -193,13 +193,13 @@ func (q *Queries) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([
 			&i.ID,
 			&i.UserID,
 			&i.TokenHash,
+			&i.Audience,
 			&i.IpAddress,
 			&i.UserAgent,
 			&i.ExpiresAt,
 			&i.LastSeenAt,
 			&i.RevokedAt,
 			&i.CreatedAt,
-			&i.Audience,
 		); err != nil {
 			return nil, err
 		}

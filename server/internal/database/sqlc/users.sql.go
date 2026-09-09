@@ -21,7 +21,7 @@ INSERT INTO users (
     $2,
     $3
 )
-RETURNING id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 `
 
 type CreateUserParams struct {
@@ -39,10 +39,10 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
@@ -62,7 +62,7 @@ func (q *Queries) DisableUser(ctx context.Context, id uuid.UUID) error {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+SELECT id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 FROM users
 WHERE email = $1
   AND disabled_at IS NULL
@@ -78,16 +78,16 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
 
 const getUserByEmailIncludingDisabled = `-- name: GetUserByEmailIncludingDisabled :one
-SELECT id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+SELECT id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 FROM users
 WHERE email = $1
 LIMIT 1
@@ -102,16 +102,16 @@ func (q *Queries) GetUserByEmailIncludingDisabled(ctx context.Context, email str
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+SELECT id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 FROM users
 WHERE id = $1
   AND disabled_at IS NULL
@@ -127,10 +127,10 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
@@ -142,7 +142,7 @@ SET
     updated_at = NOW()
 WHERE id = $1
   AND disabled_at IS NULL
-RETURNING id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 `
 
 func (q *Queries) MarkUserEmailVerified(ctx context.Context, id uuid.UUID) (User, error) {
@@ -154,10 +154,10 @@ func (q *Queries) MarkUserEmailVerified(ctx context.Context, id uuid.UUID) (User
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
@@ -169,7 +169,7 @@ SET
     updated_at = NOW()
 WHERE id = $2
   AND disabled_at IS NULL
-RETURNING id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 `
 
 type SetUserPasswordParams struct {
@@ -186,10 +186,10 @@ func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
@@ -202,7 +202,7 @@ SET
     updated_at = NOW()
 WHERE id = $3
   AND disabled_at IS NULL
-RETURNING id, email, email_verified, name, password_hash, disabled_at, created_at, updated_at, is_platform_admin
+RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
 `
 
 type UpdateUserProfileParams struct {
@@ -220,10 +220,10 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.EmailVerified,
 		&i.Name,
 		&i.PasswordHash,
+		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.IsPlatformAdmin,
 	)
 	return i, err
 }
