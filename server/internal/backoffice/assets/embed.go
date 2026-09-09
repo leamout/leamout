@@ -1,4 +1,4 @@
-// Package assets embeds the Backoffice public asset tree.
+// Package assets embeds the Backoffice static asset tree.
 package assets
 
 import (
@@ -6,13 +6,9 @@ import (
 	"io/fs"
 )
 
-//go:embed public
-var publicAssets embed.FS
+//go:embed favicon.ico static
+var files embed.FS
 
 func Public() fs.FS {
-	public, err := fs.Sub(publicAssets, "public")
-	if err != nil {
-		panic(err)
-	}
-	return public
+	return files
 }
