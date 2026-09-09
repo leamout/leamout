@@ -17,7 +17,7 @@ const sessionTokenBytes = 32
 type Audience string
 
 const (
-	AudienceAPI        Audience = "api"
+	AudienceUser       Audience = "user"
 	AudienceBackoffice Audience = "backoffice"
 )
 
@@ -37,7 +37,7 @@ func (s *Service) Create(
 	ipAddress *string,
 	userAgent *string,
 ) (string, sqlc.Session, error) {
-	return s.CreateForAudience(ctx, userID, ipAddress, userAgent, AudienceAPI)
+	return s.CreateForAudience(ctx, userID, ipAddress, userAgent, AudienceUser)
 }
 
 func (s *Service) CreateForAudience(
@@ -83,7 +83,7 @@ func (s *Service) Get(
 	ctx context.Context,
 	value string,
 ) (sqlc.Session, error) {
-	return s.GetForAudience(ctx, value, AudienceAPI)
+	return s.GetForAudience(ctx, value, AudienceUser)
 }
 
 func (s *Service) GetForAudience(
@@ -111,7 +111,7 @@ func (s *Service) GetForAudience(
 	return session, nil
 }
 
-// ResolveSession resolves an API session token for the authentication layer.
+// ResolveSession resolves a normal user session token for the authentication layer.
 func (s *Service) ResolveSession(
 	ctx context.Context,
 	value string,
@@ -173,7 +173,7 @@ func (s *Service) RevokeAll(
 
 func (a Audience) valid() bool {
 	switch a {
-	case AudienceAPI, AudienceBackoffice:
+	case AudienceUser, AudienceBackoffice:
 		return true
 	default:
 		return false
