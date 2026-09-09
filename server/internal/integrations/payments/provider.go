@@ -22,16 +22,22 @@ type CheckoutRequest struct {
 	Email       string
 	CallbackURL string
 	Metadata    map[string]string
+	MobileMoney *MobileMoney
+}
+
+type MobileMoney struct {
+	Phone    string
+	Provider string
 }
 
 type CheckoutSession struct {
-	Provider         string
-	ProviderID       string
-	Reference        string
-	ClientSecret     string
-	AccessCode       string
-	AuthorizationURL string
-	Status           Status
+	Provider     string
+	ProviderID   string
+	Reference    string
+	ClientSecret string
+	NextAction   string
+	Message      string
+	Status       Status
 }
 
 type Payment struct {
@@ -51,8 +57,8 @@ type Event struct {
 	Raw             []byte
 }
 
-// Provider initializes secure provider-hosted payment collection, retrieves the
-// authoritative payment state, and authenticates provider webhook payloads.
+// Provider initializes payment collection, retrieves the authoritative payment
+// state, and authenticates provider webhook payloads.
 // Commercial consequences remain the responsibility of the commercial domain.
 type Provider interface {
 	CreateCheckout(context.Context, CheckoutRequest) (CheckoutSession, error)
