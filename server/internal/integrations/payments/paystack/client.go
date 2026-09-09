@@ -223,8 +223,13 @@ func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovi
 	if err := decoder.Decode(&envelope); err != nil {
 		return paymentprovider.Event{}, fmt.Errorf("paystack: decode webhook: %w", err)
 	}
+	eventType := strings.TrimSpace(envelope.Event)
+	transactionID := strings.TrimSpace(envelope.Data.ID.String())
+	if eventType == "" || transactionID == "" {
+		return paymentprovider.Event{}, fmt.Errorf("paystack: webhook event identity is required")
+	}
 	return paymentprovider.Event{
-		Provider: "paystack", ProviderEventID: envelope.Data.ID.String(), Type: envelope.Event,
+		Provider: "paystack", ProviderEventID: eventType + ":" + transactionID, Type: eventType,
 		Payment: normalizePayment(envelope.Data), Raw: append([]byte(nil), payload...),
 	}, nil
 }
