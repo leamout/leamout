@@ -7,9 +7,13 @@ import (
 	"github.com/a-h/templ"
 )
 
-type Handler struct{}
+type Handler struct {
+	repository *Repository
+}
 
-func NewHandler() *Handler { return &Handler{} }
+func NewHandler(repository *Repository) *Handler {
+	return &Handler{repository: repository}
+}
 
 func (h *Handler) index(w http.ResponseWriter, r *http.Request) { render(w, r, Page()) }
 

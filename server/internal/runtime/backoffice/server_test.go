@@ -7,8 +7,12 @@ import (
 	"testing"
 )
 
+func testServer() *Server {
+	return newServer(nil, newModules(nil))
+}
+
 func TestHealth(t *testing.T) {
-	srv := New()
+	srv := testServer()
 	recorder := httptest.NewRecorder()
 	srv.Router.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/healthz", nil))
 	if recorder.Code != http.StatusOK {
@@ -17,7 +21,7 @@ func TestHealth(t *testing.T) {
 }
 
 func TestDashboard(t *testing.T) {
-	srv := New()
+	srv := testServer()
 	recorder := httptest.NewRecorder()
 	srv.Router.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil))
 	if recorder.Code != http.StatusOK {
@@ -36,7 +40,7 @@ func TestDashboard(t *testing.T) {
 }
 
 func TestStaticAssets(t *testing.T) {
-	srv := New()
+	srv := testServer()
 	for _, path := range []string{
 		"/static/css/tailwindcss.css",
 		"/static/js/htmx.min.js",
@@ -67,7 +71,7 @@ func TestModulePages(t *testing.T) {
 		{path: "/commercial", want: "Commercial"},
 	}
 
-	srv := New()
+	srv := testServer()
 	for _, tt := range tests {
 		recorder := httptest.NewRecorder()
 		srv.Router.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), http.MethodGet, tt.path, nil))

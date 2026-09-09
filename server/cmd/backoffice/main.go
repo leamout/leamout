@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/leamout/leamout/internal/platform/config"
 	runtimebackoffice "github.com/leamout/leamout/internal/runtime/backoffice"
 )
 
@@ -21,7 +22,17 @@ func main() {
 	)
 	defer stop()
 
-	srv := runtimebackoffice.New()
+	cfg, err := config.LoadBackoffice()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	srv, err := runtimebackoffice.New(ctx, cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer srv.Close()
+
 	httpServer := &http.Server{
 		Addr:              ":8081",
 		Handler:           srv.Router,
