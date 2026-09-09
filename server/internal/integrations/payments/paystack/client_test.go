@@ -44,7 +44,54 @@ func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session.Provider != "paystack" || session.NextAction != "pending" || session.Reference != "invoice-1" {
+	if session.Provider != "paystack" || session.NextAction != paymentprovider.NextActionWait || session.Reference != "invoice-1" {
+		t.Fatalf("session = %+v", session)
+	}
+}
+
+func TestContinueCheckoutSubmitsOTP(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/charge/submit_otp" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		payload, _ := io.ReadAll(r.Body)
+		for _, expected := range []string{`"otp":"123456"`, `"reference":"invoice-1"`} {
+			if !strings.Contains(string(payload), expected) {
+				t.Fatalf("body %s does not contain %s", payload, expected)
+			}
+		}
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"invoice-1","status":"success","gateway_response":"Approved"}}`))
+	}))
+	defer server.Close()
+	client, _ := NewClient(Config{BaseURL: server.URL, SecretKey: "test-secret", HTTPClient: server.Client()})
+	session, err := client.ContinueCheckout(context.Background(), paymentprovider.ContinueCheckoutRequest{
+		Reference: "invoice-1", Action: paymentprovider.NextActionSubmitOTP, Value: "123456",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.Status != paymentprovider.StatusSucceeded || session.NextAction != paymentprovider.NextActionNone {
+		t.Fatalf("session = %+v", session)
+	}
+}
+
+func TestCreateCheckoutMapsMobileMoneyAuthorization(t *testing.T) {
+	if action := nextAction("pay_offline"); action != paymentprovider.NextActionAuthorizeMobileMoney {
+		t.Fatalf("action = %s", action)
+	}
+}
+
+func TestGetCheckoutReturnsProviderContinuation(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"invoice-1","status":"pay_offline","display_text":"Approve the payment on your phone"}}`))
+	}))
+	defer server.Close()
+	client, _ := NewClient(Config{BaseURL: server.URL, SecretKey: "test-secret", HTTPClient: server.Client()})
+	session, err := client.GetCheckout(context.Background(), "invoice-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.NextAction != paymentprovider.NextActionAuthorizeMobileMoney || session.Message != "Approve the payment on your phone" {
 		t.Fatalf("session = %+v", session)
 	}
 }
