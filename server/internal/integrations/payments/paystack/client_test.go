@@ -128,20 +128,38 @@ func TestCreateCheckoutRequiresMobileMoneyFields(t *testing.T) {
 
 func TestParseWebhookAuthenticatesPaystackPayload(t *testing.T) {
 	payload := []byte(`{"event":"charge.success","data":{"id":42,"reference":"invoice-1","amount":2500,"currency":"GHS","status":"success"}}`)
-	mac := hmac.New(sha512.New, []byte("test-secret"))
-	_, _ = mac.Write(payload)
-	header := http.Header{}
-	header.Set("x-paystack-signature", hex.EncodeToString(mac.Sum(nil)))
+	header := signedHeader(payload)
 	client, _ := NewClient(Config{SecretKey: "test-secret"})
 	event, err := client.ParseWebhook(payload, header)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if event.Type != "charge.success" || event.Payment.Reference != "invoice-1" || event.Payment.Status != paymentprovider.StatusSucceeded {
+	if event.ProviderEventID != "charge.success:42" || event.Type != "charge.success" || event.Payment.Reference != "invoice-1" || event.Payment.Status != paymentprovider.StatusSucceeded {
 		t.Fatalf("event = %+v", event)
 	}
 	header.Set("x-paystack-signature", strings.Repeat("0", sha512.Size*2))
 	if _, err := client.ParseWebhook(payload, header); err == nil {
 		t.Fatal("expected invalid signature error")
 	}
+}
+
+func TestParseWebhookRejectsMissingIdentity(t *testing.T) {
+	client, _ := NewClient(Config{SecretKey: "test-secret"})
+	for _, payload := range [][]byte{
+		[]byte(`{"data":{"id":42}}`),
+		[]byte(`{"event":"   ","data":{"id":42}}`),
+		[]byte(`{"event":"charge.success","data":{}}`),
+	} {
+		if _, err := client.ParseWebhook(payload, signedHeader(payload)); err == nil || !strings.Contains(err.Error(), "event identity") {
+			t.Fatalf("payload %s error = %v", payload, err)
+		}
+	}
+}
+
+func signedHeader(payload []byte) http.Header {
+	mac := hmac.New(sha512.New, []byte("test-secret"))
+	_, _ = mac.Write(payload)
+	header := http.Header{}
+	header.Set("x-paystack-signature", hex.EncodeToString(mac.Sum(nil)))
+	return header
 }
