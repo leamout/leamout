@@ -1,0 +1,24 @@
+package components
+
+templ Table(headers []string, rows [][]string) {
+	<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+		<table class="table">
+			<thead>
+				<tr>
+					for _, header := range headers {
+						<th>{ header }</th>
+					}
+				</tr>
+			</thead>
+			<tbody>
+				for _, row := range rows {
+					<tr>
+						for _, cell := range row {
+							<td>{ cell }</td>
+						}
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
