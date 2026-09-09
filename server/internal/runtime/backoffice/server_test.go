@@ -58,3 +58,25 @@ func TestStaticAssets(t *testing.T) {
 		}
 	}
 }
+
+func TestModulePages(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/organizations", want: "Acme Communications"},
+		{path: "/calls", want: "call_01JQ8YN7"},
+	}
+
+	srv := New()
+	for _, tt := range tests {
+		recorder := httptest.NewRecorder()
+		srv.Router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, tt.path, nil))
+		if recorder.Code != http.StatusOK {
+			t.Errorf("GET %s status = %d, want %d", tt.path, recorder.Code, http.StatusOK)
+		}
+		if !strings.Contains(recorder.Body.String(), tt.want) {
+			t.Errorf("GET %s response does not contain %q", tt.path, tt.want)
+		}
+	}
+}

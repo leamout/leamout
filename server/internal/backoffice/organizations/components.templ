@@ -1,0 +1,21 @@
+package organizations
+
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+templ OrganizationTable(organizations []Organization) {
+	@components.Table(
+		[]string{"Organization", "Slug", "Plan", "Members", "Status"},
+		organizationRows(organizations),
+	)
+}
+
+func organizationRows(organizations []Organization) [][]string {
+	rows := make([][]string, 0, len(organizations))
+	for _, organization := range organizations {
+		rows = append(rows, []string{organization.Name, organization.Slug, organization.Plan, fmt.Sprint(organization.Members), organization.Status})
+	}
+	return rows
+}

@@ -1,0 +1,18 @@
+package calls
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ CallTable(calls []Call) {
+	@components.Table(
+		[]string{"Call ID", "From", "To", "Direction", "Duration", "Status"},
+		callRows(calls),
+	)
+}
+
+func callRows(calls []Call) [][]string {
+	rows := make([][]string, 0, len(calls))
+	for _, call := range calls {
+		rows = append(rows, []string{call.ID, call.From, call.To, call.Direction, call.Duration, call.Status})
+	}
+	return rows
+}

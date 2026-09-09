@@ -1,0 +1,17 @@
+package organizations
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page(organizations []Organization, page int, totalPages int) {
+	@components.Layout("Organizations", "organizations", PageContent(organizations, page, totalPages))
+}
+
+templ PageContent(organizations []Organization, page int, totalPages int) {
+	<div class="mb-6">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Tenancy</p>
+		<h1 class="mt-2 text-3xl font-bold">Organizations</h1>
+		<p class="mt-2 text-base-content/70">Inspect customer organizations, plans, and membership.</p>
+	</div>
+	@OrganizationTable(organizations)
+	<div class="mt-6 flex justify-end">@components.Pagination(page, totalPages, "/organizations")</div>
+}
