@@ -28,7 +28,7 @@ This is the Phase 1 commercial core. The subscription describes the software com
 
 Self-hosted BYOC traffic can use the customer's own carrier and infrastructure. Telecom minutes are therefore not automatically Leamout-billable usage merely because the customer runs licensed Leamout software.
 
-### Future managed / CPaaS money path
+### Managed / CPaaS prepaid money path
 
 ```text
 telecom domain event
@@ -37,18 +37,33 @@ telecom domain event
         ↓
        rating
         ↓
- durable monetary charge
+ prepaid authorization
         ↓
- accounting / balance
+ funds reservation
         ↓
-     invoicing
+ provider operation
         ↓
-      payments
+ capture + reconciliation
 ```
 
-This path becomes concrete as managed voice, multi-carrier orchestration, number lifecycle, direct carrier connectivity, messaging, media, and hosted carrier products introduce Leamout-owned billable usage and recurring telecom resources.
+Managed voice, numbers, messaging, and media create an upstream obligation for Leamout. The customer must therefore fund a wallet before Leamout authorizes a managed-provider operation. Usage may be metered and rated, but collection is prepaid; Leamout does not extend postpaid usage credit.
 
-`metering`, `rating`, `invoicing`, and `payments` are domain boundaries already represented by existing schema/code, but they must not be treated as a complete CPaaS billing engine until real product workflows require them. Future durable `charges`, ledger/accounting, prepaid balance, credit, tax, refund, and billing-account concepts should be introduced with those concrete workflows rather than hidden inside invoices or payment-provider objects.
+## Pay-before-use invariants
+
+1. Platform access requires an active subscription or enterprise license.
+2. A managed-provider operation requires sufficient prepaid funds; BYOC carrier usage does not consume a Leamout carrier wallet.
+3. A pending, processing, failed, or unverified provider payment never creates spendable credit.
+4. Only an authenticated, idempotently recorded provider success may post a wallet top-up.
+5. Spendable balance is posted ledger credits minus posted ledger debits minus active reservations.
+6. Leamout must atomically reserve sufficient funds before creating an upstream obligation with DIDWW, CommPeak, or another managed provider.
+7. A wallet cannot be overdrawn. Concurrent authorizations serialize on the wallet and fail when funds are insufficient.
+8. Successful provider work captures no more than the reserved amount; unused funds are released. Failed or abandoned work releases its reservation.
+9. Wallet ledger entries are immutable. Refunds, chargebacks, and corrections are new compensating entries.
+10. PostgreSQL is the monetary source of truth. Redis may cache availability and coordinate realtime authorization, but it cannot create or destroy value.
+11. Money is never mixed across currencies. Every wallet has exactly one ISO currency.
+12. Customer challenge secrets, including OTPs and PINs, are never persisted.
+
+These rules describe subscription/license plus prepaid usage. They prohibit postpaid usage billing, not the metering required to price and reconcile prepaid consumption.
 
 ## Current domain map
 
@@ -70,8 +85,12 @@ organization
     │
     ├── invoices
     │      └── invoice_items
-    │
-    └── payments
+    ├── checkout_orders
+    │      └── payments
+    │             └── payment_provider_events
+    └── wallets
+           ├── wallet_ledger_entries
+           └── wallet_reservations
 
 plan + meter
     └── usage_rates
@@ -92,12 +111,17 @@ usage_rates
 usage_events
 invoices
 invoice_items
+checkout_orders
 payments
+payment_provider_events
+wallets
+wallet_ledger_entries
+wallet_reservations
 ```
 
 Managed telecom wholesale cost is a separate concern: provider CDRs reconcile into `wholesale_charges`; they are not usage pricing rules.
 
-Existing tables do not imply that every future commercial workflow is implemented. Package behavior should continue to follow concrete callers and roadmap needs.
+The schema establishes financial invariants; service orchestration and public checkout routes are introduced as separately testable vertical slices.
 
 ## Strict module structure
 
@@ -147,6 +171,10 @@ New or changed SQL belongs in `server/internal/database/queries/*.sql`. Generate
 8. Usage ingestion must be idempotent.
 9. SQL queries must enforce tenant/resource ownership even when middleware or service authorization fails.
 10. Commercial repositories must use SQLC-generated queries rather than raw SQL.
+11. Managed-provider spending must be preceded by an atomic prepaid reservation.
+12. Provider payment success and wallet credit are separate, idempotent records.
+13. Ledger history is append-only; a correction never rewrites a posted entry.
+14. Redis is never the monetary system of record.
 
 See [security.md](security.md) for the database defense model.
 
@@ -160,10 +188,11 @@ See [security.md](security.md) for the database defense model.
 - [Metering](metering.md) — authoritative usage ingestion and meters for managed/billable services.
 - [Rating](rating.md) — customer-facing telecom usage pricing through usage rates.
 - [Invoicing](invoicing.md) — period statements and historical monetary snapshots.
-- [Payments](payments.md) — provider-independent payment reconciliation.
+- [Payments](payments.md) — checkout intent and provider-independent payment reconciliation.
+- **Wallets** — currency-scoped prepaid value, immutable ledger movements, and provider-operation reservations.
 
 ## Current boundaries
 
-The current model intentionally does not include a separate commercial customer entity, billing accounts, contracts, durable charges, ledger accounting, prepaid wallets, credit limits, support, notifications, credits, discounts, taxes, refunds, or payout infrastructure.
+The current model intentionally does not include a separate commercial customer entity, contracts, postpaid credit limits, support, discounts, tax calculation, customer withdrawals, or payout infrastructure.
 
 Those concepts should be added only when concrete product behavior requires them.
