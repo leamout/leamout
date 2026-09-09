@@ -463,6 +463,69 @@ func (q *Queries) GetVoiceBindingByNumber(ctx context.Context, number string) (G
 	return i, err
 }
 
+const listBackofficePhoneNumbers = `-- name: ListBackofficePhoneNumbers :many
+SELECT
+    pn.id::TEXT AS id,
+    o.name AS organization_name,
+    pn.number,
+    pn.country_code::TEXT AS country_code,
+    pn.provisioning_mode,
+    COALESCE(cp.name, 'BYOC') AS provider_name,
+    pn.voice_enabled,
+    pn.sms_enabled,
+    pn.status,
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM phone_numbers AS pn
+JOIN organizations AS o ON o.id = pn.organization_id
+LEFT JOIN carrier_providers AS cp ON cp.id = pn.provider_id
+ORDER BY pn.created_at DESC
+LIMIT 100
+`
+
+type ListBackofficePhoneNumbersRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	Number           string `db:"number" json:"number"`
+	CountryCode      string `db:"country_code" json:"country_code"`
+	ProvisioningMode string `db:"provisioning_mode" json:"provisioning_mode"`
+	ProviderName     string `db:"provider_name" json:"provider_name"`
+	VoiceEnabled     bool   `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled       bool   `db:"sms_enabled" json:"sms_enabled"`
+	Status           string `db:"status" json:"status"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficePhoneNumbers(ctx context.Context) ([]ListBackofficePhoneNumbersRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficePhoneNumbers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficePhoneNumbersRow{}
+	for rows.Next() {
+		var i ListBackofficePhoneNumbersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationName,
+			&i.Number,
+			&i.CountryCode,
+			&i.ProvisioningMode,
+			&i.ProviderName,
+			&i.VoiceEnabled,
+			&i.SmsEnabled,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPhoneNumbersByCountry = `-- name: ListPhoneNumbersByCountry :many
 SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provisioning_mode, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn

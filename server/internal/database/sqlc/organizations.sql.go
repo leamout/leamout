@@ -129,6 +129,62 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 	return i, err
 }
 
+const listBackofficeOrganizations = `-- name: ListBackofficeOrganizations :many
+SELECT
+    o.id::TEXT AS id,
+    o.name,
+    o.status,
+    COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
+    COALESCE(p.name, '—') AS plan_name,
+    to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM organizations AS o
+LEFT JOIN organization_members AS om ON om.organization_id = o.id
+LEFT JOIN subscriptions AS s
+    ON s.organization_id = o.id
+   AND s.status IN ('active', 'past_due')
+LEFT JOIN plans AS p ON p.id = s.plan_id
+WHERE o.deleted_at IS NULL
+GROUP BY o.id, o.name, o.status, p.name, o.created_at
+ORDER BY o.created_at DESC
+LIMIT 100
+`
+
+type ListBackofficeOrganizationsRow struct {
+	ID          string `db:"id" json:"id"`
+	Name        string `db:"name" json:"name"`
+	Status      string `db:"status" json:"status"`
+	MemberCount int64  `db:"member_count" json:"member_count"`
+	PlanName    string `db:"plan_name" json:"plan_name"`
+	CreatedAt   string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeOrganizations(ctx context.Context) ([]ListBackofficeOrganizationsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeOrganizations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeOrganizationsRow{}
+	for rows.Next() {
+		var i ListBackofficeOrganizationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Status,
+			&i.MemberCount,
+			&i.PlanName,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrganizationsByUserID = `-- name: ListOrganizationsByUserID :many
 SELECT t.id, t.name, t.status, t.created_at, t.updated_at, t.deleted_at, tm.role AS member_role
 FROM organizations AS t

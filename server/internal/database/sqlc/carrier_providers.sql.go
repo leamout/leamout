@@ -57,6 +57,67 @@ func (q *Queries) GetCarrierProviderBySlug(ctx context.Context, slug string) (Ca
 	return i, err
 }
 
+const listBackofficeProviders = `-- name: ListBackofficeProviders :many
+SELECT
+    cp.id::TEXT AS id,
+    cp.slug,
+    cp.name,
+    cp.adapter,
+    cp.status,
+    COUNT(DISTINCT cc.id)::BIGINT AS connection_count,
+    COUNT(DISTINCT po.id) FILTER (
+        WHERE po.state IN ('pending', 'provider_accepted')
+    )::BIGINT AS pending_operation_count,
+    COUNT(DISTINCT po.id) FILTER (
+        WHERE po.state = 'failed'
+    )::BIGINT AS failed_operation_count
+FROM carrier_providers AS cp
+LEFT JOIN carrier_connections AS cc ON cc.provider_id = cp.id
+LEFT JOIN provider_operations AS po ON po.carrier_provider_id = cp.id
+GROUP BY cp.id, cp.slug, cp.name, cp.adapter, cp.status, cp.created_at
+ORDER BY cp.created_at DESC
+`
+
+type ListBackofficeProvidersRow struct {
+	ID                    string `db:"id" json:"id"`
+	Slug                  string `db:"slug" json:"slug"`
+	Name                  string `db:"name" json:"name"`
+	Adapter               string `db:"adapter" json:"adapter"`
+	Status                string `db:"status" json:"status"`
+	ConnectionCount       int64  `db:"connection_count" json:"connection_count"`
+	PendingOperationCount int64  `db:"pending_operation_count" json:"pending_operation_count"`
+	FailedOperationCount  int64  `db:"failed_operation_count" json:"failed_operation_count"`
+}
+
+func (q *Queries) ListBackofficeProviders(ctx context.Context) ([]ListBackofficeProvidersRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeProviders)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeProvidersRow{}
+	for rows.Next() {
+		var i ListBackofficeProvidersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.Adapter,
+			&i.Status,
+			&i.ConnectionCount,
+			&i.PendingOperationCount,
+			&i.FailedOperationCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCarrierProviders = `-- name: ListCarrierProviders :many
 SELECT id, slug, name, adapter, status, created_at, updated_at
 FROM carrier_providers

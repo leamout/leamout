@@ -578,6 +578,74 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 	return items, nil
 }
 
+const listBackofficeTrunks = `-- name: ListBackofficeTrunks :many
+SELECT
+    t.id::TEXT AS id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    t.name,
+    t.provisioning_mode,
+    COALESCE(cp.name, '—') AS provider_name,
+    t.direction,
+    t.status,
+    COUNT(te.id)::BIGINT AS endpoint_count
+FROM trunks AS t
+LEFT JOIN organizations AS o ON o.id = t.organization_id
+LEFT JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN trunk_endpoints AS te ON te.trunk_id = t.id
+GROUP BY
+    t.id,
+    o.name,
+    t.name,
+    t.provisioning_mode,
+    cp.name,
+    t.direction,
+    t.status,
+    t.created_at
+ORDER BY t.created_at DESC
+LIMIT 100
+`
+
+type ListBackofficeTrunksRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	Name             string `db:"name" json:"name"`
+	ProvisioningMode string `db:"provisioning_mode" json:"provisioning_mode"`
+	ProviderName     string `db:"provider_name" json:"provider_name"`
+	Direction        string `db:"direction" json:"direction"`
+	Status           string `db:"status" json:"status"`
+	EndpointCount    int64  `db:"endpoint_count" json:"endpoint_count"`
+}
+
+func (q *Queries) ListBackofficeTrunks(ctx context.Context) ([]ListBackofficeTrunksRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeTrunks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeTrunksRow{}
+	for rows.Next() {
+		var i ListBackofficeTrunksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationName,
+			&i.Name,
+			&i.ProvisioningMode,
+			&i.ProviderName,
+			&i.Direction,
+			&i.Status,
+			&i.EndpointCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlatformTrunks = `-- name: ListPlatformTrunks :many
 SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t

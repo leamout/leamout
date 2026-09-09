@@ -301,6 +301,63 @@ func (q *Queries) GetSubscriptionByProviderID(ctx context.Context, arg GetSubscr
 	return i, err
 }
 
+const listBackofficeCommercialAccounts = `-- name: ListBackofficeCommercialAccounts :many
+SELECT
+    o.id::TEXT AS organization_id,
+    o.name AS organization_name,
+    COALESCE(p.name, '—') AS plan_name,
+    COALESCE(s.status, 'none') AS subscription_status,
+    COALESCE(s.billing_provider, '—') AS billing_provider,
+    COALESCE(
+        to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+        '—'
+    ) AS renews_at
+FROM organizations AS o
+LEFT JOIN subscriptions AS s
+    ON s.organization_id = o.id
+   AND s.status IN ('active', 'past_due')
+LEFT JOIN plans AS p ON p.id = s.plan_id
+WHERE o.deleted_at IS NULL
+ORDER BY o.created_at DESC
+LIMIT 100
+`
+
+type ListBackofficeCommercialAccountsRow struct {
+	OrganizationID     string      `db:"organization_id" json:"organization_id"`
+	OrganizationName   string      `db:"organization_name" json:"organization_name"`
+	PlanName           string      `db:"plan_name" json:"plan_name"`
+	SubscriptionStatus string      `db:"subscription_status" json:"subscription_status"`
+	BillingProvider    string      `db:"billing_provider" json:"billing_provider"`
+	RenewsAt           interface{} `db:"renews_at" json:"renews_at"`
+}
+
+func (q *Queries) ListBackofficeCommercialAccounts(ctx context.Context) ([]ListBackofficeCommercialAccountsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeCommercialAccounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeCommercialAccountsRow{}
+	for rows.Next() {
+		var i ListBackofficeCommercialAccountsRow
+		if err := rows.Scan(
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.PlanName,
+			&i.SubscriptionStatus,
+			&i.BillingProvider,
+			&i.RenewsAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSubscriptionsByOrganization = `-- name: ListSubscriptionsByOrganization :many
 SELECT s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.billing_provider, s.provider_subscription_id, s.created_at, s.updated_at
 FROM subscriptions AS s
