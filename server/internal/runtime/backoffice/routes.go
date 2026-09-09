@@ -21,15 +21,14 @@ func registerRoutes(
 	router.Handle("/static/*", public)
 
 	if authHandler != nil {
-		router.Get("/login", authHandler.LoginPage)
-		router.Post("/login", authHandler.Login)
+		authHandler.RegisterPublicRoutes(router)
 	}
 
 	router.Group(func(protected chi.Router) {
 		protected.Use(requireBackoffice(authentication))
 
 		if authHandler != nil {
-			protected.Post("/logout", authHandler.Logout)
+			authHandler.RegisterProtectedRoutes(protected)
 		}
 
 		modules.Dashboard.Routes(protected)
