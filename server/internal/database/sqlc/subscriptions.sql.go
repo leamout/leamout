@@ -308,9 +308,11 @@ SELECT
     COALESCE(p.name, '—') AS plan_name,
     COALESCE(s.status, 'none') AS subscription_status,
     COALESCE(s.billing_provider, '—') AS billing_provider,
-    COALESCE(
-        to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
-        '—'
+    CAST(
+        COALESCE(
+            to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+            '—'
+        ) AS TEXT
     ) AS renews_at
 FROM organizations AS o
 LEFT JOIN subscriptions AS s
@@ -323,12 +325,12 @@ LIMIT 100
 `
 
 type ListBackofficeCommercialAccountsRow struct {
-	OrganizationID     string      `db:"organization_id" json:"organization_id"`
-	OrganizationName   string      `db:"organization_name" json:"organization_name"`
-	PlanName           string      `db:"plan_name" json:"plan_name"`
-	SubscriptionStatus string      `db:"subscription_status" json:"subscription_status"`
-	BillingProvider    string      `db:"billing_provider" json:"billing_provider"`
-	RenewsAt           interface{} `db:"renews_at" json:"renews_at"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	PlanName           string `db:"plan_name" json:"plan_name"`
+	SubscriptionStatus string `db:"subscription_status" json:"subscription_status"`
+	BillingProvider    string `db:"billing_provider" json:"billing_provider"`
+	RenewsAt           string `db:"renews_at" json:"renews_at"`
 }
 
 func (q *Queries) ListBackofficeCommercialAccounts(ctx context.Context) ([]ListBackofficeCommercialAccountsRow, error) {
