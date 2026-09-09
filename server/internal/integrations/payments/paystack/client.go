@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +19,8 @@ import (
 )
 
 const DefaultBaseURL = "https://api.paystack.co"
+
+var paystackReferencePattern = regexp.MustCompile(`^[A-Za-z0-9.=-]+$`)
 
 type Config struct {
 	BaseURL    string
@@ -51,23 +54,27 @@ func NewClient(config Config) (*Client, error) {
 	return &Client{baseURL: parsed, secretKey: secretKey, httpClient: httpClient}, nil
 }
 
-type initializeRequest struct {
+type chargeRequest struct {
 	Email       string            `json:"email"`
-	Amount      int64             `json:"amount"`
-	Currency    string            `json:"currency"`
+	Amount      string            `json:"amount"`
 	Reference   string            `json:"reference"`
-	CallbackURL string            `json:"callback_url,omitempty"`
+	MobileMoney mobileMoney       `json:"mobile_money"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
+type mobileMoney struct {
+	Phone    string `json:"phone"`
+	Provider string `json:"provider"`
+}
+
 type transaction struct {
-	ID               json.Number `json:"id"`
-	Reference        string      `json:"reference"`
-	AccessCode       string      `json:"access_code"`
-	AuthorizationURL string      `json:"authorization_url"`
-	Amount           int64       `json:"amount"`
-	Currency         string      `json:"currency"`
-	Status           string      `json:"status"`
+	ID              json.Number `json:"id"`
+	Reference       string      `json:"reference"`
+	Amount          int64       `json:"amount"`
+	Currency        string      `json:"currency"`
+	Status          string      `json:"status"`
+	Message         string      `json:"message"`
+	GatewayResponse string      `json:"gateway_response"`
 }
 
 type response struct {
@@ -81,21 +88,48 @@ func (c *Client) CreateCheckout(ctx context.Context, request paymentprovider.Che
 	if err != nil {
 		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: %w", err)
 	}
+	if err := validateMobileMoney(normalized); err != nil {
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: %w", err)
+	}
 	var result response
-	err = c.do(ctx, http.MethodPost, "/transaction/initialize", initializeRequest{
-		Email: normalized.Email, Amount: normalized.AmountMinor, Currency: normalized.Currency,
-		Reference: normalized.Reference, CallbackURL: normalized.CallbackURL, Metadata: normalized.Metadata,
+	err = c.do(ctx, http.MethodPost, "/charge", chargeRequest{
+		Email: normalized.Email, Amount: fmt.Sprint(normalized.AmountMinor), Reference: normalized.Reference,
+		MobileMoney: mobileMoney{Phone: strings.TrimSpace(normalized.MobileMoney.Phone), Provider: strings.ToLower(strings.TrimSpace(normalized.MobileMoney.Provider))},
+		Metadata:    normalized.Metadata,
 	}, &result)
 	if err != nil {
 		return paymentprovider.CheckoutSession{}, err
 	}
-	if !result.Status || result.Data.Reference == "" || result.Data.AccessCode == "" {
-		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: invalid initialize response: %s", result.Message)
+	if !result.Status || result.Data.Reference == "" {
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: invalid charge response: %s", result.Message)
 	}
 	return paymentprovider.CheckoutSession{
 		Provider: "paystack", ProviderID: result.Data.ID.String(), Reference: result.Data.Reference,
-		AccessCode: result.Data.AccessCode, AuthorizationURL: result.Data.AuthorizationURL, Status: paymentprovider.StatusPending,
+		NextAction: result.Data.Status, Message: firstNonEmpty(result.Data.Message, result.Data.GatewayResponse, result.Message),
+		Status: normalizeStatus(result.Data.Status),
 	}, nil
+}
+
+func validateMobileMoney(request paymentprovider.CheckoutRequest) error {
+	if !paystackReferencePattern.MatchString(request.Reference) {
+		return fmt.Errorf("payment reference may contain only letters, numbers, period, equals, and hyphen")
+	}
+	if request.Currency != "GHS" {
+		return fmt.Errorf("mobile money currency must be GHS")
+	}
+	if request.MobileMoney == nil {
+		return fmt.Errorf("mobile money details are required")
+	}
+	phone := strings.TrimSpace(request.MobileMoney.Phone)
+	if phone == "" {
+		return fmt.Errorf("mobile money phone is required")
+	}
+	switch strings.ToLower(strings.TrimSpace(request.MobileMoney.Provider)) {
+	case "mtn", "atl", "vod":
+	default:
+		return fmt.Errorf("mobile money provider must be mtn, atl, or vod")
+	}
+	return nil
 }
 
 func (c *Client) GetPayment(ctx context.Context, reference string) (paymentprovider.Payment, error) {
@@ -104,11 +138,11 @@ func (c *Client) GetPayment(ctx context.Context, reference string) (paymentprovi
 		return paymentprovider.Payment{}, fmt.Errorf("paystack: payment reference is required")
 	}
 	var result response
-	if err := c.do(ctx, http.MethodGet, "/transaction/verify/"+url.PathEscape(reference), nil, &result); err != nil {
+	if err := c.do(ctx, http.MethodGet, "/charge/"+url.PathEscape(reference), nil, &result); err != nil {
 		return paymentprovider.Payment{}, err
 	}
 	if !result.Status {
-		return paymentprovider.Payment{}, fmt.Errorf("paystack: verify failed: %s", result.Message)
+		return paymentprovider.Payment{}, fmt.Errorf("paystack: charge lookup failed: %s", result.Message)
 	}
 	return normalizePayment(result.Data), nil
 }
@@ -139,8 +173,13 @@ func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovi
 }
 
 func normalizePayment(item transaction) paymentprovider.Payment {
+	status := normalizeStatus(item.Status)
+	return paymentprovider.Payment{Provider: "paystack", ProviderID: item.ID.String(), Reference: item.Reference, AmountMinor: item.Amount, Currency: strings.ToUpper(item.Currency), Status: status}
+}
+
+func normalizeStatus(value string) paymentprovider.Status {
 	status := paymentprovider.StatusPending
-	switch item.Status {
+	switch value {
 	case "success":
 		status = paymentprovider.StatusSucceeded
 	case "failed", "abandoned", "reversed":
@@ -148,7 +187,16 @@ func normalizePayment(item transaction) paymentprovider.Payment {
 	case "ongoing", "processing", "pending", "queued":
 		status = paymentprovider.StatusProcessing
 	}
-	return paymentprovider.Payment{Provider: "paystack", ProviderID: item.ID.String(), Reference: item.Reference, AmountMinor: item.Amount, Currency: strings.ToUpper(item.Currency), Status: status}
+	return status
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body any, result any) error {
