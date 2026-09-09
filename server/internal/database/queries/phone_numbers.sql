@@ -306,3 +306,21 @@ WHERE pn.number = sqlc.arg(number)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 LIMIT 1;
+
+-- name: ListBackofficePhoneNumbers :many
+SELECT
+    pn.id::TEXT AS id,
+    o.name AS organization_name,
+    pn.number,
+    pn.country_code::TEXT AS country_code,
+    pn.provisioning_mode,
+    COALESCE(cp.name, 'BYOC') AS provider_name,
+    pn.voice_enabled,
+    pn.sms_enabled,
+    pn.status,
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM phone_numbers AS pn
+JOIN organizations AS o ON o.id = pn.organization_id
+LEFT JOIN carrier_providers AS cp ON cp.id = pn.provider_id
+ORDER BY pn.created_at DESC
+LIMIT 100;
