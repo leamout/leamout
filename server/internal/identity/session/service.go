@@ -14,6 +14,13 @@ import (
 
 const sessionTokenBytes = 32
 
+type Audience string
+
+const (
+	AudienceAPI        Audience = "api"
+	AudienceBackoffice Audience = "backoffice"
+)
+
 type Service struct {
 	repo *Repository
 }
@@ -30,8 +37,21 @@ func (s *Service) Create(
 	ipAddress *string,
 	userAgent *string,
 ) (string, sqlc.Session, error) {
+	return s.CreateForAudience(ctx, userID, ipAddress, userAgent, AudienceAPI)
+}
+
+func (s *Service) CreateForAudience(
+	ctx context.Context,
+	userID uuid.UUID,
+	ipAddress *string,
+	userAgent *string,
+	audience Audience,
+) (string, sqlc.Session, error) {
 	if err := validateUserID(userID); err != nil {
 		return "", sqlc.Session{}, err
+	}
+	if !audience.valid() {
+		return "", sqlc.Session{}, ErrInvalidSession
 	}
 
 	value, err := token.Generate(sessionTokenBytes)
@@ -39,13 +59,14 @@ func (s *Service) Create(
 		return "", sqlc.Session{}, err
 	}
 
-	expiresAt := time.Now().Add(30 * 24 * time.Hour)
+	expiresAt := time.Now().Add(sessionTTL(audience))
 
 	session, err := s.repo.Create(
 		ctx,
 		sqlc.CreateSessionParams{
 			UserID:    userID,
 			TokenHash: token.Hash(value),
+			Audience:  string(audience),
 			IpAddress: parseIP(ipAddress),
 			UserAgent: userAgent,
 			ExpiresAt: pgconv.NullableTimestamptz(&expiresAt),
@@ -62,13 +83,22 @@ func (s *Service) Get(
 	ctx context.Context,
 	value string,
 ) (sqlc.Session, error) {
-	if err := validateToken(value); err != nil {
+	return s.GetForAudience(ctx, value, AudienceAPI)
+}
+
+func (s *Service) GetForAudience(
+	ctx context.Context,
+	value string,
+	audience Audience,
+) (sqlc.Session, error) {
+	if err := validateToken(value); err != nil || !audience.valid() {
 		return sqlc.Session{}, ErrInvalidSession
 	}
 
-	session, err := s.repo.GetByTokenHash(
+	session, err := s.repo.GetByTokenHashAndAudience(
 		ctx,
 		token.Hash(value),
+		string(audience),
 	)
 	if err != nil {
 		return sqlc.Session{}, ErrInvalidSession
@@ -81,7 +111,7 @@ func (s *Service) Get(
 	return session, nil
 }
 
-// ResolveSession resolves a session token for the authentication layer.
+// ResolveSession resolves an API session token for the authentication layer.
 func (s *Service) ResolveSession(
 	ctx context.Context,
 	value string,
@@ -139,4 +169,20 @@ func (s *Service) RevokeAll(
 	}
 
 	return s.repo.RevokeUserSessions(ctx, userID)
+}
+
+func (a Audience) valid() bool {
+	switch a {
+	case AudienceAPI, AudienceBackoffice:
+		return true
+	default:
+		return false
+	}
+}
+
+func sessionTTL(audience Audience) time.Duration {
+	if audience == AudienceBackoffice {
+		return 12 * time.Hour
+	}
+	return 30 * 24 * time.Hour
 }
