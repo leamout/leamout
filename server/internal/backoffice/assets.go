@@ -5,16 +5,16 @@ import (
 	"io/fs"
 )
 
-// publicAssets contains the generated frontend bundle so the backoffice binary
+// staticAssets contains the generated frontend bundle so the backoffice binary
 // can serve its UI independently of its working directory.
 //
-//go:embed assets/public
-var publicAssets embed.FS
+//go:embed assets
+var staticAssets embed.FS
 
-func PublicAssets() fs.FS {
-	public, err := fs.Sub(publicAssets, "assets/public")
+func StaticAssets() fs.FS {
+	static, err := fs.Sub(staticAssets, "assets")
 	if err != nil {
 		panic(err)
 	}
-	return public
+	return static
 }

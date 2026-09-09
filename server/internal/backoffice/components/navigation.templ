@@ -7,16 +7,24 @@ templ Navigation(active string) {
 			<div class="px-4 py-4 text-lg font-bold">Leamout</div>
 			<ul class="menu w-full gap-1">
 				@NavigationItem("Dashboard", "/", "dashboard", active)
+
+                <li><span class="menu-title">Tenants</span></li>
 				@NavigationItem("Organizations", "/organizations", "organizations", active)
-				@NavigationItem("Calls", "/calls", "calls", active)
-				<li><span class="menu-title">Telecom</span></li>
-				<li><span class="opacity-60">Numbers</span></li>
-				<li><span class="opacity-60">Carriers</span></li>
-				<li><span class="opacity-60">Trunks</span></li>
-				<li><span class="opacity-60">Providers</span></li>
-				<li><span class="menu-title">Operations</span></li>
-				<li><span class="opacity-60">Commercial</span></li>
-				<li><span class="opacity-60">Audit</span></li>
+				@NavigationItem("Users", "/users", "users", active)
+				@NavigationItem("Licenses", "/licenses", "licenses", active)
+
+                <li><span class="menu-title">Telecom</span></li>
+                @NavigationItem("Calls", "/calls", "calls", active)
+                @NavigationItem("Phone Numbers", "/numbers", "numbers", active)
+				@NavigationItem("SIP Trunks", "/trunks", "trunks", active)
+				@NavigationItem("SMPP Connections", "/smpp", "smpp", active)
+				@NavigationItem("CDRs & Logs", "/cdrs", "cdrs", active)
+
+				<li><span class="menu-title">Billing</span></li>
+				@NavigationItem("Revenue", "/revenue", "revenue", active)
+				@NavigationItem("Wallets", "/wallets", "wallets", active)
+				@NavigationItem("Invoices", "/invoices", "invoices", active)
+				@NavigationItem("Disputes", "/disputes", "disputes", active)
 			</ul>
 		</aside>
 	</div>

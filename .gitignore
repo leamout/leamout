@@ -23,7 +23,7 @@ deploy/certs/*.pem
 *_templ.txt
 
 # Generated Backoffice assets
-server/internal/backoffice/assets/public/static/css/tailwindcss.css
+server/internal/backoffice/assets/static/css/tailwindcss.css
 
 # Go profiling / coverage
 /coverage/

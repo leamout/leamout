@@ -14,7 +14,7 @@ import (
 
 func registerRoutes(router chi.Router) {
 	router.Get("/healthz", health)
-	public := http.FileServerFS(backofficeui.PublicAssets())
+	public := http.FileServerFS(backofficeui.StaticAssets())
 	router.Get("/", component(components.Dashboard()))
 	router.Get("/fragments/runtime-status", component(components.RuntimeStatus()))
 	router.Mount("/organizations", backofficeorganizations.NewHandler().Routes())
