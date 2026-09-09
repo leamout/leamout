@@ -4,8 +4,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
 	"github.com/leamout/leamout/internal/backoffice/assets"
+	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
 )
 
 func registerRoutes(
