@@ -1,169 +1,74 @@
-# Payments
+# Payments and prepaid checkout
 
-Payments record provider-independent money movement and reconcile it with Leamout invoices and commercial state.
+Payments reconcile externally collected money with a server-priced Leamout checkout order. A payment is evidence of collection; it is not itself a subscription, entitlement, license, or wallet balance.
 
-## Flow
+## Collection boundary
 
 ```text
-Stripe cards / Paystack Mobile Money / manual
-                    ↓
-              billing adapter
-                    ↓
-                 payment
-                    ↓
-                 invoice
-                    ↓
-        subscription consequences
-                    ↓
-              entitlements
-                    ↓
-                licensing
+card         -> Stripe PaymentIntent + Leamout card checkout
+mobile money -> Paystack Charge API + Leamout MoMo checkout
 ```
 
-Leamout is not building payment-network or Merchant-of-Record infrastructure. Those capabilities belong behind provider adapters when needed.
+Leamout creates every checkout reference and owns the amount, currency, target, and commercial consequence. Stripe is restricted to cards. Paystack is restricted to Mobile Money and exposes only the continuation actions needed by that channel.
 
-## Collection adapters
+Challenge values such as an OTP are relayed to the provider over a protected request and are never persisted. Leamout does not collect a Paystack PIN.
 
-Payment collection adapters live under `server/internal/integrations/payments`.
-They expose one provider-neutral contract for initializing secure checkout,
-retrieving authoritative provider state, and authenticating webhook payloads.
+## Checkout order
 
-The initial channel boundary is explicit:
+A checkout order is the durable intent that precedes provider collection. It has exactly one target:
 
-```text
-card         -> Stripe PaymentIntent + Stripe Elements
-mobile money -> Paystack transaction + Paystack Popup/redirect
-```
+- `subscription` references a server-owned catalog price and may reference its invoice.
+- `wallet_topup` references the destination currency wallet.
 
-Leamout owns the amount, currency, reference, invoice, subscription, prepaid
-balance, and all commercial consequences. The browser receives only the Stripe
-client secret or Paystack access code/authorization URL needed by the provider's
-secure UI. Provider adapters must not activate subscriptions, grant entitlements,
-issue licenses, or credit balances.
+The provider and payment method are fixed pairs:
 
-Both adapters require a Leamout-generated idempotent reference. Stripe receives
-that reference as both its idempotency key and PaymentIntent metadata. Paystack
-receives it as the transaction reference. Reconciliation must retrieve provider
-state and compare the provider, reference, amount, and currency with Leamout's
-commercial intent before delivering value.
+| Provider | Method |
+| --- | --- |
+| Stripe | `card` |
+| Paystack | `mobile_money` |
 
-Webhook parsers authenticate the unmodified request body. Stripe uses the
-endpoint-specific webhook secret and a bounded timestamp tolerance. Paystack
-uses the account secret key with its HMAC-SHA512 signature. Authenticated events
-are normalized, but durable event storage and asynchronous commercial processing
-belong to the forthcoming checkout/payment orchestration layer.
+The browser may select a permitted wallet top-up amount, but configured limits and the final amount are enforced by the server. Subscription amounts always come from the selected immutable price and invoice snapshot.
 
-## Current payment model
+## Verified collection flow
 
 ```text
-organization_id
-invoice_id
-provider
-provider_payment_id
-amount
-currency
-status
-paid_at
-metadata
-created_at
-updated_at
-```
-
-Current states are:
-
-```text
-pending
-succeeded
-failed
-refunded
-partially_refunded
-```
-
-The database validates state names and basic amount/currency requirements. Service logic owns valid provider-specific transition handling.
-
-## Provider reconciliation
-
-`provider` identifies the adapter/source. `provider_payment_id` stores the provider's payment identifier when one exists.
-
-The pair is unique when a provider payment ID is present, which prevents the same external payment from being represented by multiple Leamout payment rows.
-
-A typical webhook path is:
-
-```text
-provider webhook
-    ↓
-verify provider signature/authenticity
-    ↓
-normalize provider event
-    ↓
-lookup by provider + provider_payment_id
-    ↓
-idempotently reconcile payment state
-    ↓
-reconcile invoice/subscription state
-```
-
-A provider identifier is a reconciliation key, not an authorization credential.
-
-## Invoice relationship
-
-`invoice_id` is optional because a payment can enter the system before final invoice association or represent a provider flow that is reconciled later.
-
-When an invoice is supplied, SQL should verify:
-
-```text
-payment organization == invoice organization
-payment currency == invoice currency
-```
-
-Service logic should additionally enforce amount/allocation rules appropriate to the payment flow.
-
-## Tenant safety
-
-Payment reads and writes require an active, non-deleted organization. Invoice-scoped payment listing also verifies that the invoice and payment share the same organization.
-
-Provider-ID reconciliation lookups currently filter through active organizations for normal domain access. If a future privileged reconciliation worker must process disabled organizations, create a deliberately named privileged query rather than weakening normal tenant queries.
-
-## Payment does not equal entitlement
-
-Never implement:
-
-```text
-payment provider webhook
+server-priced checkout order
         ↓
-direct entitlement grant or license signing
+provider payment attempt
+        ↓
+authenticated provider event
+        ↓
+idempotent payment success
+        ↓
+subscription transition OR wallet ledger credit
 ```
 
-Use Leamout domain transitions:
+Pending or processing payment state never delivers value. Before applying a success, reconciliation compares provider, reference, amount, and currency to the checkout order.
+
+Provider events are stored with a unique `(provider, provider_event_id)` identity. Re-delivery can observe the recorded result but cannot repeat a wallet credit or subscription transition.
+
+## Prepaid wallets
+
+Each organization may have one wallet per ISO currency. Currency is never converted implicitly or mixed within a wallet.
+
+Posted balance is the sum of immutable ledger entries. Spendable balance is:
 
 ```text
-payment reconciliation
-        ↓
-invoice/subscription state
-        ↓
-commercial service decision
-        ↓
-entitlement resolution
-        ↓
-license issuance/renewal
+posted ledger balance - active reservations
 ```
 
-This keeps business policy provider-independent.
+Positive entries are top-ups, refunds, or credit adjustments. Negative entries are captures, chargebacks, or debit adjustments. Ledger rows cannot be updated or deleted; corrections are compensating entries with their own idempotency key.
 
-## Manual billing
+## Provider spending
 
-Manual invoice/payment flows may use the same `payments` domain model without pretending that a card processor exists. Manual billing behavior should be introduced only when an operational workflow requires it.
+Before Leamout incurs an upstream obligation, it atomically locks the wallet, verifies spendable funds, and creates a reservation. This applies to DIDWW number purchases, CommPeak calls, and every future managed carrier operation.
+
+A successful operation captures no more than the reservation. Failure releases it. Realtime Redis state may accelerate admission and incremental call authorization, but PostgreSQL remains authoritative and Redis cannot mint credit.
+
+## Provider independence
+
+Provider webhooks must never directly grant entitlements, issue licenses, or mutate wallet balances. They authenticate and record provider facts; commercial services apply the matching Leamout transition in an idempotent database transaction.
 
 ## Deferred concerns
 
-The current model intentionally avoids premature payment infrastructure such as:
-
-```text
-stored cards
-payouts
-full refund ledger
-tax remittance
-payment-network settlement
-```
-
-Add dedicated models when Leamout owns concrete behavior for them.
+The initial pay-before-use model does not implement postpaid credit, customer withdrawals, automatic foreign-exchange conversion, tax calculation, payouts, or Merchant-of-Record infrastructure.
