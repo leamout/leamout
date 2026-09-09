@@ -6,6 +6,7 @@ import (
 )
 
 type Status string
+type NextAction string
 
 const (
 	StatusPending    Status = "pending"
@@ -13,6 +14,15 @@ const (
 	StatusSucceeded  Status = "succeeded"
 	StatusFailed     Status = "failed"
 	StatusCancelled  Status = "cancelled"
+)
+
+const (
+	NextActionNone                 NextAction = "none"
+	NextActionWait                 NextAction = "wait"
+	NextActionAuthorizeMobileMoney NextAction = "authorize_mobile_money"
+	NextActionSubmitOTP            NextAction = "submit_otp"
+	NextActionSubmitPhone          NextAction = "submit_phone"
+	NextActionUnsupported          NextAction = "unsupported"
 )
 
 type CheckoutRequest struct {
@@ -35,9 +45,22 @@ type CheckoutSession struct {
 	ProviderID   string
 	Reference    string
 	ClientSecret string
-	NextAction   string
+	NextAction   NextAction
 	Message      string
 	Status       Status
+}
+
+type ContinueCheckoutRequest struct {
+	Reference string
+	Action    NextAction
+	Value     string
+}
+
+// ContinuationProvider handles provider-requested input without persisting
+// sensitive challenge values such as a PIN or OTP.
+type ContinuationProvider interface {
+	ContinueCheckout(context.Context, ContinueCheckoutRequest) (CheckoutSession, error)
+	GetCheckout(context.Context, string) (CheckoutSession, error)
 }
 
 type Payment struct {
