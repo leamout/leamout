@@ -212,12 +212,14 @@ SELECT
     c.to_uri,
     c.direction,
     c.state,
-    GREATEST(
-        0::BIGINT,
-        COALESCE(
-            EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
-            0::BIGINT
-        )
+    CAST(
+        GREATEST(
+            0::BIGINT,
+            COALESCE(
+                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
+                0::BIGINT
+            )
+        ) AS BIGINT
     ) AS duration_seconds,
     to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
 FROM calls AS c
