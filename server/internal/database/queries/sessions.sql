@@ -40,7 +40,7 @@ FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
 WHERE s.token_hash = sqlc.arg(token_hash)
-  AND s.audience = 'api'
+  AND s.audience = 'user'
   AND s.expires_at > NOW()
   AND s.revoked_at IS NULL
   AND u.disabled_at IS NULL
