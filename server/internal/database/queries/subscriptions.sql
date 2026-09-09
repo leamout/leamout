@@ -149,9 +149,11 @@ SELECT
     COALESCE(p.name, '—') AS plan_name,
     COALESCE(s.status, 'none') AS subscription_status,
     COALESCE(s.billing_provider, '—') AS billing_provider,
-    COALESCE(
-        to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
-        '—'
+    CAST(
+        COALESCE(
+            to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+            '—'
+        ) AS TEXT
     ) AS renews_at
 FROM organizations AS o
 LEFT JOIN subscriptions AS s
