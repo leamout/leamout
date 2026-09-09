@@ -17,20 +17,20 @@ var (
 )
 
 type Service struct {
-	auth     *identityauth.Service
-	sessions *session.Service
-	queries  *sqlc.Queries
+	auth       *identityauth.Service
+	sessions   *session.Service
+	repository *Repository
 }
 
 func NewService(
 	authService *identityauth.Service,
 	sessionService *session.Service,
-	queries *sqlc.Queries,
+	repository *Repository,
 ) *Service {
 	return &Service{
-		auth:     authService,
-		sessions: sessionService,
-		queries:  queries,
+		auth:       authService,
+		sessions:   sessionService,
+		repository: repository,
 	}
 }
 
@@ -76,7 +76,7 @@ func (s *Service) Authenticate(
 		return authn.Principal{}, ErrUnauthenticated
 	}
 
-	user, err := s.queries.GetUserByID(ctx, backofficeSession.UserID)
+	user, err := s.repository.GetUser(ctx, backofficeSession.UserID)
 	if err != nil {
 		return authn.Principal{}, ErrUnauthenticated
 	}
