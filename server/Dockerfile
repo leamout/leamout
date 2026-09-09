@@ -7,12 +7,21 @@ WORKDIR /src
 RUN apk add --no-cache \
     ca-certificates \
     git \
+    nodejs \
+    npm \
     tzdata
+
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+RUN templ generate
+
+RUN npm ci --prefix ./internal/backoffice --no-audit --no-fund \
+    && npm run --prefix ./internal/backoffice build
 
 RUN set -eux; \
     CGO_ENABLED=0 GOOS=linux go build \
@@ -24,7 +33,12 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/worker \
-        ./cmd/worker
+        ./cmd/worker; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/backoffice \
+        ./cmd/backoffice
 
 FROM alpine:3.22
 
@@ -38,7 +52,7 @@ RUN apk add --no-cache \
 
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
-
+COPY --from=build /out/backoffice /leamout/backoffice
 USER leamout
 
 CMD ["/leamout/server"]

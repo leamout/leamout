@@ -4,3 +4,4 @@
 !*.example
 coverage.out
 *.test
+**/node_modules

@@ -18,6 +18,13 @@ deploy/certs/*.pem
 *.dylib
 *.test
 
+# Generated Templ sources
+*_templ.go
+*_templ.txt
+
+# Generated Backoffice assets
+server/internal/backoffice/assets/static/css/tailwindcss.css
+
 # Go profiling / coverage
 /coverage/
 *.out

@@ -1,0 +1,16 @@
+package calls
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page(calls []Call) {
+	@components.Layout("Calls", "calls", PageContent(calls))
+}
+
+templ PageContent(calls []Call) {
+	<div class="mb-6">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Voice</p>
+		<h1 class="mt-2 text-3xl font-bold">Calls</h1>
+		<p class="mt-2 text-base-content/70">Monitor recent call activity across all organizations.</p>
+	</div>
+	@CallTable(calls)
+}
