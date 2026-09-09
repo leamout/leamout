@@ -8,14 +8,18 @@ import (
 )
 
 type Handler struct {
+	repository    *Repository
 	organizations []Organization
 }
 
-func NewHandler() *Handler {
-	return &Handler{organizations: []Organization{
-		{Name: "Acme Communications", Slug: "acme", Plan: "Scale", Members: 12, Status: "Active"},
-		{Name: "Northstar Voice", Slug: "northstar", Plan: "Growth", Members: 5, Status: "Active"},
-	}}
+func NewHandler(repository *Repository) *Handler {
+	return &Handler{
+		repository: repository,
+		organizations: []Organization{
+			{Name: "Acme Communications", Slug: "acme", Plan: "Scale", Members: 12, Status: "Active"},
+			{Name: "Northstar Voice", Slug: "northstar", Plan: "Growth", Members: 5, Status: "Active"},
+		},
+	}
 }
 
 func (h *Handler) index(w http.ResponseWriter, r *http.Request) {

@@ -9,6 +9,7 @@ import (
 	backofficeorganizations "github.com/leamout/leamout/internal/backoffice/organizations"
 	"github.com/leamout/leamout/internal/backoffice/providers"
 	"github.com/leamout/leamout/internal/backoffice/trunks"
+	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 // Modules contains the Backoffice feature handlers mounted by the HTTP runtime.
@@ -23,15 +24,23 @@ type Modules struct {
 	Commercial         *commercial.Handler
 }
 
-func newModules() Modules {
+func newModules(queries *sqlc.Queries) Modules {
+	organizationsRepository := backofficeorganizations.NewRepository(queries)
+	callsRepository := backofficecalls.NewRepository(queries)
+	numbersRepository := numbers.NewRepository(queries)
+	trunksRepository := trunks.NewRepository(queries)
+	carrierConnectionsRepository := carrierconnections.NewRepository(queries)
+	providersRepository := providers.NewRepository(queries)
+	commercialRepository := commercial.NewRepository(queries)
+
 	return Modules{
 		Dashboard:          dashboard.NewHandler(),
-		Organizations:      backofficeorganizations.NewHandler(),
-		Calls:              backofficecalls.NewHandler(),
-		Numbers:            numbers.NewHandler(),
-		Trunks:             trunks.NewHandler(),
-		CarrierConnections: carrierconnections.NewHandler(),
-		Providers:          providers.NewHandler(),
-		Commercial:         commercial.NewHandler(),
+		Organizations:      backofficeorganizations.NewHandler(organizationsRepository),
+		Calls:              backofficecalls.NewHandler(callsRepository),
+		Numbers:            numbers.NewHandler(numbersRepository),
+		Trunks:             trunks.NewHandler(trunksRepository),
+		CarrierConnections: carrierconnections.NewHandler(carrierConnectionsRepository),
+		Providers:          providers.NewHandler(providersRepository),
+		Commercial:         commercial.NewHandler(commercialRepository),
 	}
 }
