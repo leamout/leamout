@@ -71,3 +71,22 @@ AND tm.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 ORDER BY t.created_at DESC;
+
+-- name: ListBackofficeOrganizations :many
+SELECT
+    o.id::TEXT AS id,
+    o.name,
+    o.status,
+    COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
+    COALESCE(p.name, '—') AS plan_name,
+    to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM organizations AS o
+LEFT JOIN organization_members AS om ON om.organization_id = o.id
+LEFT JOIN subscriptions AS s
+    ON s.organization_id = o.id
+   AND s.status IN ('active', 'past_due')
+LEFT JOIN plans AS p ON p.id = s.plan_id
+WHERE o.deleted_at IS NULL
+GROUP BY o.id, o.name, o.status, p.name, o.created_at
+ORDER BY o.created_at DESC
+LIMIT 100;

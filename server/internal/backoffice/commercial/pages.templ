@@ -2,15 +2,19 @@ package commercial
 
 import "github.com/leamout/leamout/internal/backoffice/components"
 
-templ Page() {
-	@components.Layout("Commercial", "commercial", Content())
+templ Page(accounts []Account) {
+	@components.Layout("Commercial", "commercial", Content(accounts))
 }
 
-templ Content() {
+templ Content(accounts []Account) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Commercial</p>
 		<h1 class="mt-2 text-3xl font-bold">Commercial</h1>
-		<p class="mt-2 text-base-content/70">Inspect subscriptions, entitlements, licensing, and account commercial state.</p>
+		<p class="mt-2 text-base-content/70">Inspect organization subscription, plan, billing provider, and renewal state.</p>
 	</div>
-	<div class="alert"><span>Commercial data will be connected to the existing commercial services in a follow-up.</span></div>
+	if len(accounts) == 0 {
+		@EmptyState()
+	} else {
+		@AccountTable(accounts)
+	}
 }

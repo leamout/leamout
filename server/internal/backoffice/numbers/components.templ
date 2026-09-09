@@ -1,5 +1,35 @@
 package numbers
 
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+templ NumberTable(numbers []Number) {
+	@components.Table(
+		[]string{"Number", "Organization", "Country", "Mode", "Provider", "Voice", "SMS", "Status", "Created"},
+		numberRows(numbers),
+	)
+}
+
+func numberRows(numbers []Number) [][]string {
+	rows := make([][]string, 0, len(numbers))
+	for _, number := range numbers {
+		rows = append(rows, []string{
+			number.Number,
+			number.Organization,
+			number.CountryCode,
+			number.Mode,
+			number.Provider,
+			fmt.Sprint(number.Voice),
+			fmt.Sprint(number.SMS),
+			number.Status,
+			number.CreatedAt,
+		})
+	}
+	return rows
+}
+
 templ EmptyState() {
-	<div class="alert"><span>Number inventory will be loaded from the Backoffice repository.</span></div>
+	<div class="alert"><span>No phone numbers found.</span></div>
 }

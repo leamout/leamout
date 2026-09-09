@@ -15,7 +15,14 @@ func NewHandler(repository *Repository) *Handler {
 	return &Handler{repository: repository}
 }
 
-func (h *Handler) index(w http.ResponseWriter, r *http.Request) { render(w, r, Page()) }
+func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
+	trunks, err := h.repository.List(r.Context())
+	if err != nil {
+		http.Error(w, "load trunks", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, Page(trunks))
+}
 
 func render(w http.ResponseWriter, r *http.Request, view templ.Component) {
 	var body bytes.Buffer

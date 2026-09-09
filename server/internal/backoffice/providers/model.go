@@ -1,4 +1,12 @@
 package providers
 
-// IndexModel is the Backoffice read model for managed provider operations.
-type IndexModel struct{}
+type Provider struct {
+	ID                string
+	Slug              string
+	Name              string
+	Adapter           string
+	Status            string
+	Connections       int64
+	PendingOperations int64
+	FailedOperations  int64
+}

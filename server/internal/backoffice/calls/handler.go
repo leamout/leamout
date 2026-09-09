@@ -9,21 +9,19 @@ import (
 
 type Handler struct {
 	repository *Repository
-	calls      []Call
 }
 
 func NewHandler(repository *Repository) *Handler {
-	return &Handler{
-		repository: repository,
-		calls: []Call{
-			{ID: "call_01JQ8YN7", From: "+1 415 555 0100", To: "+1 212 555 0198", Direction: "Outbound", Duration: "03:42", Status: "Completed"},
-			{ID: "call_01JQ8XKV", From: "+44 20 7946 0958", To: "+1 415 555 0100", Direction: "Inbound", Duration: "00:18", Status: "In progress"},
-		},
-	}
+	return &Handler{repository: repository}
 }
 
 func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
-	render(w, r, Page(h.calls))
+	calls, err := h.repository.List(r.Context())
+	if err != nil {
+		http.Error(w, "load calls", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, Page(calls))
 }
 
 func render(w http.ResponseWriter, r *http.Request, view templ.Component) {

@@ -16,7 +16,12 @@ func NewHandler(repository *Repository) *Handler {
 }
 
 func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
-	render(w, r, Page())
+	numbers, err := h.repository.List(r.Context())
+	if err != nil {
+		http.Error(w, "load phone numbers", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, Page(numbers))
 }
 
 func render(w http.ResponseWriter, r *http.Request, view templ.Component) {

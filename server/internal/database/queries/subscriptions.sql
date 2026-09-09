@@ -141,3 +141,25 @@ WHERE s.organization_id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 RETURNING s.*;
+
+-- name: ListBackofficeCommercialAccounts :many
+SELECT
+    o.id::TEXT AS organization_id,
+    o.name AS organization_name,
+    COALESCE(p.name, '—') AS plan_name,
+    COALESCE(s.status, 'none') AS subscription_status,
+    COALESCE(s.billing_provider, '—') AS billing_provider,
+    CAST(
+        COALESCE(
+            to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+            '—'
+        ) AS TEXT
+    ) AS renews_at
+FROM organizations AS o
+LEFT JOIN subscriptions AS s
+    ON s.organization_id = o.id
+   AND s.status IN ('active', 'past_due')
+LEFT JOIN plans AS p ON p.id = s.plan_id
+WHERE o.deleted_at IS NULL
+ORDER BY o.created_at DESC
+LIMIT 100;

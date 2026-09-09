@@ -8,9 +8,13 @@ templ Page(calls []Call) {
 
 templ PageContent(calls []Call) {
 	<div class="mb-6">
-		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Voice</p>
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telecom</p>
 		<h1 class="mt-2 text-3xl font-bold">Calls</h1>
-		<p class="mt-2 text-base-content/70">Monitor recent call activity across all organizations.</p>
+		<p class="mt-2 text-base-content/70">Inspect recent call activity across organizations.</p>
 	</div>
-	@CallTable(calls)
+	if len(calls) == 0 {
+		<div class="alert"><span>No calls found.</span></div>
+	} else {
+		@CallTable(calls)
+	}
 }

@@ -4,7 +4,7 @@ import "github.com/leamout/leamout/internal/backoffice/components"
 
 templ CallTable(calls []Call) {
 	@components.Table(
-		[]string{"Call ID", "From", "To", "Direction", "Duration", "Status"},
+		[]string{"Call ID", "Organization", "From", "To", "Direction", "Duration", "Status", "Created"},
 		callRows(calls),
 	)
 }
@@ -12,7 +12,16 @@ templ CallTable(calls []Call) {
 func callRows(calls []Call) [][]string {
 	rows := make([][]string, 0, len(calls))
 	for _, call := range calls {
-		rows = append(rows, []string{call.ID, call.From, call.To, call.Direction, call.Duration, call.Status})
+		rows = append(rows, []string{
+			call.ID,
+			call.Organization,
+			call.From,
+			call.To,
+			call.Direction,
+			call.Duration,
+			call.Status,
+			call.CreatedAt,
+		})
 	}
 	return rows
 }

@@ -1,5 +1,33 @@
 package trunks
 
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+templ TrunkTable(trunks []Trunk) {
+	@components.Table(
+		[]string{"Trunk", "Organization", "Mode", "Provider", "Direction", "Endpoints", "Status"},
+		trunkRows(trunks),
+	)
+}
+
+func trunkRows(trunks []Trunk) [][]string {
+	rows := make([][]string, 0, len(trunks))
+	for _, trunk := range trunks {
+		rows = append(rows, []string{
+			trunk.Name,
+			trunk.Organization,
+			trunk.Mode,
+			trunk.Provider,
+			trunk.Direction,
+			fmt.Sprint(trunk.Endpoints),
+			trunk.Status,
+		})
+	}
+	return rows
+}
+
 templ EmptyState() {
-	<div class="alert"><span>Trunk inventory will be loaded from the Backoffice repository.</span></div>
+	<div class="alert"><span>No SIP trunks found.</span></div>
 }

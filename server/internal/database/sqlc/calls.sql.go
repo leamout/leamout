@@ -263,6 +263,70 @@ func (q *Queries) GetInboundCallContext(ctx context.Context, arg GetInboundCallC
 	return i, err
 }
 
+const listBackofficeCalls = `-- name: ListBackofficeCalls :many
+SELECT
+    c.id::TEXT AS id,
+    o.name AS organization_name,
+    c.from_uri,
+    c.to_uri,
+    c.direction,
+    c.state,
+    CAST(
+        GREATEST(
+            0::BIGINT,
+            COALESCE(
+                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
+                0::BIGINT
+            )
+        ) AS BIGINT
+    ) AS duration_seconds,
+    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM calls AS c
+JOIN organizations AS o ON o.id = c.organization_id
+ORDER BY c.created_at DESC
+LIMIT 100
+`
+
+type ListBackofficeCallsRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	FromUri          string `db:"from_uri" json:"from_uri"`
+	ToUri            string `db:"to_uri" json:"to_uri"`
+	Direction        string `db:"direction" json:"direction"`
+	State            string `db:"state" json:"state"`
+	DurationSeconds  int64  `db:"duration_seconds" json:"duration_seconds"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeCalls(ctx context.Context) ([]ListBackofficeCallsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeCalls)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeCallsRow{}
+	for rows.Next() {
+		var i ListBackofficeCallsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationName,
+			&i.FromUri,
+			&i.ToUri,
+			&i.Direction,
+			&i.State,
+			&i.DurationSeconds,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCalls = `-- name: ListCalls :many
 SELECT id, organization_id, application_id, carrier_connection_id, trunk_id, trunk_endpoint_id, direction, state, media_state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 FROM calls

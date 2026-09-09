@@ -1,5 +1,35 @@
 package carrierconnections
 
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+templ CarrierConnectionTable(connections []CarrierConnection) {
+	@components.Table(
+		[]string{"Connection", "Organization", "Provider", "Scope", "Inbound", "Max CPS", "Max Calls", "Trunks", "Status"},
+		carrierConnectionRows(connections),
+	)
+}
+
+func carrierConnectionRows(connections []CarrierConnection) [][]string {
+	rows := make([][]string, 0, len(connections))
+	for _, connection := range connections {
+		rows = append(rows, []string{
+			connection.Name,
+			connection.Organization,
+			connection.Provider,
+			connection.Scope,
+			fmt.Sprint(connection.InboundEnabled),
+			fmt.Sprint(connection.MaxCPS),
+			fmt.Sprint(connection.MaxConcurrentCalls),
+			fmt.Sprint(connection.Trunks),
+			connection.Status,
+		})
+	}
+	return rows
+}
+
 templ EmptyState() {
-	<div class="alert"><span>Carrier connections will be loaded from the Backoffice repository.</span></div>
+	<div class="alert"><span>No carrier connections found.</span></div>
 }

@@ -1,5 +1,28 @@
 package commercial
 
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ AccountTable(accounts []Account) {
+	@components.Table(
+		[]string{"Organization", "Plan", "Subscription", "Billing Provider", "Renews"},
+		accountRows(accounts),
+	)
+}
+
+func accountRows(accounts []Account) [][]string {
+	rows := make([][]string, 0, len(accounts))
+	for _, account := range accounts {
+		rows = append(rows, []string{
+			account.Organization,
+			account.Plan,
+			account.SubscriptionStatus,
+			account.BillingProvider,
+			account.RenewsAt,
+		})
+	}
+	return rows
+}
+
 templ EmptyState() {
-	<div class="alert"><span>Commercial state will be loaded from the Backoffice repository.</span></div>
+	<div class="alert"><span>No commercial accounts found.</span></div>
 }

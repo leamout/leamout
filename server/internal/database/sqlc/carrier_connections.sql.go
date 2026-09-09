@@ -718,6 +718,81 @@ func (q *Queries) ListActivePlatformCarrierConnections(ctx context.Context) ([]C
 	return items, nil
 }
 
+const listBackofficeCarrierConnections = `-- name: ListBackofficeCarrierConnections :many
+SELECT
+    cc.id::TEXT AS id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    cc.name,
+    cp.name AS provider_name,
+    cc.scope,
+    cc.status,
+    cc.inbound_enabled,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    COUNT(t.id)::BIGINT AS trunk_count
+FROM carrier_connections AS cc
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN organizations AS o ON o.id = cc.organization_id
+LEFT JOIN trunks AS t ON t.carrier_connection_id = cc.id
+GROUP BY
+    cc.id,
+    o.name,
+    cc.name,
+    cp.name,
+    cc.scope,
+    cc.status,
+    cc.inbound_enabled,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    cc.created_at
+ORDER BY cc.created_at DESC
+LIMIT 100
+`
+
+type ListBackofficeCarrierConnectionsRow struct {
+	ID                 string `db:"id" json:"id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	Name               string `db:"name" json:"name"`
+	ProviderName       string `db:"provider_name" json:"provider_name"`
+	Scope              string `db:"scope" json:"scope"`
+	Status             string `db:"status" json:"status"`
+	InboundEnabled     bool   `db:"inbound_enabled" json:"inbound_enabled"`
+	MaxCps             int32  `db:"max_cps" json:"max_cps"`
+	MaxConcurrentCalls int32  `db:"max_concurrent_calls" json:"max_concurrent_calls"`
+	TrunkCount         int64  `db:"trunk_count" json:"trunk_count"`
+}
+
+func (q *Queries) ListBackofficeCarrierConnections(ctx context.Context) ([]ListBackofficeCarrierConnectionsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeCarrierConnections)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeCarrierConnectionsRow{}
+	for rows.Next() {
+		var i ListBackofficeCarrierConnectionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationName,
+			&i.Name,
+			&i.ProviderName,
+			&i.Scope,
+			&i.Status,
+			&i.InboundEnabled,
+			&i.MaxCps,
+			&i.MaxConcurrentCalls,
+			&i.TrunkCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCarrierConnectionSourceIPs = `-- name: ListCarrierConnectionSourceIPs :many
 SELECT src.id, src.organization_id, src.carrier_connection_id, src.cidr, src.created_at
 FROM carrier_connection_source_ips AS src

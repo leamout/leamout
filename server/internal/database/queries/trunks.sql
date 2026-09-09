@@ -400,3 +400,30 @@ SET consecutive_failures = consecutive_failures + 1,
     END
 WHERE id = sqlc.arg(id)
 RETURNING *;
+
+-- name: ListBackofficeTrunks :many
+SELECT
+    t.id::TEXT AS id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    t.name,
+    t.provisioning_mode,
+    COALESCE(cp.name, '—') AS provider_name,
+    t.direction,
+    t.status,
+    COUNT(te.id)::BIGINT AS endpoint_count
+FROM trunks AS t
+LEFT JOIN organizations AS o ON o.id = t.organization_id
+LEFT JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN trunk_endpoints AS te ON te.trunk_id = t.id
+GROUP BY
+    t.id,
+    o.name,
+    t.name,
+    t.provisioning_mode,
+    cp.name,
+    t.direction,
+    t.status,
+    t.created_at
+ORDER BY t.created_at DESC
+LIMIT 100;

@@ -1,5 +1,33 @@
 package providers
 
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+templ ProviderTable(providers []Provider) {
+	@components.Table(
+		[]string{"Provider", "Slug", "Adapter", "Connections", "Pending Ops", "Failed Ops", "Status"},
+		providerRows(providers),
+	)
+}
+
+func providerRows(providers []Provider) [][]string {
+	rows := make([][]string, 0, len(providers))
+	for _, provider := range providers {
+		rows = append(rows, []string{
+			provider.Name,
+			provider.Slug,
+			provider.Adapter,
+			fmt.Sprint(provider.Connections),
+			fmt.Sprint(provider.PendingOperations),
+			fmt.Sprint(provider.FailedOperations),
+			provider.Status,
+		})
+	}
+	return rows
+}
+
 templ EmptyState() {
-	<div class="alert"><span>Managed provider state will be loaded from the Backoffice repository.</span></div>
+	<div class="alert"><span>No managed providers found.</span></div>
 }

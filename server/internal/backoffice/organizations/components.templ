@@ -7,7 +7,7 @@ import (
 
 templ OrganizationTable(organizations []Organization) {
 	@components.Table(
-		[]string{"Organization", "Slug", "Plan", "Members", "Status"},
+		[]string{"Organization", "Plan", "Members", "Status", "Created"},
 		organizationRows(organizations),
 	)
 }
@@ -15,7 +15,13 @@ templ OrganizationTable(organizations []Organization) {
 func organizationRows(organizations []Organization) [][]string {
 	rows := make([][]string, 0, len(organizations))
 	for _, organization := range organizations {
-		rows = append(rows, []string{organization.Name, organization.Slug, organization.Plan, fmt.Sprint(organization.Members), organization.Status})
+		rows = append(rows, []string{
+			organization.Name,
+			organization.Plan,
+			fmt.Sprint(organization.Members),
+			organization.Status,
+			organization.CreatedAt,
+		})
 	}
 	return rows
 }

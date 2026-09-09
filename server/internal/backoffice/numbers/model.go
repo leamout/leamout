@@ -1,4 +1,14 @@
 package numbers
 
-// IndexModel is the Backoffice read model for the number inventory page.
-type IndexModel struct{}
+type Number struct {
+	ID           string
+	Organization string
+	Number       string
+	CountryCode  string
+	Mode         string
+	Provider     string
+	Voice        bool
+	SMS          bool
+	Status       string
+	CreatedAt    string
+}
