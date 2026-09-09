@@ -74,7 +74,7 @@ func TestAuthenticatedOrganizationAllowsSessionWithOrganizationHeader(t *testing
 	})))
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/example", nil)
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session-token"})
+	req.AddCookie(&http.Cookie{Name: authn.SessionCookieName, Value: "session-token"})
 	req.Header.Set(organizationIDHeader, organizationID.String())
 	res := httptest.NewRecorder()
 
@@ -169,7 +169,7 @@ func TestAuthenticatedOrganizationRequiresOrganizationHeaderForSession(t *testin
 	})))
 
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/v1/example", nil)
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session-token"})
+	req.AddCookie(&http.Cookie{Name: authn.SessionCookieName, Value: "session-token"})
 	res := httptest.NewRecorder()
 
 	handler.ServeHTTP(res, req)
@@ -223,7 +223,7 @@ func TestAuthenticatedOrganizationRejectsSessionFromAnotherOrganization(t *testi
 		t.Fatal("handler should not be called")
 	})))
 	req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/v1/numbers", nil)
-	req.AddCookie(&http.Cookie{Name: sessionCookieName, Value: "session-token"})
+	req.AddCookie(&http.Cookie{Name: authn.SessionCookieName, Value: "session-token"})
 	req.Header.Set(organizationIDHeader, requestedOrganizationID.String())
 	res := httptest.NewRecorder()
 
