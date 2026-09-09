@@ -148,6 +148,29 @@ type CarrierProvider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Server-priced intent to collect money. Provider success is required before subscription activation or wallet credit.
+type CheckoutOrder struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
+	WalletID        *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
+	PriceID         *uuid.UUID         `db:"price_id" json:"price_id"`
+	InvoiceID       *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
+	OrderType       string             `db:"order_type" json:"order_type"`
+	Provider        string             `db:"provider" json:"provider"`
+	PaymentMethod   string             `db:"payment_method" json:"payment_method"`
+	Reference       string             `db:"reference" json:"reference"`
+	Amount          int64              `db:"amount" json:"amount"`
+	Currency        string             `db:"currency" json:"currency"`
+	Status          string             `db:"status" json:"status"`
+	NextAction      string             `db:"next_action" json:"next_action"`
+	ProviderMessage *string            `db:"provider_message" json:"provider_message"`
+	ExpiresAt       pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CompletedAt     pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
+	Metadata        []byte             `db:"metadata" json:"metadata"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type Conference struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -382,8 +405,8 @@ type OutboxEvent struct {
 
 type Payment struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
+	CheckoutOrderID   uuid.UUID          `db:"checkout_order_id" json:"checkout_order_id"`
 	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
-	InvoiceID         *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
 	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
 	Amount            int64              `db:"amount" json:"amount"`
@@ -393,6 +416,20 @@ type Payment struct {
 	Metadata          []byte             `db:"metadata" json:"metadata"`
 	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+// Authenticated provider events retained once by provider identity so duplicate webhooks cannot repeat commercial effects.
+type PaymentProviderEvent struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	PaymentID       uuid.UUID          `db:"payment_id" json:"payment_id"`
+	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Provider        string             `db:"provider" json:"provider"`
+	ProviderEventID string             `db:"provider_event_id" json:"provider_event_id"`
+	EventType       string             `db:"event_type" json:"event_type"`
+	PayloadSha256   string             `db:"payload_sha256" json:"payload_sha256"`
+	Payload         []byte             `db:"payload" json:"payload"`
+	ReceivedAt      pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	ProcessedAt     pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
 }
 
 type PhoneNumber struct {
@@ -700,6 +737,49 @@ type VoiceBinding struct {
 	SipDomainID        *uuid.UUID         `db:"sip_domain_id" json:"sip_domain_id"`
 	SubscriberID       *uuid.UUID         `db:"subscriber_id" json:"subscriber_id"`
 	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// Organization-scoped prepaid accounts. Balances are derived from immutable ledger entries and active reservations.
+type Wallet struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Currency       string             `db:"currency" json:"currency"`
+	Status         string             `db:"status" json:"status"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+// Immutable posted monetary movements. Corrections are new compensating entries; rows are never updated or deleted.
+type WalletLedgerEntry struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	WalletID       uuid.UUID          `db:"wallet_id" json:"wallet_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	EntryType      string             `db:"entry_type" json:"entry_type"`
+	Amount         int64              `db:"amount" json:"amount"`
+	SourceType     string             `db:"source_type" json:"source_type"`
+	SourceID       string             `db:"source_id" json:"source_id"`
+	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
+	Metadata       []byte             `db:"metadata" json:"metadata"`
+	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// Funds committed before Leamout incurs a managed-provider obligation. Active reservations reduce spendable balance.
+type WalletReservation struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	WalletID       uuid.UUID          `db:"wallet_id" json:"wallet_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Amount         int64              `db:"amount" json:"amount"`
+	CapturedAmount *int64             `db:"captured_amount" json:"captured_amount"`
+	OperationType  string             `db:"operation_type" json:"operation_type"`
+	OperationID    string             `db:"operation_id" json:"operation_id"`
+	Status         string             `db:"status" json:"status"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CapturedAt     pgtype.Timestamptz `db:"captured_at" json:"captured_at"`
+	ReleasedAt     pgtype.Timestamptz `db:"released_at" json:"released_at"`
+	ExpiredAt      pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type WebhookDelivery struct {

@@ -177,7 +177,7 @@ Conceptually:
     {"os": "debian", "version": "13", "arch": "amd64"}
   ],
   "database": {
-    "migration": "039_create_idempotency.sql"
+    "migration": "043_create_idempotency.sql"
   },
   "cli_artifacts": [
     {
@@ -251,7 +251,7 @@ The repository's `deploy/compose.yaml` remains a development/CI stack. It may co
 The manifest records the highest migration included in the release, for example:
 
 ```text
-039_create_idempotency.sql
+043_create_idempotency.sql
 ```
 
 The migration value must match a migration present in `server/migrations` at the manifest's source commit. A future upgrade planner can use this boundary to reason about compatibility and rollback safety.

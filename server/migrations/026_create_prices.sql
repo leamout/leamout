@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS prices (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_prices_id_plan UNIQUE (id, plan_id),
+    CONSTRAINT uq_prices_id_currency UNIQUE (id, currency),
     CONSTRAINT chk_prices_currency CHECK (currency ~ '^[A-Z]{3}$'),
     CONSTRAINT chk_prices_amount_minor CHECK (amount_minor >= 0),
     CONSTRAINT chk_prices_billing_interval CHECK (

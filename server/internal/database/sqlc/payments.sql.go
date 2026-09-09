@@ -14,8 +14,8 @@ import (
 
 const createPayment = `-- name: CreatePayment :one
 INSERT INTO payments (
+    checkout_order_id,
     organization_id,
-    invoice_id,
     provider,
     provider_payment_id,
     amount,
@@ -25,61 +25,56 @@ INSERT INTO payments (
     metadata
 )
 SELECT
-    o.id AS organization_id,
-    $1::uuid AS invoice_id,
-    $2 AS provider,
-    $3 AS provider_payment_id,
-    $4 AS amount,
-    $5 AS currency,
-    COALESCE($6, 'pending') AS status,
-    $7 AS paid_at,
-    COALESCE($8, '{}'::jsonb) AS metadata
-FROM organizations AS o
-WHERE o.id = $9
+    co.id AS checkout_order_id,
+    co.organization_id,
+    co.provider,
+    $1 AS provider_payment_id,
+    $2 AS amount,
+    $3 AS currency,
+    COALESCE($4, 'pending') AS status,
+    $5 AS paid_at,
+    COALESCE($6, '{}'::jsonb) AS metadata
+FROM checkout_orders AS co
+JOIN organizations AS o ON o.id = co.organization_id
+WHERE co.id = $7
+  AND co.organization_id = $8
+  AND co.provider = $9
+  AND co.amount = $2
+  AND co.currency = $3
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-  AND (
-      $1::uuid IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM invoices AS i
-          WHERE i.id = $1::uuid
-            AND i.organization_id = o.id
-            AND i.currency = $5
-      )
-  )
-RETURNING id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
+RETURNING id, checkout_order_id, organization_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
 `
 
 type CreatePaymentParams struct {
-	InvoiceID         *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
-	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
 	Amount            int64              `db:"amount" json:"amount"`
 	Currency          string             `db:"currency" json:"currency"`
 	Status            *string            `db:"status" json:"status"`
 	PaidAt            pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
 	Metadata          []byte             `db:"metadata" json:"metadata"`
+	CheckoutOrderID   uuid.UUID          `db:"checkout_order_id" json:"checkout_order_id"`
 	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Provider          string             `db:"provider" json:"provider"`
 }
 
 func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
 	row := q.db.QueryRow(ctx, createPayment,
-		arg.InvoiceID,
-		arg.Provider,
 		arg.ProviderPaymentID,
 		arg.Amount,
 		arg.Currency,
 		arg.Status,
 		arg.PaidAt,
 		arg.Metadata,
+		arg.CheckoutOrderID,
 		arg.OrganizationID,
+		arg.Provider,
 	)
 	var i Payment
 	err := row.Scan(
 		&i.ID,
+		&i.CheckoutOrderID,
 		&i.OrganizationID,
-		&i.InvoiceID,
 		&i.Provider,
 		&i.ProviderPaymentID,
 		&i.Amount,
@@ -94,7 +89,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 }
 
 const getPayment = `-- name: GetPayment :one
-SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.organization_id = $1
@@ -114,8 +109,8 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 	var i Payment
 	err := row.Scan(
 		&i.ID,
+		&i.CheckoutOrderID,
 		&i.OrganizationID,
-		&i.InvoiceID,
 		&i.Provider,
 		&i.ProviderPaymentID,
 		&i.Amount,
@@ -130,7 +125,7 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 }
 
 const getPaymentByProviderID = `-- name: GetPaymentByProviderID :one
-SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.provider = $1
@@ -150,8 +145,8 @@ func (q *Queries) GetPaymentByProviderID(ctx context.Context, arg GetPaymentByPr
 	var i Payment
 	err := row.Scan(
 		&i.ID,
+		&i.CheckoutOrderID,
 		&i.OrganizationID,
-		&i.InvoiceID,
 		&i.Provider,
 		&i.ProviderPaymentID,
 		&i.Amount,
@@ -165,60 +160,8 @@ func (q *Queries) GetPaymentByProviderID(ctx context.Context, arg GetPaymentByPr
 	return i, err
 }
 
-const listPaymentsByInvoice = `-- name: ListPaymentsByInvoice :many
-SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
-FROM payments AS p
-JOIN invoices AS i
-  ON i.id = p.invoice_id
- AND i.organization_id = p.organization_id
-JOIN organizations AS o ON o.id = p.organization_id
-WHERE p.organization_id = $1
-  AND p.invoice_id = $2
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-ORDER BY p.created_at DESC
-`
-
-type ListPaymentsByInvoiceParams struct {
-	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
-	InvoiceID      *uuid.UUID `db:"invoice_id" json:"invoice_id"`
-}
-
-func (q *Queries) ListPaymentsByInvoice(ctx context.Context, arg ListPaymentsByInvoiceParams) ([]Payment, error) {
-	rows, err := q.db.Query(ctx, listPaymentsByInvoice, arg.OrganizationID, arg.InvoiceID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Payment{}
-	for rows.Next() {
-		var i Payment
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrganizationID,
-			&i.InvoiceID,
-			&i.Provider,
-			&i.ProviderPaymentID,
-			&i.Amount,
-			&i.Currency,
-			&i.Status,
-			&i.PaidAt,
-			&i.Metadata,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listPaymentsByOrganization = `-- name: ListPaymentsByOrganization :many
-SELECT p.id, p.organization_id, p.invoice_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.organization_id = $1
@@ -238,8 +181,8 @@ func (q *Queries) ListPaymentsByOrganization(ctx context.Context, organizationID
 		var i Payment
 		if err := rows.Scan(
 			&i.ID,
+			&i.CheckoutOrderID,
 			&i.OrganizationID,
-			&i.InvoiceID,
 			&i.Provider,
 			&i.ProviderPaymentID,
 			&i.Amount,
@@ -273,7 +216,7 @@ WHERE p.organization_id = $4
   AND o.id = p.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, p.id, organization_id, invoice_id, provider, provider_payment_id, amount, currency, p.status, paid_at, metadata, p.created_at, p.updated_at
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, p.id, checkout_order_id, organization_id, provider, provider_payment_id, amount, currency, p.status, paid_at, metadata, p.created_at, p.updated_at
 `
 
 type UpdatePaymentStatusParams struct {
@@ -292,8 +235,8 @@ type UpdatePaymentStatusRow struct {
 	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	DeletedAt         pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 	ID_2              uuid.UUID          `db:"id_2" json:"id_2"`
+	CheckoutOrderID   uuid.UUID          `db:"checkout_order_id" json:"checkout_order_id"`
 	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
-	InvoiceID         *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
 	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
 	Amount            int64              `db:"amount" json:"amount"`
@@ -322,8 +265,8 @@ func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStat
 		&i.UpdatedAt,
 		&i.DeletedAt,
 		&i.ID_2,
+		&i.CheckoutOrderID,
 		&i.OrganizationID,
-		&i.InvoiceID,
 		&i.Provider,
 		&i.ProviderPaymentID,
 		&i.Amount,

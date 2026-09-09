@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_invoices_id_organization UNIQUE (id, organization_id),
+    CONSTRAINT uq_invoices_payment_terms UNIQUE (id, organization_id, total, currency),
     CONSTRAINT fk_invoices_subscription_organization
         FOREIGN KEY (subscription_id, organization_id)
         REFERENCES subscriptions (id, organization_id)

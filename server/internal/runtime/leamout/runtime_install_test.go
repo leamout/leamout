@@ -32,7 +32,7 @@ func stageRuntimeRelease(t *testing.T, stateDir, version string) string {
 		"source_commit":       strings.Repeat("1", 40),
 		"minimum_cli_version": version,
 		"supported_hosts":     []map[string]string{{"os": "ubuntu", "version": "24.04", "arch": "amd64"}},
-		"database":            map[string]string{"migration": "039_create_idempotency.sql"},
+		"database":            map[string]string{"migration": "043_create_idempotency.sql"},
 		"cli_artifacts": []map[string]string{{
 			"os": "linux", "arch": "amd64",
 			"filename": "leamout_" + version + "_linux_amd64.tar.gz",
@@ -66,7 +66,7 @@ func stageRuntimeRelease(t *testing.T, stateDir, version string) string {
 		"runtime/compose.yaml.tmpl":                     compose,
 		"runtime/coturn/turnserver.conf":                "listening-port=3478\n",
 		"runtime/migrations/atlas.sum":                  "h1:test\n",
-		"runtime/migrations/039_create_idempotency.sql": "-- fixture\n",
+		"runtime/migrations/043_create_idempotency.sql": "-- fixture\n",
 	}
 	for name, content := range files {
 		header := &tar.Header{Name: name, Mode: 0o640, Size: int64(len(content)), Typeflag: tar.TypeReg}
