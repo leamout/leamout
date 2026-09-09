@@ -271,12 +271,14 @@ SELECT
     c.to_uri,
     c.direction,
     c.state,
-    GREATEST(
-        0::BIGINT,
-        COALESCE(
-            EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
-            0::BIGINT
-        )
+    CAST(
+        GREATEST(
+            0::BIGINT,
+            COALESCE(
+                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
+                0::BIGINT
+            )
+        ) AS BIGINT
     ) AS duration_seconds,
     to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
 FROM calls AS c
@@ -286,14 +288,14 @@ LIMIT 100
 `
 
 type ListBackofficeCallsRow struct {
-	ID               string      `db:"id" json:"id"`
-	OrganizationName string      `db:"organization_name" json:"organization_name"`
-	FromUri          string      `db:"from_uri" json:"from_uri"`
-	ToUri            string      `db:"to_uri" json:"to_uri"`
-	Direction        string      `db:"direction" json:"direction"`
-	State            string      `db:"state" json:"state"`
-	DurationSeconds  interface{} `db:"duration_seconds" json:"duration_seconds"`
-	CreatedAt        string      `db:"created_at" json:"created_at"`
+	ID               string `db:"id" json:"id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	FromUri          string `db:"from_uri" json:"from_uri"`
+	ToUri            string `db:"to_uri" json:"to_uri"`
+	Direction        string `db:"direction" json:"direction"`
+	State            string `db:"state" json:"state"`
+	DurationSeconds  int64  `db:"duration_seconds" json:"duration_seconds"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) ListBackofficeCalls(ctx context.Context) ([]ListBackofficeCallsRow, error) {
