@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS sessions (
         REFERENCES users(id)
         ON DELETE CASCADE,
     token_hash TEXT NOT NULL UNIQUE,
+    audience TEXT NOT NULL DEFAULT 'user',
     ip_address INET,
     user_agent TEXT,
     expires_at TIMESTAMPTZ NOT NULL,
@@ -15,6 +16,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     CONSTRAINT chk_sessions_revoked CHECK (
         revoked_at IS NULL
         OR revoked_at >= created_at
+    ),
+    CONSTRAINT chk_sessions_audience CHECK (
+        audience IN ('user', 'backoffice')
     )
 );
 

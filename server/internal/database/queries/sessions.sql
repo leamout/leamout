@@ -2,6 +2,7 @@
 INSERT INTO sessions (
     user_id,
     token_hash,
+    audience,
     ip_address,
     user_agent,
     expires_at,
@@ -10,6 +11,7 @@ INSERT INTO sessions (
 SELECT
     u.id,
     sqlc.arg(token_hash),
+    sqlc.arg(audience),
     sqlc.narg(ip_address)::inet,
     sqlc.narg(user_agent)::text,
     sqlc.arg(expires_at)::timestamptz,
@@ -38,6 +40,20 @@ FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
 WHERE s.token_hash = sqlc.arg(token_hash)
+  AND s.audience = 'user'
+  AND s.expires_at > NOW()
+  AND s.revoked_at IS NULL
+  AND u.disabled_at IS NULL
+LIMIT 1;
+
+
+-- name: GetSessionByTokenHashAndAudience :one
+SELECT s.*
+FROM sessions AS s
+JOIN users AS u
+    ON u.id = s.user_id
+WHERE s.token_hash = sqlc.arg(token_hash)
+  AND s.audience = sqlc.arg(audience)
   AND s.expires_at > NOW()
   AND s.revoked_at IS NULL
   AND u.disabled_at IS NULL

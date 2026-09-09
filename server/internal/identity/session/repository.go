@@ -31,6 +31,20 @@ func (r *Repository) GetByTokenHash(
 	return r.queries.GetSessionByTokenHash(ctx, tokenHash)
 }
 
+func (r *Repository) GetByTokenHashAndAudience(
+	ctx context.Context,
+	tokenHash string,
+	audience string,
+) (sqlc.Session, error) {
+	return r.queries.GetSessionByTokenHashAndAudience(
+		ctx,
+		sqlc.GetSessionByTokenHashAndAudienceParams{
+			TokenHash: tokenHash,
+			Audience:  audience,
+		},
+	)
+}
+
 func (r *Repository) ListByUserID(
 	ctx context.Context,
 	userID uuid.UUID,

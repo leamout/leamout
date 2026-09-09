@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
     email_verified BOOLEAN NOT NULL DEFAULT false,
     name TEXT,
     password_hash TEXT,
+    is_platform_admin BOOLEAN NOT NULL DEFAULT false,
     disabled_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
