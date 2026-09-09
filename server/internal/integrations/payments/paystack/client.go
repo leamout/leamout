@@ -75,6 +75,7 @@ type transaction struct {
 	Status          string      `json:"status"`
 	Message         string      `json:"message"`
 	GatewayResponse string      `json:"gateway_response"`
+	DisplayText     string      `json:"display_text"`
 }
 
 type response struct {
@@ -103,11 +104,67 @@ func (c *Client) CreateCheckout(ctx context.Context, request paymentprovider.Che
 	if !result.Status || result.Data.Reference == "" {
 		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: invalid charge response: %s", result.Message)
 	}
+	return checkoutSession(result), nil
+}
+
+func (c *Client) ContinueCheckout(ctx context.Context, request paymentprovider.ContinueCheckoutRequest) (paymentprovider.CheckoutSession, error) {
+	reference := strings.TrimSpace(request.Reference)
+	if !paystackReferencePattern.MatchString(reference) {
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: valid payment reference is required")
+	}
+
+	path := ""
+	var payload any
+	switch request.Action {
+	case paymentprovider.NextActionSubmitOTP:
+		if strings.TrimSpace(request.Value) == "" {
+			return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: OTP is required")
+		}
+		path, payload = "/charge/submit_otp", challengePayload("otp", request.Value, reference)
+	case paymentprovider.NextActionSubmitPhone:
+		if strings.TrimSpace(request.Value) == "" {
+			return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: phone is required")
+		}
+		path, payload = "/charge/submit_phone", challengePayload("phone", request.Value, reference)
+	default:
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: unsupported mobile money checkout action")
+	}
+
+	var result response
+	if err := c.do(ctx, http.MethodPost, path, payload, &result); err != nil {
+		return paymentprovider.CheckoutSession{}, err
+	}
+	if !result.Status || result.Data.Reference == "" {
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: invalid continuation response: %s", result.Message)
+	}
+	return checkoutSession(result), nil
+}
+
+func (c *Client) GetCheckout(ctx context.Context, reference string) (paymentprovider.CheckoutSession, error) {
+	reference = strings.TrimSpace(reference)
+	if !paystackReferencePattern.MatchString(reference) {
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: valid payment reference is required")
+	}
+	var result response
+	if err := c.do(ctx, http.MethodGet, "/charge/"+url.PathEscape(reference), nil, &result); err != nil {
+		return paymentprovider.CheckoutSession{}, err
+	}
+	if !result.Status || result.Data.Reference == "" {
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("paystack: charge lookup failed: %s", result.Message)
+	}
+	return checkoutSession(result), nil
+}
+
+func challengePayload(field, value, reference string) map[string]string {
+	return map[string]string{field: strings.TrimSpace(value), "reference": reference}
+}
+
+func checkoutSession(result response) paymentprovider.CheckoutSession {
 	return paymentprovider.CheckoutSession{
 		Provider: "paystack", ProviderID: result.Data.ID.String(), Reference: result.Data.Reference,
-		NextAction: result.Data.Status, Message: firstNonEmpty(result.Data.Message, result.Data.GatewayResponse, result.Message),
+		NextAction: nextAction(result.Data.Status), Message: firstNonEmpty(result.Data.DisplayText, result.Data.Message, result.Data.GatewayResponse, result.Message),
 		Status: normalizeStatus(result.Data.Status),
-	}, nil
+	}
 }
 
 func validateMobileMoney(request paymentprovider.CheckoutRequest) error {
@@ -184,10 +241,27 @@ func normalizeStatus(value string) paymentprovider.Status {
 		status = paymentprovider.StatusSucceeded
 	case "failed", "abandoned", "reversed":
 		status = paymentprovider.StatusFailed
-	case "ongoing", "processing", "pending", "queued":
+	case "ongoing", "processing", "pending", "queued", "pay_offline", "send_otp", "send_phone":
 		status = paymentprovider.StatusProcessing
 	}
 	return status
+}
+
+func nextAction(status string) paymentprovider.NextAction {
+	switch status {
+	case "success", "failed", "abandoned", "reversed":
+		return paymentprovider.NextActionNone
+	case "pay_offline":
+		return paymentprovider.NextActionAuthorizeMobileMoney
+	case "send_otp":
+		return paymentprovider.NextActionSubmitOTP
+	case "send_phone":
+		return paymentprovider.NextActionSubmitPhone
+	case "send_pin", "send_birthday", "send_address":
+		return paymentprovider.NextActionUnsupported
+	default:
+		return paymentprovider.NextActionWait
+	}
 }
 
 func firstNonEmpty(values ...string) string {
