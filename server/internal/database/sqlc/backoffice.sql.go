@@ -5,7 +5,9 @@
 
 package sqlc
 
-import "context"
+import (
+	"context"
+)
 
 const listBackofficeCalls = `-- name: ListBackofficeCalls :many
 SELECT
@@ -30,14 +32,14 @@ LIMIT 100
 `
 
 type ListBackofficeCallsRow struct {
-	ID               string `db:"id" json:"id"`
-	OrganizationName string `db:"organization_name" json:"organization_name"`
-	FromUri          string `db:"from_uri" json:"from_uri"`
-	ToUri            string `db:"to_uri" json:"to_uri"`
-	Direction        string `db:"direction" json:"direction"`
-	State            string `db:"state" json:"state"`
-	DurationSeconds  int64  `db:"duration_seconds" json:"duration_seconds"`
-	CreatedAt        string `db:"created_at" json:"created_at"`
+	ID               string      `db:"id" json:"id"`
+	OrganizationName string      `db:"organization_name" json:"organization_name"`
+	FromUri          string      `db:"from_uri" json:"from_uri"`
+	ToUri            string      `db:"to_uri" json:"to_uri"`
+	Direction        string      `db:"direction" json:"direction"`
+	State            string      `db:"state" json:"state"`
+	DurationSeconds  interface{} `db:"duration_seconds" json:"duration_seconds"`
+	CreatedAt        string      `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) ListBackofficeCalls(ctx context.Context) ([]ListBackofficeCallsRow, error) {
@@ -166,12 +168,12 @@ LIMIT 100
 `
 
 type ListBackofficeCommercialAccountsRow struct {
-	OrganizationID     string `db:"organization_id" json:"organization_id"`
-	OrganizationName   string `db:"organization_name" json:"organization_name"`
-	PlanName           string `db:"plan_name" json:"plan_name"`
-	SubscriptionStatus string `db:"subscription_status" json:"subscription_status"`
-	BillingProvider    string `db:"billing_provider" json:"billing_provider"`
-	RenewsAt           string `db:"renews_at" json:"renews_at"`
+	OrganizationID     string      `db:"organization_id" json:"organization_id"`
+	OrganizationName   string      `db:"organization_name" json:"organization_name"`
+	PlanName           string      `db:"plan_name" json:"plan_name"`
+	SubscriptionStatus string      `db:"subscription_status" json:"subscription_status"`
+	BillingProvider    string      `db:"billing_provider" json:"billing_provider"`
+	RenewsAt           interface{} `db:"renews_at" json:"renews_at"`
 }
 
 func (q *Queries) ListBackofficeCommercialAccounts(ctx context.Context) ([]ListBackofficeCommercialAccountsRow, error) {
