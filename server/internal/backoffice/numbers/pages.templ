@@ -2,15 +2,19 @@ package numbers
 
 import "github.com/leamout/leamout/internal/backoffice/components"
 
-templ Page() {
-	@components.Layout("Phone Numbers", "numbers", Content())
+templ Page(numbers []Number) {
+	@components.Layout("Phone Numbers", "numbers", Content(numbers))
 }
 
-templ Content() {
+templ Content(numbers []Number) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telecom</p>
 		<h1 class="mt-2 text-3xl font-bold">Phone Numbers</h1>
-		<p class="mt-2 text-base-content/70">Inspect number inventory, ownership, routing, and lifecycle state across organizations.</p>
+		<p class="mt-2 text-base-content/70">Inspect number inventory, ownership, provisioning mode, provider, and lifecycle state across organizations.</p>
 	</div>
-	<div class="alert"><span>Number inventory will be connected to the existing numbers repository in a follow-up.</span></div>
+	if len(numbers) == 0 {
+		@EmptyState()
+	} else {
+		@NumberTable(numbers)
+	}
 }

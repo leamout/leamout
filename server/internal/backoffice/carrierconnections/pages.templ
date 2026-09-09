@@ -2,15 +2,19 @@ package carrierconnections
 
 import "github.com/leamout/leamout/internal/backoffice/components"
 
-templ Page() {
-	@components.Layout("Carrier Connections", "carrierconnections", Content())
+templ Page(connections []CarrierConnection) {
+	@components.Layout("Carrier Connections", "carrierconnections", Content(connections))
 }
 
-templ Content() {
+templ Content(connections []CarrierConnection) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telecom</p>
 		<h1 class="mt-2 text-3xl font-bold">Carrier Connections</h1>
-		<p class="mt-2 text-base-content/70">Inspect generic BYOC carrier connections and the trunks attached to them.</p>
+		<p class="mt-2 text-base-content/70">Inspect organization and platform carrier connections, provider ownership, capacity, and attached trunks.</p>
 	</div>
-	<div class="alert"><span>Carrier connection inventory will be connected to the existing carriers repository in a follow-up.</span></div>
+	if len(connections) == 0 {
+		@EmptyState()
+	} else {
+		@CarrierConnectionTable(connections)
+	}
 }

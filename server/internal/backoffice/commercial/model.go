@@ -1,4 +1,10 @@
 package commercial
 
-// IndexModel is the Backoffice read model for commercial state.
-type IndexModel struct{}
+type Account struct {
+	OrganizationID     string
+	Organization       string
+	Plan               string
+	SubscriptionStatus string
+	BillingProvider    string
+	RenewsAt           string
+}

@@ -8,25 +8,20 @@ import (
 )
 
 type Handler struct {
-	repository    *Repository
-	organizations []Organization
+	repository *Repository
 }
 
 func NewHandler(repository *Repository) *Handler {
-	return &Handler{
-		repository: repository,
-		organizations: []Organization{
-			{Name: "Acme Communications", Slug: "acme", Plan: "Scale", Members: 12, Status: "Active"},
-			{Name: "Northstar Voice", Slug: "northstar", Plan: "Growth", Members: 5, Status: "Active"},
-		},
-	}
+	return &Handler{repository: repository}
 }
 
 func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
-	page := pageFrom(r.URL.Query().Get("page"))
-	start := min((page-1)*pageSize, len(h.organizations))
-	end := min(start+pageSize, len(h.organizations))
-	render(w, r, Page(h.organizations[start:end], page, max(1, (len(h.organizations)+pageSize-1)/pageSize)))
+	organizations, err := h.repository.List(r.Context())
+	if err != nil {
+		http.Error(w, "load organizations", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, Page(organizations))
 }
 
 func render(w http.ResponseWriter, r *http.Request, view templ.Component) {

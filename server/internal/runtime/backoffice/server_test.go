@@ -41,11 +41,7 @@ func TestDashboard(t *testing.T) {
 
 func TestStaticAssets(t *testing.T) {
 	srv := testServer()
-	for _, path := range []string{
-		"/static/css/tailwindcss.css",
-		"/static/js/htmx.min.js",
-		"/static/js/hyperscript.min.js",
-	} {
+	for _, path := range []string{"/static/css/tailwindcss.css", "/static/js/htmx.min.js", "/static/js/hyperscript.min.js"} {
 		recorder := httptest.NewRecorder()
 		srv.Router.ServeHTTP(recorder, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
 		if recorder.Code != http.StatusOK {
@@ -58,12 +54,9 @@ func TestStaticAssets(t *testing.T) {
 }
 
 func TestModulePages(t *testing.T) {
-	tests := []struct {
-		path string
-		want string
-	}{
-		{path: "/organizations", want: "Acme Communications"},
-		{path: "/calls", want: "call_01JQ8YN7"},
+	tests := []struct{ path, want string }{
+		{path: "/organizations", want: "Organizations"},
+		{path: "/calls", want: "Calls"},
 		{path: "/numbers", want: "Phone Numbers"},
 		{path: "/trunks", want: "SIP Trunks"},
 		{path: "/carrier-connections", want: "Carrier Connections"},

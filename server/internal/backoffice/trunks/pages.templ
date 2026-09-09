@@ -2,15 +2,19 @@ package trunks
 
 import "github.com/leamout/leamout/internal/backoffice/components"
 
-templ Page() {
-	@components.Layout("SIP Trunks", "trunks", Content())
+templ Page(trunks []Trunk) {
+	@components.Layout("SIP Trunks", "trunks", Content(trunks))
 }
 
-templ Content() {
+templ Content(trunks []Trunk) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telecom</p>
 		<h1 class="mt-2 text-3xl font-bold">SIP Trunks</h1>
-		<p class="mt-2 text-base-content/70">Inspect trunks, endpoints, authentication, and routing attachment state.</p>
+		<p class="mt-2 text-base-content/70">Inspect tenant and platform trunks, provider attachment, endpoints, direction, and status.</p>
 	</div>
-	<div class="alert"><span>Trunk inventory will be connected to the existing trunks repository in a follow-up.</span></div>
+	if len(trunks) == 0 {
+		@EmptyState()
+	} else {
+		@TrunkTable(trunks)
+	}
 }

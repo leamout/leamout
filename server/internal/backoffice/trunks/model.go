@@ -1,4 +1,12 @@
 package trunks
 
-// IndexModel is the Backoffice read model for the trunk inventory page.
-type IndexModel struct{}
+type Trunk struct {
+	ID           string
+	Organization string
+	Name         string
+	Mode         string
+	Provider     string
+	Direction    string
+	Status       string
+	Endpoints    int64
+}
