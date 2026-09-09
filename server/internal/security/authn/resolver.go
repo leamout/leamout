@@ -18,8 +18,9 @@ type OrganizationTokenResolver interface {
 }
 
 type Session struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Assurance AssuranceLevel
 }
 
 type OrganizationToken struct {
@@ -65,7 +66,7 @@ func (r *Resolver) resolveSession(ctx context.Context, token string) (Principal,
 	return Principal{
 		Subject:    Subject{ID: session.UserID, Type: SubjectUser},
 		Credential: Credential{ID: session.ID, Type: CredentialSession},
-		Assurance:  AssuranceUnknown,
+		Assurance:  session.Assurance,
 	}, nil
 }
 
