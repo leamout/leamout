@@ -87,7 +87,7 @@ func (h *Handler) LoginWithPassword(
 		return
 	}
 
-	h.createSession(w, r, user.ID)
+	h.createSession(w, r, user.ID, authn.AssurancePassword)
 }
 
 func (h *Handler) SendOTP(
@@ -148,7 +148,7 @@ func (h *Handler) VerifyOTP(
 		return
 	}
 
-	h.createSession(w, r, user.ID)
+	h.createSession(w, r, user.ID, authn.AssuranceOTP)
 }
 
 func (h *Handler) SetPassword(
@@ -197,12 +197,14 @@ func (h *Handler) createSession(
 	w http.ResponseWriter,
 	r *http.Request,
 	userID uuid.UUID,
+	assurance authn.AssuranceLevel,
 ) {
-	token, sess, err := h.sessionService.Create(
+	token, sess, err := h.sessionService.CreateWithAssurance(
 		r.Context(),
 		userID,
 		helper.ClientIP(r),
 		helper.UserAgent(r),
+		assurance,
 	)
 	if err != nil {
 		httputil.Error(w, err)
