@@ -2,5 +2,5 @@
 @plugin "daisyui" {
   themes: corporate --default, business --prefersdark;
 }
-@source "../../../../**/*.templ";
-@source "../../../../../runtime/backoffice/**/*.go";
+@source "../../../**/*.templ";
+@source "../../../../runtime/backoffice/**/*.go";
