@@ -1,0 +1,16 @@
+package commercial
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page() {
+	@components.Layout("Commercial", "commercial", Content())
+}
+
+templ Content() {
+	<div class="mb-6">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Commercial</p>
+		<h1 class="mt-2 text-3xl font-bold">Commercial</h1>
+		<p class="mt-2 text-base-content/70">Inspect subscriptions, entitlements, licensing, and account commercial state.</p>
+	</div>
+	<div class="alert"><span>Commercial data will be connected to the existing commercial services in a follow-up.</span></div>
+}

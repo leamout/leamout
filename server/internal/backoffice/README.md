@@ -29,9 +29,27 @@ The runtime listens directly on `http://127.0.0.1:8081`.
 
 - `assets` owns the embedded static asset tree.
 - `components` owns reusable Templ UI primitives only.
-- Feature packages such as `dashboard`, `organizations`, and `calls` own their handlers, routes, pages, page-specific components, and Backoffice-only view models or validation when needed.
-- Backoffice feature packages reuse existing Leamout repositories for reads and domain services for writes rather than creating a parallel service or persistence layer.
-- `internal/runtime/backoffice` owns HTTP runtime concerns and mounts Backoffice feature modules.
+- Feature packages own Backoffice-specific models, cross-tenant repositories, handlers, routes, validation where needed, pages, and feature-specific components.
+- Backoffice repositories are operator-facing cross-tenant read projections. They do not replace tenant-scoped domain repositories.
+- Backoffice `service.go` files should only be introduced when a feature needs real operator-specific orchestration or mutations.
+- `internal/runtime/backoffice/modules.go` owns Backoffice feature composition.
+- `internal/runtime/backoffice/routes.go` only mounts feature routes and static/runtime endpoints.
+- `internal/runtime/backoffice/server.go` owns the assembled Backoffice HTTP server.
+
+The canonical feature package shape is:
+
+```text
+feature/
+├── model.go
+├── repository.go
+├── handler.go
+├── routes.go
+├── validation.go      # only when the feature has query/form validation
+├── pages.templ
+└── components.templ
+```
+
+Current feature modules are `organizations`, `calls`, `numbers`, `trunks`, `carrierconnections`, `providers`, and `commercial`.
 
 ## Component conventions
 
