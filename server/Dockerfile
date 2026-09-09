@@ -16,7 +16,7 @@ RUN go mod download
 
 COPY . .
 
-RUN npm install --prefix ./internal/backoffice --no-audit --no-fund \
+RUN npm ci --prefix ./internal/backoffice --no-audit --no-fund \
     && npm run --prefix ./internal/backoffice build
 
 RUN set -eux; \
@@ -49,8 +49,6 @@ RUN apk add --no-cache \
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
 COPY --from=build /out/backoffice /leamout/backoffice
-COPY --from=build /src/internal/backoffice/assets/public /leamout/internal/backoffice/assets/public
-
 USER leamout
 
 CMD ["/leamout/server"]

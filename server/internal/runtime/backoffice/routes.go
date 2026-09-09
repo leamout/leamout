@@ -6,12 +6,13 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
+	backofficeui "github.com/leamout/leamout/internal/backoffice"
 	"github.com/leamout/leamout/internal/backoffice/components"
 )
 
 func registerRoutes(router chi.Router) {
 	router.Get("/healthz", health)
-	public := http.FileServer(http.Dir("internal/backoffice/assets/public"))
+	public := http.FileServerFS(backofficeui.PublicAssets())
 	router.Get("/", component(components.Dashboard()))
 	router.Get("/fragments/runtime-status", component(components.RuntimeStatus()))
 	router.Handle("/favicon.ico", public)

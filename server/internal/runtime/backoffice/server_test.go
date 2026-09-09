@@ -36,4 +36,25 @@ func TestDashboard(t *testing.T) {
 	if !strings.Contains(string(body), `hx-get="/fragments/runtime-status"`) {
 		t.Fatalf("dashboard response missing HTMX runtime action")
 	}
+	if !strings.Contains(string(body), `_="on click`) {
+		t.Fatalf("dashboard response missing Hyperscript interaction")
+	}
+}
+
+func TestStaticAssets(t *testing.T) {
+	srv := New()
+	for _, path := range []string{
+		"/static/css/custom.css",
+		"/static/js/htmx.min.js",
+		"/static/js/hyperscript.min.js",
+	} {
+		recorder := httptest.NewRecorder()
+		srv.Router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusOK {
+			t.Errorf("GET %s status = %d, want %d", path, recorder.Code, http.StatusOK)
+		}
+		if recorder.Body.Len() < 1000 {
+			t.Errorf("GET %s returned an unexpectedly small asset (%d bytes)", path, recorder.Body.Len())
+		}
+	}
 }
