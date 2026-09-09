@@ -9,8 +9,6 @@ import (
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
-const sessionCookieName = "leamout-session"
-
 type AuthnMiddleware struct {
 	resolver *authn.Resolver
 }
@@ -68,7 +66,7 @@ func (m *AuthnMiddleware) RequireSession(next http.Handler) http.Handler {
 }
 
 func (m *AuthnMiddleware) resolveSessionCookie(r *http.Request) (authn.Principal, bool) {
-	cookie, err := r.Cookie(sessionCookieName)
+	cookie, err := r.Cookie(authn.SessionCookieName)
 	if err != nil || cookie.Value == "" {
 		return authn.Principal{}, false
 	}
