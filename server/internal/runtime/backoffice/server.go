@@ -7,7 +7,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
 	"github.com/leamout/leamout/internal/database/sqlc"
+	identityauth "github.com/leamout/leamout/internal/identity/auth"
+	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/platform/config"
 )
 
@@ -31,14 +34,37 @@ func New(ctx context.Context, cfg config.BackofficeConfig) (*Server, error) {
 		return nil, fmt.Errorf("ping backoffice database: %w", err)
 	}
 
-	modules := newModules(sqlc.New(db))
-	return newServer(db, modules), nil
+	queries := sqlc.New(db)
+	modules := newModules(queries)
+
+	sessionRepository := session.NewRepository(queries)
+	sessionService := session.NewService(sessionRepository)
+	identityAuthRepository := identityauth.NewRepository(queries)
+	identityAuthService := identityauth.NewService(identityAuthRepository)
+	backofficeAuthService := backofficeauth.NewService(
+		identityAuthService,
+		sessionService,
+		queries,
+	)
+	backofficeAuthHandler := backofficeauth.NewHandler(backofficeAuthService)
+
+	return newServer(
+		db,
+		modules,
+		backofficeAuthHandler,
+		backofficeAuthService,
+	), nil
 }
 
-func newServer(db *pgxpool.Pool, modules Modules) *Server {
+func newServer(
+	db *pgxpool.Pool,
+	modules Modules,
+	authHandler *backofficeauth.Handler,
+	authentication authenticator,
+) *Server {
 	router := chi.NewRouter()
 	router.Use(securityHeaders)
-	registerRoutes(router, modules)
+	registerRoutes(router, modules, authHandler, authentication)
 	return &Server{DB: db, Router: router, Modules: modules}
 }
 
