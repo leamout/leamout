@@ -8,13 +8,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/checkout"
-	"github.com/leamout/leamout/internal/commercial/entitlements"
-	"github.com/leamout/leamout/internal/commercial/licensing"
-	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
+	"github.com/leamout/leamout/internal/commercial"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
@@ -22,7 +17,6 @@ import (
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 	"github.com/leamout/leamout/internal/integrations/payments/paystack"
 	"github.com/leamout/leamout/internal/integrations/payments/stripe"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
@@ -127,7 +121,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Wallets.TopupService); err != nil {
+	if err := configurePaymentProviders(cfg, modules.Commercial.Money.TopupService); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -139,7 +133,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
 	}
-	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.CommercialState.Service); err != nil {
+	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.State.Service); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -192,26 +186,7 @@ func NewModules(
 	redisClient *redisintegration.Client,
 ) (Modules, error) {
 	queries := sqlc.New(db)
-	catalogRepository := catalog.NewRepository(db)
-	catalogService := catalog.NewService(catalogRepository)
-	subscriptionsRepository := subscriptions.NewRepository(db)
-	subscriptionsService := subscriptions.NewService(subscriptionsRepository, catalogService)
-	entitlementsRepository := entitlements.NewRepository(db)
-	entitlementsService := entitlements.NewService(entitlementsRepository, subscriptionsService)
-	commercialStateService := commercialstate.NewService(subscriptionsService, entitlementsService)
-	licensingRepository := licensing.NewRepository(db)
-	licensingService := licensing.NewService(licensingRepository, commercialStateService)
-	walletRepository := wallets.NewRepository(db)
-	checkoutRepository := checkout.NewRepository(db)
-	paymentRepository := commercialpayments.NewRepository(db)
-	topupRepository := wallets.NewTopupRepository(db)
-	topupService := wallets.NewTopupService(
-		walletRepository,
-		checkoutRepository,
-		paymentRepository,
-		topupRepository,
-		map[string]paymentprovider.Provider{},
-	)
+	commercialModule := commercial.New(db)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -259,7 +234,7 @@ func NewModules(
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
 	edgeRepository := edge.NewRepository(db)
-	edgeService := edge.NewService(edgeRepository, commercialStateService)
+	edgeService := edge.NewService(edgeRepository, commercialModule.State.Service)
 	wholesaleRepository := wholesale.NewRepository(db)
 	wholesaleService := wholesale.NewService(wholesaleRepository)
 	providerDiagnosticsRepository := providerdiagnostics.NewRepository(queries)
@@ -284,33 +259,7 @@ func NewModules(
 	}
 
 	return Modules{
-		Catalog: CatalogModule{
-			Repository: catalogRepository,
-			Service:    catalogService,
-			Handler:    catalog.NewHandler(catalogService),
-		},
-		Licensing: LicensingModule{
-			Repository: licensingRepository,
-			Service:    licensingService,
-			Handler:    licensing.NewHandler(licensingService),
-		},
-		CommercialState: CommercialStateModule{
-			Service: commercialStateService,
-			Handler: commercialstate.NewHandler(commercialStateService),
-		},
-		Subscriptions: SubscriptionsModule{
-			Repository: subscriptionsRepository,
-			Service:    subscriptionsService,
-			Handler:    subscriptions.NewHandler(subscriptionsService),
-		},
-		Wallets: WalletsModule{
-			Repository:      walletRepository,
-			Checkouts:       checkoutRepository,
-			Payments:        paymentRepository,
-			TopupRepository: topupRepository,
-			TopupService:    topupService,
-			TopupHandler:    wallets.NewTopupHandler(topupService),
-		},
+		Commercial: commercialModule,
 		Auth: AuthModule{
 			Repository: authRepository,
 			Service:    authService,

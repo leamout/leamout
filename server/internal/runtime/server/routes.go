@@ -5,11 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/licensing"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/wallets"
+	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -39,6 +35,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		r.Post("/internal/v1/provider-cdrs/reconcile", modules.Wholesale.Handler.Reconcile)
 	}
 	providerdiagnostics.RegisterRoutes(r, modules.ProviderDiagnostics.Handler)
+
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			requireAuthenticated := modules.OrganizationsContext.RequireAuthenticated(modules.Authn)
@@ -62,24 +59,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	}
 
 	r.Route("/v1", func(r chi.Router) {
-		catalog.RegisterRoutes(r, modules.Catalog.Handler, modules.Authn.RequireSession)
-		licensing.RegisterRoutes(
+		commercial.RegisterRoutes(
 			r,
-			modules.Licensing.Handler,
-			organizationAccess("licensing"),
-			modules.Idempotency.Middleware.Handle,
-		)
-		commercialstate.RegisterRoutes(r, modules.CommercialState.Handler, organizationAccess("commercial-state"))
-		subscriptions.RegisterRoutes(
-			r,
-			modules.Subscriptions.Handler,
-			organizationAccess("subscriptions"),
-			modules.Idempotency.Middleware.Handle,
-		)
-		wallets.RegisterTopupRoutes(
-			r,
-			modules.Wallets.TopupHandler,
-			organizationAccess("billing"),
+			modules.Commercial,
+			modules.Authn.RequireSession,
+			organizationAccess,
 			modules.Idempotency.Middleware.Handle,
 		)
 		auth.RegisterRoutes(r, modules.Auth.Handler, modules.Authn.RequireSession)
