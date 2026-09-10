@@ -36,7 +36,7 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provi
 		Currency:          input.Currency,
 		Status:            &status,
 		Metadata:          input.Metadata,
-		CheckoutOrderID:   input.CheckoutOrderID,
+		CheckoutID:        input.CheckoutID,
 		OrganizationID:    organizationID,
 		Provider:          provider,
 	})
@@ -47,17 +47,20 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provi
 }
 
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Payment, error) {
-	row, err := r.queries.GetPayment(ctx, sqlc.GetPaymentParams{OrganizationID: organizationID, ID: id})
+	row, err := r.queries.GetPayment(ctx, sqlc.GetPaymentParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
 	if err != nil {
 		return Payment{}, mapReadError(err)
 	}
 	return paymentFromRow(row), nil
 }
 
-func (r *Repository) GetByCheckoutOrder(ctx context.Context, organizationID, orderID uuid.UUID) (Payment, error) {
-	row, err := r.queries.GetPaymentByCheckoutOrder(ctx, sqlc.GetPaymentByCheckoutOrderParams{
-		OrganizationID:  organizationID,
-		CheckoutOrderID: orderID,
+func (r *Repository) GetByCheckout(ctx context.Context, organizationID, checkoutID uuid.UUID) (Payment, error) {
+	row, err := r.queries.GetPaymentByCheckout(ctx, sqlc.GetPaymentByCheckoutParams{
+		OrganizationID: organizationID,
+		CheckoutID:     checkoutID,
 	})
 	if err != nil {
 		return Payment{}, mapReadError(err)
@@ -93,18 +96,18 @@ func (r *Repository) UpdateStatus(ctx context.Context, organizationID, id uuid.U
 
 func paymentFromRow(row sqlc.Payment) Payment {
 	return Payment{
-		ID:              row.ID,
-		CheckoutOrderID: row.CheckoutOrderID,
-		OrganizationID:  row.OrganizationID,
-		Provider:        row.Provider,
-		ProviderID:      row.ProviderPaymentID,
-		Status:          Status(row.Status),
-		AmountMinor:     row.AmountMinor,
-		Currency:        row.Currency,
-		PaidAt:          pgconv.TimestamptzToTimePtr(row.PaidAt),
-		Metadata:        row.Metadata,
-		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
-		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
+		ID:             row.ID,
+		CheckoutID:     row.CheckoutID,
+		OrganizationID: row.OrganizationID,
+		Provider:       row.Provider,
+		ProviderID:     row.ProviderPaymentID,
+		Status:         Status(row.Status),
+		AmountMinor:    row.AmountMinor,
+		Currency:       row.Currency,
+		PaidAt:         pgconv.TimestamptzToTimePtr(row.PaidAt),
+		Metadata:       row.Metadata,
+		CreatedAt:      pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
 }
 

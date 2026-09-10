@@ -21,15 +21,15 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{queries: sqlc.New(db)}
 }
 
-func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Order, error) {
+func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Checkout, error) {
 	if err := validateCreate(input, time.Now()); err != nil {
-		return Order{}, err
+		return Checkout{}, err
 	}
-	row, err := r.queries.CreateCheckoutOrder(ctx, sqlc.CreateCheckoutOrderParams{
+	row, err := r.queries.CreateCheckout(ctx, sqlc.CreateCheckoutParams{
 		OrganizationID: organizationID,
 		WalletID:       input.WalletID,
 		PriceID:        input.PriceID,
-		OrderType:      string(input.Type),
+		CheckoutType:   string(input.Type),
 		Provider:       string(input.Provider),
 		PaymentMethod:  string(input.PaymentMethod),
 		Reference:      input.Reference,
@@ -39,35 +39,35 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 		Metadata:       input.Metadata,
 	})
 	if err != nil {
-		return Order{}, mapWriteError(err)
+		return Checkout{}, mapWriteError(err)
 	}
-	return orderFromRow(row), nil
+	return checkoutFromRow(row), nil
 }
 
-func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Order, error) {
-	row, err := r.queries.GetCheckoutOrder(ctx, sqlc.GetCheckoutOrderParams{
+func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Checkout, error) {
+	row, err := r.queries.GetCheckout(ctx, sqlc.GetCheckoutParams{
 		OrganizationID: organizationID,
 		ID:             id,
 	})
 	if err != nil {
-		return Order{}, mapReadError(err)
+		return Checkout{}, mapReadError(err)
 	}
-	return orderFromRow(row), nil
+	return checkoutFromRow(row), nil
 }
 
-func (r *Repository) GetByReference(ctx context.Context, reference string) (Order, error) {
-	row, err := r.queries.GetCheckoutOrderByReference(ctx, reference)
+func (r *Repository) GetByReference(ctx context.Context, reference string) (Checkout, error) {
+	row, err := r.queries.GetCheckoutByReference(ctx, reference)
 	if err != nil {
-		return Order{}, mapReadError(err)
+		return Checkout{}, mapReadError(err)
 	}
-	return orderFromRow(row), nil
+	return checkoutFromRow(row), nil
 }
 
-func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUID, transition Transition) (Order, error) {
+func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUID, transition Transition) (Checkout, error) {
 	if err := validateTransition(transition); err != nil {
-		return Order{}, err
+		return Checkout{}, err
 	}
-	row, err := r.queries.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
+	row, err := r.queries.CompareAndSetCheckoutState(ctx, sqlc.CompareAndSetCheckoutStateParams{
 		Status:          string(transition.Status),
 		NextAction:      string(transition.NextAction),
 		ProviderMessage: transition.ProviderMessage,
@@ -78,44 +78,44 @@ func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUI
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Order{}, ErrInvalidTransition
+			return Checkout{}, ErrInvalidTransition
 		}
-		return Order{}, mapWriteError(err)
+		return Checkout{}, mapWriteError(err)
 	}
-	return orderFromRow(row), nil
+	return checkoutFromRow(row), nil
 }
 
-func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.UUID, refreshBefore time.Time) (Order, error) {
-	row, err := r.queries.ClaimCheckoutOrderRefresh(ctx, sqlc.ClaimCheckoutOrderRefreshParams{
+func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.UUID, refreshBefore time.Time) (Checkout, error) {
+	row, err := r.queries.ClaimCheckoutRefresh(ctx, sqlc.ClaimCheckoutRefreshParams{
 		OrganizationID: organizationID,
 		ID:             id,
 		RefreshBefore:  pgconv.NullableTimestamptz(&refreshBefore),
 	})
 	if err != nil {
-		return Order{}, mapReadError(err)
+		return Checkout{}, mapReadError(err)
 	}
-	return orderFromRow(row), nil
+	return checkoutFromRow(row), nil
 }
 
-func (r *Repository) Expire(ctx context.Context) ([]Order, error) {
-	rows, err := r.queries.ExpireCheckoutOrders(ctx)
+func (r *Repository) Expire(ctx context.Context) ([]Checkout, error) {
+	rows, err := r.queries.ExpireCheckouts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]Order, 0, len(rows))
+	result := make([]Checkout, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, orderFromRow(row))
+		result = append(result, checkoutFromRow(row))
 	}
 	return result, nil
 }
 
-func orderFromRow(row sqlc.CheckoutOrder) Order {
-	return Order{
+func checkoutFromRow(row sqlc.Checkout) Checkout {
+	return Checkout{
 		ID:              row.ID,
 		OrganizationID:  row.OrganizationID,
 		WalletID:        row.WalletID,
 		PriceID:         row.PriceID,
-		Type:            OrderType(row.OrderType),
+		Type:            Type(row.CheckoutType),
 		Provider:        Provider(row.Provider),
 		PaymentMethod:   PaymentMethod(row.PaymentMethod),
 		Reference:       row.Reference,
@@ -134,7 +134,7 @@ func orderFromRow(row sqlc.CheckoutOrder) Order {
 
 func mapReadError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrOrderNotFound
+		return ErrCheckoutNotFound
 	}
 	return err
 }
@@ -142,15 +142,15 @@ func mapReadError(err error) error {
 func mapWriteError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {
-		if pgErr.ConstraintName == "checkout_orders_reference_key" {
+		if pgErr.ConstraintName == "checkouts_reference_key" {
 			return ErrReferenceConflict
 		}
 		if pgErr.Code == "23514" || pgErr.Code == "23503" {
-			return ErrInvalidOrder
+			return ErrInvalidCheckout
 		}
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrInvalidOrder
+		return ErrInvalidCheckout
 	}
 	return err
 }

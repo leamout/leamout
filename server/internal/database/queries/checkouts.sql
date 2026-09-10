@@ -1,13 +1,13 @@
--- name: CreateCheckoutOrder :one
-INSERT INTO checkout_orders (
-    organization_id, wallet_id, price_id, order_type,
+-- name: CreateCheckout :one
+INSERT INTO checkouts (
+    organization_id, wallet_id, price_id, checkout_type,
     provider, payment_method, reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     sqlc.arg(organization_id) AS organization_id,
     sqlc.narg(wallet_id)::UUID AS wallet_id,
     sqlc.narg(price_id)::UUID AS price_id,
-    sqlc.arg(order_type) AS order_type,
+    sqlc.arg(checkout_type) AS checkout_type,
     sqlc.arg(provider) AS provider,
     sqlc.arg(payment_method) AS payment_method,
     sqlc.arg(reference) AS reference,
@@ -21,27 +21,27 @@ WHERE o.id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 RETURNING *;
 
--- name: GetCheckoutOrder :one
-SELECT co.*
-FROM checkout_orders AS co
-JOIN organizations AS o ON o.id = co.organization_id
-WHERE co.organization_id = sqlc.arg(organization_id)
-  AND co.id = sqlc.arg(id)
+-- name: GetCheckout :one
+SELECT c.*
+FROM checkouts AS c
+JOIN organizations AS o ON o.id = c.organization_id
+WHERE c.organization_id = sqlc.arg(organization_id)
+  AND c.id = sqlc.arg(id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 LIMIT 1;
 
--- name: GetCheckoutOrderByReference :one
-SELECT co.*
-FROM checkout_orders AS co
-JOIN organizations AS o ON o.id = co.organization_id
-WHERE co.reference = sqlc.arg(reference)
+-- name: GetCheckoutByReference :one
+SELECT c.*
+FROM checkouts AS c
+JOIN organizations AS o ON o.id = c.organization_id
+WHERE c.reference = sqlc.arg(reference)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 LIMIT 1;
 
--- name: CompareAndSetCheckoutOrderState :one
-UPDATE checkout_orders
+-- name: CompareAndSetCheckoutState :one
+UPDATE checkouts
 SET status = sqlc.arg(status),
     next_action = sqlc.arg(next_action),
     provider_message = sqlc.narg(provider_message),
@@ -52,15 +52,15 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND status = sqlc.arg(expected_status)
 RETURNING *;
 
--- name: ExpireCheckoutOrders :many
-UPDATE checkout_orders
+-- name: ExpireCheckouts :many
+UPDATE checkouts
 SET status = 'expired', next_action = 'none', completed_at = NOW(), updated_at = NOW()
 WHERE status IN ('pending', 'processing')
   AND expires_at <= NOW()
 RETURNING *;
 
--- name: ClaimCheckoutOrderRefresh :one
-UPDATE checkout_orders
+-- name: ClaimCheckoutRefresh :one
+UPDATE checkouts
 SET updated_at = NOW()
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)

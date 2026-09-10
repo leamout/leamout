@@ -9,14 +9,14 @@ import (
 var checkoutReferencePattern = regexp.MustCompile(`^[A-Za-z0-9.=-]+$`)
 
 func validateCreate(input CreateInput, now time.Time) error {
-	validTarget := input.Type == OrderSubscription && input.PriceID != nil && input.WalletID == nil ||
-		input.Type == OrderWalletTopup && input.WalletID != nil && input.PriceID == nil
+	validTarget := input.Type == TypeSubscription && input.PriceID != nil && input.WalletID == nil ||
+		input.Type == TypeWalletTopup && input.WalletID != nil && input.PriceID == nil
 	validMethod := input.Provider == ProviderStripe && input.PaymentMethod == MethodCard ||
 		input.Provider == ProviderPaystack && input.PaymentMethod == MethodMobileMoney
 	if !validTarget || !validMethod || input.AmountMinor <= 0 ||
 		len(input.Currency) != 3 || input.Currency != strings.ToUpper(input.Currency) ||
 		!checkoutReferencePattern.MatchString(input.Reference) || !input.ExpiresAt.After(now) {
-		return ErrInvalidOrder
+		return ErrInvalidCheckout
 	}
 	return nil
 }

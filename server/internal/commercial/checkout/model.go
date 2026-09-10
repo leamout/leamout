@@ -8,46 +8,46 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type OrderType string
+type Type string
 type Provider string
 type PaymentMethod string
 type Status string
 type NextAction string
 
 const (
-	OrderSubscription   OrderType     = "subscription"
-	OrderWalletTopup    OrderType     = "wallet_topup"
-	ProviderStripe      Provider      = "stripe"
-	ProviderPaystack    Provider      = "paystack"
-	MethodCard          PaymentMethod = "card"
-	MethodMobileMoney   PaymentMethod = "mobile_money"
-	StatusPending       Status        = "pending"
-	StatusProcessing    Status        = "processing"
-	StatusSucceeded     Status        = "succeeded"
-	StatusFailed        Status        = "failed"
-	StatusCancelled     Status        = "cancelled"
-	StatusExpired       Status        = "expired"
-	ActionNone          NextAction    = "none"
-	ActionWait          NextAction    = "wait"
-	ActionAuthorizeMoMo NextAction    = "authorize_mobile_money"
-	ActionSubmitOTP     NextAction    = "submit_otp"
-	ActionSubmitPhone   NextAction    = "submit_phone"
-	ActionUnsupported   NextAction    = "unsupported"
+	TypeSubscription   Type          = "subscription"
+	TypeWalletTopup    Type          = "wallet_topup"
+	ProviderStripe     Provider      = "stripe"
+	ProviderPaystack   Provider      = "paystack"
+	MethodCard         PaymentMethod = "card"
+	MethodMobileMoney  PaymentMethod = "mobile_money"
+	StatusPending      Status        = "pending"
+	StatusProcessing   Status        = "processing"
+	StatusSucceeded    Status        = "succeeded"
+	StatusFailed       Status        = "failed"
+	StatusCancelled    Status        = "cancelled"
+	StatusExpired      Status        = "expired"
+	ActionNone         NextAction    = "none"
+	ActionWait         NextAction    = "wait"
+	ActionAuthorizeMoMo NextAction   = "authorize_mobile_money"
+	ActionSubmitOTP    NextAction    = "submit_otp"
+	ActionSubmitPhone  NextAction    = "submit_phone"
+	ActionUnsupported  NextAction    = "unsupported"
 )
 
 var (
-	ErrOrderNotFound     = apperror.NewNotFound("checkout order not found")
+	ErrCheckoutNotFound = apperror.NewNotFound("checkout not found")
 	ErrReferenceConflict = apperror.NewConflict("checkout reference already exists")
-	ErrInvalidTransition = apperror.NewConflict("invalid checkout order transition")
-	ErrInvalidOrder      = apperror.NewBadRequest("invalid checkout order")
+	ErrInvalidTransition = apperror.NewConflict("invalid checkout transition")
+	ErrInvalidCheckout   = apperror.NewBadRequest("invalid checkout")
 )
 
-type Order struct {
+type Checkout struct {
 	ID              uuid.UUID
 	OrganizationID  uuid.UUID
 	WalletID        *uuid.UUID
 	PriceID         *uuid.UUID
-	Type            OrderType
+	Type            Type
 	Provider        Provider
 	PaymentMethod   PaymentMethod
 	Reference       string
@@ -66,7 +66,7 @@ type Order struct {
 type CreateInput struct {
 	WalletID      *uuid.UUID
 	PriceID       *uuid.UUID
-	Type          OrderType
+	Type          Type
 	Provider      Provider
 	PaymentMethod PaymentMethod
 	Reference     string

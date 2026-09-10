@@ -1,6 +1,6 @@
 -- name: CreatePayment :one
 INSERT INTO payments (
-    checkout_order_id,
+    checkout_id,
     organization_id,
     provider,
     provider_payment_id,
@@ -11,22 +11,22 @@ INSERT INTO payments (
     metadata
 )
 SELECT
-    co.id AS checkout_order_id,
-    co.organization_id,
-    co.provider,
+    c.id AS checkout_id,
+    c.organization_id,
+    c.provider,
     sqlc.narg(provider_payment_id) AS provider_payment_id,
     sqlc.arg(amount_minor) AS amount_minor,
     sqlc.arg(currency) AS currency,
     COALESCE(sqlc.narg(status), 'pending') AS status,
     sqlc.narg(paid_at) AS paid_at,
     COALESCE(sqlc.narg(metadata), '{}'::jsonb) AS metadata
-FROM checkout_orders AS co
-JOIN organizations AS o ON o.id = co.organization_id
-WHERE co.id = sqlc.arg(checkout_order_id)
-  AND co.organization_id = sqlc.arg(organization_id)
-  AND co.provider = sqlc.arg(provider)
-  AND co.amount_minor = sqlc.arg(amount_minor)
-  AND co.currency = sqlc.arg(currency)
+FROM checkouts AS c
+JOIN organizations AS o ON o.id = c.organization_id
+WHERE c.id = sqlc.arg(checkout_id)
+  AND c.organization_id = sqlc.arg(organization_id)
+  AND c.provider = sqlc.arg(provider)
+  AND c.amount_minor = sqlc.arg(amount_minor)
+  AND c.currency = sqlc.arg(currency)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 RETURNING *;
@@ -60,12 +60,12 @@ WHERE p.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 ORDER BY p.created_at DESC;
 
--- name: GetPaymentByCheckoutOrder :one
+-- name: GetPaymentByCheckout :one
 SELECT p.*
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.organization_id = sqlc.arg(organization_id)
-  AND p.checkout_order_id = sqlc.arg(checkout_order_id)
+  AND p.checkout_id = sqlc.arg(checkout_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 LIMIT 1;
