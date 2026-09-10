@@ -86,7 +86,12 @@ WITH updated AS (
     ON CONFLICT (checkout_id) DO NOTHING
     RETURNING id
 )
-SELECT * FROM updated;
+SELECT c.*
+FROM checkouts AS c
+JOIN updated AS u
+  ON u.id = c.id
+ AND u.organization_id = c.organization_id
+LEFT JOIN created_order AS o ON TRUE;
 
 -- name: ExpireCheckoutOrders :many
 UPDATE checkouts
