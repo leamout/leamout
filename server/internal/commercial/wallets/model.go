@@ -136,7 +136,7 @@ type TopupCheckout struct {
 	Payment  payments.Payment
 	Session  paymentprovider.CheckoutSession
 
-	// Deprecated: use Checkout.
+	// Compatibility mirror for callers migrating from the old checkout/order terminology.
 	Order checkout.Checkout
 }
 
@@ -144,7 +144,7 @@ type TopupDetails struct {
 	Checkout checkout.Checkout
 	Payment  payments.Payment
 
-	// Deprecated: use Checkout.
+	// Compatibility mirror for callers migrating from the old checkout/order terminology.
 	Order checkout.Checkout
 }
 
