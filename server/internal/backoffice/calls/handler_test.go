@@ -12,11 +12,11 @@ import (
 )
 
 type stubRepository struct {
-	calls  []Call
+	calls   []Call
 	listErr error
-	detail Detail
-	getErr error
-	gotID  uuid.UUID
+	detail  Detail
+	getErr  error
+	gotID   uuid.UUID
 }
 
 func (r *stubRepository) List(context.Context) ([]Call, error) {
