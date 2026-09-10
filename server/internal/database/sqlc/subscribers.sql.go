@@ -119,6 +119,54 @@ func (q *Queries) EnableSubscriber(ctx context.Context, arg EnableSubscriberPara
 	return err
 }
 
+const getBackofficeSubscriber = `-- name: GetBackofficeSubscriber :one
+SELECT s.id::TEXT AS id, s.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       s.sip_domain_id::TEXT AS sip_domain_id, s.username, s.domain::TEXT AS domain,
+       COALESCE(s.display_name, '—') AS display_name, s.status,
+       (s.ha1_md5 IS NOT NULL OR s.ha1_sha256 IS NOT NULL OR s.ha1_sha512_256 IS NOT NULL) AS credentials_configured,
+       COUNT(vb.id)::BIGINT AS binding_count,
+       to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(s.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM subscribers s JOIN organizations o ON o.id=s.organization_id
+LEFT JOIN voice_bindings vb ON vb.subscriber_id=s.id WHERE s.id=$1
+GROUP BY s.id,o.name LIMIT 1
+`
+
+type GetBackofficeSubscriberRow struct {
+	ID                    string `db:"id" json:"id"`
+	OrganizationID        string `db:"organization_id" json:"organization_id"`
+	OrganizationName      string `db:"organization_name" json:"organization_name"`
+	SipDomainID           string `db:"sip_domain_id" json:"sip_domain_id"`
+	Username              string `db:"username" json:"username"`
+	Domain                string `db:"domain" json:"domain"`
+	DisplayName           string `db:"display_name" json:"display_name"`
+	Status                string `db:"status" json:"status"`
+	CredentialsConfigured *bool  `db:"credentials_configured" json:"credentials_configured"`
+	BindingCount          int64  `db:"binding_count" json:"binding_count"`
+	CreatedAt             string `db:"created_at" json:"created_at"`
+	UpdatedAt             string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeSubscriber(ctx context.Context, id uuid.UUID) (GetBackofficeSubscriberRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeSubscriber, id)
+	var i GetBackofficeSubscriberRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.SipDomainID,
+		&i.Username,
+		&i.Domain,
+		&i.DisplayName,
+		&i.Status,
+		&i.CredentialsConfigured,
+		&i.BindingCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSubscriberByID = `-- name: GetSubscriberByID :one
 SELECT s.id, s.organization_id, s.sip_domain_id, s.username, s.domain, s.ha1_md5, s.ha1_sha256, s.ha1_sha512_256, s.display_name, s.status, s.created_at, s.updated_at
 FROM subscribers AS s
@@ -193,6 +241,57 @@ func (q *Queries) GetSubscriberBySIPIdentity(ctx context.Context, arg GetSubscri
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeSubscribers = `-- name: ListBackofficeSubscribers :many
+SELECT s.id::TEXT AS id, s.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       s.sip_domain_id::TEXT AS sip_domain_id, s.username, s.domain::TEXT AS domain,
+       COALESCE(s.display_name, '—') AS display_name, s.status,
+       to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM subscribers s JOIN organizations o ON o.id = s.organization_id
+ORDER BY s.created_at DESC LIMIT 100
+`
+
+type ListBackofficeSubscribersRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	SipDomainID      string `db:"sip_domain_id" json:"sip_domain_id"`
+	Username         string `db:"username" json:"username"`
+	Domain           string `db:"domain" json:"domain"`
+	DisplayName      string `db:"display_name" json:"display_name"`
+	Status           string `db:"status" json:"status"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeSubscribers(ctx context.Context) ([]ListBackofficeSubscribersRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeSubscribers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeSubscribersRow{}
+	for rows.Next() {
+		var i ListBackofficeSubscribersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.SipDomainID,
+			&i.Username,
+			&i.Domain,
+			&i.DisplayName,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSubscribersByOrganizationID = `-- name: ListSubscribersByOrganizationID :many

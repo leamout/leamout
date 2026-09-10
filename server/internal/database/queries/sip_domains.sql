@@ -71,3 +71,20 @@ SET
 WHERE id = sqlc.arg(id)
 AND organization_id = sqlc.arg(organization_id)
 AND status = 'disabled';
+-- name: ListBackofficeSIPDomains :many
+SELECT d.id::TEXT AS id, d.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       d.domain::TEXT AS domain, d.status, COUNT(s.id)::BIGINT AS subscriber_count,
+       to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM sip_domains d JOIN organizations o ON o.id=d.organization_id
+LEFT JOIN subscribers s ON s.sip_domain_id=d.id
+GROUP BY d.id,o.name ORDER BY d.created_at DESC LIMIT 100;
+
+-- name: GetBackofficeSIPDomain :one
+SELECT d.id::TEXT AS id, d.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       d.domain::TEXT AS domain, d.status, COUNT(DISTINCT s.id)::BIGINT AS subscriber_count,
+       COUNT(DISTINCT vb.id)::BIGINT AS binding_count,
+       to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(d.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM sip_domains d JOIN organizations o ON o.id=d.organization_id
+LEFT JOIN subscribers s ON s.sip_domain_id=d.id LEFT JOIN voice_bindings vb ON vb.sip_domain_id=d.id
+WHERE d.id=sqlc.arg(id) GROUP BY d.id,o.name LIMIT 1;

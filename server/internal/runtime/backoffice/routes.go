@@ -36,6 +36,12 @@ func registerRoutes(
 		protected.Mount("/carrier-connections", modules.CarrierConnections.Routes())
 		protected.Mount("/providers", modules.Providers.Routes())
 		protected.Mount("/commercial", modules.Commercial.Routes())
+		protected.Mount("/subscribers", modules.Subscribers.Routes())
+		protected.Mount("/sip-domains", modules.SIPDomains.Routes())
+		protected.Mount("/voice-applications", modules.VoiceApplications.Routes())
+		protected.Mount("/conferences", modules.Conferences.Routes())
+		protected.Mount("/recordings", modules.Recordings.Routes())
+		protected.Mount("/provider-cdrs", modules.ProviderCDRs.Routes())
 	})
 }
 

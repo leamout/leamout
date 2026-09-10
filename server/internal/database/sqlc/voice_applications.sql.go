@@ -179,6 +179,55 @@ func (q *Queries) EnableVoiceApplication(ctx context.Context, arg EnableVoiceApp
 	return err
 }
 
+const getBackofficeVoiceApplication = `-- name: GetBackofficeVoiceApplication :one
+SELECT va.id::TEXT AS id, va.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       va.name, va.status, va.ring_timeout_seconds,
+       CAST(COALESCE(va.caller_id, '—') AS TEXT) AS caller_id,
+       CAST(COALESCE(va.voice_url, '—') AS TEXT) AS voice_url,
+       CAST(COALESCE(va.callback_url, '—') AS TEXT) AS callback_url,
+       COUNT(vb.id)::BIGINT AS binding_count,
+       to_char(va.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(va.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM voice_applications va JOIN organizations o ON o.id=va.organization_id
+LEFT JOIN voice_bindings vb ON vb.voice_application_id=va.id
+WHERE va.id=$1 GROUP BY va.id,o.name LIMIT 1
+`
+
+type GetBackofficeVoiceApplicationRow struct {
+	ID                 string `db:"id" json:"id"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	Name               string `db:"name" json:"name"`
+	Status             string `db:"status" json:"status"`
+	RingTimeoutSeconds int32  `db:"ring_timeout_seconds" json:"ring_timeout_seconds"`
+	CallerID           string `db:"caller_id" json:"caller_id"`
+	VoiceUrl           string `db:"voice_url" json:"voice_url"`
+	CallbackUrl        string `db:"callback_url" json:"callback_url"`
+	BindingCount       int64  `db:"binding_count" json:"binding_count"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+	UpdatedAt          string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeVoiceApplication(ctx context.Context, id uuid.UUID) (GetBackofficeVoiceApplicationRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeVoiceApplication, id)
+	var i GetBackofficeVoiceApplicationRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.Name,
+		&i.Status,
+		&i.RingTimeoutSeconds,
+		&i.CallerID,
+		&i.VoiceUrl,
+		&i.CallbackUrl,
+		&i.BindingCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getVoiceApplicationByID = `-- name: GetVoiceApplicationByID :one
 SELECT va.id, va.organization_id, va.name, va.ring_timeout_seconds, va.caller_id, va.status, va.voice_url, va.callback_url, va.created_at, va.updated_at
 FROM voice_applications AS va
@@ -375,6 +424,55 @@ func (q *Queries) GetVoiceBindingBySubscriberID(ctx context.Context, arg GetVoic
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeVoiceApplications = `-- name: ListBackofficeVoiceApplications :many
+SELECT va.id::TEXT AS id, va.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       va.name, va.status, va.ring_timeout_seconds, COUNT(vb.id)::BIGINT AS binding_count,
+       to_char(va.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM voice_applications va JOIN organizations o ON o.id=va.organization_id
+LEFT JOIN voice_bindings vb ON vb.voice_application_id=va.id
+GROUP BY va.id,o.name ORDER BY va.created_at DESC LIMIT 100
+`
+
+type ListBackofficeVoiceApplicationsRow struct {
+	ID                 string `db:"id" json:"id"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	Name               string `db:"name" json:"name"`
+	Status             string `db:"status" json:"status"`
+	RingTimeoutSeconds int32  `db:"ring_timeout_seconds" json:"ring_timeout_seconds"`
+	BindingCount       int64  `db:"binding_count" json:"binding_count"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeVoiceApplications(ctx context.Context) ([]ListBackofficeVoiceApplicationsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeVoiceApplications)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeVoiceApplicationsRow{}
+	for rows.Next() {
+		var i ListBackofficeVoiceApplicationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.Name,
+			&i.Status,
+			&i.RingTimeoutSeconds,
+			&i.BindingCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listVoiceApplicationsByOrganizationID = `-- name: ListVoiceApplicationsByOrganizationID :many

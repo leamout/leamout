@@ -98,6 +98,74 @@ func (q *Queries) FindManagedCallForProviderCDR(ctx context.Context, sipCallID *
 	return i, err
 }
 
+const getBackofficeProviderCDR = `-- name: GetBackofficeProviderCDR :one
+SELECT pc.id::TEXT AS id, pc.provider, pc.provider_record_id, pc.direction,
+       CAST(COALESCE(pc.carrier_connection_id::TEXT,'—') AS TEXT) AS carrier_connection_id,
+       COALESCE(cc.name,'—') AS carrier_connection_name,
+       CAST(COALESCE(pc.organization_id::TEXT,'—') AS TEXT) AS organization_id,
+       COALESCE(o.name,'Unreconciled') AS organization_name,
+       CAST(COALESCE(pc.call_id::TEXT,'—') AS TEXT) AS call_id,
+       COALESCE(pc.sip_call_id,'—') AS sip_call_id, pc.duration_seconds, pc.currency, pc.cost_micros,
+       CAST(COALESCE(to_char(pc.reconciled_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS reconciled_at,
+       CAST(COALESCE(wc.id::TEXT,'—') AS TEXT) AS wholesale_charge_id,
+       CAST(COALESCE(wc.amount_micros::TEXT,'—') AS TEXT) AS wholesale_amount_micros,
+       CAST(COALESCE(wc.currency,'—') AS TEXT) AS wholesale_currency,
+       to_char(pc.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS started_at,
+       to_char(pc.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at
+FROM provider_cdrs pc LEFT JOIN carrier_connections cc ON cc.id=pc.carrier_connection_id
+LEFT JOIN organizations o ON o.id=pc.organization_id LEFT JOIN wholesale_charges wc ON wc.provider_cdr_id=pc.id
+WHERE pc.id=$1 LIMIT 1
+`
+
+type GetBackofficeProviderCDRRow struct {
+	ID                    string `db:"id" json:"id"`
+	Provider              string `db:"provider" json:"provider"`
+	ProviderRecordID      string `db:"provider_record_id" json:"provider_record_id"`
+	Direction             string `db:"direction" json:"direction"`
+	CarrierConnectionID   string `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionName string `db:"carrier_connection_name" json:"carrier_connection_name"`
+	OrganizationID        string `db:"organization_id" json:"organization_id"`
+	OrganizationName      string `db:"organization_name" json:"organization_name"`
+	CallID                string `db:"call_id" json:"call_id"`
+	SipCallID             string `db:"sip_call_id" json:"sip_call_id"`
+	DurationSeconds       int64  `db:"duration_seconds" json:"duration_seconds"`
+	Currency              string `db:"currency" json:"currency"`
+	CostMicros            int64  `db:"cost_micros" json:"cost_micros"`
+	ReconciledAt          string `db:"reconciled_at" json:"reconciled_at"`
+	WholesaleChargeID     string `db:"wholesale_charge_id" json:"wholesale_charge_id"`
+	WholesaleAmountMicros string `db:"wholesale_amount_micros" json:"wholesale_amount_micros"`
+	WholesaleCurrency     string `db:"wholesale_currency" json:"wholesale_currency"`
+	StartedAt             string `db:"started_at" json:"started_at"`
+	CreatedAt             string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetBackofficeProviderCDR(ctx context.Context, id uuid.UUID) (GetBackofficeProviderCDRRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeProviderCDR, id)
+	var i GetBackofficeProviderCDRRow
+	err := row.Scan(
+		&i.ID,
+		&i.Provider,
+		&i.ProviderRecordID,
+		&i.Direction,
+		&i.CarrierConnectionID,
+		&i.CarrierConnectionName,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.CallID,
+		&i.SipCallID,
+		&i.DurationSeconds,
+		&i.Currency,
+		&i.CostMicros,
+		&i.ReconciledAt,
+		&i.WholesaleChargeID,
+		&i.WholesaleAmountMicros,
+		&i.WholesaleCurrency,
+		&i.StartedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getProviderCDRForUpdate = `-- name: GetProviderCDRForUpdate :one
 SELECT id, provider, carrier_connection_id, provider_record_id, direction, sip_call_id, call_id, organization_id, reconciled_at, started_at, duration_seconds, currency, cost_micros, raw, created_at
 FROM provider_cdrs
@@ -230,6 +298,66 @@ func (q *Queries) InsertProviderCDR(ctx context.Context, arg InsertProviderCDRPa
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeProviderCDRs = `-- name: ListBackofficeProviderCDRs :many
+SELECT pc.id::TEXT AS id, pc.provider, pc.provider_record_id, pc.direction,
+       CAST(COALESCE(pc.organization_id::TEXT,'—') AS TEXT) AS organization_id,
+       COALESCE(o.name,'Unreconciled') AS organization_name,
+       CAST(COALESCE(pc.call_id::TEXT,'—') AS TEXT) AS call_id,
+       pc.duration_seconds, pc.currency, pc.cost_micros,
+       CASE WHEN pc.reconciled_at IS NOT NULL THEN true ELSE false END AS reconciled,
+       to_char(pc.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS started_at
+FROM provider_cdrs pc LEFT JOIN organizations o ON o.id=pc.organization_id
+ORDER BY pc.started_at DESC LIMIT 100
+`
+
+type ListBackofficeProviderCDRsRow struct {
+	ID               string `db:"id" json:"id"`
+	Provider         string `db:"provider" json:"provider"`
+	ProviderRecordID string `db:"provider_record_id" json:"provider_record_id"`
+	Direction        string `db:"direction" json:"direction"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	CallID           string `db:"call_id" json:"call_id"`
+	DurationSeconds  int64  `db:"duration_seconds" json:"duration_seconds"`
+	Currency         string `db:"currency" json:"currency"`
+	CostMicros       int64  `db:"cost_micros" json:"cost_micros"`
+	Reconciled       bool   `db:"reconciled" json:"reconciled"`
+	StartedAt        string `db:"started_at" json:"started_at"`
+}
+
+func (q *Queries) ListBackofficeProviderCDRs(ctx context.Context) ([]ListBackofficeProviderCDRsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeProviderCDRs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeProviderCDRsRow{}
+	for rows.Next() {
+		var i ListBackofficeProviderCDRsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Provider,
+			&i.ProviderRecordID,
+			&i.Direction,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.CallID,
+			&i.DurationSeconds,
+			&i.Currency,
+			&i.CostMicros,
+			&i.Reconciled,
+			&i.StartedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const markProviderCDRReconciled = `-- name: MarkProviderCDRReconciled :one

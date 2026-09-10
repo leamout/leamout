@@ -95,3 +95,31 @@ SELECT *
 FROM wholesale_charges
 WHERE provider_cdr_id = sqlc.arg(provider_cdr_id)
 LIMIT 1;
+-- name: ListBackofficeProviderCDRs :many
+SELECT pc.id::TEXT AS id, pc.provider, pc.provider_record_id, pc.direction,
+       CAST(COALESCE(pc.organization_id::TEXT,'—') AS TEXT) AS organization_id,
+       COALESCE(o.name,'Unreconciled') AS organization_name,
+       CAST(COALESCE(pc.call_id::TEXT,'—') AS TEXT) AS call_id,
+       pc.duration_seconds, pc.currency, pc.cost_micros,
+       CASE WHEN pc.reconciled_at IS NOT NULL THEN true ELSE false END AS reconciled,
+       to_char(pc.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS started_at
+FROM provider_cdrs pc LEFT JOIN organizations o ON o.id=pc.organization_id
+ORDER BY pc.started_at DESC LIMIT 100;
+
+-- name: GetBackofficeProviderCDR :one
+SELECT pc.id::TEXT AS id, pc.provider, pc.provider_record_id, pc.direction,
+       CAST(COALESCE(pc.carrier_connection_id::TEXT,'—') AS TEXT) AS carrier_connection_id,
+       COALESCE(cc.name,'—') AS carrier_connection_name,
+       CAST(COALESCE(pc.organization_id::TEXT,'—') AS TEXT) AS organization_id,
+       COALESCE(o.name,'Unreconciled') AS organization_name,
+       CAST(COALESCE(pc.call_id::TEXT,'—') AS TEXT) AS call_id,
+       COALESCE(pc.sip_call_id,'—') AS sip_call_id, pc.duration_seconds, pc.currency, pc.cost_micros,
+       CAST(COALESCE(to_char(pc.reconciled_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS reconciled_at,
+       CAST(COALESCE(wc.id::TEXT,'—') AS TEXT) AS wholesale_charge_id,
+       CAST(COALESCE(wc.amount_micros::TEXT,'—') AS TEXT) AS wholesale_amount_micros,
+       CAST(COALESCE(wc.currency,'—') AS TEXT) AS wholesale_currency,
+       to_char(pc.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS started_at,
+       to_char(pc.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at
+FROM provider_cdrs pc LEFT JOIN carrier_connections cc ON cc.id=pc.carrier_connection_id
+LEFT JOIN organizations o ON o.id=pc.organization_id LEFT JOIN wholesale_charges wc ON wc.provider_cdr_id=pc.id
+WHERE pc.id=sqlc.arg(id) LIMIT 1;

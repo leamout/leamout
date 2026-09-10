@@ -85,6 +85,46 @@ func (q *Queries) EnableSipDomain(ctx context.Context, arg EnableSipDomainParams
 	return err
 }
 
+const getBackofficeSIPDomain = `-- name: GetBackofficeSIPDomain :one
+SELECT d.id::TEXT AS id, d.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       d.domain::TEXT AS domain, d.status, COUNT(DISTINCT s.id)::BIGINT AS subscriber_count,
+       COUNT(DISTINCT vb.id)::BIGINT AS binding_count,
+       to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(d.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM sip_domains d JOIN organizations o ON o.id=d.organization_id
+LEFT JOIN subscribers s ON s.sip_domain_id=d.id LEFT JOIN voice_bindings vb ON vb.sip_domain_id=d.id
+WHERE d.id=$1 GROUP BY d.id,o.name LIMIT 1
+`
+
+type GetBackofficeSIPDomainRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	Domain           string `db:"domain" json:"domain"`
+	Status           string `db:"status" json:"status"`
+	SubscriberCount  int64  `db:"subscriber_count" json:"subscriber_count"`
+	BindingCount     int64  `db:"binding_count" json:"binding_count"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+	UpdatedAt        string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeSIPDomain(ctx context.Context, id uuid.UUID) (GetBackofficeSIPDomainRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeSIPDomain, id)
+	var i GetBackofficeSIPDomainRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.Domain,
+		&i.Status,
+		&i.SubscriberCount,
+		&i.BindingCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getSipDomainByDomain = `-- name: GetSipDomainByDomain :one
 SELECT sd.id, sd.organization_id, sd.domain, sd.status, sd.created_at, sd.updated_at
 FROM sip_domains AS sd
@@ -145,6 +185,53 @@ func (q *Queries) GetSipDomainByID(ctx context.Context, arg GetSipDomainByIDPara
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeSIPDomains = `-- name: ListBackofficeSIPDomains :many
+SELECT d.id::TEXT AS id, d.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       d.domain::TEXT AS domain, d.status, COUNT(s.id)::BIGINT AS subscriber_count,
+       to_char(d.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM sip_domains d JOIN organizations o ON o.id=d.organization_id
+LEFT JOIN subscribers s ON s.sip_domain_id=d.id
+GROUP BY d.id,o.name ORDER BY d.created_at DESC LIMIT 100
+`
+
+type ListBackofficeSIPDomainsRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	Domain           string `db:"domain" json:"domain"`
+	Status           string `db:"status" json:"status"`
+	SubscriberCount  int64  `db:"subscriber_count" json:"subscriber_count"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeSIPDomains(ctx context.Context) ([]ListBackofficeSIPDomainsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeSIPDomains)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeSIPDomainsRow{}
+	for rows.Next() {
+		var i ListBackofficeSIPDomainsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.Domain,
+			&i.Status,
+			&i.SubscriberCount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listSipDomainsByOrganizationID = `-- name: ListSipDomainsByOrganizationID :many
