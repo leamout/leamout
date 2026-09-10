@@ -7,7 +7,6 @@ import (
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/topups"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -40,7 +39,7 @@ type Modules struct {
 	Licensing            LicensingModule
 	CommercialState      CommercialStateModule
 	Subscriptions        SubscriptionsModule
-	Topups               TopupsModule
+	Wallets              WalletsModule
 	Auth                 AuthModule
 	Session              SessionModule
 	Users                UsersModule
@@ -69,13 +68,13 @@ type Modules struct {
 	OrganizationsContext *middleware.OrganizationMiddleware
 }
 
-type TopupsModule struct {
-	Wallets    *wallets.Repository
-	Checkouts  *checkout.Repository
-	Payments   *commercialpayments.Repository
-	Repository *topups.Repository
-	Service    *topups.Service
-	Handler    *topups.Handler
+type WalletsModule struct {
+	Repository      *wallets.Repository
+	Checkouts       *checkout.Repository
+	Payments        *commercialpayments.Repository
+	TopupRepository *wallets.TopupRepository
+	TopupService    *wallets.TopupService
+	TopupHandler    *wallets.TopupHandler
 }
 
 type ProviderDiagnosticsModule struct {

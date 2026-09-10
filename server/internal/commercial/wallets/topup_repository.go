@@ -1,4 +1,4 @@
-package topups
+package wallets
 
 import (
 	"context"
@@ -16,28 +16,28 @@ import (
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-type Repository struct {
+type TopupRepository struct {
 	db      *pgxpool.Pool
 	queries *sqlc.Queries
 	now     func() time.Time
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db, queries: sqlc.New(db), now: time.Now}
+func NewTopupRepository(db *pgxpool.Pool) *TopupRepository {
+	return &TopupRepository{db: db, queries: sqlc.New(db), now: time.Now}
 }
 
 // Reconcile records a verified provider event and applies its commercial
 // consequence in one transaction. Duplicate events and later success events
 // cannot post a second wallet credit.
-func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event) (Settlement, error) {
+func (r *TopupRepository) Reconcile(ctx context.Context, event paymentprovider.Event) (TopupSettlement, error) {
 	if event.Provider == "" || event.ProviderEventID == "" || event.Type == "" ||
 		event.Payment.Reference == "" || len(event.Raw) == 0 || !json.Valid(event.Raw) {
-		return Settlement{}, ErrPaymentMismatch
+		return TopupSettlement{}, ErrPaymentMismatch
 	}
 
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return Settlement{}, err
+		return TopupSettlement{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := r.queries.WithTx(tx)
@@ -45,15 +45,15 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 	topup, err := q.LockWalletTopupByReference(ctx, event.Payment.Reference)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Settlement{}, ErrPaymentMismatch
+			return TopupSettlement{}, ErrPaymentMismatch
 		}
-		return Settlement{}, err
+		return TopupSettlement{}, err
 	}
 	if topup.WalletID == nil || topup.Provider != event.Provider ||
 		topup.Amount != event.Payment.AmountMinor || topup.Currency != event.Payment.Currency ||
 		event.Payment.ProviderID == "" ||
 		(topup.ProviderPaymentID != nil && *topup.ProviderPaymentID != event.Payment.ProviderID) {
-		return Settlement{}, ErrPaymentMismatch
+		return TopupSettlement{}, ErrPaymentMismatch
 	}
 
 	if topup.ProviderPaymentID == nil {
@@ -63,7 +63,7 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 			OrganizationID:    topup.OrganizationID,
 			ID:                topup.PaymentID,
 		}); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 	}
 
@@ -78,13 +78,13 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 		Payload:         event.Raw,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Settlement{Applied: false}, nil
+		return TopupSettlement{Applied: false}, nil
 	}
 	if err != nil {
-		return Settlement{}, err
+		return TopupSettlement{}, err
 	}
 
-	result := Settlement{
+	result := TopupSettlement{
 		OrganizationID: topup.OrganizationID,
 		WalletID:       *topup.WalletID,
 		PaymentID:      topup.PaymentID,
@@ -92,10 +92,10 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 	}
 	if topup.PaymentStatus == "succeeded" {
 		if err = q.MarkPaymentProviderEventProcessed(ctx, providerEvent.ID); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 		if err = tx.Commit(ctx); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 		return result, nil
 	}
@@ -109,7 +109,7 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 			OrganizationID: topup.OrganizationID,
 			ID:             topup.PaymentID,
 		}); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 		if _, err = q.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
 			Status:         "succeeded",
@@ -119,7 +119,7 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 			ID:             topup.CheckoutOrderID,
 			ExpectedStatus: topup.CheckoutStatus,
 		}); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 		if _, err = q.CreateWalletLedgerEntry(ctx, sqlc.CreateWalletLedgerEntryParams{
 			EntryType:      "topup",
@@ -130,7 +130,7 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 			WalletID:       *topup.WalletID,
 			OrganizationID: topup.OrganizationID,
 		}); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 		result.Applied = true
 		result.SettledAt = &now
@@ -139,22 +139,22 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 		if _, err = q.UpdatePaymentStatus(ctx, sqlc.UpdatePaymentStatusParams{
 			Status: status, OrganizationID: topup.OrganizationID, ID: topup.PaymentID,
 		}); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 		if _, err = q.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
 			Status: status, NextAction: "none", CompletedAt: pgconv.NullableTimestamptz(&now),
 			OrganizationID: topup.OrganizationID, ID: topup.CheckoutOrderID,
 			ExpectedStatus: topup.CheckoutStatus,
 		}); err != nil {
-			return Settlement{}, err
+			return TopupSettlement{}, err
 		}
 	}
 
 	if err = q.MarkPaymentProviderEventProcessed(ctx, providerEvent.ID); err != nil {
-		return Settlement{}, err
+		return TopupSettlement{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
-		return Settlement{}, err
+		return TopupSettlement{}, err
 	}
 	return result, nil
 }

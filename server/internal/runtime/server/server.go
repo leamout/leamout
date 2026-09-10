@@ -15,7 +15,6 @@ import (
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/topups"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
@@ -128,7 +127,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Topups.Service); err != nil {
+	if err := configurePaymentProviders(cfg, modules.Wallets.TopupService); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -205,8 +204,8 @@ func NewModules(
 	walletRepository := wallets.NewRepository(db)
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := commercialpayments.NewRepository(db)
-	topupRepository := topups.NewRepository(db)
-	topupService := topups.NewService(
+	topupRepository := wallets.NewTopupRepository(db)
+	topupService := wallets.NewTopupService(
 		walletRepository,
 		checkoutRepository,
 		paymentRepository,
@@ -304,13 +303,13 @@ func NewModules(
 			Service:    subscriptionsService,
 			Handler:    subscriptions.NewHandler(subscriptionsService),
 		},
-		Topups: TopupsModule{
-			Wallets:    walletRepository,
-			Checkouts:  checkoutRepository,
-			Payments:   paymentRepository,
-			Repository: topupRepository,
-			Service:    topupService,
-			Handler:    topups.NewHandler(topupService),
+		Wallets: WalletsModule{
+			Repository:      walletRepository,
+			Checkouts:       checkoutRepository,
+			Payments:        paymentRepository,
+			TopupRepository: topupRepository,
+			TopupService:    topupService,
+			TopupHandler:    wallets.NewTopupHandler(topupService),
 		},
 		Auth: AuthModule{
 			Repository: authRepository,
@@ -437,7 +436,7 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 	return nil
 }
 
-func configurePaymentProviders(cfg config.Config, service *topups.Service) error {
+func configurePaymentProviders(cfg config.Config, service *wallets.TopupService) error {
 	if cfg.Stripe.SecretKey != "" {
 		if cfg.Stripe.WebhookSecret == "" {
 			return fmt.Errorf("Stripe webhook secret is required when Stripe is enabled")

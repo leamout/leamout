@@ -1,4 +1,4 @@
-package topups
+package wallets
 
 import (
 	"io"
@@ -16,12 +16,12 @@ import (
 
 const maxWebhookBytes = 1 << 20
 
-type Handler struct {
-	service *Service
+type TopupHandler struct {
+	service *TopupService
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewTopupHandler(service *TopupService) *TopupHandler {
+	return &TopupHandler{service: service}
 }
 
 type createRequest struct {
@@ -50,7 +50,7 @@ type checkoutResponse struct {
 	ClientSecret    string              `json:"client_secret,omitempty"`
 }
 
-func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *TopupHandler) Create(w http.ResponseWriter, r *http.Request) {
 	organizationID, walletID, err := requestIDs(r, "wallet_id")
 	if err != nil {
 		httputil.Error(w, err)
@@ -61,7 +61,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Create(r.Context(), organizationID, walletID, CreateInput{
+	result, err := h.service.Create(r.Context(), organizationID, walletID, TopupCreateInput{
 		AmountMinor: request.AmountMinor,
 		Provider:    request.Provider,
 		Email:       request.Email,
@@ -75,7 +75,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 	httputil.Created(w, responseFromCheckout(result))
 }
 
-func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+func (h *TopupHandler) Get(w http.ResponseWriter, r *http.Request) {
 	organizationID, orderID, err := requestIDs(r, "checkout_order_id")
 	if err != nil {
 		httputil.Error(w, err)
@@ -95,7 +95,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
+func (h *TopupHandler) Continue(w http.ResponseWriter, r *http.Request) {
 	organizationID, orderID, err := requestIDs(r, "checkout_order_id")
 	if err != nil {
 		httputil.Error(w, err)
@@ -106,7 +106,7 @@ func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Continue(r.Context(), organizationID, orderID, ContinueInput{
+	result, err := h.service.Continue(r.Context(), organizationID, orderID, TopupContinueInput{
 		Action: request.Action,
 		Value:  request.Value,
 	})
@@ -117,7 +117,7 @@ func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, responseFromCheckout(result))
 }
 
-func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
+func (h *TopupHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBytes)
 	payload, err := io.ReadAll(r.Body)
@@ -144,7 +144,7 @@ func requestIDs(r *http.Request, resourceParam string) (uuid.UUID, uuid.UUID, er
 	return organizationID, resourceID, nil
 }
 
-func responseFromCheckout(result Checkout) checkoutResponse {
+func responseFromCheckout(result TopupCheckout) checkoutResponse {
 	return checkoutResponse{
 		OrderID: result.Order.ID, PaymentID: result.Payment.ID,
 		Reference: result.Order.Reference, Provider: result.Order.Provider,

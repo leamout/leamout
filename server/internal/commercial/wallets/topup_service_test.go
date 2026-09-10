@@ -1,4 +1,4 @@
-package topups
+package wallets
 
 import (
 	"context"
@@ -9,13 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/wallets"
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-type walletStub struct{ wallet wallets.Wallet }
+type walletStub struct{ wallet Wallet }
 
-func (s walletStub) Get(context.Context, uuid.UUID, uuid.UUID) (wallets.Wallet, error) {
+func (s walletStub) Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error) {
 	return s.wallet, nil
 }
 
@@ -77,9 +76,9 @@ type settlementStub struct {
 	event paymentprovider.Event
 }
 
-func (s *settlementStub) Reconcile(_ context.Context, event paymentprovider.Event) (Settlement, error) {
+func (s *settlementStub) Reconcile(_ context.Context, event paymentprovider.Event) (TopupSettlement, error) {
 	s.event = event
-	return Settlement{Applied: true}, nil
+	return TopupSettlement{Applied: true}, nil
 }
 
 type providerStub struct {
@@ -107,15 +106,15 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	provider := &providerStub{session: &paymentprovider.CheckoutSession{
 		Provider: "stripe", ProviderID: "pi_123", Reference: "topup.wrong",
 	}}
-	service := NewService(
-		walletStub{wallet: wallets.Wallet{
-			ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive,
+	service := NewTopupService(
+		walletStub{wallet: Wallet{
+			ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive,
 		}},
 		checkouts, payments, &settlementStub{},
 		map[string]paymentprovider.Provider{"stripe": provider},
 	)
 
-	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
+	_, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: "payer@example.com",
 	})
 	if err != ErrPaymentMismatch {
@@ -147,14 +146,14 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 	checkouts := &checkoutStub{}
 	payments := &paymentStub{}
 	provider := &providerStub{}
-	service := NewService(
-		walletStub{wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive}},
+	service := NewTopupService(
+		walletStub{wallet: Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive}},
 		checkouts, payments, &settlementStub{},
 		map[string]paymentprovider.Provider{"stripe": provider},
 	)
 	service.now = func() time.Time { return time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC) }
 
-	result, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
+	result, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: " payer@example.com ",
 	})
 	if err != nil {
@@ -175,12 +174,12 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 
 func TestCreateRejectsPaystackForNonGHSWallet(t *testing.T) {
 	provider := &providerStub{}
-	service := NewService(
-		walletStub{wallet: wallets.Wallet{ID: uuid.New(), Currency: "USD", Status: wallets.StatusActive}},
+	service := NewTopupService(
+		walletStub{wallet: Wallet{ID: uuid.New(), Currency: "USD", Status: StatusActive}},
 		&checkoutStub{}, &paymentStub{}, &settlementStub{},
 		map[string]paymentprovider.Provider{"paystack": provider},
 	)
-	_, err := service.Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
+	_, err := service.Create(context.Background(), uuid.New(), uuid.New(), TopupCreateInput{
 		AmountMinor: 100, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
 		MobileMoney: &paymentprovider.MobileMoney{Phone: "+233200000000", Provider: "mtn"},
 	})
@@ -200,7 +199,7 @@ func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 	}
 	provider := &providerStub{event: event}
 	settlements := &settlementStub{}
-	service := NewService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"stripe": provider})
+	service := NewTopupService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"stripe": provider})
 
 	result, err := service.Webhook(context.Background(), "stripe", []byte(`{}`), http.Header{})
 	if err != nil {

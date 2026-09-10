@@ -9,7 +9,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/topups"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -76,9 +76,9 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			organizationAccess("subscriptions"),
 			modules.Idempotency.Middleware.Handle,
 		)
-		topups.RegisterRoutes(
+		wallets.RegisterTopupRoutes(
 			r,
-			modules.Topups.Handler,
+			modules.Wallets.TopupHandler,
 			organizationAccess("billing"),
 			modules.Idempotency.Middleware.Handle,
 		)

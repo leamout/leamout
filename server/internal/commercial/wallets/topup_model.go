@@ -1,4 +1,4 @@
-package topups
+package wallets
 
 import (
 	"errors"
@@ -17,7 +17,7 @@ var (
 	ErrPaymentMismatch     = apperror.NewConflict("provider payment does not match checkout order")
 )
 
-type CreateInput struct {
+type TopupCreateInput struct {
 	AmountMinor int64
 	Provider    checkout.Provider
 	Email       string
@@ -25,23 +25,23 @@ type CreateInput struct {
 	MobileMoney *paymentprovider.MobileMoney
 }
 
-type ContinueInput struct {
+type TopupContinueInput struct {
 	Action paymentprovider.NextAction
 	Value  string
 }
 
-type Checkout struct {
+type TopupCheckout struct {
 	Order   checkout.Order
 	Payment payments.Payment
 	Session paymentprovider.CheckoutSession
 }
 
-type Details struct {
+type TopupDetails struct {
 	Order   checkout.Order
 	Payment payments.Payment
 }
 
-type Settlement struct {
+type TopupSettlement struct {
 	Applied        bool
 	OrganizationID uuid.UUID
 	WalletID       uuid.UUID
