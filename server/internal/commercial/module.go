@@ -26,6 +26,11 @@ type Module struct {
 	Usage    UsageModule
 	Prepaid  PrepaidModule
 	Payments PaymentsModule
+
+	// Deprecated: use Prepaid. Kept temporarily for runtime migration.
+	Money PrepaidModule
+	// Deprecated: use Access.State. Kept temporarily for runtime migration.
+	State StateModule
 }
 
 type CatalogModule struct {
@@ -127,6 +132,16 @@ func New(db *pgxpool.Pool) *Module {
 		walletRepository,
 		map[string]paymentprovider.Provider{},
 	)
+	topupHandler := wallets.NewTopupHandler(topupService)
+	stateModule := StateModule{
+		Service: commercialStateService,
+		Handler: commercialstate.NewHandler(commercialStateService),
+	}
+	prepaidModule := PrepaidModule{
+		Wallets:      walletRepository,
+		TopupService: topupService,
+		TopupHandler: topupHandler,
+	}
 
 	return &Module{
 		Catalog: CatalogModule{
@@ -153,22 +168,17 @@ func New(db *pgxpool.Pool) *Module {
 				Repository: entitlementsRepository,
 				Service:    entitlementsService,
 			},
-			State: StateModule{
-				Service: commercialStateService,
-				Handler: commercialstate.NewHandler(commercialStateService),
-			},
+			State: stateModule,
 		},
 		Usage: UsageModule{
 			Repository: usageRepository,
 			Service:    usageService,
 		},
-		Prepaid: PrepaidModule{
-			Wallets:      walletRepository,
-			TopupService: topupService,
-			TopupHandler: wallets.NewTopupHandler(topupService),
-		},
+		Prepaid: prepaidModule,
 		Payments: PaymentsModule{
 			Repository: paymentRepository,
 		},
+		Money: prepaidModule,
+		State: stateModule,
 	}
 }
