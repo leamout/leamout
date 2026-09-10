@@ -5,7 +5,7 @@ SELECT
     co.wallet_id,
     co.provider,
     co.reference,
-    co.amount,
+    co.amount_minor,
     co.currency,
     co.status AS checkout_status,
     p.id AS payment_id,

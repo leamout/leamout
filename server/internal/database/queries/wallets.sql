@@ -29,12 +29,12 @@ LIMIT 1;
 
 -- name: GetWalletBalance :one
 SELECT
-    COALESCE((SELECT SUM(amount) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)::BIGINT AS posted,
-    COALESCE((SELECT SUM(amount) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)::BIGINT AS reserved,
+    COALESCE((SELECT SUM(amount_minor) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)::BIGINT AS posted_minor,
+    COALESCE((SELECT SUM(amount_minor) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)::BIGINT AS reserved_minor,
     (
-        COALESCE((SELECT SUM(amount) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)
-        - COALESCE((SELECT SUM(amount) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)
-    )::BIGINT AS available
+        COALESCE((SELECT SUM(amount_minor) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)
+        - COALESCE((SELECT SUM(amount_minor) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)
+    )::BIGINT AS available_minor
 FROM wallets AS w
 JOIN organizations AS o ON o.id = w.organization_id
 WHERE w.organization_id = sqlc.arg(organization_id)
@@ -45,14 +45,14 @@ LIMIT 1;
 
 -- name: CreateWalletLedgerEntry :one
 INSERT INTO wallet_ledger_entries (
-    wallet_id, organization_id, entry_type, amount, source_type,
+    wallet_id, organization_id, entry_type, amount_minor, source_type,
     source_id, idempotency_key, metadata, occurred_at
 )
 SELECT
     w.id AS wallet_id,
     w.organization_id,
     sqlc.arg(entry_type) AS entry_type,
-    sqlc.arg(amount) AS amount,
+    sqlc.arg(amount_minor) AS amount_minor,
     sqlc.arg(source_type) AS source_type,
     sqlc.arg(source_id) AS source_id,
     sqlc.arg(idempotency_key) AS idempotency_key,
@@ -87,10 +87,10 @@ FOR UPDATE OF w;
 
 -- name: InsertWalletReservation :one
 INSERT INTO wallet_reservations (
-    wallet_id, organization_id, amount, operation_type, operation_id, expires_at
+    wallet_id, organization_id, amount_minor, operation_type, operation_id, expires_at
 )
 VALUES (
-    sqlc.arg(wallet_id), sqlc.arg(organization_id), sqlc.arg(amount),
+    sqlc.arg(wallet_id), sqlc.arg(organization_id), sqlc.arg(amount_minor),
     sqlc.arg(operation_type), sqlc.arg(operation_id), sqlc.arg(expires_at)
 )
 RETURNING *;
@@ -105,14 +105,14 @@ LIMIT 1;
 -- name: CaptureWalletReservation :one
 UPDATE wallet_reservations AS wr
 SET status = 'captured',
-    captured_amount = sqlc.arg(captured_amount),
+    captured_amount_minor = sqlc.arg(captured_amount_minor),
     captured_at = NOW(),
     updated_at = NOW()
 WHERE wr.organization_id = sqlc.arg(organization_id)
   AND wr.id = sqlc.arg(id)
   AND wr.status = 'active'
   AND wr.expires_at > NOW()
-  AND sqlc.arg(captured_amount) <= wr.amount
+  AND sqlc.arg(captured_amount_minor) <= wr.amount_minor
 RETURNING wr.*;
 
 -- name: ReleaseWalletReservation :one

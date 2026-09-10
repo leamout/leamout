@@ -50,7 +50,7 @@ func (r *TopupRepository) Reconcile(ctx context.Context, event paymentprovider.E
 		return TopupSettlement{}, err
 	}
 	if topup.WalletID == nil || topup.Provider != event.Provider ||
-		topup.Amount != event.Payment.AmountMinor || topup.Currency != event.Payment.Currency ||
+		topup.AmountMinor != event.Payment.AmountMinor || topup.Currency != event.Payment.Currency ||
 		(topup.ProviderPaymentID != nil && *topup.ProviderPaymentID != event.Payment.ProviderID) {
 		return TopupSettlement{}, ErrPaymentMismatch
 	}
@@ -87,7 +87,7 @@ func (r *TopupRepository) Reconcile(ctx context.Context, event paymentprovider.E
 		OrganizationID: topup.OrganizationID,
 		WalletID:       *topup.WalletID,
 		PaymentID:      topup.PaymentID,
-		AmountMinor:    topup.Amount,
+		AmountMinor:    topup.AmountMinor,
 	}
 	if topup.PaymentStatus == "succeeded" {
 		if err = q.MarkPaymentProviderEventProcessed(ctx, providerEvent.ID); err != nil {
@@ -122,7 +122,7 @@ func (r *TopupRepository) Reconcile(ctx context.Context, event paymentprovider.E
 		}
 		if _, err = q.CreateWalletLedgerEntry(ctx, sqlc.CreateWalletLedgerEntryParams{
 			EntryType:      "topup",
-			Amount:         topup.Amount,
+			AmountMinor:    topup.AmountMinor,
 			SourceType:     "payment",
 			SourceID:       topup.PaymentID.String(),
 			IdempotencyKey: fmt.Sprintf("payment:%s", topup.PaymentID),

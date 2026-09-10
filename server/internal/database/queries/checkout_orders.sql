@@ -1,7 +1,7 @@
 -- name: CreateCheckoutOrder :one
 INSERT INTO checkout_orders (
     organization_id, wallet_id, price_id, order_type,
-    provider, payment_method, reference, amount, currency, expires_at, metadata
+    provider, payment_method, reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     sqlc.arg(organization_id) AS organization_id,
@@ -11,7 +11,7 @@ SELECT
     sqlc.arg(provider) AS provider,
     sqlc.arg(payment_method) AS payment_method,
     sqlc.arg(reference) AS reference,
-    sqlc.arg(amount) AS amount,
+    sqlc.arg(amount_minor) AS amount_minor,
     sqlc.arg(currency) AS currency,
     sqlc.arg(expires_at) AS expires_at,
     COALESCE(sqlc.narg(metadata), '{}'::jsonb) AS metadata

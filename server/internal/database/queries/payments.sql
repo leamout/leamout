@@ -4,7 +4,7 @@ INSERT INTO payments (
     organization_id,
     provider,
     provider_payment_id,
-    amount,
+    amount_minor,
     currency,
     status,
     paid_at,
@@ -15,7 +15,7 @@ SELECT
     co.organization_id,
     co.provider,
     sqlc.narg(provider_payment_id) AS provider_payment_id,
-    sqlc.arg(amount) AS amount,
+    sqlc.arg(amount_minor) AS amount_minor,
     sqlc.arg(currency) AS currency,
     COALESCE(sqlc.narg(status), 'pending') AS status,
     sqlc.narg(paid_at) AS paid_at,
@@ -25,7 +25,7 @@ JOIN organizations AS o ON o.id = co.organization_id
 WHERE co.id = sqlc.arg(checkout_order_id)
   AND co.organization_id = sqlc.arg(organization_id)
   AND co.provider = sqlc.arg(provider)
-  AND co.amount = sqlc.arg(amount)
+  AND co.amount_minor = sqlc.arg(amount_minor)
   AND co.currency = sqlc.arg(currency)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
