@@ -19,15 +19,15 @@ type walletStore interface {
 }
 
 type checkoutStore interface {
-	Create(context.Context, uuid.UUID, checkout.CreateInput) (checkout.Order, error)
-	Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Order, error)
-	ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (checkout.Order, error)
-	Transition(context.Context, uuid.UUID, uuid.UUID, checkout.Transition) (checkout.Order, error)
+	Create(context.Context, uuid.UUID, checkout.CreateInput) (checkout.Checkout, error)
+	Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Checkout, error)
+	ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (checkout.Checkout, error)
+	Transition(context.Context, uuid.UUID, uuid.UUID, checkout.Transition) (checkout.Checkout, error)
 }
 
 type paymentStore interface {
 	Create(context.Context, uuid.UUID, string, commercialpayments.CreateInput) (commercialpayments.Payment, error)
-	GetByCheckoutOrder(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error)
+	GetByCheckout(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error)
 	SetProviderID(context.Context, uuid.UUID, uuid.UUID, string, commercialpayments.Status) (commercialpayments.Payment, error)
 	UpdateStatus(context.Context, uuid.UUID, uuid.UUID, commercialpayments.Status, *time.Time) (commercialpayments.Payment, error)
 }
@@ -100,9 +100,9 @@ func (s *TopupService) Create(
 
 	now := s.now().UTC()
 	reference := "topup." + uuid.NewString()
-	order, err := s.checkouts.Create(ctx, organizationID, checkout.CreateInput{
+	checkoutRecord, err := s.checkouts.Create(ctx, organizationID, checkout.CreateInput{
 		WalletID:      &walletID,
-		Type:          checkout.OrderWalletTopup,
+		Type:          checkout.TypeWalletTopup,
 		Provider:      input.Provider,
 		PaymentMethod: method,
 		Reference:     reference,
@@ -115,10 +115,10 @@ func (s *TopupService) Create(
 	}
 
 	payment, err := s.payments.Create(ctx, organizationID, providerName, commercialpayments.CreateInput{
-		CheckoutOrderID: order.ID,
-		Status:          commercialpayments.StatusPending,
-		AmountMinor:     order.AmountMinor,
-		Currency:        order.Currency,
+		CheckoutID:  checkoutRecord.ID,
+		Status:      commercialpayments.StatusPending,
+		AmountMinor: checkoutRecord.AmountMinor,
+		Currency:    checkoutRecord.Currency,
 	})
 	if err != nil {
 		return TopupCheckout{}, err
@@ -126,8 +126,8 @@ func (s *TopupService) Create(
 
 	session, err := provider.CreateCheckout(ctx, paymentprovider.CheckoutRequest{
 		Reference:   reference,
-		AmountMinor: order.AmountMinor,
-		Currency:    order.Currency,
+		AmountMinor: checkoutRecord.AmountMinor,
+		Currency:    checkoutRecord.Currency,
 		Email:       strings.TrimSpace(input.Email),
 		CallbackURL: strings.TrimSpace(input.CallbackURL),
 		Metadata: map[string]string{
@@ -137,12 +137,12 @@ func (s *TopupService) Create(
 		MobileMoney: input.MobileMoney,
 	})
 	if err != nil {
-		s.failPendingCheckout(ctx, organizationID, order, payment)
+		s.failPendingCheckout(ctx, organizationID, checkoutRecord, payment)
 		return TopupCheckout{}, err
 	}
 	if session.Provider != providerName || session.Reference != reference ||
 		(input.Provider == checkout.ProviderStripe && session.ProviderID == "") {
-		s.failPendingCheckout(ctx, organizationID, order, payment)
+		s.failPendingCheckout(ctx, organizationID, checkoutRecord, payment)
 		return TopupCheckout{}, ErrPaymentMismatch
 	}
 
@@ -173,27 +173,32 @@ func (s *TopupService) Create(
 		providerMessage = &message
 	}
 
-	order, err = s.checkouts.Transition(ctx, organizationID, order.ID, checkout.Transition{
-		Expected:        checkout.StatusPending,
-		Status:          checkout.StatusProcessing,
-		NextAction:      checkout.NextAction(session.NextAction),
-		ProviderMessage: providerMessage,
-	})
+	checkoutRecord, err = s.checkouts.Transition(
+		ctx,
+		organizationID,
+		checkoutRecord.ID,
+		checkout.Transition{
+			Expected:        checkout.StatusPending,
+			Status:          checkout.StatusProcessing,
+			NextAction:      checkout.NextAction(session.NextAction),
+			ProviderMessage: providerMessage,
+		},
+	)
 	if err != nil {
 		return TopupCheckout{}, err
 	}
 
 	return TopupCheckout{
-		Order:   order,
-		Payment: payment,
-		Session: session,
+		Checkout: checkoutRecord,
+		Payment:  payment,
+		Session:  session,
 	}, nil
 }
 
 func (s *TopupService) failPendingCheckout(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	order checkout.Order,
+	checkoutRecord checkout.Checkout,
 	payment commercialpayments.Payment,
 ) {
 	completedAt := s.now().UTC()
@@ -205,34 +210,39 @@ func (s *TopupService) failPendingCheckout(
 		commercialpayments.StatusFailed,
 		nil,
 	)
-	_, _ = s.checkouts.Transition(ctx, organizationID, order.ID, checkout.Transition{
-		Expected:    checkout.StatusPending,
-		Status:      checkout.StatusFailed,
-		NextAction:  checkout.ActionNone,
-		CompletedAt: &completedAt,
-	})
+	_, _ = s.checkouts.Transition(
+		ctx,
+		organizationID,
+		checkoutRecord.ID,
+		checkout.Transition{
+			Expected:    checkout.StatusPending,
+			Status:      checkout.StatusFailed,
+			NextAction:  checkout.ActionNone,
+			CompletedAt: &completedAt,
+		},
+	)
 }
 
 func (s *TopupService) Get(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	orderID uuid.UUID,
+	checkoutID uuid.UUID,
 ) (TopupDetails, error) {
-	order, err := s.checkouts.Get(ctx, organizationID, orderID)
+	checkoutRecord, err := s.checkouts.Get(ctx, organizationID, checkoutID)
 	if err != nil {
 		return TopupDetails{}, err
 	}
 
-	payment, err := s.payments.GetByCheckoutOrder(ctx, organizationID, orderID)
+	payment, err := s.payments.GetByCheckout(ctx, organizationID, checkoutID)
 	if err != nil {
 		return TopupDetails{}, err
 	}
 
-	if order.Provider == checkout.ProviderPaystack && order.Status == checkout.StatusProcessing {
+	if checkoutRecord.Provider == checkout.ProviderPaystack && checkoutRecord.Status == checkout.StatusProcessing {
 		claimed, claimErr := s.checkouts.ClaimRefresh(
 			ctx,
 			organizationID,
-			orderID,
+			checkoutID,
 			s.now().UTC().Add(-10*time.Second),
 		)
 		if claimErr == nil {
@@ -241,44 +251,44 @@ func (s *TopupService) Get(
 					return TopupDetails{}, err
 				}
 
-				order, err = s.checkouts.Get(ctx, organizationID, orderID)
+				checkoutRecord, err = s.checkouts.Get(ctx, organizationID, checkoutID)
 				if err != nil {
 					return TopupDetails{}, err
 				}
 
-				payment, err = s.payments.GetByCheckoutOrder(ctx, organizationID, orderID)
+				payment, err = s.payments.GetByCheckout(ctx, organizationID, checkoutID)
 				if err != nil {
 					return TopupDetails{}, err
 				}
 			}
-		} else if !errors.Is(claimErr, checkout.ErrOrderNotFound) {
+		} else if !errors.Is(claimErr, checkout.ErrCheckoutNotFound) {
 			return TopupDetails{}, claimErr
 		}
 	}
 
 	return TopupDetails{
-		Order:   order,
-		Payment: payment,
+		Checkout: checkoutRecord,
+		Payment:  payment,
 	}, nil
 }
 
 func (s *TopupService) refreshPaystack(
 	ctx context.Context,
-	order checkout.Order,
+	checkoutRecord checkout.Checkout,
 ) (paymentprovider.Event, bool) {
 	provider, ok := s.providers["paystack"]
 	if !ok {
 		return paymentprovider.Event{}, false
 	}
 
-	payment, err := provider.GetPayment(ctx, order.Reference)
+	payment, err := provider.GetPayment(ctx, checkoutRecord.Reference)
 	if err != nil || (payment.Status != paymentprovider.StatusSucceeded && payment.Status != paymentprovider.StatusFailed) {
 		return paymentprovider.Event{}, false
 	}
 
 	raw, _ := json.Marshal(map[string]string{
 		"source":    "charge_lookup",
-		"reference": order.Reference,
+		"reference": checkoutRecord.Reference,
 		"status":    string(payment.Status),
 	})
 
@@ -289,7 +299,7 @@ func (s *TopupService) refreshPaystack(
 
 	return paymentprovider.Event{
 		Provider:        "paystack",
-		ProviderEventID: "lookup:" + order.Reference + ":" + string(payment.Status),
+		ProviderEventID: "lookup:" + checkoutRecord.Reference + ":" + string(payment.Status),
 		Type:            eventType,
 		Payment:         payment,
 		Raw:             raw,
@@ -299,26 +309,27 @@ func (s *TopupService) refreshPaystack(
 func (s *TopupService) Continue(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	orderID uuid.UUID,
+	checkoutID uuid.UUID,
 	input TopupContinueInput,
 ) (TopupCheckout, error) {
-	details, err := s.Get(ctx, organizationID, orderID)
+	details, err := s.Get(ctx, organizationID, checkoutID)
 	if err != nil {
 		return TopupCheckout{}, err
 	}
 
-	provider, ok := s.providers[string(details.Order.Provider)]
+	provider, ok := s.providers[string(details.Checkout.Provider)]
 	if !ok {
 		return TopupCheckout{}, ErrProviderUnavailable
 	}
 
 	continuation, ok := provider.(paymentprovider.ContinuationProvider)
-	if !ok || details.Order.Provider != checkout.ProviderPaystack || details.Order.Status != checkout.StatusProcessing {
+	if !ok || details.Checkout.Provider != checkout.ProviderPaystack ||
+		details.Checkout.Status != checkout.StatusProcessing {
 		return TopupCheckout{}, ErrInvalidTopup
 	}
 
 	session, err := continuation.ContinueCheckout(ctx, paymentprovider.ContinueCheckoutRequest{
-		Reference: details.Order.Reference,
+		Reference: details.Checkout.Reference,
 		Action:    input.Action,
 		Value:     input.Value,
 	})
@@ -332,20 +343,25 @@ func (s *TopupService) Continue(
 		providerMessage = &message
 	}
 
-	order, err := s.checkouts.Transition(ctx, organizationID, orderID, checkout.Transition{
-		Expected:        checkout.StatusProcessing,
-		Status:          checkout.StatusProcessing,
-		NextAction:      checkout.NextAction(session.NextAction),
-		ProviderMessage: providerMessage,
-	})
+	checkoutRecord, err := s.checkouts.Transition(
+		ctx,
+		organizationID,
+		checkoutID,
+		checkout.Transition{
+			Expected:        checkout.StatusProcessing,
+			Status:          checkout.StatusProcessing,
+			NextAction:      checkout.NextAction(session.NextAction),
+			ProviderMessage: providerMessage,
+		},
+	)
 	if err != nil {
 		return TopupCheckout{}, err
 	}
 
 	return TopupCheckout{
-		Order:   order,
-		Payment: details.Payment,
-		Session: session,
+		Checkout: checkoutRecord,
+		Payment:  details.Payment,
+		Session:  session,
 	}, nil
 }
 
