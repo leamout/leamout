@@ -8,6 +8,9 @@ templ Navigation(active string) {
 			<ul class="menu w-full gap-1">
 				@NavigationItem("Dashboard", "/", "dashboard", active)
 
+				<li><span class="menu-title">Identity</span></li>
+				@NavigationItem("Users", "/users", "users", active)
+
 				<li><span class="menu-title">Organizations</span></li>
 				@NavigationItem("Organizations", "/organizations", "organizations", active)
 
