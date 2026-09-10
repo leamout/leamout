@@ -124,6 +124,42 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 	return i, err
 }
 
+const getPaymentByCheckoutOrder = `-- name: GetPaymentByCheckoutOrder :one
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+FROM payments AS p
+JOIN organizations AS o ON o.id = p.organization_id
+WHERE p.organization_id = $1
+  AND p.checkout_order_id = $2
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+LIMIT 1
+`
+
+type GetPaymentByCheckoutOrderParams struct {
+	OrganizationID  uuid.UUID `db:"organization_id" json:"organization_id"`
+	CheckoutOrderID uuid.UUID `db:"checkout_order_id" json:"checkout_order_id"`
+}
+
+func (q *Queries) GetPaymentByCheckoutOrder(ctx context.Context, arg GetPaymentByCheckoutOrderParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, getPaymentByCheckoutOrder, arg.OrganizationID, arg.CheckoutOrderID)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.CheckoutOrderID,
+		&i.OrganizationID,
+		&i.Provider,
+		&i.ProviderPaymentID,
+		&i.Amount,
+		&i.Currency,
+		&i.Status,
+		&i.PaidAt,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPaymentByProviderID = `-- name: GetPaymentByProviderID :one
 SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
@@ -203,6 +239,53 @@ func (q *Queries) ListPaymentsByOrganization(ctx context.Context, organizationID
 	return items, nil
 }
 
+const setPaymentProviderID = `-- name: SetPaymentProviderID :one
+UPDATE payments AS p
+SET provider_payment_id = $1,
+    status = $2,
+    updated_at = NOW()
+FROM organizations AS o
+WHERE p.organization_id = $3
+  AND p.id = $4
+  AND p.provider_payment_id IS NULL
+  AND o.id = p.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+`
+
+type SetPaymentProviderIDParams struct {
+	ProviderPaymentID *string   `db:"provider_payment_id" json:"provider_payment_id"`
+	Status            string    `db:"status" json:"status"`
+	OrganizationID    uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID                uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) SetPaymentProviderID(ctx context.Context, arg SetPaymentProviderIDParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, setPaymentProviderID,
+		arg.ProviderPaymentID,
+		arg.Status,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	var i Payment
+	err := row.Scan(
+		&i.ID,
+		&i.CheckoutOrderID,
+		&i.OrganizationID,
+		&i.Provider,
+		&i.ProviderPaymentID,
+		&i.Amount,
+		&i.Currency,
+		&i.Status,
+		&i.PaidAt,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updatePaymentStatus = `-- name: UpdatePaymentStatus :one
 UPDATE payments AS p
 SET
@@ -216,7 +299,7 @@ WHERE p.organization_id = $4
   AND o.id = p.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, p.id, checkout_order_id, organization_id, provider, provider_payment_id, amount, currency, p.status, paid_at, metadata, p.created_at, p.updated_at
+RETURNING p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 `
 
 type UpdatePaymentStatusParams struct {
@@ -227,28 +310,7 @@ type UpdatePaymentStatusParams struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 }
 
-type UpdatePaymentStatusRow struct {
-	ID                uuid.UUID          `db:"id" json:"id"`
-	Name              string             `db:"name" json:"name"`
-	Status            string             `db:"status" json:"status"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-	DeletedAt         pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
-	ID_2              uuid.UUID          `db:"id_2" json:"id_2"`
-	CheckoutOrderID   uuid.UUID          `db:"checkout_order_id" json:"checkout_order_id"`
-	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Provider          string             `db:"provider" json:"provider"`
-	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
-	Amount            int64              `db:"amount" json:"amount"`
-	Currency          string             `db:"currency" json:"currency"`
-	Status_2          string             `db:"status_2" json:"status_2"`
-	PaidAt            pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
-	Metadata          []byte             `db:"metadata" json:"metadata"`
-	CreatedAt_2       pgtype.Timestamptz `db:"created_at_2" json:"created_at_2"`
-	UpdatedAt_2       pgtype.Timestamptz `db:"updated_at_2" json:"updated_at_2"`
-}
-
-func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (UpdatePaymentStatusRow, error) {
+func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStatusParams) (Payment, error) {
 	row := q.db.QueryRow(ctx, updatePaymentStatus,
 		arg.Status,
 		arg.PaidAt,
@@ -256,26 +318,20 @@ func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStat
 		arg.OrganizationID,
 		arg.ID,
 	)
-	var i UpdatePaymentStatusRow
+	var i Payment
 	err := row.Scan(
 		&i.ID,
-		&i.Name,
-		&i.Status,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
-		&i.ID_2,
 		&i.CheckoutOrderID,
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
 		&i.Amount,
 		&i.Currency,
-		&i.Status_2,
+		&i.Status,
 		&i.PaidAt,
 		&i.Metadata,
-		&i.CreatedAt_2,
-		&i.UpdatedAt_2,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

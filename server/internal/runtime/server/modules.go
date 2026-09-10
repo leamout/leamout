@@ -2,9 +2,13 @@ package server
 
 import (
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/topups"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -36,6 +40,7 @@ type Modules struct {
 	Licensing            LicensingModule
 	CommercialState      CommercialStateModule
 	Subscriptions        SubscriptionsModule
+	Topups               TopupsModule
 	Auth                 AuthModule
 	Session              SessionModule
 	Users                UsersModule
@@ -62,6 +67,15 @@ type Modules struct {
 	ProviderDiagnostics  ProviderDiagnosticsModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
+}
+
+type TopupsModule struct {
+	Wallets    *wallets.Repository
+	Checkouts  *checkout.Repository
+	Payments   *commercialpayments.Repository
+	Repository *topups.Repository
+	Service    *topups.Service
+	Handler    *topups.Handler
 }
 
 type ProviderDiagnosticsModule struct {

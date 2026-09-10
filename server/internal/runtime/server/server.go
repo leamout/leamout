@@ -9,16 +9,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	"github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
+	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/topups"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
 	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
+	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
+	"github.com/leamout/leamout/internal/integrations/payments/paystack"
+	"github.com/leamout/leamout/internal/integrations/payments/stripe"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/idempotency"
@@ -121,6 +128,12 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
+	if err := configurePaymentProviders(cfg, modules.Topups.Service); err != nil {
+		_ = freeSwitch.Close()
+		_ = redisClient.Close()
+		db.Close()
+		return nil, fmt.Errorf("initialize payment providers: %w", err)
+	}
 	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
@@ -189,6 +202,17 @@ func NewModules(
 	commercialStateService := commercialstate.NewService(subscriptionsService, entitlementsService)
 	licensingRepository := licensing.NewRepository(db)
 	licensingService := licensing.NewService(licensingRepository, commercialStateService)
+	walletRepository := wallets.NewRepository(db)
+	checkoutRepository := checkout.NewRepository(db)
+	paymentRepository := commercialpayments.NewRepository(db)
+	topupRepository := topups.NewRepository(db)
+	topupService := topups.NewService(
+		walletRepository,
+		checkoutRepository,
+		paymentRepository,
+		topupRepository,
+		map[string]paymentprovider.Provider{},
+	)
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
@@ -279,6 +303,14 @@ func NewModules(
 			Repository: subscriptionsRepository,
 			Service:    subscriptionsService,
 			Handler:    subscriptions.NewHandler(subscriptionsService),
+		},
+		Topups: TopupsModule{
+			Wallets:    walletRepository,
+			Checkouts:  checkoutRepository,
+			Payments:   paymentRepository,
+			Repository: topupRepository,
+			Service:    topupService,
+			Handler:    topups.NewHandler(topupService),
 		},
 		Auth: AuthModule{
 			Repository: authRepository,
@@ -402,6 +434,34 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 		return err
 	}
 	service.SetManagedAcquisition(client)
+	return nil
+}
+
+func configurePaymentProviders(cfg config.Config, service *topups.Service) error {
+	if cfg.Stripe.SecretKey != "" {
+		if cfg.Stripe.WebhookSecret == "" {
+			return fmt.Errorf("Stripe webhook secret is required when Stripe is enabled")
+		}
+		client, err := stripe.NewClient(stripe.Config{
+			BaseURL:       cfg.Stripe.APIBaseURL,
+			SecretKey:     cfg.Stripe.SecretKey,
+			WebhookSecret: cfg.Stripe.WebhookSecret,
+		})
+		if err != nil {
+			return err
+		}
+		service.SetProvider("stripe", client)
+	}
+	if cfg.Paystack.SecretKey != "" {
+		client, err := paystack.NewClient(paystack.Config{
+			BaseURL:   cfg.Paystack.APIBaseURL,
+			SecretKey: cfg.Paystack.SecretKey,
+		})
+		if err != nil {
+			return err
+		}
+		service.SetProvider("paystack", client)
+	}
 	return nil
 }
 
