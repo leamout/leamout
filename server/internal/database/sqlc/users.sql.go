@@ -214,7 +214,6 @@ SELECT
     o.id::TEXT AS organization_id,
     o.name,
     CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::TEXT AS organization_status,
-    (o.deleted_at IS NULL) AS detail_available,
     om.role,
     om.status AS membership_status,
     to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS joined_at
@@ -227,13 +226,12 @@ ORDER BY
 `
 
 type ListBackofficeUserOrganizationsRow struct {
-	OrganizationID     string      `db:"organization_id" json:"organization_id"`
-	Name               string      `db:"name" json:"name"`
-	OrganizationStatus string      `db:"organization_status" json:"organization_status"`
-	DetailAvailable    interface{} `db:"detail_available" json:"detail_available"`
-	Role               string      `db:"role" json:"role"`
-	MembershipStatus   string      `db:"membership_status" json:"membership_status"`
-	JoinedAt           string      `db:"joined_at" json:"joined_at"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	Name               string `db:"name" json:"name"`
+	OrganizationStatus string `db:"organization_status" json:"organization_status"`
+	Role               string `db:"role" json:"role"`
+	MembershipStatus   string `db:"membership_status" json:"membership_status"`
+	JoinedAt           string `db:"joined_at" json:"joined_at"`
 }
 
 func (q *Queries) ListBackofficeUserOrganizations(ctx context.Context, userID uuid.UUID) ([]ListBackofficeUserOrganizationsRow, error) {
@@ -249,7 +247,6 @@ func (q *Queries) ListBackofficeUserOrganizations(ctx context.Context, userID uu
 			&i.OrganizationID,
 			&i.Name,
 			&i.OrganizationStatus,
-			&i.DetailAvailable,
 			&i.Role,
 			&i.MembershipStatus,
 			&i.JoinedAt,
