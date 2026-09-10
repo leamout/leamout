@@ -35,6 +35,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 		r.Post("/internal/v1/provider-cdrs/reconcile", modules.Wholesale.Handler.Reconcile)
 	}
 	providerdiagnostics.RegisterRoutes(r, modules.ProviderDiagnostics.Handler)
+
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			requireAuthenticated := modules.OrganizationsContext.RequireAuthenticated(modules.Authn)
@@ -58,11 +59,13 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	}
 
 	r.Route("/v1", func(r chi.Router) {
-		commercial.RegisterRoutes(r, modules.Commercial, commercial.RouteMiddleware{
-			Session:            modules.Authn.RequireSession,
-			OrganizationAccess: organizationAccess,
-			Idempotency:        modules.Idempotency.Middleware.Handle,
-		})
+		commercial.RegisterRoutes(
+			r,
+			modules.Commercial,
+			modules.Authn.RequireSession,
+			organizationAccess,
+			modules.Idempotency.Middleware.Handle,
+		)
 		auth.RegisterRoutes(r, modules.Auth.Handler, modules.Authn.RequireSession)
 		session.RegisterRoutes(r, modules.Session.Handler, modules.Authn.RequireSession)
 		users.RegisterRoutes(r, modules.Users.Handler, modules.Authn.RequireSession)
