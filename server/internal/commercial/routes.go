@@ -23,13 +23,13 @@ func RegisterRoutes(
 	catalog.RegisterRoutes(router, module.Catalog.Handler, requireSession)
 	licensing.RegisterRoutes(
 		router,
-		module.Access.Licensing.Handler,
+		module.Access.Licenses.Handler,
 		organizationAccess("licensing"),
 		idempotency,
 	)
 	commercialstate.RegisterRoutes(
 		router,
-		module.State.Handler,
+		module.Access.State.Handler,
 		organizationAccess("commercial-state"),
 	)
 	subscriptions.RegisterRoutes(
@@ -40,7 +40,7 @@ func RegisterRoutes(
 	)
 	wallets.RegisterRoutes(
 		router,
-		module.Money.TopupHandler,
+		module.Prepaid.TopupHandler,
 		organizationAccess("billing"),
 		idempotency,
 	)
