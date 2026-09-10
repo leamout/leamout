@@ -14,14 +14,20 @@ import (
 
 var sourceTypePattern = regexp.MustCompile(`^[a-z0-9]+(?:_[a-z0-9]+)*$`)
 
+type store interface {
+	GetMeter(context.Context, string) (Meter, error)
+	CreateUsageEvent(context.Context, uuid.UUID, RecordInput) (UsageEvent, error)
+	GetUsageEventByIdempotencyKey(context.Context, uuid.UUID, string) (UsageEvent, error)
+}
+
 // Service owns validation and organization-scoped idempotency for usage
 // observations. Whether an observation is billable is decided later from the
 // organization's commercial mode and an applicable metered price.
 type Service struct {
-	repo *Repository
+	repo store
 }
 
-func NewService(repo *Repository) *Service {
+func NewService(repo store) *Service {
 	return &Service{repo: repo}
 }
 
