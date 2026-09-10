@@ -138,7 +138,6 @@ SELECT
     o.id::TEXT AS organization_id,
     o.name,
     CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::TEXT AS organization_status,
-    (o.deleted_at IS NULL) AS detail_available,
     om.role,
     om.status AS membership_status,
     to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS joined_at
