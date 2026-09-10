@@ -33,9 +33,7 @@ func TestRequirePlatformAdminAllowsAdmin(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
-	principal := authn.Principal{
-		Subject: authn.Subject{ID: userID, Type: authn.SubjectUser},
-	}
+	principal := sessionPrincipal(userID)
 	handler.ServeHTTP(recorder, r.WithContext(authn.WithPrincipal(r.Context(), principal)))
 
 	if recorder.Code != http.StatusNoContent {
@@ -52,9 +50,7 @@ func TestRequirePlatformAdminRejectsNonAdmin(t *testing.T) {
 
 	recorder := httptest.NewRecorder()
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
-	principal := authn.Principal{
-		Subject: authn.Subject{ID: userID, Type: authn.SubjectUser},
-	}
+	principal := sessionPrincipal(userID)
 	handler.ServeHTTP(recorder, r.WithContext(authn.WithPrincipal(r.Context(), principal)))
 
 	if recorder.Code != http.StatusForbidden {
@@ -74,5 +70,19 @@ func TestRequirePlatformAdminRequiresSessionPrincipal(t *testing.T) {
 
 	if recorder.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusUnauthorized)
+	}
+}
+
+func sessionPrincipal(userID uuid.UUID) authn.Principal {
+	return authn.Principal{
+		Subject: authn.Subject{
+			ID:   userID,
+			Type: authn.SubjectUser,
+		},
+		Credential: authn.Credential{
+			ID:   uuid.New(),
+			Type: authn.CredentialSession,
+		},
+		Assurance: authn.AssurancePassword,
 	}
 }
