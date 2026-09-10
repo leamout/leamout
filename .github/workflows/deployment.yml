@@ -138,11 +138,6 @@ jobs:
           BUILD_SERVICES: server worker
         run: sh server/scripts/deploy/build.sh
 
-      - name: Build frontend images
-        env:
-          BUILD_SERVICES: web console
-        run: sh server/scripts/deploy/build.sh
-
       - name: Build telecom images
         env:
           BUILD_SERVICES: opensips freeswitch rtpengine
