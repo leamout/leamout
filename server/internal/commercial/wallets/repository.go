@@ -31,6 +31,13 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	}
 }
 
+func (r *Repository) currentTime() time.Time {
+	if r.now != nil {
+		return r.now()
+	}
+	return time.Now()
+}
+
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
 	row, err := r.queries.CreateWallet(ctx, sqlc.CreateWalletParams{
 		OrganizationID: organizationID,
@@ -105,13 +112,12 @@ func (r *Repository) ListEntries(ctx context.Context, organizationID, walletID u
 	return result, nil
 }
 
-// Reserve serializes on the wallet row and reads the balance only after the
-// lock is acquired. Under READ COMMITTED this makes a concurrent reservation's
-// committed row visible before the next caller decides whether funds remain.
+// Reserve serializes on the wallet row before checking available funds.
 func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.UUID, input ReserveInput) (Reservation, error) {
-	if err := validateReservationInput(input, r.now()); err != nil {
+	if err := validateReservationInput(input, r.currentTime()); err != nil {
 		return Reservation{}, err
 	}
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Reservation{}, err
@@ -163,12 +169,12 @@ func (r *Repository) GetReservation(ctx context.Context, organizationID, id uuid
 	return reservationFromRow(row), nil
 }
 
-// Capture closes the reservation and posts its debit atomically. If posting
-// fails (including an idempotency collision), the reservation remains active.
+// Capture closes the reservation and posts its debit atomically.
 func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, amountMinor int64, idempotencyKey string) (Reservation, error) {
 	if err := validateCaptureInput(amountMinor); err != nil {
 		return Reservation{}, err
 	}
+
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Reservation{}, err
@@ -223,9 +229,8 @@ func (r *Repository) Expire(ctx context.Context) ([]Reservation, error) {
 	return result, nil
 }
 
-// Reconcile records a verified provider event and applies its commercial
-// consequence in one transaction. Duplicate events and later success events
-// cannot post a second wallet credit.
+// Reconcile records a verified provider event and applies its wallet consequence
+// in one transaction. Duplicate events cannot post a second wallet credit.
 func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event) (TopupSettlement, error) {
 	if err := validateProviderEvent(event); err != nil {
 		return TopupSettlement{}, err
@@ -295,7 +300,7 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 		return result, nil
 	}
 
-	now := r.now().UTC()
+	now := r.currentTime().UTC()
 	switch event.Payment.Status {
 	case paymentprovider.StatusSucceeded:
 		if _, err = q.UpdatePaymentStatus(ctx, sqlc.UpdatePaymentStatusParams{
