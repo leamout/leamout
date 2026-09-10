@@ -2,6 +2,7 @@ package commercial
 
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
@@ -76,23 +77,35 @@ type StateModule struct {
 	Handler *commercialstate.Handler
 }
 
-// New composes Commercial from its durable subdomains. Payment providers are
-// registered after construction so provider adapters remain outside Commercial
-// state and can be configured by the runtime.
+// New composes the Commercial domain from its durable submodules. Payment
+// providers are registered after construction so provider adapters remain
+// outside Commercial state and are configured by the runtime.
 func New(db *pgxpool.Pool) *Module {
 	catalogRepository := catalog.NewRepository(db)
 	catalogService := catalog.NewService(catalogRepository)
 
 	subscriptionsRepository := subscriptions.NewRepository(db)
-	subscriptionsService := subscriptions.NewService(subscriptionsRepository, catalogService)
+	subscriptionsService := subscriptions.NewService(
+		subscriptionsRepository,
+		catalogService,
+	)
 
 	entitlementsRepository := entitlements.NewRepository(db)
-	entitlementsService := entitlements.NewService(entitlementsRepository, subscriptionsService)
+	entitlementsService := entitlements.NewService(
+		entitlementsRepository,
+		subscriptionsService,
+	)
 
-	stateService := commercialstate.NewService(subscriptionsService, entitlementsService)
+	commercialStateService := commercialstate.NewService(
+		subscriptionsService,
+		entitlementsService,
+	)
 
 	licensingRepository := licensing.NewRepository(db)
-	licensingService := licensing.NewService(licensingRepository, stateService)
+	licensingService := licensing.NewService(
+		licensingRepository,
+		commercialStateService,
+	)
 
 	meteringRepository := metering.NewRepository(db)
 	meteringService := metering.NewService(meteringRepository)
@@ -144,8 +157,8 @@ func New(db *pgxpool.Pool) *Module {
 			Payments:  paymentRepository,
 		},
 		State: StateModule{
-			Service: stateService,
-			Handler: commercialstate.NewHandler(stateService),
+			Service: commercialStateService,
+			Handler: commercialstate.NewHandler(commercialStateService),
 		},
 	}
 }
