@@ -63,22 +63,22 @@ func (q *Queries) InsertPaymentProviderEvent(ctx context.Context, arg InsertPaym
 
 const lockWalletTopupByReference = `-- name: LockWalletTopupByReference :one
 SELECT
-    co.id AS checkout_order_id,
-    co.organization_id,
-    co.wallet_id,
-    co.provider,
-    co.reference,
-    co.amount_minor,
-    co.currency,
-    co.status AS checkout_status,
+    c.id AS checkout_order_id,
+    c.organization_id,
+    c.wallet_id,
+    c.provider,
+    c.reference,
+    c.amount_minor,
+    c.currency,
+    c.status AS checkout_status,
     p.id AS payment_id,
     p.provider_payment_id,
     p.status AS payment_status
-FROM checkout_orders AS co
-JOIN payments AS p ON p.checkout_order_id = co.id
-WHERE co.reference = $1
-  AND co.order_type = 'wallet_topup'
-FOR UPDATE OF co, p
+FROM checkouts AS c
+JOIN payments AS p ON p.checkout_id = c.id
+WHERE c.reference = $1
+  AND c.checkout_type = 'wallet_topup'
+FOR UPDATE OF c, p
 `
 
 type LockWalletTopupByReferenceRow struct {
