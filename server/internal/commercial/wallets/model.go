@@ -132,14 +132,14 @@ type TopupContinueInput struct {
 }
 
 type TopupCheckout struct {
-	Order   checkout.Checkout
-	Payment payments.Payment
-	Session paymentprovider.CheckoutSession
+	Checkout checkout.Checkout
+	Payment  payments.Payment
+	Session  paymentprovider.CheckoutSession
 }
 
 type TopupDetails struct {
-	Order   checkout.Checkout
-	Payment payments.Payment
+	Checkout checkout.Checkout
+	Payment  payments.Payment
 }
 
 type TopupSettlement struct {
