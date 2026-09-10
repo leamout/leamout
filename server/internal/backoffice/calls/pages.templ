@@ -13,7 +13,9 @@ templ PageContent(calls []Call) {
 		<p class="mt-2 text-base-content/70">Inspect recent call activity across organizations.</p>
 	</div>
 	if len(calls) == 0 {
-		<div class="alert"><span>No calls found.</span></div>
+		<div class="alert">
+			<span>No calls found.</span>
+		</div>
 	} else {
 		@CallTable(calls)
 	}
@@ -29,25 +31,66 @@ templ DetailContent(call Detail) {
 		{Label: call.ID},
 	})
 	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-		<div><p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Call</p><h1 class="mt-2 text-3xl font-bold">{ call.From } <span class="text-base-content/40">→</span> { call.To }</h1><p class="mt-2 font-mono text-xs text-base-content/60">{ call.ID }</p></div>
-		<div class="flex gap-2"><span class="badge badge-outline badge-lg">{ call.Direction }</span><span class="badge badge-primary badge-lg">{ call.Status }</span></div>
+		<div>
+			<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Call</p>
+			<h1 class="mt-2 text-3xl font-bold">
+				{ call.From }
+				<span class="text-base-content/40">→</span>
+				{ call.To }
+			</h1>
+			<p class="mt-2 font-mono text-xs text-base-content/60">{ call.ID }</p>
+		</div>
+		<div class="flex gap-2">
+			<span class="badge badge-outline badge-lg">{ call.Direction }</span>
+			<span class="badge badge-primary badge-lg">{ call.Status }</span>
+		</div>
 	</div>
-	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
-		<div class="stat"><div class="stat-title">Duration</div><div class="stat-value text-3xl">{ call.Duration }</div><div class="stat-desc">Answered media time</div></div>
-		<div class="stat"><div class="stat-title">Media</div><div class="stat-value text-3xl">{ call.MediaState }</div><div class="stat-desc">Current media state</div></div>
-		<div class="stat"><div class="stat-title">Recordings</div><div class="stat-value text-3xl">{ recordingSummary(call) }</div><div class="stat-desc">Count and lifecycle states</div></div>
+	<div class="stats stats-vertical mt-6 w-full border border-base-300 bg-base-100 shadow-sm lg:stats-horizontal">
+		<div class="stat">
+			<div class="stat-title">Duration</div>
+			<div class="stat-value text-3xl">{ call.Duration }</div>
+			<div class="stat-desc">Answered media time</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Media</div>
+			<div class="stat-value text-3xl">{ call.MediaState }</div>
+			<div class="stat-desc">Current media state</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Recordings</div>
+			<div class="stat-value text-3xl">{ recordingSummary(call) }</div>
+			<div class="stat-desc">Count and lifecycle states</div>
+		</div>
 	</div>
 	<div class="mt-6 grid gap-6 xl:grid-cols-2">
-		<section class="rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Call lifecycle</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2">
-			@DetailField("State", call.Status) @DetailField("Direction", call.Direction) @DetailField("Created", call.CreatedAt) @DetailField("Started", call.StartedAt) @DetailField("Answered", call.AnsweredAt) @DetailField("Ended", call.EndedAt) @DetailField("Updated", call.UpdatedAt) @DetailField("Hangup reason", call.HangupReason)
-		</dl></section>
-		<section class="rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Routing</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2">
-			@LinkedDetailField("Organization", call.Organization, "/organizations/"+call.OrganizationID)
-			@DetailField("Application", call.Application) @DetailField("Application ID", call.ApplicationID)
-			@DetailField("Carrier connection", call.CarrierConnection) @DetailField("Carrier connection ID", call.CarrierConnectionID)
-			@DetailField("Provider", call.Provider) @DetailField("Provider ID", call.ProviderID)
-			@DetailField("Trunk", call.Trunk) @DetailField("Trunk ID", call.TrunkID)
-			@DetailField("Trunk endpoint ID", call.TrunkEndpointID) @DetailField("SIP call ID", call.SIPCallID)
-		</dl></section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Call lifecycle</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("State", call.Status)
+				@DetailField("Direction", call.Direction)
+				@DetailField("Created", call.CreatedAt)
+				@DetailField("Started", call.StartedAt)
+				@DetailField("Answered", call.AnsweredAt)
+				@DetailField("Ended", call.EndedAt)
+				@DetailField("Updated", call.UpdatedAt)
+				@DetailField("Hangup reason", call.HangupReason)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Routing</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@LinkedDetailField("Organization", call.Organization, "/organizations/"+call.OrganizationID)
+				@DetailField("Application", call.Application)
+				@DetailField("Application ID", call.ApplicationID)
+				@DetailField("Carrier connection", call.CarrierConnection)
+				@DetailField("Carrier connection ID", call.CarrierConnectionID)
+				@DetailField("Provider", call.Provider)
+				@DetailField("Provider ID", call.ProviderID)
+				@DetailField("Trunk", call.Trunk)
+				@DetailField("Trunk ID", call.TrunkID)
+				@DetailField("Trunk endpoint ID", call.TrunkEndpointID)
+				@DetailField("SIP call ID", call.SIPCallID)
+			</dl>
+		</section>
 	</div>
 }
