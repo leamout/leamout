@@ -52,7 +52,7 @@ var (
 	ErrInvalidMoney            = apperror.NewBadRequest("invalid monetary amount or currency")
 	ErrProviderUnavailable     = apperror.NewServiceUnavailable("payment provider is unavailable", errors.New("payment provider is not configured"))
 	ErrInvalidTopup            = apperror.NewBadRequest("invalid wallet top-up")
-	ErrPaymentMismatch         = apperror.NewConflict("provider payment does not match checkout order")
+	ErrPaymentMismatch         = apperror.NewConflict("provider payment does not match checkout")
 )
 
 type Wallet struct {
@@ -132,13 +132,13 @@ type TopupContinueInput struct {
 }
 
 type TopupCheckout struct {
-	Order   checkout.Order
+	Order   checkout.Checkout
 	Payment payments.Payment
 	Session paymentprovider.CheckoutSession
 }
 
 type TopupDetails struct {
-	Order   checkout.Order
+	Order   checkout.Checkout
 	Payment payments.Payment
 }
 

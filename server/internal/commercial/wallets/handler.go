@@ -38,7 +38,7 @@ type continueRequest struct {
 }
 
 type checkoutResponse struct {
-	OrderID         uuid.UUID           `json:"order_id"`
+	CheckoutID      uuid.UUID           `json:"checkout_id"`
 	PaymentID       uuid.UUID           `json:"payment_id"`
 	Reference       string              `json:"reference"`
 	Provider        checkout.Provider   `json:"provider"`
@@ -78,20 +78,20 @@ func (h *TopupHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TopupHandler) Get(w http.ResponseWriter, r *http.Request) {
-	organizationID, orderID, err := requestIDs(r, "checkout_order_id")
+	organizationID, checkoutID, err := requestIDs(r, "checkout_id")
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
-	result, err := h.service.Get(r.Context(), organizationID, orderID)
+	result, err := h.service.Get(r.Context(), organizationID, checkoutID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
 
 	httputil.OK(w, checkoutResponse{
-		OrderID:         result.Order.ID,
+		CheckoutID:      result.Order.ID,
 		PaymentID:       result.Payment.ID,
 		Reference:       result.Order.Reference,
 		Provider:        result.Order.Provider,
@@ -104,7 +104,7 @@ func (h *TopupHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TopupHandler) Continue(w http.ResponseWriter, r *http.Request) {
-	organizationID, orderID, err := requestIDs(r, "checkout_order_id")
+	organizationID, checkoutID, err := requestIDs(r, "checkout_id")
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -119,7 +119,7 @@ func (h *TopupHandler) Continue(w http.ResponseWriter, r *http.Request) {
 	result, err := h.service.Continue(
 		r.Context(),
 		organizationID,
-		orderID,
+		checkoutID,
 		TopupContinueInput(request),
 	)
 	if err != nil {
@@ -164,7 +164,7 @@ func requestIDs(r *http.Request, resourceParam string) (uuid.UUID, uuid.UUID, er
 
 func responseFromCheckout(result TopupCheckout) checkoutResponse {
 	return checkoutResponse{
-		OrderID:         result.Order.ID,
+		CheckoutID:      result.Order.ID,
 		PaymentID:       result.Payment.ID,
 		Reference:       result.Order.Reference,
 		Provider:        result.Order.Provider,

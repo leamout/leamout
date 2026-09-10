@@ -8,6 +8,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/metering"
+	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
@@ -69,6 +70,7 @@ type MoneyModule struct {
 
 type PaymentsModule struct {
 	Checkouts *checkout.Repository
+	Orders    *orders.Repository
 	Payments  *payments.Repository
 }
 
@@ -112,6 +114,7 @@ func New(db *pgxpool.Pool) *Module {
 
 	walletRepository := wallets.NewRepository(db)
 	checkoutRepository := checkout.NewRepository(db)
+	orderRepository := orders.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
 	topupService := wallets.NewTopupService(
 		walletRepository,
@@ -154,6 +157,7 @@ func New(db *pgxpool.Pool) *Module {
 		},
 		Payments: PaymentsModule{
 			Checkouts: checkoutRepository,
+			Orders:    orderRepository,
 			Payments:  paymentRepository,
 		},
 		State: StateModule{

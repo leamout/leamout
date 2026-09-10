@@ -32,13 +32,19 @@ type Payment struct {
 	Metadata       json.RawMessage
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+
+	// Deprecated: use CheckoutID.
+	CheckoutOrderID uuid.UUID
 }
 
 type CreateInput struct {
-	CheckoutID uuid.UUID
-	ProviderID *string
-	Status     Status
+	CheckoutID  uuid.UUID
+	ProviderID  *string
+	Status      Status
 	AmountMinor int64
-	Currency   string
-	Metadata   json.RawMessage
+	Currency    string
+	Metadata    json.RawMessage
+
+	// Deprecated: use CheckoutID.
+	CheckoutOrderID uuid.UUID
 }

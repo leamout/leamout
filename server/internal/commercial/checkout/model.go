@@ -15,28 +15,28 @@ type Status string
 type NextAction string
 
 const (
-	TypeSubscription   Type          = "subscription"
-	TypeWalletTopup    Type          = "wallet_topup"
-	ProviderStripe     Provider      = "stripe"
-	ProviderPaystack   Provider      = "paystack"
-	MethodCard         PaymentMethod = "card"
-	MethodMobileMoney  PaymentMethod = "mobile_money"
-	StatusPending      Status        = "pending"
-	StatusProcessing   Status        = "processing"
-	StatusSucceeded    Status        = "succeeded"
-	StatusFailed       Status        = "failed"
-	StatusCancelled    Status        = "cancelled"
-	StatusExpired      Status        = "expired"
-	ActionNone         NextAction    = "none"
-	ActionWait         NextAction    = "wait"
-	ActionAuthorizeMoMo NextAction   = "authorize_mobile_money"
-	ActionSubmitOTP    NextAction    = "submit_otp"
-	ActionSubmitPhone  NextAction    = "submit_phone"
-	ActionUnsupported  NextAction    = "unsupported"
+	TypeSubscription    Type          = "subscription"
+	TypeWalletTopup     Type          = "wallet_topup"
+	ProviderStripe      Provider      = "stripe"
+	ProviderPaystack    Provider      = "paystack"
+	MethodCard          PaymentMethod = "card"
+	MethodMobileMoney   PaymentMethod = "mobile_money"
+	StatusPending       Status        = "pending"
+	StatusProcessing    Status        = "processing"
+	StatusSucceeded     Status        = "succeeded"
+	StatusFailed        Status        = "failed"
+	StatusCancelled     Status        = "cancelled"
+	StatusExpired       Status        = "expired"
+	ActionNone          NextAction    = "none"
+	ActionWait          NextAction    = "wait"
+	ActionAuthorizeMoMo NextAction    = "authorize_mobile_money"
+	ActionSubmitOTP     NextAction    = "submit_otp"
+	ActionSubmitPhone   NextAction    = "submit_phone"
+	ActionUnsupported   NextAction    = "unsupported"
 )
 
 var (
-	ErrCheckoutNotFound = apperror.NewNotFound("checkout not found")
+	ErrCheckoutNotFound  = apperror.NewNotFound("checkout not found")
 	ErrReferenceConflict = apperror.NewConflict("checkout reference already exists")
 	ErrInvalidTransition = apperror.NewConflict("invalid checkout transition")
 	ErrInvalidCheckout   = apperror.NewBadRequest("invalid checkout")
@@ -83,3 +83,16 @@ type Transition struct {
 	ProviderMessage *string
 	CompletedAt     *time.Time
 }
+
+// Deprecated compatibility names for callers that still use the pre-split
+// checkout terminology. New code should use Checkout, TypeSubscription, and
+// TypeWalletTopup.
+type Order = Checkout
+type OrderType = Type
+
+const (
+	OrderSubscription = TypeSubscription
+	OrderWalletTopup  = TypeWalletTopup
+)
+
+var ErrOrderNotFound = ErrCheckoutNotFound
