@@ -27,9 +27,9 @@ type Module struct {
 	Prepaid  PrepaidModule
 	Payments PaymentsModule
 
-	// Deprecated: use Prepaid. Kept temporarily for runtime migration.
+	// Compatibility bridge for runtime callers migrating to Prepaid.
 	Money PrepaidModule
-	// Deprecated: use Access.State. Kept temporarily for runtime migration.
+	// Compatibility bridge for runtime callers migrating to Access.State.
 	State StateModule
 }
 
