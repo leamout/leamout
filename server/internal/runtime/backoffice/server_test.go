@@ -147,6 +147,7 @@ func TestStaticAssets(t *testing.T) {
 
 func TestModulePages(t *testing.T) {
 	tests := []struct{ path, want string }{
+		{path: "/users", want: "Users"},
 		{path: "/organizations", want: "Organizations"},
 		{path: "/calls", want: "Calls"},
 		{path: "/numbers", want: "Phone Numbers"},

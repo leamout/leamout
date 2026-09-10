@@ -9,12 +9,14 @@ import (
 	backofficeorganizations "github.com/leamout/leamout/internal/backoffice/organizations"
 	"github.com/leamout/leamout/internal/backoffice/providers"
 	"github.com/leamout/leamout/internal/backoffice/trunks"
+	backofficeusers "github.com/leamout/leamout/internal/backoffice/users"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
 // Modules contains the Backoffice feature handlers mounted by the HTTP runtime.
 type Modules struct {
 	Dashboard          *dashboard.Handler
+	Users              *backofficeusers.Handler
 	Organizations      *backofficeorganizations.Handler
 	Calls              *backofficecalls.Handler
 	Numbers            *numbers.Handler
@@ -25,6 +27,7 @@ type Modules struct {
 }
 
 func newModules(queries *sqlc.Queries) Modules {
+	usersRepository := backofficeusers.NewRepository(queries)
 	organizationsRepository := backofficeorganizations.NewRepository(queries)
 	callsRepository := backofficecalls.NewRepository(queries)
 	numbersRepository := numbers.NewRepository(queries)
@@ -35,6 +38,7 @@ func newModules(queries *sqlc.Queries) Modules {
 
 	return Modules{
 		Dashboard:          dashboard.NewHandler(),
+		Users:              backofficeusers.NewHandler(usersRepository),
 		Organizations:      backofficeorganizations.NewHandler(organizationsRepository),
 		Calls:              backofficecalls.NewHandler(callsRepository),
 		Numbers:            numbers.NewHandler(numbersRepository),
