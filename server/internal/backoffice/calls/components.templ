@@ -1,36 +1,75 @@
 package calls
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
 
 templ CallTable(calls []Call) {
-	<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
-		<table class="table">
-			<thead><tr><th>Call</th><th>Organization</th><th>From</th><th>To</th><th>Direction</th><th>Duration</th><th>Status</th><th>Created</th></tr></thead>
-			<tbody>
-				for _, call := range calls {
-					<tr>
-						<td><a class="link link-primary font-mono text-xs" href={ templ.SafeURL("/calls/" + call.ID) }>{ call.ID }</a></td>
-						<td><a class="link" href={ templ.SafeURL("/organizations/" + call.OrganizationID) }>{ call.Organization }</a></td>
-						<td>{ call.From }</td><td>{ call.To }</td><td>{ call.Direction }</td><td>{ call.Duration }</td><td>{ call.Status }</td><td>{ call.CreatedAt }</td>
-					</tr>
-				}
-			</tbody>
-		</table>
-	</div>
+	@components.TableWithLinks(
+		[]string{"Call ID", "Organization", "From", "To", "Direction", "Duration", "Status", "Created"},
+		callRows(calls),
+		callLinks(calls),
+	)
 }
 
 templ DetailField(label string, value string) {
-	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">{ value }</dd></div>
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">{ value }</dd>
+	</div>
 }
 
 templ LinkedDetailField(label string, value string, href string) {
-	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">
-		if value == "—" {
-			{ value }
-		} else {
-			<a class="link link-primary" href={ templ.SafeURL(href) }>{ value }</a>
-		}
-	</dd></div>
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">
+			if value == "—" {
+				{ value }
+			} else {
+				<a class="link link-primary" href={ templ.SafeURL(href) }>{ value }</a>
+			}
+		</dd>
+	</div>
+}
+
+func callRows(calls []Call) [][]string {
+	rows := make([][]string, 0, len(calls))
+	for _, call := range calls {
+		rows = append(rows, []string{
+			call.ID,
+			call.Organization,
+			call.From,
+			call.To,
+			call.Direction,
+			call.Duration,
+			call.Status,
+			call.CreatedAt,
+		})
+	}
+	return rows
+}
+
+func callLinks(calls []Call) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(calls)*2)
+	for row, call := range calls {
+		links = append(links,
+			components.TableCellLink{
+				Row:    row,
+				Column: 0,
+				Href:   "/calls/" + call.ID,
+				Class:  "link link-primary font-mono text-xs",
+			},
+			components.TableCellLink{
+				Row:    row,
+				Column: 1,
+				Href:   "/organizations/" + call.OrganizationID,
+				Class:  "link link-primary",
+			},
+		)
+	}
+	return links
 }
 
 func recordingSummary(call Detail) string {
