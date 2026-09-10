@@ -58,7 +58,7 @@ func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Pay
 }
 
 func (r *Repository) GetByCheckout(ctx context.Context, organizationID, checkoutID uuid.UUID) (Payment, error) {
-	row, err := r.queries.GetPaymentByCheckout(ctx, sqlc.GetPaymentByCheckoutParams{
+	row, err := r.queries.GetPaymentByCheckoutOrder(ctx, sqlc.GetPaymentByCheckoutOrderParams{
 		OrganizationID: organizationID,
 		CheckoutID:     checkoutID,
 	})

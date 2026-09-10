@@ -25,7 +25,8 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 	if err := validateCreate(input, time.Now()); err != nil {
 		return Checkout{}, err
 	}
-	row, err := r.queries.CreateCheckout(ctx, sqlc.CreateCheckoutParams{
+
+	row, err := r.queries.CreateCheckoutOrder(ctx, sqlc.CreateCheckoutOrderParams{
 		OrganizationID: organizationID,
 		WalletID:       input.WalletID,
 		PriceID:        input.PriceID,
@@ -41,25 +42,28 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 	if err != nil {
 		return Checkout{}, mapWriteError(err)
 	}
+
 	return checkoutFromRow(row), nil
 }
 
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Checkout, error) {
-	row, err := r.queries.GetCheckout(ctx, sqlc.GetCheckoutParams{
+	row, err := r.queries.GetCheckoutOrder(ctx, sqlc.GetCheckoutOrderParams{
 		OrganizationID: organizationID,
 		ID:             id,
 	})
 	if err != nil {
 		return Checkout{}, mapReadError(err)
 	}
+
 	return checkoutFromRow(row), nil
 }
 
 func (r *Repository) GetByReference(ctx context.Context, reference string) (Checkout, error) {
-	row, err := r.queries.GetCheckoutByReference(ctx, reference)
+	row, err := r.queries.GetCheckoutOrderByReference(ctx, reference)
 	if err != nil {
 		return Checkout{}, mapReadError(err)
 	}
+
 	return checkoutFromRow(row), nil
 }
 
@@ -67,7 +71,8 @@ func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUI
 	if err := validateTransition(transition); err != nil {
 		return Checkout{}, err
 	}
-	row, err := r.queries.CompareAndSetCheckoutState(ctx, sqlc.CompareAndSetCheckoutStateParams{
+
+	row, err := r.queries.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
 		Status:          string(transition.Status),
 		NextAction:      string(transition.NextAction),
 		ProviderMessage: transition.ProviderMessage,
@@ -82,11 +87,12 @@ func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUI
 		}
 		return Checkout{}, mapWriteError(err)
 	}
+
 	return checkoutFromRow(row), nil
 }
 
 func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.UUID, refreshBefore time.Time) (Checkout, error) {
-	row, err := r.queries.ClaimCheckoutRefresh(ctx, sqlc.ClaimCheckoutRefreshParams{
+	row, err := r.queries.ClaimCheckoutOrderRefresh(ctx, sqlc.ClaimCheckoutOrderRefreshParams{
 		OrganizationID: organizationID,
 		ID:             id,
 		RefreshBefore:  pgconv.NullableTimestamptz(&refreshBefore),
@@ -94,18 +100,21 @@ func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.U
 	if err != nil {
 		return Checkout{}, mapReadError(err)
 	}
+
 	return checkoutFromRow(row), nil
 }
 
 func (r *Repository) Expire(ctx context.Context) ([]Checkout, error) {
-	rows, err := r.queries.ExpireCheckouts(ctx)
+	rows, err := r.queries.ExpireCheckoutOrders(ctx)
 	if err != nil {
 		return nil, err
 	}
+
 	result := make([]Checkout, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, checkoutFromRow(row))
 	}
+
 	return result, nil
 }
 

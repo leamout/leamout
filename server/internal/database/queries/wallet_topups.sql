@@ -1,6 +1,6 @@
 -- name: LockWalletTopupByReference :one
 SELECT
-    c.id AS checkout_id,
+    c.id AS checkout_order_id,
     c.organization_id,
     c.wallet_id,
     c.provider,

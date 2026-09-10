@@ -12,7 +12,16 @@ func TestValidateCreateEnforcesTargetAndProviderPair(t *testing.T) {
 	now := time.Now()
 	walletID := uuid.New()
 	priceID := uuid.New()
-	valid := CreateInput{WalletID: &walletID, Type: OrderWalletTopup, Provider: ProviderPaystack, PaymentMethod: MethodMobileMoney, Reference: "wallet.123", AmountMinor: 100, Currency: "GHS", ExpiresAt: now.Add(time.Hour)}
+	valid := CreateInput{
+		WalletID:      &walletID,
+		Type:          TypeWalletTopup,
+		Provider:      ProviderPaystack,
+		PaymentMethod: MethodMobileMoney,
+		Reference:     "wallet.123",
+		AmountMinor:   100,
+		Currency:      "GHS",
+		ExpiresAt:     now.Add(time.Hour),
+	}
 
 	tests := []struct {
 		name  string
@@ -20,11 +29,36 @@ func TestValidateCreateEnforcesTargetAndProviderPair(t *testing.T) {
 		want  error
 	}{
 		{name: "wallet topup", input: valid},
-		{name: "subscription", input: CreateInput{PriceID: &priceID, Type: OrderSubscription, Provider: ProviderStripe, PaymentMethod: MethodCard, Reference: "sub.123", AmountMinor: 100, Currency: "USD", ExpiresAt: now.Add(time.Hour)}},
-		{name: "mixed target", input: func() CreateInput { input := valid; input.PriceID = &priceID; return input }(), want: ErrInvalidOrder},
-		{name: "wrong provider method", input: func() CreateInput { input := valid; input.PaymentMethod = MethodCard; return input }(), want: ErrInvalidOrder},
-		{name: "browser style invalid reference", input: func() CreateInput { input := valid; input.Reference = "wallet 123"; return input }(), want: ErrInvalidOrder},
-		{name: "expired", input: func() CreateInput { input := valid; input.ExpiresAt = now; return input }(), want: ErrInvalidOrder},
+		{name: "subscription", input: CreateInput{
+			PriceID:       &priceID,
+			Type:          TypeSubscription,
+			Provider:      ProviderStripe,
+			PaymentMethod: MethodCard,
+			Reference:     "sub.123",
+			AmountMinor:   100,
+			Currency:      "USD",
+			ExpiresAt:     now.Add(time.Hour),
+		}},
+		{name: "mixed target", input: func() CreateInput {
+			input := valid
+			input.PriceID = &priceID
+			return input
+		}(), want: ErrInvalidCheckout},
+		{name: "wrong provider method", input: func() CreateInput {
+			input := valid
+			input.PaymentMethod = MethodCard
+			return input
+		}(), want: ErrInvalidCheckout},
+		{name: "browser style invalid reference", input: func() CreateInput {
+			input := valid
+			input.Reference = "wallet 123"
+			return input
+		}(), want: ErrInvalidCheckout},
+		{name: "expired", input: func() CreateInput {
+			input := valid
+			input.ExpiresAt = now
+			return input
+		}(), want: ErrInvalidCheckout},
 	}
 
 	for _, test := range tests {
