@@ -1,9 +1,6 @@
 package organizations
 
-import (
-	"fmt"
-	"github.com/leamout/leamout/internal/backoffice/components"
-)
+import "fmt"
 
 templ OrganizationTable(organizations []Organization) {
 	<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
@@ -85,5 +82,3 @@ templ DetailField(label string, value string) {
 		<dd class="mt-1 font-medium break-all">{ value }</dd>
 	</div>
 }
-
-var _ = components.Table
