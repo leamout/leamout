@@ -91,15 +91,15 @@ func (h *TopupHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	httputil.OK(w, checkoutResponse{
-		CheckoutID:      result.Order.ID,
+		CheckoutID:      result.Checkout.ID,
 		PaymentID:       result.Payment.ID,
-		Reference:       result.Order.Reference,
-		Provider:        result.Order.Provider,
-		AmountMinor:     result.Order.AmountMinor,
-		Currency:        result.Order.Currency,
-		Status:          result.Order.Status,
-		NextAction:      result.Order.NextAction,
-		ProviderMessage: result.Order.ProviderMessage,
+		Reference:       result.Checkout.Reference,
+		Provider:        result.Checkout.Provider,
+		AmountMinor:     result.Checkout.AmountMinor,
+		Currency:        result.Checkout.Currency,
+		Status:          result.Checkout.Status,
+		NextAction:      result.Checkout.NextAction,
+		ProviderMessage: result.Checkout.ProviderMessage,
 	})
 }
 
@@ -164,15 +164,15 @@ func requestIDs(r *http.Request, resourceParam string) (uuid.UUID, uuid.UUID, er
 
 func responseFromCheckout(result TopupCheckout) checkoutResponse {
 	return checkoutResponse{
-		CheckoutID:      result.Order.ID,
+		CheckoutID:      result.Checkout.ID,
 		PaymentID:       result.Payment.ID,
-		Reference:       result.Order.Reference,
-		Provider:        result.Order.Provider,
-		AmountMinor:     result.Order.AmountMinor,
-		Currency:        result.Order.Currency,
-		Status:          result.Order.Status,
-		NextAction:      result.Order.NextAction,
-		ProviderMessage: result.Order.ProviderMessage,
+		Reference:       result.Checkout.Reference,
+		Provider:        result.Checkout.Provider,
+		AmountMinor:     result.Checkout.AmountMinor,
+		Currency:        result.Checkout.Currency,
+		Status:          result.Checkout.Status,
+		NextAction:      result.Checkout.NextAction,
+		ProviderMessage: result.Checkout.ProviderMessage,
 		ClientSecret:    result.Session.ClientSecret,
 	}
 }
