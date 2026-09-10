@@ -118,13 +118,13 @@ templ SessionTable(sessions []Session) {
 					}
 				</tbody>
 			</table>
-	</div>
+		</div>
 	}
 }
 
 templ DetailField(label string, value string) {
 	<div>
 		<dt class="text-sm text-base-content/60">{ label }</dt>
-		<dd class="mt-1 font-medium break-all">{ value }</dd>
+		<dd class="mt-1 break-all font-medium">{ value }</dd>
 	</div>
 }
