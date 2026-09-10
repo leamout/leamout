@@ -3,12 +3,11 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
     wallet_id UUID,
     price_id UUID REFERENCES prices(id) ON DELETE RESTRICT,
-    invoice_id UUID,
     order_type TEXT NOT NULL,
     provider TEXT NOT NULL,
     payment_method TEXT NOT NULL,
     reference TEXT NOT NULL UNIQUE,
-    amount BIGINT NOT NULL,
+    amount_minor BIGINT NOT NULL,
     currency TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     next_action TEXT NOT NULL DEFAULT 'wait',
@@ -20,7 +19,7 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_checkout_orders_id_organization UNIQUE (id, organization_id),
-    CONSTRAINT uq_checkout_orders_payment_terms UNIQUE (id, organization_id, provider, amount, currency),
+    CONSTRAINT uq_checkout_orders_payment_terms UNIQUE (id, organization_id, provider, amount_minor, currency),
     CONSTRAINT fk_checkout_orders_wallet_terms
         FOREIGN KEY (wallet_id, organization_id, currency)
         REFERENCES wallets (id, organization_id, currency)
@@ -29,14 +28,10 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
         FOREIGN KEY (price_id, currency)
         REFERENCES prices (id, currency)
         ON DELETE RESTRICT,
-    CONSTRAINT fk_checkout_orders_invoice_terms
-        FOREIGN KEY (invoice_id, organization_id, amount, currency)
-        REFERENCES invoices (id, organization_id, total, currency)
-        ON DELETE RESTRICT,
     CONSTRAINT chk_checkout_orders_type CHECK (order_type IN ('subscription', 'wallet_topup')),
     CONSTRAINT chk_checkout_orders_target CHECK (
         (order_type = 'subscription' AND price_id IS NOT NULL AND wallet_id IS NULL)
-        OR (order_type = 'wallet_topup' AND wallet_id IS NOT NULL AND price_id IS NULL AND invoice_id IS NULL)
+        OR (order_type = 'wallet_topup' AND wallet_id IS NOT NULL AND price_id IS NULL)
     ),
     CONSTRAINT chk_checkout_orders_provider CHECK (provider IN ('stripe', 'paystack')),
     CONSTRAINT chk_checkout_orders_method CHECK (
@@ -46,7 +41,7 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
     CONSTRAINT chk_checkout_orders_reference CHECK (
         reference ~ '^[A-Za-z0-9.=-]+$'
     ),
-    CONSTRAINT chk_checkout_orders_amount CHECK (amount > 0),
+    CONSTRAINT chk_checkout_orders_amount_minor CHECK (amount_minor > 0),
     CONSTRAINT chk_checkout_orders_currency CHECK (currency ~ '^[A-Z]{3}$'),
     CONSTRAINT chk_checkout_orders_status CHECK (
         status IN ('pending', 'processing', 'succeeded', 'failed', 'cancelled', 'expired')
@@ -69,7 +64,7 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
 );
 
 COMMENT ON TABLE checkout_orders IS
-    'Server-priced intent to collect money. Provider success is required before subscription activation or wallet credit.';
+    'Server-priced intent to collect prepaid money in currency minor units. Provider success is required before subscription activation or wallet credit.';
 
 CREATE INDEX IF NOT EXISTS idx_checkout_orders_organization_created
     ON checkout_orders (organization_id, created_at DESC);

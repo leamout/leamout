@@ -58,9 +58,9 @@ type Wallet struct {
 }
 
 type Balance struct {
-	Posted    int64
-	Reserved  int64
-	Available int64
+	PostedMinor    int64
+	ReservedMinor  int64
+	AvailableMinor int64
 }
 
 type LedgerEntry struct {
@@ -78,20 +78,20 @@ type LedgerEntry struct {
 }
 
 type Reservation struct {
-	ID             uuid.UUID
-	WalletID       uuid.UUID
-	OrganizationID uuid.UUID
-	AmountMinor    int64
-	CapturedMinor  *int64
-	OperationType  string
-	OperationID    string
-	Status         ReservationStatus
-	ExpiresAt      time.Time
-	CapturedAt     *time.Time
-	ReleasedAt     *time.Time
-	ExpiredAt      *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                  uuid.UUID
+	WalletID            uuid.UUID
+	OrganizationID      uuid.UUID
+	AmountMinor         int64
+	CapturedAmountMinor *int64
+	OperationType       string
+	OperationID         string
+	Status              ReservationStatus
+	ExpiresAt           time.Time
+	CapturedAt          *time.Time
+	ReleasedAt          *time.Time
+	ExpiredAt           *time.Time
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 type PostEntryInput struct {

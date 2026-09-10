@@ -59,8 +59,6 @@ func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Subscri
 	return s.repo.List(ctx, organizationID)
 }
 
-// ChangePrice changes the subscription's acquired commercial terms. The selected
-// price determines the new plan and keeps price/plan identity consistent.
 func (s *Service) ChangePrice(ctx context.Context, organizationID, id, priceID uuid.UUID) (Subscription, error) {
 	if err := validateID(priceID, ErrPriceIDRequired); err != nil {
 		return Subscription{}, err
@@ -72,7 +70,7 @@ func (s *Service) ChangePrice(ctx context.Context, organizationID, id, priceID u
 	if current.Status == StatusCancelled || current.Status == StatusExpired {
 		return Subscription{}, ErrTerminalSubscription
 	}
-	if current.PriceID != nil && *current.PriceID == priceID {
+	if current.PriceID == priceID {
 		return current, nil
 	}
 	price, err := s.requireAvailablePrice(ctx, priceID, s.now())
@@ -112,31 +110,6 @@ func (s *Service) Transition(ctx context.Context, organizationID, id uuid.UUID, 
 	return s.repo.UpdateStatus(ctx, organizationID, id, current.Status, target)
 }
 
-func (s *Service) SetProvider(ctx context.Context, organizationID, id uuid.UUID, reference ProviderReference) (Subscription, error) {
-	normalized, err := normalizeProvider(reference)
-	if err != nil {
-		return Subscription{}, err
-	}
-	current, err := s.Get(ctx, organizationID, id)
-	if err != nil {
-		return Subscription{}, err
-	}
-	if current.BillingProvider != nil && current.ProviderSubscriptionID != nil &&
-		*current.BillingProvider == normalized.Provider && *current.ProviderSubscriptionID == normalized.SubscriptionID {
-		return current, nil
-	}
-	return s.repo.SetProvider(ctx, organizationID, id, normalized)
-}
-
-// GetByProvider resolves provider reconciliation metadata back to Leamout-owned state.
-func (s *Service) GetByProvider(ctx context.Context, reference ProviderReference) (Subscription, error) {
-	normalized, err := normalizeProvider(reference)
-	if err != nil {
-		return Subscription{}, err
-	}
-	return s.repo.GetByProvider(ctx, normalized)
-}
-
 func (s *Service) requireAvailablePrice(ctx context.Context, priceID uuid.UUID, at time.Time) (catalog.Price, error) {
 	price, err := s.catalog.GetPrice(ctx, priceID)
 	if err != nil {
@@ -145,7 +118,7 @@ func (s *Service) requireAvailablePrice(ctx context.Context, priceID uuid.UUID, 
 		}
 		return catalog.Price{}, err
 	}
-	if !price.EffectiveAt(at) {
+	if price.PricingType != catalog.PricingTypeRecurring || !price.EffectiveAt(at) {
 		return catalog.Price{}, ErrPriceUnavailable
 	}
 	plan, err := s.catalog.GetPlan(ctx, price.PlanID)

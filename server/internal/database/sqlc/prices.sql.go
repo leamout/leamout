@@ -13,7 +13,7 @@ import (
 )
 
 const getPriceByID = `-- name: GetPriceByID :one
-SELECT id, plan_id, currency, amount_minor, billing_interval, active, effective_from, effective_until, created_at
+SELECT id, plan_id, meter_id, pricing_type, currency, amount_minor, billing_interval, unit_amount_micros, unit_size, dimensions, active, effective_from, effective_until, created_at
 FROM prices
 WHERE id = $1
 LIMIT 1
@@ -25,9 +25,14 @@ func (q *Queries) GetPriceByID(ctx context.Context, id uuid.UUID) (Price, error)
 	err := row.Scan(
 		&i.ID,
 		&i.PlanID,
+		&i.MeterID,
+		&i.PricingType,
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
+		&i.UnitAmountMicros,
+		&i.UnitSize,
+		&i.Dimensions,
 		&i.Active,
 		&i.EffectiveFrom,
 		&i.EffectiveUntil,
@@ -36,8 +41,67 @@ func (q *Queries) GetPriceByID(ctx context.Context, id uuid.UUID) (Price, error)
 	return i, err
 }
 
+const listActiveMeteredPricesByPlanAndMeter = `-- name: ListActiveMeteredPricesByPlanAndMeter :many
+SELECT pr.id, pr.plan_id, pr.meter_id, pr.pricing_type, pr.currency, pr.amount_minor, pr.billing_interval, pr.unit_amount_micros, pr.unit_size, pr.dimensions, pr.active, pr.effective_from, pr.effective_until, pr.created_at
+FROM prices AS pr
+JOIN plans AS pl ON pl.id = pr.plan_id
+JOIN products AS p ON p.id = pl.product_id
+JOIN meters AS m ON m.id = pr.meter_id
+WHERE pr.plan_id = $1
+  AND pr.meter_id = $2
+  AND pr.pricing_type = 'metered'
+  AND pr.active = true
+  AND pr.effective_from <= $3
+  AND (pr.effective_until IS NULL OR pr.effective_until > $3)
+  AND pl.active = true
+  AND p.active = true
+  AND m.active = true
+ORDER BY pr.effective_from DESC, pr.created_at DESC
+`
+
+type ListActiveMeteredPricesByPlanAndMeterParams struct {
+	PlanID  uuid.UUID          `db:"plan_id" json:"plan_id"`
+	MeterID *uuid.UUID         `db:"meter_id" json:"meter_id"`
+	At      pgtype.Timestamptz `db:"at" json:"at"`
+}
+
+func (q *Queries) ListActiveMeteredPricesByPlanAndMeter(ctx context.Context, arg ListActiveMeteredPricesByPlanAndMeterParams) ([]Price, error) {
+	rows, err := q.db.Query(ctx, listActiveMeteredPricesByPlanAndMeter, arg.PlanID, arg.MeterID, arg.At)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Price{}
+	for rows.Next() {
+		var i Price
+		if err := rows.Scan(
+			&i.ID,
+			&i.PlanID,
+			&i.MeterID,
+			&i.PricingType,
+			&i.Currency,
+			&i.AmountMinor,
+			&i.BillingInterval,
+			&i.UnitAmountMicros,
+			&i.UnitSize,
+			&i.Dimensions,
+			&i.Active,
+			&i.EffectiveFrom,
+			&i.EffectiveUntil,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActivePricesByPlan = `-- name: ListActivePricesByPlan :many
-SELECT pr.id, pr.plan_id, pr.currency, pr.amount_minor, pr.billing_interval, pr.active, pr.effective_from, pr.effective_until, pr.created_at
+SELECT pr.id, pr.plan_id, pr.meter_id, pr.pricing_type, pr.currency, pr.amount_minor, pr.billing_interval, pr.unit_amount_micros, pr.unit_size, pr.dimensions, pr.active, pr.effective_from, pr.effective_until, pr.created_at
 FROM prices AS pr
 JOIN plans AS pl ON pl.id = pr.plan_id
 JOIN products AS p ON p.id = pl.product_id
@@ -67,9 +131,14 @@ func (q *Queries) ListActivePricesByPlan(ctx context.Context, arg ListActivePric
 		if err := rows.Scan(
 			&i.ID,
 			&i.PlanID,
+			&i.MeterID,
+			&i.PricingType,
 			&i.Currency,
 			&i.AmountMinor,
 			&i.BillingInterval,
+			&i.UnitAmountMicros,
+			&i.UnitSize,
+			&i.Dimensions,
 			&i.Active,
 			&i.EffectiveFrom,
 			&i.EffectiveUntil,
@@ -86,7 +155,7 @@ func (q *Queries) ListActivePricesByPlan(ctx context.Context, arg ListActivePric
 }
 
 const listPricesByPlan = `-- name: ListPricesByPlan :many
-SELECT id, plan_id, currency, amount_minor, billing_interval, active, effective_from, effective_until, created_at
+SELECT id, plan_id, meter_id, pricing_type, currency, amount_minor, billing_interval, unit_amount_micros, unit_size, dimensions, active, effective_from, effective_until, created_at
 FROM prices
 WHERE plan_id = $1
 ORDER BY effective_from DESC, created_at DESC
@@ -104,9 +173,14 @@ func (q *Queries) ListPricesByPlan(ctx context.Context, planID uuid.UUID) ([]Pri
 		if err := rows.Scan(
 			&i.ID,
 			&i.PlanID,
+			&i.MeterID,
+			&i.PricingType,
 			&i.Currency,
 			&i.AmountMinor,
 			&i.BillingInterval,
+			&i.UnitAmountMicros,
+			&i.UnitSize,
+			&i.Dimensions,
 			&i.Active,
 			&i.EffectiveFrom,
 			&i.EffectiveUntil,

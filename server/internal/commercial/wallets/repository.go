@@ -67,9 +67,9 @@ func (r *Repository) Balance(ctx context.Context, organizationID, walletID uuid.
 		return Balance{}, mapWalletReadError(err)
 	}
 	return Balance{
-		Posted:    row.Posted,
-		Reserved:  row.Reserved,
-		Available: row.Available,
+		PostedMinor:    row.PostedMinor,
+		ReservedMinor:  row.ReservedMinor,
+		AvailableMinor: row.AvailableMinor,
 	}, nil
 }
 
@@ -126,13 +126,13 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 	if err != nil {
 		return Reservation{}, mapWalletReadError(err)
 	}
-	if balance.Available < input.AmountMinor {
+	if balance.AvailableMinor < input.AmountMinor {
 		return Reservation{}, ErrInsufficientFunds
 	}
 	row, err := q.InsertWalletReservation(ctx, sqlc.InsertWalletReservationParams{
 		WalletID:       walletID,
 		OrganizationID: organizationID,
-		Amount:         input.AmountMinor,
+		AmountMinor:    input.AmountMinor,
 		OperationType:  input.OperationType,
 		OperationID:    input.OperationID,
 		ExpiresAt:      pgconv.NullableTimestamptz(&input.ExpiresAt),
@@ -171,9 +171,9 @@ func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, 
 
 	q := r.queries.WithTx(tx)
 	row, err := q.CaptureWalletReservation(ctx, sqlc.CaptureWalletReservationParams{
-		CapturedAmount: &amountMinor,
-		OrganizationID: organizationID,
-		ID:             id,
+		CapturedAmountMinor: &amountMinor,
+		OrganizationID:      organizationID,
+		ID:                  id,
 	})
 	if err != nil {
 		return Reservation{}, mapReservationTransitionError(err)
@@ -220,7 +220,7 @@ func (r *Repository) Expire(ctx context.Context) ([]Reservation, error) {
 func entryParams(organizationID, walletID uuid.UUID, input PostEntryInput) sqlc.CreateWalletLedgerEntryParams {
 	return sqlc.CreateWalletLedgerEntryParams{
 		EntryType:      string(input.Type),
-		Amount:         input.AmountMinor,
+		AmountMinor:    input.AmountMinor,
 		SourceType:     input.SourceType,
 		SourceID:       input.SourceID,
 		IdempotencyKey: input.IdempotencyKey,
@@ -248,7 +248,7 @@ func ledgerEntryFromRow(row sqlc.WalletLedgerEntry) LedgerEntry {
 		WalletID:       row.WalletID,
 		OrganizationID: row.OrganizationID,
 		Type:           EntryType(row.EntryType),
-		AmountMinor:    row.Amount,
+		AmountMinor:    row.AmountMinor,
 		SourceType:     row.SourceType,
 		SourceID:       row.SourceID,
 		IdempotencyKey: row.IdempotencyKey,
@@ -260,20 +260,20 @@ func ledgerEntryFromRow(row sqlc.WalletLedgerEntry) LedgerEntry {
 
 func reservationFromRow(row sqlc.WalletReservation) Reservation {
 	return Reservation{
-		ID:             row.ID,
-		WalletID:       row.WalletID,
-		OrganizationID: row.OrganizationID,
-		AmountMinor:    row.Amount,
-		CapturedMinor:  row.CapturedAmount,
-		OperationType:  row.OperationType,
-		OperationID:    row.OperationID,
-		Status:         ReservationStatus(row.Status),
-		ExpiresAt:      pgconv.TimestamptzToTime(row.ExpiresAt),
-		CapturedAt:     pgconv.TimestamptzToTimePtr(row.CapturedAt),
-		ReleasedAt:     pgconv.TimestamptzToTimePtr(row.ReleasedAt),
-		ExpiredAt:      pgconv.TimestamptzToTimePtr(row.ExpiredAt),
-		CreatedAt:      pgconv.TimestamptzToTime(row.CreatedAt),
-		UpdatedAt:      pgconv.TimestamptzToTime(row.UpdatedAt),
+		ID:                  row.ID,
+		WalletID:            row.WalletID,
+		OrganizationID:      row.OrganizationID,
+		AmountMinor:         row.AmountMinor,
+		CapturedAmountMinor: row.CapturedAmountMinor,
+		OperationType:       row.OperationType,
+		OperationID:         row.OperationID,
+		Status:              ReservationStatus(row.Status),
+		ExpiresAt:           pgconv.TimestamptzToTime(row.ExpiresAt),
+		CapturedAt:          pgconv.TimestamptzToTimePtr(row.CapturedAt),
+		ReleasedAt:          pgconv.TimestamptzToTimePtr(row.ReleasedAt),
+		ExpiredAt:           pgconv.TimestamptzToTimePtr(row.ExpiredAt),
+		CreatedAt:           pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt:           pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
 }
 

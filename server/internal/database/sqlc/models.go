@@ -148,18 +148,17 @@ type CarrierProvider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Server-priced intent to collect money. Provider success is required before subscription activation or wallet credit.
+// Server-priced intent to collect prepaid money in currency minor units. Provider success is required before subscription activation or wallet credit.
 type CheckoutOrder struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
 	WalletID        *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
 	PriceID         *uuid.UUID         `db:"price_id" json:"price_id"`
-	InvoiceID       *uuid.UUID         `db:"invoice_id" json:"invoice_id"`
 	OrderType       string             `db:"order_type" json:"order_type"`
 	Provider        string             `db:"provider" json:"provider"`
 	PaymentMethod   string             `db:"payment_method" json:"payment_method"`
 	Reference       string             `db:"reference" json:"reference"`
-	Amount          int64              `db:"amount" json:"amount"`
+	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
 	Currency        string             `db:"currency" json:"currency"`
 	Status          string             `db:"status" json:"status"`
 	NextAction      string             `db:"next_action" json:"next_action"`
@@ -243,40 +242,6 @@ type Idempotency struct {
 	ExpiresAt           pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type Invoice struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
-	InvoiceNumber  string             `db:"invoice_number" json:"invoice_number"`
-	Currency       string             `db:"currency" json:"currency"`
-	Subtotal       int64              `db:"subtotal" json:"subtotal"`
-	Tax            int64              `db:"tax" json:"tax"`
-	Total          int64              `db:"total" json:"total"`
-	Status         string             `db:"status" json:"status"`
-	IssuedAt       pgtype.Timestamptz `db:"issued_at" json:"issued_at"`
-	DueAt          pgtype.Timestamptz `db:"due_at" json:"due_at"`
-	PaidAt         pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
-	Metadata       []byte             `db:"metadata" json:"metadata"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type InvoiceItem struct {
-	ID               uuid.UUID          `db:"id" json:"id"`
-	InvoiceID        uuid.UUID          `db:"invoice_id" json:"invoice_id"`
-	MeterID          *uuid.UUID         `db:"meter_id" json:"meter_id"`
-	UsageRateID      *uuid.UUID         `db:"usage_rate_id" json:"usage_rate_id"`
-	Type             string             `db:"type" json:"type"`
-	Description      string             `db:"description" json:"description"`
-	Quantity         int64              `db:"quantity" json:"quantity"`
-	UnitAmountMicros *int64             `db:"unit_amount_micros" json:"unit_amount_micros"`
-	Amount           int64              `db:"amount" json:"amount"`
-	PeriodStart      pgtype.Timestamptz `db:"period_start" json:"period_start"`
-	PeriodEnd        pgtype.Timestamptz `db:"period_end" json:"period_end"`
-	Metadata         []byte             `db:"metadata" json:"metadata"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type License struct {
@@ -403,13 +368,14 @@ type OutboxEvent struct {
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Reconciled payment movements in currency minor units associated with a checkout order.
 type Payment struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
 	CheckoutOrderID   uuid.UUID          `db:"checkout_order_id" json:"checkout_order_id"`
 	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
-	Amount            int64              `db:"amount" json:"amount"`
+	AmountMinor       int64              `db:"amount_minor" json:"amount_minor"`
 	Currency          string             `db:"currency" json:"currency"`
 	Status            string             `db:"status" json:"status"`
 	PaidAt            pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
@@ -461,16 +427,22 @@ type Plan struct {
 	UpdatedAt   pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Customer-facing catalog prices. Metered prices rate Leamout usage; upstream provider cost is tracked separately as COGS.
 type Price struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	PlanID          uuid.UUID          `db:"plan_id" json:"plan_id"`
-	Currency        string             `db:"currency" json:"currency"`
-	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
-	BillingInterval string             `db:"billing_interval" json:"billing_interval"`
-	Active          bool               `db:"active" json:"active"`
-	EffectiveFrom   pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
-	EffectiveUntil  pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID               uuid.UUID          `db:"id" json:"id"`
+	PlanID           uuid.UUID          `db:"plan_id" json:"plan_id"`
+	MeterID          *uuid.UUID         `db:"meter_id" json:"meter_id"`
+	PricingType      string             `db:"pricing_type" json:"pricing_type"`
+	Currency         string             `db:"currency" json:"currency"`
+	AmountMinor      *int64             `db:"amount_minor" json:"amount_minor"`
+	BillingInterval  *string            `db:"billing_interval" json:"billing_interval"`
+	UnitAmountMicros *int64             `db:"unit_amount_micros" json:"unit_amount_micros"`
+	UnitSize         *int64             `db:"unit_size" json:"unit_size"`
+	Dimensions       []byte             `db:"dimensions" json:"dimensions"`
+	Active           bool               `db:"active" json:"active"`
+	EffectiveFrom    pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
+	EffectiveUntil   pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type ProcessedEvent struct {
@@ -614,19 +586,18 @@ type Subscriber struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Leamout-owned recurring software access. Payment providers are settlement adapters and do not own subscription identity or lifecycle.
 type Subscription struct {
-	ID                     uuid.UUID          `db:"id" json:"id"`
-	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
-	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
-	PriceID                *uuid.UUID         `db:"price_id" json:"price_id"`
-	Status                 string             `db:"status" json:"status"`
-	StartsAt               pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
-	RenewsAt               pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
-	EndsAt                 pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
-	BillingProvider        *string            `db:"billing_provider" json:"billing_provider"`
-	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
-	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID         uuid.UUID          `db:"plan_id" json:"plan_id"`
+	PriceID        uuid.UUID          `db:"price_id" json:"price_id"`
+	Status         string             `db:"status" json:"status"`
+	StartsAt       pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
+	RenewsAt       pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
+	EndsAt         pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Trunk struct {
@@ -674,6 +645,7 @@ type TrunkEndpoint struct {
 	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+// Immutable usage observations. Recording usage does not by itself make that usage billable.
 type UsageEvent struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -686,25 +658,6 @@ type UsageEvent struct {
 	Dimensions     []byte             `db:"dimensions" json:"dimensions"`
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-}
-
-// Customer-facing usage pricing rules used by Leamout rating; actual upstream carrier costs are stored separately in wholesale_charges.
-type UsageRate struct {
-	ID                uuid.UUID          `db:"id" json:"id"`
-	PlanID            uuid.UUID          `db:"plan_id" json:"plan_id"`
-	MeterID           uuid.UUID          `db:"meter_id" json:"meter_id"`
-	CarrierProviderID *uuid.UUID         `db:"carrier_provider_id" json:"carrier_provider_id"`
-	Direction         *string            `db:"direction" json:"direction"`
-	CountryCode       *string            `db:"country_code" json:"country_code"`
-	Network           *string            `db:"network" json:"network"`
-	Currency          string             `db:"currency" json:"currency"`
-	UnitAmountMicros  int64              `db:"unit_amount_micros" json:"unit_amount_micros"`
-	UnitSize          int64              `db:"unit_size" json:"unit_size"`
-	EffectiveFrom     pgtype.Timestamptz `db:"effective_from" json:"effective_from"`
-	EffectiveUntil    pgtype.Timestamptz `db:"effective_until" json:"effective_until"`
-	Active            bool               `db:"active" json:"active"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type User struct {
@@ -751,13 +704,13 @@ type Wallet struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Immutable posted monetary movements. Corrections are new compensating entries; rows are never updated or deleted.
+// Immutable posted monetary movements in currency minor units. Corrections are new compensating entries; rows are never updated or deleted.
 type WalletLedgerEntry struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	WalletID       uuid.UUID          `db:"wallet_id" json:"wallet_id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	EntryType      string             `db:"entry_type" json:"entry_type"`
-	Amount         int64              `db:"amount" json:"amount"`
+	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	SourceType     string             `db:"source_type" json:"source_type"`
 	SourceID       string             `db:"source_id" json:"source_id"`
 	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
@@ -766,22 +719,22 @@ type WalletLedgerEntry struct {
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-// Funds committed before Leamout incurs a managed-provider obligation. Active reservations reduce spendable balance.
+// Funds in currency minor units committed before Leamout incurs a managed-provider obligation. Active reservations reduce spendable balance.
 type WalletReservation struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	WalletID       uuid.UUID          `db:"wallet_id" json:"wallet_id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Amount         int64              `db:"amount" json:"amount"`
-	CapturedAmount *int64             `db:"captured_amount" json:"captured_amount"`
-	OperationType  string             `db:"operation_type" json:"operation_type"`
-	OperationID    string             `db:"operation_id" json:"operation_id"`
-	Status         string             `db:"status" json:"status"`
-	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CapturedAt     pgtype.Timestamptz `db:"captured_at" json:"captured_at"`
-	ReleasedAt     pgtype.Timestamptz `db:"released_at" json:"released_at"`
-	ExpiredAt      pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	WalletID            uuid.UUID          `db:"wallet_id" json:"wallet_id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	AmountMinor         int64              `db:"amount_minor" json:"amount_minor"`
+	CapturedAmountMinor *int64             `db:"captured_amount_minor" json:"captured_amount_minor"`
+	OperationType       string             `db:"operation_type" json:"operation_type"`
+	OperationID         string             `db:"operation_id" json:"operation_id"`
+	Status              string             `db:"status" json:"status"`
+	ExpiresAt           pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	CapturedAt          pgtype.Timestamptz `db:"captured_at" json:"captured_at"`
+	ReleasedAt          pgtype.Timestamptz `db:"released_at" json:"released_at"`
+	ExpiredAt           pgtype.Timestamptz `db:"expired_at" json:"expired_at"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type WebhookDelivery struct {

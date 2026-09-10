@@ -114,8 +114,8 @@ SELECT
     COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
     COALESCE(subscription.plan_name, '—') AS plan_name,
     COALESCE(subscription.status, 'none') AS subscription_status,
-    COALESCE(subscription.billing_provider, '—') AS billing_provider,
-    COALESCE(subscription.provider_subscription_id, '—') AS provider_subscription_id,
+    'prepaid'::TEXT AS billing_model,
+    COALESCE(subscription.pricing_type, '—') AS pricing_type,
     COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS renews_at,
     COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS ends_at,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
@@ -126,12 +126,12 @@ LEFT JOIN LATERAL (
     SELECT
         p.name AS plan_name,
         s.status,
-        s.billing_provider,
-        s.provider_subscription_id,
+        pr.pricing_type,
         s.renews_at,
         s.ends_at
     FROM subscriptions AS s
     JOIN plans AS p ON p.id = s.plan_id
+    JOIN prices AS pr ON pr.id = s.price_id
     WHERE s.organization_id = o.id
     ORDER BY
         CASE WHEN s.status IN ('active', 'past_due') THEN 0 ELSE 1 END,
@@ -148,26 +148,25 @@ GROUP BY
     o.updated_at,
     subscription.plan_name,
     subscription.status,
-    subscription.billing_provider,
-    subscription.provider_subscription_id,
+    subscription.pricing_type,
     subscription.renews_at,
     subscription.ends_at
 LIMIT 1
 `
 
 type GetBackofficeOrganizationRow struct {
-	ID                     string `db:"id" json:"id"`
-	Name                   string `db:"name" json:"name"`
-	Status                 string `db:"status" json:"status"`
-	MemberCount            int64  `db:"member_count" json:"member_count"`
-	PlanName               string `db:"plan_name" json:"plan_name"`
-	SubscriptionStatus     string `db:"subscription_status" json:"subscription_status"`
-	BillingProvider        string `db:"billing_provider" json:"billing_provider"`
-	ProviderSubscriptionID string `db:"provider_subscription_id" json:"provider_subscription_id"`
-	RenewsAt               string `db:"renews_at" json:"renews_at"`
-	EndsAt                 string `db:"ends_at" json:"ends_at"`
-	CreatedAt              string `db:"created_at" json:"created_at"`
-	UpdatedAt              string `db:"updated_at" json:"updated_at"`
+	ID                 string `db:"id" json:"id"`
+	Name               string `db:"name" json:"name"`
+	Status             string `db:"status" json:"status"`
+	MemberCount        int64  `db:"member_count" json:"member_count"`
+	PlanName           string `db:"plan_name" json:"plan_name"`
+	SubscriptionStatus string `db:"subscription_status" json:"subscription_status"`
+	BillingModel       string `db:"billing_model" json:"billing_model"`
+	PricingType        string `db:"pricing_type" json:"pricing_type"`
+	RenewsAt           string `db:"renews_at" json:"renews_at"`
+	EndsAt             string `db:"ends_at" json:"ends_at"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+	UpdatedAt          string `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (GetBackofficeOrganizationRow, error) {
@@ -180,8 +179,8 @@ func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (
 		&i.MemberCount,
 		&i.PlanName,
 		&i.SubscriptionStatus,
-		&i.BillingProvider,
-		&i.ProviderSubscriptionID,
+		&i.BillingModel,
+		&i.PricingType,
 		&i.RenewsAt,
 		&i.EndsAt,
 		&i.CreatedAt,

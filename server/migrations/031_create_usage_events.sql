@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
     quantity BIGINT NOT NULL,
     source_type TEXT NOT NULL,
     source_id TEXT NOT NULL,
-    idempotency_key TEXT NOT NULL UNIQUE,
+    idempotency_key TEXT NOT NULL,
     dimensions JSONB NOT NULL DEFAULT '{}'::jsonb,
     occurred_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -15,18 +15,23 @@ CREATE TABLE IF NOT EXISTS usage_events (
         FOREIGN KEY (subscription_id, organization_id)
         REFERENCES subscriptions (id, organization_id)
         ON DELETE SET NULL (subscription_id),
+    CONSTRAINT uq_usage_events_organization_idempotency
+        UNIQUE (organization_id, idempotency_key),
     CONSTRAINT chk_usage_events_quantity CHECK (quantity > 0),
     CONSTRAINT chk_usage_events_source_type CHECK (
-        length(trim(source_type)) > 0 AND source_type !~ '[[:space:]]'
+        source_type ~ '^[a-z0-9]+(?:_[a-z0-9]+)*$'
     ),
-    CONSTRAINT chk_usage_events_source_id CHECK (length(trim(source_id)) > 0),
+    CONSTRAINT chk_usage_events_source_id CHECK (length(btrim(source_id)) > 0),
     CONSTRAINT chk_usage_events_idempotency_key CHECK (
-        length(trim(idempotency_key)) > 0
+        length(btrim(idempotency_key)) > 0
     ),
     CONSTRAINT chk_usage_events_dimensions_object CHECK (
         jsonb_typeof(dimensions) = 'object'
     )
 );
+
+COMMENT ON TABLE usage_events IS
+    'Immutable usage observations. Recording usage does not by itself make that usage billable.';
 
 CREATE INDEX IF NOT EXISTS idx_usage_events_organization_meter_occurred
     ON usage_events (organization_id, meter_id, occurred_at);

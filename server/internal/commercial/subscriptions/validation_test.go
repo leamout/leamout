@@ -39,18 +39,6 @@ func TestValidateTransition(t *testing.T) {
 	}
 }
 
-func TestNormalizeProvider(t *testing.T) {
-	t.Parallel()
-
-	got, err := normalizeProvider(ProviderReference{Provider: " Stripe ", SubscriptionID: " sub_123 "})
-	if err != nil {
-		t.Fatalf("normalize provider: %v", err)
-	}
-	if got.Provider != "stripe" || got.SubscriptionID != "sub_123" {
-		t.Fatalf("unexpected normalized provider: %#v", got)
-	}
-}
-
 func TestValidatePeriod(t *testing.T) {
 	t.Parallel()
 

@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS wallet_ledger_entries (
     wallet_id UUID NOT NULL,
     organization_id UUID NOT NULL,
     entry_type TEXT NOT NULL,
-    amount BIGINT NOT NULL,
+    amount_minor BIGINT NOT NULL,
     source_type TEXT NOT NULL,
     source_id TEXT NOT NULL,
     idempotency_key TEXT NOT NULL,
@@ -16,12 +16,9 @@ CREATE TABLE IF NOT EXISTS wallet_ledger_entries (
         REFERENCES wallets (id, organization_id)
         ON DELETE RESTRICT,
     CONSTRAINT uq_wallet_ledger_idempotency UNIQUE (wallet_id, idempotency_key),
-    CONSTRAINT chk_wallet_ledger_type CHECK (
-        entry_type IN ('topup', 'capture', 'refund', 'chargeback', 'adjustment_credit', 'adjustment_debit')
-    ),
-    CONSTRAINT chk_wallet_ledger_amount CHECK (
-        (entry_type IN ('topup', 'refund', 'adjustment_credit') AND amount > 0)
-        OR (entry_type IN ('capture', 'chargeback', 'adjustment_debit') AND amount < 0)
+    CONSTRAINT chk_wallet_ledger_amount_minor CHECK (
+        (entry_type IN ('topup', 'refund', 'adjustment_credit') AND amount_minor > 0)
+        OR (entry_type IN ('capture', 'chargeback', 'adjustment_debit') AND amount_minor < 0)
     ),
     CONSTRAINT chk_wallet_ledger_source_type CHECK (
         source_type ~ '^[a-z0-9]+(?:_[a-z0-9]+)*$'
@@ -32,7 +29,7 @@ CREATE TABLE IF NOT EXISTS wallet_ledger_entries (
 );
 
 COMMENT ON TABLE wallet_ledger_entries IS
-    'Immutable posted monetary movements. Corrections are new compensating entries; rows are never updated or deleted.';
+    'Immutable posted monetary movements in currency minor units. Corrections are new compensating entries; rows are never updated or deleted.';
 
 CREATE INDEX IF NOT EXISTS idx_wallet_ledger_wallet_occurred
     ON wallet_ledger_entries (wallet_id, occurred_at, id);

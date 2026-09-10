@@ -38,6 +38,8 @@ func TestCatalogResponses(t *testing.T) {
 	planID := uuid.New()
 	priceID := uuid.New()
 	description := "Commercial self-hosted edition"
+	amountMinor := int64(29900)
+	billingInterval := BillingIntervalMonth
 	effectiveFrom := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
 
 	values := []any{
@@ -48,8 +50,8 @@ func TestCatalogResponses(t *testing.T) {
 			ID: planID, ProductID: productID, Code: "enterprise", Name: "Enterprise", Description: &description,
 		}),
 		newPriceResponse(Price{
-			ID: priceID, PlanID: planID, Currency: "USD", AmountMinor: 29900,
-			BillingInterval: BillingIntervalMonth, EffectiveFrom: effectiveFrom,
+			ID: priceID, PlanID: planID, PricingType: PricingTypeRecurring, Currency: "USD",
+			AmountMinor: &amountMinor, BillingInterval: &billingInterval, EffectiveFrom: effectiveFrom,
 		}),
 	}
 

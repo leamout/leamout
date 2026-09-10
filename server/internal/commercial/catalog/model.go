@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -8,10 +9,14 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-// BillingInterval identifies the recurring cadence attached to a catalog price.
+type PricingType string
 type BillingInterval string
 
 const (
+	PricingTypeOneTime   PricingType = "one_time"
+	PricingTypeRecurring PricingType = "recurring"
+	PricingTypeMetered   PricingType = "metered"
+
 	BillingIntervalMonth BillingInterval = "month"
 	BillingIntervalYear  BillingInterval = "year"
 )
@@ -48,19 +53,24 @@ type Plan struct {
 	UpdatedAt   time.Time
 }
 
-// Price is an immutable set of recurring commercial terms for a plan.
-// Active/effective bounds control acquisition availability without rewriting
-// historical subscriptions that already reference this price.
+// Price is an immutable set of customer-facing commercial terms for a plan.
+// A price is either one-time, recurring, or metered. Metered prices reference
+// the meter they rate and may use dimensions for routing-specific variants.
 type Price struct {
-	ID              uuid.UUID
-	PlanID          uuid.UUID
-	Currency        string
-	AmountMinor     int64
-	BillingInterval BillingInterval
-	Active          bool
-	EffectiveFrom   time.Time
-	EffectiveUntil  *time.Time
-	CreatedAt       time.Time
+	ID               uuid.UUID
+	PlanID           uuid.UUID
+	MeterID          *uuid.UUID
+	PricingType      PricingType
+	Currency         string
+	AmountMinor      *int64
+	BillingInterval  *BillingInterval
+	UnitAmountMicros *int64
+	UnitSize         *int64
+	Dimensions       json.RawMessage
+	Active           bool
+	EffectiveFrom    time.Time
+	EffectiveUntil   *time.Time
+	CreatedAt        time.Time
 }
 
 type productResponse struct {
@@ -98,24 +108,34 @@ func newPlanResponse(plan Plan) planResponse {
 }
 
 type priceResponse struct {
-	ID              string          `json:"id"`
-	PlanID          string          `json:"plan_id"`
-	Currency        string          `json:"currency"`
-	AmountMinor     int64           `json:"amount_minor"`
-	BillingInterval BillingInterval `json:"billing_interval"`
-	EffectiveFrom   time.Time       `json:"effective_from"`
-	EffectiveUntil  *time.Time      `json:"effective_until,omitempty"`
+	ID               string           `json:"id"`
+	PlanID           string           `json:"plan_id"`
+	MeterID          *uuid.UUID       `json:"meter_id,omitempty"`
+	PricingType      PricingType      `json:"pricing_type"`
+	Currency         string           `json:"currency"`
+	AmountMinor      *int64           `json:"amount_minor,omitempty"`
+	BillingInterval  *BillingInterval `json:"billing_interval,omitempty"`
+	UnitAmountMicros *int64           `json:"unit_amount_micros,omitempty"`
+	UnitSize         *int64           `json:"unit_size,omitempty"`
+	Dimensions       json.RawMessage  `json:"dimensions,omitempty"`
+	EffectiveFrom    time.Time        `json:"effective_from"`
+	EffectiveUntil   *time.Time       `json:"effective_until,omitempty"`
 }
 
 func newPriceResponse(price Price) priceResponse {
 	return priceResponse{
-		ID:              price.ID.String(),
-		PlanID:          price.PlanID.String(),
-		Currency:        price.Currency,
-		AmountMinor:     price.AmountMinor,
-		BillingInterval: price.BillingInterval,
-		EffectiveFrom:   price.EffectiveFrom,
-		EffectiveUntil:  price.EffectiveUntil,
+		ID:               price.ID.String(),
+		PlanID:           price.PlanID.String(),
+		MeterID:          price.MeterID,
+		PricingType:      price.PricingType,
+		Currency:         price.Currency,
+		AmountMinor:      price.AmountMinor,
+		BillingInterval:  price.BillingInterval,
+		UnitAmountMicros: price.UnitAmountMicros,
+		UnitSize:         price.UnitSize,
+		Dimensions:       price.Dimensions,
+		EffectiveFrom:    price.EffectiveFrom,
+		EffectiveUntil:   price.EffectiveUntil,
 	}
 }
 

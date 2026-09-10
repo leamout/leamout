@@ -18,9 +18,7 @@ type Repository struct {
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{
-		queries: sqlc.New(db),
-	}
+	return &Repository{queries: sqlc.New(db)}
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Order, error) {
@@ -31,12 +29,11 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 		OrganizationID: organizationID,
 		WalletID:       input.WalletID,
 		PriceID:        input.PriceID,
-		InvoiceID:      input.InvoiceID,
 		OrderType:      string(input.Type),
 		Provider:       string(input.Provider),
 		PaymentMethod:  string(input.PaymentMethod),
 		Reference:      input.Reference,
-		Amount:         input.AmountMinor,
+		AmountMinor:    input.AmountMinor,
 		Currency:       input.Currency,
 		ExpiresAt:      pgconv.NullableTimestamptz(&input.ExpiresAt),
 		Metadata:       input.Metadata,
@@ -118,12 +115,11 @@ func orderFromRow(row sqlc.CheckoutOrder) Order {
 		OrganizationID:  row.OrganizationID,
 		WalletID:        row.WalletID,
 		PriceID:         row.PriceID,
-		InvoiceID:       row.InvoiceID,
 		Type:            OrderType(row.OrderType),
 		Provider:        Provider(row.Provider),
 		PaymentMethod:   PaymentMethod(row.PaymentMethod),
 		Reference:       row.Reference,
-		AmountMinor:     row.Amount,
+		AmountMinor:     row.AmountMinor,
 		Currency:        row.Currency,
 		Status:          Status(row.Status),
 		NextAction:      NextAction(row.NextAction),

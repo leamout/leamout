@@ -68,7 +68,7 @@ SELECT
     co.wallet_id,
     co.provider,
     co.reference,
-    co.amount,
+    co.amount_minor,
     co.currency,
     co.status AS checkout_status,
     p.id AS payment_id,
@@ -87,7 +87,7 @@ type LockWalletTopupByReferenceRow struct {
 	WalletID          *uuid.UUID `db:"wallet_id" json:"wallet_id"`
 	Provider          string     `db:"provider" json:"provider"`
 	Reference         string     `db:"reference" json:"reference"`
-	Amount            int64      `db:"amount" json:"amount"`
+	AmountMinor       int64      `db:"amount_minor" json:"amount_minor"`
 	Currency          string     `db:"currency" json:"currency"`
 	CheckoutStatus    string     `db:"checkout_status" json:"checkout_status"`
 	PaymentID         uuid.UUID  `db:"payment_id" json:"payment_id"`
@@ -104,7 +104,7 @@ func (q *Queries) LockWalletTopupByReference(ctx context.Context, reference stri
 		&i.WalletID,
 		&i.Provider,
 		&i.Reference,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.CheckoutStatus,
 		&i.PaymentID,

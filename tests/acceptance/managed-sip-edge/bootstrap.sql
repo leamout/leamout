@@ -10,8 +10,10 @@ INSERT INTO products (id, code, name) VALUES
 ('00000000-0000-0000-0000-000000004010', 'managed-edge-test', 'Managed Edge Test');
 INSERT INTO plans (id, product_id, code, name) VALUES
 ('00000000-0000-0000-0000-000000004011', '00000000-0000-0000-0000-000000004010', 'managed-edge-test', 'Managed Edge Test');
-INSERT INTO subscriptions (id, organization_id, plan_id, status) VALUES
-('00000000-0000-0000-0000-000000004012', '00000000-0000-0000-0000-000000004001', '00000000-0000-0000-0000-000000004011', 'active');
+INSERT INTO prices (id, plan_id, pricing_type, currency, amount_minor, billing_interval) VALUES
+('00000000-0000-0000-0000-000000004013', '00000000-0000-0000-0000-000000004011', 'recurring', 'USD', 0, 'month');
+INSERT INTO subscriptions (id, organization_id, plan_id, price_id, status) VALUES
+('00000000-0000-0000-0000-000000004012', '00000000-0000-0000-0000-000000004001', '00000000-0000-0000-0000-000000004011', '00000000-0000-0000-0000-000000004013', 'active');
 INSERT INTO entitlements (plan_id, entitlement_key, kind, enabled) VALUES
 ('00000000-0000-0000-0000-000000004011', 'voice.managed.enabled', 'feature', true);
 INSERT INTO entitlements (plan_id, entitlement_key, kind, limit_value) VALUES

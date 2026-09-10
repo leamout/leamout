@@ -61,21 +61,6 @@ func validateTransition(from, to Status) error {
 	return ErrInvalidTransition
 }
 
-func normalizeProvider(reference ProviderReference) (ProviderReference, error) {
-	provider := strings.ToLower(strings.TrimSpace(reference.Provider))
-	if provider == "" {
-		return ProviderReference{}, ErrProviderRequired
-	}
-	if strings.IndexFunc(provider, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0 {
-		return ProviderReference{}, ErrInvalidProvider
-	}
-	providerID := strings.TrimSpace(reference.SubscriptionID)
-	if providerID == "" {
-		return ProviderReference{}, ErrProviderIDRequired
-	}
-	return ProviderReference{Provider: provider, SubscriptionID: providerID}, nil
-}
-
 func validatePeriod(startsAt time.Time, renewsAt, endsAt *time.Time) error {
 	if startsAt.IsZero() {
 		return ErrInvalidPeriod
@@ -118,13 +103,6 @@ func normalizeCreate(input CreateInput, now time.Time) (CreateInput, error) {
 	}
 	if err := validatePeriod(*input.StartsAt, input.RenewsAt, input.EndsAt); err != nil {
 		return CreateInput{}, err
-	}
-	if input.Provider != nil {
-		reference, err := normalizeProvider(*input.Provider)
-		if err != nil {
-			return CreateInput{}, err
-		}
-		input.Provider = &reference
 	}
 	return input, nil
 }

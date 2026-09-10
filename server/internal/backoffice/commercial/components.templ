@@ -4,7 +4,7 @@ import "github.com/leamout/leamout/internal/backoffice/components"
 
 templ AccountTable(accounts []Account) {
 	@components.Table(
-		[]string{"Organization", "Plan", "Subscription", "Billing Provider", "Renews"},
+		[]string{"Organization", "Plan", "Subscription", "Billing Model", "Renews"},
 		accountRows(accounts),
 	)
 }
@@ -16,7 +16,7 @@ func accountRows(accounts []Account) [][]string {
 			account.Organization,
 			account.Plan,
 			account.SubscriptionStatus,
-			account.BillingProvider,
+			account.BillingModel,
 			account.RenewsAt,
 		})
 	}

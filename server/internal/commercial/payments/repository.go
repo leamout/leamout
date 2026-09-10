@@ -32,7 +32,7 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provi
 	status := string(input.Status)
 	row, err := r.queries.CreatePayment(ctx, sqlc.CreatePaymentParams{
 		ProviderPaymentID: input.ProviderID,
-		Amount:            input.AmountMinor,
+		AmountMinor:       input.AmountMinor,
 		Currency:          input.Currency,
 		Status:            &status,
 		Metadata:          input.Metadata,
@@ -99,7 +99,7 @@ func paymentFromRow(row sqlc.Payment) Payment {
 		Provider:        row.Provider,
 		ProviderID:      row.ProviderPaymentID,
 		Status:          Status(row.Status),
-		AmountMinor:     row.Amount,
+		AmountMinor:     row.AmountMinor,
 		Currency:        row.Currency,
 		PaidAt:          pgconv.TimestamptzToTimePtr(row.PaidAt),
 		Metadata:        row.Metadata,

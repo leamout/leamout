@@ -10,7 +10,7 @@ var checkoutReferencePattern = regexp.MustCompile(`^[A-Za-z0-9.=-]+$`)
 
 func validateCreate(input CreateInput, now time.Time) error {
 	validTarget := input.Type == OrderSubscription && input.PriceID != nil && input.WalletID == nil ||
-		input.Type == OrderWalletTopup && input.WalletID != nil && input.PriceID == nil && input.InvoiceID == nil
+		input.Type == OrderWalletTopup && input.WalletID != nil && input.PriceID == nil
 	validMethod := input.Provider == ProviderStripe && input.PaymentMethod == MethodCard ||
 		input.Provider == ProviderPaystack && input.PaymentMethod == MethodMobileMoney
 	if !validTarget || !validMethod || input.AmountMinor <= 0 ||
