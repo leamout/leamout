@@ -18,13 +18,17 @@ import (
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-const DefaultBaseURL = "https://api.stripe.com/v1"
+const (
+	DefaultBaseURL    = "https://api.stripe.com/v1"
+	DefaultAPIVersion = "2026-08-26.dahlia"
+)
 
 type Config struct {
 	BaseURL          string
 	SecretKey        string
 	WebhookSecret    string
 	WebhookTolerance time.Duration
+	APIVersion       string
 	HTTPClient       *http.Client
 	Now              func() time.Time
 }
@@ -34,6 +38,7 @@ type Client struct {
 	secretKey        string
 	webhookSecret    string
 	webhookTolerance time.Duration
+	apiVersion       string
 	httpClient       *http.Client
 	now              func() time.Time
 }
@@ -68,17 +73,19 @@ func NewClient(config Config) (*Client, error) {
 	}
 	return &Client{
 		baseURL: parsed, secretKey: secretKey, webhookSecret: strings.TrimSpace(config.WebhookSecret),
-		webhookTolerance: tolerance, httpClient: httpClient, now: now,
+		webhookTolerance: tolerance, apiVersion: firstNonEmpty(config.APIVersion, DefaultAPIVersion),
+		httpClient: httpClient, now: now,
 	}, nil
 }
 
-type paymentIntent struct {
-	ID           string            `json:"id"`
-	ClientSecret string            `json:"client_secret"`
-	Amount       int64             `json:"amount"`
-	Currency     string            `json:"currency"`
-	Status       string            `json:"status"`
-	Metadata     map[string]string `json:"metadata"`
+type checkoutSession struct {
+	ID            string            `json:"id"`
+	ClientSecret  string            `json:"client_secret"`
+	AmountTotal   int64             `json:"amount_total"`
+	Currency      string            `json:"currency"`
+	PaymentStatus string            `json:"payment_status"`
+	Status        string            `json:"status"`
+	Metadata      map[string]string `json:"metadata"`
 }
 
 func (c *Client) CreateCheckout(ctx context.Context, request paymentprovider.CheckoutRequest) (paymentprovider.CheckoutSession, error) {
@@ -87,37 +94,41 @@ func (c *Client) CreateCheckout(ctx context.Context, request paymentprovider.Che
 		return paymentprovider.CheckoutSession{}, fmt.Errorf("stripe: %w", err)
 	}
 	values := url.Values{
-		"amount":                      {strconv.FormatInt(normalized.AmountMinor, 10)},
-		"currency":                    {strings.ToLower(normalized.Currency)},
-		"receipt_email":               {normalized.Email},
-		"payment_method_types[]":      {"card"},
-		"metadata[leamout_reference]": {normalized.Reference},
+		"mode":                                   {"payment"},
+		"ui_mode":                                {"elements"},
+		"customer_email":                         {normalized.Email},
+		"payment_method_types[]":                 {"card"},
+		"line_items[0][price_data][currency]":    {strings.ToLower(normalized.Currency)},
+		"line_items[0][price_data][unit_amount]": {strconv.FormatInt(normalized.AmountMinor, 10)},
+		"line_items[0][price_data][product_data][name]": {"Wallet top-up"},
+		"line_items[0][quantity]":                       {"1"},
+		"metadata[leamout_reference]":                   {normalized.Reference},
 	}
 	for key, value := range normalized.Metadata {
 		if key = strings.TrimSpace(key); key != "" && key != "leamout_reference" {
 			values.Set("metadata["+key+"]", value)
 		}
 	}
-	var result paymentIntent
-	if err := c.do(ctx, http.MethodPost, "/payment_intents", values, normalized.Reference, &result); err != nil {
+	var result checkoutSession
+	if err := c.do(ctx, http.MethodPost, "/checkout/sessions", values, normalized.Reference, &result); err != nil {
 		return paymentprovider.CheckoutSession{}, err
 	}
 	if result.ID == "" || result.ClientSecret == "" {
-		return paymentprovider.CheckoutSession{}, fmt.Errorf("stripe: invalid PaymentIntent response")
+		return paymentprovider.CheckoutSession{}, fmt.Errorf("stripe: invalid Checkout Session response")
 	}
 	return paymentprovider.CheckoutSession{
 		Provider: "stripe", ProviderID: result.ID, Reference: normalized.Reference,
-		ClientSecret: result.ClientSecret, Status: normalizeStatus(result.Status),
+		ClientSecret: result.ClientSecret, Status: normalizeStatus(result),
 	}, nil
 }
 
 func (c *Client) GetPayment(ctx context.Context, providerID string) (paymentprovider.Payment, error) {
 	providerID = strings.TrimSpace(providerID)
 	if providerID == "" {
-		return paymentprovider.Payment{}, fmt.Errorf("stripe: PaymentIntent ID is required")
+		return paymentprovider.Payment{}, fmt.Errorf("stripe: Checkout Session ID is required")
 	}
-	var result paymentIntent
-	if err := c.do(ctx, http.MethodGet, "/payment_intents/"+url.PathEscape(providerID), nil, "", &result); err != nil {
+	var result checkoutSession
+	if err := c.do(ctx, http.MethodGet, "/checkout/sessions/"+url.PathEscape(providerID), nil, "", &result); err != nil {
 		return paymentprovider.Payment{}, err
 	}
 	return normalizePayment(result), nil
@@ -152,7 +163,7 @@ func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovi
 		ID   string `json:"id"`
 		Type string `json:"type"`
 		Data struct {
-			Object paymentIntent `json:"object"`
+			Object checkoutSession `json:"object"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(payload, &envelope); err != nil {
@@ -195,23 +206,22 @@ func parseSignatureHeader(value string) (int64, [][]byte, error) {
 	return timestamp, signatures, nil
 }
 
-func normalizePayment(item paymentIntent) paymentprovider.Payment {
+func normalizePayment(item checkoutSession) paymentprovider.Payment {
 	return paymentprovider.Payment{
 		Provider: "stripe", ProviderID: item.ID, Reference: item.Metadata["leamout_reference"],
-		AmountMinor: item.Amount, Currency: strings.ToUpper(item.Currency), Status: normalizeStatus(item.Status),
+		AmountMinor: item.AmountTotal, Currency: strings.ToUpper(item.Currency), Status: normalizeStatus(item),
 	}
 }
 
-func normalizeStatus(status string) paymentprovider.Status {
-	switch status {
-	case "succeeded":
+func normalizeStatus(session checkoutSession) paymentprovider.Status {
+	if session.PaymentStatus == "paid" {
 		return paymentprovider.StatusSucceeded
-	case "processing":
-		return paymentprovider.StatusProcessing
-	case "canceled":
+	}
+	switch session.Status {
+	case "expired":
 		return paymentprovider.StatusCancelled
-	case "requires_payment_method", "requires_confirmation", "requires_action", "requires_capture":
-		return paymentprovider.StatusPending
+	case "complete":
+		return paymentprovider.StatusProcessing
 	default:
 		return paymentprovider.StatusPending
 	}
@@ -228,6 +238,7 @@ func (c *Client) do(ctx context.Context, method, path string, values url.Values,
 		return fmt.Errorf("stripe: create request: %w", err)
 	}
 	req.SetBasicAuth(c.secretKey, "")
+	req.Header.Set("Stripe-Version", c.apiVersion)
 	req.Header.Set("Accept", "application/json")
 	if values != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -251,4 +262,13 @@ func (c *Client) do(ctx context.Context, method, path string, values url.Values,
 		return fmt.Errorf("stripe: decode response: %w", err)
 	}
 	return nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
 }

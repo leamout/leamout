@@ -12,6 +12,50 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimCheckoutOrderRefresh = `-- name: ClaimCheckoutOrderRefresh :one
+UPDATE checkout_orders
+SET updated_at = NOW()
+WHERE organization_id = $1
+  AND id = $2
+  AND provider = 'paystack'
+  AND status = 'processing'
+  AND updated_at <= $3
+RETURNING id, organization_id, wallet_id, price_id, invoice_id, order_type, provider, payment_method, reference, amount, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+`
+
+type ClaimCheckoutOrderRefreshParams struct {
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+	RefreshBefore  pgtype.Timestamptz `db:"refresh_before" json:"refresh_before"`
+}
+
+func (q *Queries) ClaimCheckoutOrderRefresh(ctx context.Context, arg ClaimCheckoutOrderRefreshParams) (CheckoutOrder, error) {
+	row := q.db.QueryRow(ctx, claimCheckoutOrderRefresh, arg.OrganizationID, arg.ID, arg.RefreshBefore)
+	var i CheckoutOrder
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.WalletID,
+		&i.PriceID,
+		&i.InvoiceID,
+		&i.OrderType,
+		&i.Provider,
+		&i.PaymentMethod,
+		&i.Reference,
+		&i.Amount,
+		&i.Currency,
+		&i.Status,
+		&i.NextAction,
+		&i.ProviderMessage,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const compareAndSetCheckoutOrderState = `-- name: CompareAndSetCheckoutOrderState :one
 UPDATE checkout_orders
 SET status = $1,

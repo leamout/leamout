@@ -59,3 +59,13 @@ SET status = 'expired', next_action = 'none', completed_at = NOW(), updated_at =
 WHERE status IN ('pending', 'processing')
   AND expires_at <= NOW()
 RETURNING *;
+
+-- name: ClaimCheckoutOrderRefresh :one
+UPDATE checkout_orders
+SET updated_at = NOW()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND id = sqlc.arg(id)
+  AND provider = 'paystack'
+  AND status = 'processing'
+  AND updated_at <= sqlc.arg(refresh_before)
+RETURNING *;

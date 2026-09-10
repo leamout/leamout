@@ -51,12 +51,11 @@ func (r *TopupRepository) Reconcile(ctx context.Context, event paymentprovider.E
 	}
 	if topup.WalletID == nil || topup.Provider != event.Provider ||
 		topup.Amount != event.Payment.AmountMinor || topup.Currency != event.Payment.Currency ||
-		event.Payment.ProviderID == "" ||
 		(topup.ProviderPaymentID != nil && *topup.ProviderPaymentID != event.Payment.ProviderID) {
 		return TopupSettlement{}, ErrPaymentMismatch
 	}
 
-	if topup.ProviderPaymentID == nil {
+	if topup.ProviderPaymentID == nil && event.Payment.ProviderID != "" {
 		if _, err = q.SetPaymentProviderID(ctx, sqlc.SetPaymentProviderIDParams{
 			ProviderPaymentID: &event.Payment.ProviderID,
 			Status:            "processing",

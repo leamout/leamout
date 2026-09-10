@@ -2,6 +2,8 @@ package wallets
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -19,6 +21,7 @@ type walletStore interface {
 type checkoutStore interface {
 	Create(context.Context, uuid.UUID, checkout.CreateInput) (checkout.Order, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Order, error)
+	ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (checkout.Order, error)
 	Transition(context.Context, uuid.UUID, uuid.UUID, checkout.Transition) (checkout.Order, error)
 }
 
@@ -103,11 +106,16 @@ func (s *TopupService) Create(ctx context.Context, organizationID, walletID uuid
 		s.failPendingCheckout(ctx, organizationID, order, payment)
 		return TopupCheckout{}, err
 	}
-	if session.Provider != providerName || session.ProviderID == "" || session.Reference != reference {
+	if session.Provider != providerName || session.Reference != reference ||
+		(input.Provider == checkout.ProviderStripe && session.ProviderID == "") {
 		s.failPendingCheckout(ctx, organizationID, order, payment)
 		return TopupCheckout{}, ErrPaymentMismatch
 	}
-	payment, err = s.payments.SetProviderID(ctx, organizationID, payment.ID, session.ProviderID, commercialpayments.StatusProcessing)
+	if session.ProviderID == "" {
+		payment, err = s.payments.UpdateStatus(ctx, organizationID, payment.ID, commercialpayments.StatusProcessing, nil)
+	} else {
+		payment, err = s.payments.SetProviderID(ctx, organizationID, payment.ID, session.ProviderID, commercialpayments.StatusProcessing)
+	}
 	if err != nil {
 		return TopupCheckout{}, err
 	}
@@ -151,7 +159,47 @@ func (s *TopupService) Get(ctx context.Context, organizationID, orderID uuid.UUI
 	if err != nil {
 		return TopupDetails{}, err
 	}
+	if order.Provider == checkout.ProviderPaystack && order.Status == checkout.StatusProcessing {
+		claimed, claimErr := s.checkouts.ClaimRefresh(ctx, organizationID, orderID, s.now().UTC().Add(-10*time.Second))
+		if claimErr == nil {
+			if refreshed, ok := s.refreshPaystack(ctx, claimed); ok {
+				if _, err = s.settlements.Reconcile(ctx, refreshed); err != nil {
+					return TopupDetails{}, err
+				}
+				order, err = s.checkouts.Get(ctx, organizationID, orderID)
+				if err != nil {
+					return TopupDetails{}, err
+				}
+				payment, err = s.payments.GetByCheckoutOrder(ctx, organizationID, orderID)
+				if err != nil {
+					return TopupDetails{}, err
+				}
+			}
+		} else if !errors.Is(claimErr, checkout.ErrOrderNotFound) {
+			return TopupDetails{}, claimErr
+		}
+	}
 	return TopupDetails{Order: order, Payment: payment}, nil
+}
+
+func (s *TopupService) refreshPaystack(ctx context.Context, order checkout.Order) (paymentprovider.Event, bool) {
+	provider, ok := s.providers["paystack"]
+	if !ok {
+		return paymentprovider.Event{}, false
+	}
+	payment, err := provider.GetPayment(ctx, order.Reference)
+	if err != nil || (payment.Status != paymentprovider.StatusSucceeded && payment.Status != paymentprovider.StatusFailed) {
+		return paymentprovider.Event{}, false
+	}
+	raw, _ := json.Marshal(map[string]string{"source": "charge_lookup", "reference": order.Reference, "status": string(payment.Status)})
+	eventType := "charge.failed"
+	if payment.Status == paymentprovider.StatusSucceeded {
+		eventType = "charge.success"
+	}
+	return paymentprovider.Event{
+		Provider: "paystack", ProviderEventID: "lookup:" + order.Reference + ":" + string(payment.Status), Type: eventType,
+		Payment: payment, Raw: raw,
+	}, true
 }
 
 func (s *TopupService) Continue(ctx context.Context, organizationID, orderID uuid.UUID, input TopupContinueInput) (TopupCheckout, error) {
@@ -200,5 +248,19 @@ func (s *TopupService) Webhook(ctx context.Context, providerName string, payload
 	if event.Provider != providerName {
 		return TopupSettlement{}, ErrPaymentMismatch
 	}
+	if !isTopupPaymentEvent(event.Provider, event.Type) {
+		return TopupSettlement{}, nil
+	}
 	return s.settlements.Reconcile(ctx, event)
+}
+
+func isTopupPaymentEvent(provider, eventType string) bool {
+	switch provider {
+	case "paystack":
+		return eventType == "charge.success" || eventType == "charge.failed"
+	case "stripe":
+		return eventType == "checkout.session.completed" || eventType == "checkout.session.expired"
+	default:
+		return false
+	}
 }

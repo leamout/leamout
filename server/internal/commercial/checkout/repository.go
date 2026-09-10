@@ -88,6 +88,18 @@ func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUI
 	return orderFromRow(row), nil
 }
 
+func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.UUID, refreshBefore time.Time) (Order, error) {
+	row, err := r.queries.ClaimCheckoutOrderRefresh(ctx, sqlc.ClaimCheckoutOrderRefreshParams{
+		OrganizationID: organizationID,
+		ID:             id,
+		RefreshBefore:  pgconv.NullableTimestamptz(&refreshBefore),
+	})
+	if err != nil {
+		return Order{}, mapReadError(err)
+	}
+	return orderFromRow(row), nil
+}
+
 func (r *Repository) Expire(ctx context.Context) ([]Order, error) {
 	rows, err := r.queries.ExpireCheckoutOrders(ctx)
 	if err != nil {

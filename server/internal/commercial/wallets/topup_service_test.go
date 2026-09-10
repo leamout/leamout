@@ -40,6 +40,14 @@ func (s *checkoutStub) Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Orde
 	return s.order, nil
 }
 
+func (s *checkoutStub) ClaimRefresh(_ context.Context, _, _ uuid.UUID, refreshBefore time.Time) (checkout.Order, error) {
+	if s.order.UpdatedAt.After(refreshBefore) {
+		return checkout.Order{}, checkout.ErrOrderNotFound
+	}
+	s.order.UpdatedAt = refreshBefore.Add(10 * time.Second)
+	return s.order, nil
+}
+
 func (s *checkoutStub) Transition(_ context.Context, _ uuid.UUID, _ uuid.UUID, transition checkout.Transition) (checkout.Order, error) {
 	s.transitions = append(s.transitions, transition)
 	s.order.Status = transition.Status
@@ -85,6 +93,7 @@ func (s *settlementStub) Reconcile(_ context.Context, event paymentprovider.Even
 type providerStub struct {
 	request paymentprovider.CheckoutRequest
 	event   paymentprovider.Event
+	payment paymentprovider.Payment
 	session *paymentprovider.CheckoutSession
 }
 
@@ -134,7 +143,7 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 }
 
 func (s *providerStub) GetPayment(context.Context, string) (paymentprovider.Payment, error) {
-	return paymentprovider.Payment{}, nil
+	return s.payment, nil
 }
 
 func (s *providerStub) ParseWebhook([]byte, http.Header) (paymentprovider.Event, error) {
@@ -192,9 +201,42 @@ func TestCreateRejectsPaystackForNonGHSWallet(t *testing.T) {
 	}
 }
 
+func TestCreateAcceptsPaystackChargeWithoutTransactionID(t *testing.T) {
+	organizationID := uuid.New()
+	walletID := uuid.New()
+	payments := &paymentStub{}
+	checkouts := &checkoutStub{}
+	provider := &referenceProviderStub{provider: "paystack"}
+	service := NewTopupService(
+		walletStub{wallet: Wallet{ID: walletID, OrganizationID: organizationID, Currency: "GHS", Status: StatusActive}},
+		checkouts, payments, &settlementStub{}, map[string]paymentprovider.Provider{"paystack": provider},
+	)
+
+	_, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
+		AmountMinor: 2500, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
+		MobileMoney: &paymentprovider.MobileMoney{Phone: "0240000000", Provider: "mtn"},
+	})
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if payments.payment.ProviderID != nil || payments.payment.Status != commercialpayments.StatusProcessing {
+		t.Fatalf("payment = %+v", payments.payment)
+	}
+}
+
+type referenceProviderStub struct {
+	providerStub
+	provider string
+}
+
+func (s *referenceProviderStub) CreateCheckout(_ context.Context, request paymentprovider.CheckoutRequest) (paymentprovider.CheckoutSession, error) {
+	s.request = request
+	return paymentprovider.CheckoutSession{Provider: s.provider, Reference: request.Reference, Status: paymentprovider.StatusProcessing}, nil
+}
+
 func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 	event := paymentprovider.Event{
-		Provider: "stripe", ProviderEventID: "evt_123", Type: "payment_intent.succeeded",
+		Provider: "stripe", ProviderEventID: "evt_123", Type: "checkout.session.completed",
 		Payment: paymentprovider.Payment{Reference: "topup.123", Status: paymentprovider.StatusSucceeded},
 		Raw:     []byte(`{"id":"evt_123"}`),
 	}
@@ -208,5 +250,46 @@ func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 	}
 	if !result.Applied || settlements.event.ProviderEventID != "evt_123" {
 		t.Fatalf("verified event was not reconciled: %+v", settlements.event)
+	}
+}
+
+func TestWebhookIgnoresAuthenticatedNonPaymentEvent(t *testing.T) {
+	provider := &providerStub{event: paymentprovider.Event{
+		Provider: "paystack", ProviderEventID: "refund:1", Type: "refund.processed",
+		Payment: paymentprovider.Payment{Status: paymentprovider.StatusSucceeded}, Raw: []byte(`{"event":"refund.processed"}`),
+	}}
+	settlements := &settlementStub{}
+	service := NewTopupService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"paystack": provider})
+
+	result, err := service.Webhook(context.Background(), "paystack", []byte(`{}`), http.Header{})
+	if err != nil || result.Applied || settlements.event.ProviderEventID != "" {
+		t.Fatalf("non-payment event was reconciled: result=%+v event=%+v err=%v", result, settlements.event, err)
+	}
+}
+
+func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
+	now := time.Date(2026, 9, 10, 1, 0, 0, 0, time.UTC)
+	organizationID := uuid.New()
+	walletID := uuid.New()
+	orderID := uuid.New()
+	checkouts := &checkoutStub{order: checkout.Order{
+		ID: orderID, OrganizationID: organizationID, WalletID: &walletID,
+		Provider: checkout.ProviderPaystack, Reference: "topup.123", AmountMinor: 2500,
+		Currency: "GHS", Status: checkout.StatusProcessing, UpdatedAt: now.Add(-11 * time.Second),
+	}}
+	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutOrderID: orderID}}
+	provider := &providerStub{payment: paymentprovider.Payment{
+		Provider: "paystack", ProviderID: "42", Reference: "topup.123",
+		AmountMinor: 2500, Currency: "GHS", Status: paymentprovider.StatusSucceeded,
+	}}
+	settlements := &settlementStub{}
+	service := NewTopupService(nil, checkouts, payments, settlements, map[string]paymentprovider.Provider{"paystack": provider})
+	service.now = func() time.Time { return now }
+
+	if _, err := service.Get(context.Background(), organizationID, orderID); err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if settlements.event.Type != "charge.success" || settlements.event.Payment.ProviderID != "42" {
+		t.Fatalf("charge lookup was not reconciled: %+v", settlements.event)
 	}
 }
