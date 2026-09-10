@@ -59,7 +59,7 @@ func (r *Repository) Get(ctx context.Context, userID uuid.UUID) (Detail, error) 
 			OrganizationID:     organization.OrganizationID,
 			OrganizationName:   organization.Name,
 			OrganizationStatus: organization.OrganizationStatus,
-			DetailAvailable:    organization.DetailAvailable,
+			DetailAvailable:    organization.OrganizationStatus != "deleted",
 			Role:               organization.Role,
 			MembershipStatus:   organization.MembershipStatus,
 			JoinedAt:            organization.JoinedAt,
