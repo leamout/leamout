@@ -1,6 +1,9 @@
 package organizations
 
-import "github.com/leamout/leamout/internal/backoffice/components"
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
 
 templ Page(organizations []Organization) {
 	@components.Layout("Organizations", "organizations", PageContent(organizations))
@@ -17,4 +20,73 @@ templ PageContent(organizations []Organization) {
 	} else {
 		@OrganizationTable(organizations)
 	}
+}
+
+templ DetailPage(organization Detail) {
+	@components.Layout(organization.Name, "organizations", DetailContent(organization))
+}
+
+templ DetailContent(organization Detail) {
+	@components.Breadcrumbs(components.BreadcrumbsProps{
+		{Label: "Organizations", Attrs: templ.Attributes{"href": "/organizations/"}},
+		{Label: organization.Name},
+	})
+	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+		<div>
+			<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Organization</p>
+			<h1 class="mt-2 text-3xl font-bold">{ organization.Name }</h1>
+			<p class="mt-2 font-mono text-xs text-base-content/60">{ organization.ID }</p>
+		</div>
+		<div class="badge badge-outline badge-lg">{ organization.Status }</div>
+	</div>
+
+	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
+		<div class="stat">
+			<div class="stat-title">Members</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(organization.Members) }</div>
+			<div class="stat-desc">Active memberships</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Plan</div>
+			<div class="stat-value text-3xl">{ organization.Plan }</div>
+			<div class="stat-desc">Subscription: { organization.SubscriptionStatus }</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Billing provider</div>
+			<div class="stat-value text-3xl">{ organization.BillingProvider }</div>
+			<div class="stat-desc">Current or latest subscription</div>
+		</div>
+	</div>
+
+	<div class="mt-6 grid gap-6 xl:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Organization details</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("Status", organization.Status)
+				@DetailField("Created", organization.CreatedAt)
+				@DetailField("Updated", organization.UpdatedAt)
+				@DetailField("Organization ID", organization.ID)
+			</dl>
+		</section>
+
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Commercial state</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("Plan", organization.Plan)
+				@DetailField("Subscription status", organization.SubscriptionStatus)
+				@DetailField("Billing provider", organization.BillingProvider)
+				@DetailField("Provider subscription ID", organization.ProviderSubscriptionID)
+				@DetailField("Renews", organization.RenewsAt)
+				@DetailField("Ends", organization.EndsAt)
+			</dl>
+		</section>
+	</div>
+
+	<section class="mt-6">
+		<div class="mb-4">
+			<h2 class="text-xl font-semibold">Members</h2>
+			<p class="mt-1 text-sm text-base-content/60">Organization memberships and underlying user account state.</p>
+		</div>
+		@MemberTable(organization.MembersList)
+	</section>
 }
