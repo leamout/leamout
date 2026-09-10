@@ -39,7 +39,7 @@ func (r *Repository) CreateUsageEvent(ctx context.Context, organizationID uuid.U
 		SourceID:       input.SourceID,
 		IdempotencyKey: input.IdempotencyKey,
 		Dimensions:     input.Dimensions,
-		OccurredAt:     pgconv.Timestamptz(input.OccurredAt),
+		OccurredAt:     pgconv.NullableTimestamptz(&input.OccurredAt),
 		MeterID:        input.MeterID,
 		OrganizationID: organizationID,
 	})
