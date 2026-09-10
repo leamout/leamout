@@ -11,39 +11,37 @@ import (
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
-type Middleware func(http.Handler) http.Handler
-
-type RouteMiddleware struct {
-	Session            Middleware
-	OrganizationAccess func(resource string) Middleware
-	Idempotency        Middleware
-}
-
-// RegisterRoutes exposes Commercial HTTP surfaces while keeping authentication
-// and tenant authorization policy owned by the runtime.
-func RegisterRoutes(router chi.Router, module *Module, middleware RouteMiddleware) {
-	catalog.RegisterRoutes(router, module.Catalog.Handler, middleware.Session)
+// RegisterRoutes exposes Commercial HTTP routes. Authentication, organization
+// authorization, and idempotency remain runtime middleware concerns.
+func RegisterRoutes(
+	router chi.Router,
+	module *Module,
+	requireSession func(http.Handler) http.Handler,
+	organizationAccess func(string) func(http.Handler) http.Handler,
+	idempotency func(http.Handler) http.Handler,
+) {
+	catalog.RegisterRoutes(router, module.Catalog.Handler, requireSession)
 	licensing.RegisterRoutes(
 		router,
 		module.Access.Licensing.Handler,
-		middleware.OrganizationAccess("licensing"),
-		middleware.Idempotency,
+		organizationAccess("licensing"),
+		idempotency,
 	)
 	commercialstate.RegisterRoutes(
 		router,
 		module.State.Handler,
-		middleware.OrganizationAccess("commercial-state"),
+		organizationAccess("commercial-state"),
 	)
 	subscriptions.RegisterRoutes(
 		router,
 		module.Access.Subscriptions.Handler,
-		middleware.OrganizationAccess("subscriptions"),
-		middleware.Idempotency,
+		organizationAccess("subscriptions"),
+		idempotency,
 	)
 	wallets.RegisterTopupRoutes(
 		router,
 		module.Money.TopupHandler,
-		middleware.OrganizationAccess("billing"),
-		middleware.Idempotency,
+		organizationAccess("billing"),
+		idempotency,
 	)
 }
