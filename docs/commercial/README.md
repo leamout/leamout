@@ -121,7 +121,12 @@ wallet_reservations
 
 Managed telecom wholesale cost is a separate concern: provider CDRs reconcile into `wholesale_charges`; they are not usage pricing rules.
 
-The schema establishes financial invariants; service orchestration and public checkout routes are introduced as separately testable vertical slices.
+The schema establishes financial invariants. The `commercial/wallets` and
+`commercial/checkout` repositories implement the four durable prepaid records:
+wallets, immutable ledger entries, funds reservations, and checkout orders.
+Reservation admission serializes on the wallet row, and capture closes the
+reservation and posts its ledger debit in one transaction. Public checkout
+routes and provider-side effects remain separate vertical slices.
 
 ## Strict module structure
 

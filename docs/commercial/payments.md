@@ -65,6 +65,12 @@ Before Leamout incurs an upstream obligation, it atomically locks the wallet, ve
 
 A successful operation captures no more than the reservation. Failure releases it. Realtime Redis state may accelerate admission and incremental call authorization, but PostgreSQL remains authoritative and Redis cannot mint credit.
 
+The wallet repository acquires a PostgreSQL row lock before reading spendable
+balance and inserting a reservation. Capturing a reservation and appending its
+immutable debit share one database transaction, so neither half can commit
+without the other. Expiration records `expired_at`; an automatic timeout is not
+represented as a manual release.
+
 ## Provider independence
 
 Provider webhooks must never directly grant entitlements, issue licenses, or mutate wallet balances. They authenticate and record provider facts; commercial services apply the matching Leamout transition in an idempotent database transaction.

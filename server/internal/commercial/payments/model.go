@@ -1,6 +1,11 @@
 package payments
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Status describes the reconciliation state of a payment.
 type Status string
@@ -17,13 +22,25 @@ const (
 
 // Payment is provider-independent commercial payment state owned by Leamout.
 type Payment struct {
-	ID              string
-	CheckoutOrderID string
-	OrganizationID  string
+	ID              uuid.UUID
+	CheckoutOrderID uuid.UUID
+	OrganizationID  uuid.UUID
 	Provider        string
-	ProviderID      string
+	ProviderID      *string
 	Status          Status
 	AmountMinor     int64
 	Currency        string
-	OccurredAt      time.Time
+	PaidAt          *time.Time
+	Metadata        json.RawMessage
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
+type CreateInput struct {
+	CheckoutOrderID uuid.UUID
+	ProviderID      *string
+	Status          Status
+	AmountMinor     int64
+	Currency        string
+	Metadata        json.RawMessage
 }

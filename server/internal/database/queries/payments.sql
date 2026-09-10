@@ -60,6 +60,16 @@ WHERE p.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 ORDER BY p.created_at DESC;
 
+-- name: GetPaymentByCheckoutOrder :one
+SELECT p.*
+FROM payments AS p
+JOIN organizations AS o ON o.id = p.organization_id
+WHERE p.organization_id = sqlc.arg(organization_id)
+  AND p.checkout_order_id = sqlc.arg(checkout_order_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+LIMIT 1;
+
 -- name: UpdatePaymentStatus :one
 UPDATE payments AS p
 SET
@@ -73,4 +83,18 @@ WHERE p.organization_id = sqlc.arg(organization_id)
   AND o.id = p.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING *;
+RETURNING p.*;
+
+-- name: SetPaymentProviderID :one
+UPDATE payments AS p
+SET provider_payment_id = sqlc.arg(provider_payment_id),
+    status = sqlc.arg(status),
+    updated_at = NOW()
+FROM organizations AS o
+WHERE p.organization_id = sqlc.arg(organization_id)
+  AND p.id = sqlc.arg(id)
+  AND p.provider_payment_id IS NULL
+  AND o.id = p.organization_id
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING p.*;
