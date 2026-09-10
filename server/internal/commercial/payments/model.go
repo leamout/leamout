@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Status describes the reconciliation state of a payment.
 type Status string
 
 const (
@@ -20,27 +19,32 @@ const (
 	StatusPartiallyRefunded Status = "partially_refunded"
 )
 
-// Payment is provider-independent commercial payment state owned by Leamout.
 type Payment struct {
-	ID              uuid.UUID
+	ID             uuid.UUID
+	CheckoutID     uuid.UUID
+	OrganizationID uuid.UUID
+	Provider       string
+	ProviderID     *string
+	Status         Status
+	AmountMinor    int64
+	Currency       string
+	PaidAt         *time.Time
+	Metadata       json.RawMessage
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+
+	// Deprecated: use CheckoutID.
 	CheckoutOrderID uuid.UUID
-	OrganizationID  uuid.UUID
-	Provider        string
-	ProviderID      *string
-	Status          Status
-	AmountMinor     int64
-	Currency        string
-	PaidAt          *time.Time
-	Metadata        json.RawMessage
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
 }
 
 type CreateInput struct {
+	CheckoutID  uuid.UUID
+	ProviderID  *string
+	Status      Status
+	AmountMinor int64
+	Currency    string
+	Metadata    json.RawMessage
+
+	// Deprecated: use CheckoutID.
 	CheckoutOrderID uuid.UUID
-	ProviderID      *string
-	Status          Status
-	AmountMinor     int64
-	Currency        string
-	Metadata        json.RawMessage
 }

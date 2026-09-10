@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    checkout_order_id UUID NOT NULL,
+    checkout_id UUID NOT NULL,
     organization_id UUID NOT NULL,
     provider TEXT NOT NULL,
     provider_payment_id TEXT,
@@ -12,11 +12,11 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_payments_checkout_order UNIQUE (checkout_order_id),
+    CONSTRAINT uq_payments_checkout UNIQUE (checkout_id),
     CONSTRAINT uq_payments_id_organization UNIQUE (id, organization_id),
     CONSTRAINT fk_payments_checkout_terms
-        FOREIGN KEY (checkout_order_id, organization_id, provider, amount_minor, currency)
-        REFERENCES checkout_orders (id, organization_id, provider, amount_minor, currency)
+        FOREIGN KEY (checkout_id, organization_id, provider, amount_minor, currency)
+        REFERENCES checkouts (id, organization_id, provider, amount_minor, currency)
         ON DELETE RESTRICT,
     CONSTRAINT chk_payments_provider CHECK (provider IN ('stripe', 'paystack')),
     CONSTRAINT chk_payments_provider_payment_id CHECK (
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 COMMENT ON TABLE payments IS
-    'Reconciled payment movements in currency minor units associated with a checkout order.';
+    'Provider-independent payment state associated with a checkout.';
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_payments_provider_payment_id
     ON payments (provider, provider_payment_id)
@@ -50,34 +50,3 @@ CREATE TRIGGER set_payments_updated_at
 BEFORE UPDATE ON payments
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
-
-CREATE TABLE IF NOT EXISTS payment_provider_events (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    payment_id UUID NOT NULL,
-    organization_id UUID NOT NULL,
-    provider TEXT NOT NULL,
-    provider_event_id TEXT NOT NULL,
-    event_type TEXT NOT NULL,
-    payload_sha256 TEXT NOT NULL,
-    payload JSONB NOT NULL,
-    received_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    processed_at TIMESTAMPTZ,
-
-    CONSTRAINT fk_payment_provider_events_payment_organization
-        FOREIGN KEY (payment_id, organization_id)
-        REFERENCES payments (id, organization_id)
-        ON DELETE RESTRICT,
-    CONSTRAINT uq_payment_provider_events_identity UNIQUE (provider, provider_event_id),
-    CONSTRAINT chk_payment_provider_events_provider CHECK (provider IN ('stripe', 'paystack')),
-    CONSTRAINT chk_payment_provider_events_id CHECK (length(btrim(provider_event_id)) > 0),
-    CONSTRAINT chk_payment_provider_events_type CHECK (length(btrim(event_type)) > 0),
-    CONSTRAINT chk_payment_provider_events_hash CHECK (payload_sha256 ~ '^[0-9a-f]{64}$'),
-    CONSTRAINT chk_payment_provider_events_payload CHECK (jsonb_typeof(payload) = 'object')
-);
-
-COMMENT ON TABLE payment_provider_events IS
-    'Authenticated provider events retained once by provider identity so duplicate webhooks cannot repeat commercial effects.';
-
-CREATE INDEX IF NOT EXISTS idx_payment_provider_events_unprocessed
-    ON payment_provider_events (received_at, id)
-    WHERE processed_at IS NULL;

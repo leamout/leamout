@@ -8,15 +8,15 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type OrderType string
+type Type string
 type Provider string
 type PaymentMethod string
 type Status string
 type NextAction string
 
 const (
-	OrderSubscription   OrderType     = "subscription"
-	OrderWalletTopup    OrderType     = "wallet_topup"
+	TypeSubscription    Type          = "subscription"
+	TypeWalletTopup     Type          = "wallet_topup"
 	ProviderStripe      Provider      = "stripe"
 	ProviderPaystack    Provider      = "paystack"
 	MethodCard          PaymentMethod = "card"
@@ -36,18 +36,18 @@ const (
 )
 
 var (
-	ErrOrderNotFound     = apperror.NewNotFound("checkout order not found")
+	ErrCheckoutNotFound  = apperror.NewNotFound("checkout not found")
 	ErrReferenceConflict = apperror.NewConflict("checkout reference already exists")
-	ErrInvalidTransition = apperror.NewConflict("invalid checkout order transition")
-	ErrInvalidOrder      = apperror.NewBadRequest("invalid checkout order")
+	ErrInvalidTransition = apperror.NewConflict("invalid checkout transition")
+	ErrInvalidCheckout   = apperror.NewBadRequest("invalid checkout")
 )
 
-type Order struct {
+type Checkout struct {
 	ID              uuid.UUID
 	OrganizationID  uuid.UUID
 	WalletID        *uuid.UUID
 	PriceID         *uuid.UUID
-	Type            OrderType
+	Type            Type
 	Provider        Provider
 	PaymentMethod   PaymentMethod
 	Reference       string
@@ -66,7 +66,7 @@ type Order struct {
 type CreateInput struct {
 	WalletID      *uuid.UUID
 	PriceID       *uuid.UUID
-	Type          OrderType
+	Type          Type
 	Provider      Provider
 	PaymentMethod PaymentMethod
 	Reference     string
@@ -83,3 +83,16 @@ type Transition struct {
 	ProviderMessage *string
 	CompletedAt     *time.Time
 }
+
+// Deprecated compatibility names for callers that still use the pre-split
+// checkout terminology. New code should use Checkout, TypeSubscription, and
+// TypeWalletTopup.
+type Order = Checkout
+type OrderType = Type
+
+const (
+	OrderSubscription = TypeSubscription
+	OrderWalletTopup  = TypeWalletTopup
+)
+
+var ErrOrderNotFound = ErrCheckoutNotFound
