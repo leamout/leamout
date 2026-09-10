@@ -1,4 +1,4 @@
-package organizations
+package users
 
 import (
 	"net/http"
@@ -9,6 +9,6 @@ import (
 func (h *Handler) Routes() http.Handler {
 	router := chi.NewRouter()
 	router.Get("/", h.index)
-	router.Get("/{organization_id}", h.detail)
+	router.Get("/{user_id}", h.detail)
 	return router
 }

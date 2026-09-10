@@ -3,6 +3,7 @@ package organizations
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -35,4 +36,46 @@ func (r *Repository) List(ctx context.Context) ([]Organization, error) {
 		})
 	}
 	return organizations, nil
+}
+
+func (r *Repository) Get(ctx context.Context, organizationID uuid.UUID) (Detail, error) {
+	row, err := r.queries.GetBackofficeOrganization(ctx, organizationID)
+	if err != nil {
+		return Detail{}, err
+	}
+
+	memberRows, err := r.queries.ListBackofficeOrganizationMembers(ctx, organizationID)
+	if err != nil {
+		return Detail{}, err
+	}
+	members := make([]Member, 0, len(memberRows))
+	for _, member := range memberRows {
+		members = append(members, Member{
+			UserID:           member.UserID,
+			Name:             member.Name,
+			Email:            member.Email,
+			Role:             member.Role,
+			MembershipStatus: member.Status,
+			UserStatus:       member.UserStatus,
+			EmailVerified:    member.EmailVerified,
+			PlatformAdmin:    member.IsPlatformAdmin,
+			JoinedAt:         member.JoinedAt,
+		})
+	}
+
+	return Detail{
+		ID:                     row.ID,
+		Name:                   row.Name,
+		Status:                 row.Status,
+		Members:                row.MemberCount,
+		Plan:                   row.PlanName,
+		SubscriptionStatus:     row.SubscriptionStatus,
+		BillingProvider:        row.BillingProvider,
+		ProviderSubscriptionID: row.ProviderSubscriptionID,
+		RenewsAt:               row.RenewsAt,
+		EndsAt:                 row.EndsAt,
+		CreatedAt:              row.CreatedAt,
+		UpdatedAt:              row.UpdatedAt,
+		MembersList:            members,
+	}, nil
 }

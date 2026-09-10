@@ -106,6 +106,90 @@ func (q *Queries) DeleteOrganization(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const getBackofficeOrganization = `-- name: GetBackofficeOrganization :one
+SELECT
+    o.id::TEXT AS id,
+    o.name,
+    o.status,
+    COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
+    COALESCE(subscription.plan_name, '—') AS plan_name,
+    COALESCE(subscription.status, 'none') AS subscription_status,
+    COALESCE(subscription.billing_provider, '—') AS billing_provider,
+    COALESCE(subscription.provider_subscription_id, '—') AS provider_subscription_id,
+    COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS renews_at,
+    COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS ends_at,
+    to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(o.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM organizations AS o
+LEFT JOIN organization_members AS om ON om.organization_id = o.id
+LEFT JOIN LATERAL (
+    SELECT
+        p.name AS plan_name,
+        s.status,
+        s.billing_provider,
+        s.provider_subscription_id,
+        s.renews_at,
+        s.ends_at
+    FROM subscriptions AS s
+    JOIN plans AS p ON p.id = s.plan_id
+    WHERE s.organization_id = o.id
+    ORDER BY
+        CASE WHEN s.status IN ('active', 'past_due') THEN 0 ELSE 1 END,
+        s.created_at DESC
+    LIMIT 1
+) AS subscription ON TRUE
+WHERE o.id = $1
+  AND o.deleted_at IS NULL
+GROUP BY
+    o.id,
+    o.name,
+    o.status,
+    o.created_at,
+    o.updated_at,
+    subscription.plan_name,
+    subscription.status,
+    subscription.billing_provider,
+    subscription.provider_subscription_id,
+    subscription.renews_at,
+    subscription.ends_at
+LIMIT 1
+`
+
+type GetBackofficeOrganizationRow struct {
+	ID                     string `db:"id" json:"id"`
+	Name                   string `db:"name" json:"name"`
+	Status                 string `db:"status" json:"status"`
+	MemberCount            int64  `db:"member_count" json:"member_count"`
+	PlanName               string `db:"plan_name" json:"plan_name"`
+	SubscriptionStatus     string `db:"subscription_status" json:"subscription_status"`
+	BillingProvider        string `db:"billing_provider" json:"billing_provider"`
+	ProviderSubscriptionID string `db:"provider_subscription_id" json:"provider_subscription_id"`
+	RenewsAt               string `db:"renews_at" json:"renews_at"`
+	EndsAt                 string `db:"ends_at" json:"ends_at"`
+	CreatedAt              string `db:"created_at" json:"created_at"`
+	UpdatedAt              string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (GetBackofficeOrganizationRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeOrganization, id)
+	var i GetBackofficeOrganizationRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Status,
+		&i.MemberCount,
+		&i.PlanName,
+		&i.SubscriptionStatus,
+		&i.BillingProvider,
+		&i.ProviderSubscriptionID,
+		&i.RenewsAt,
+		&i.EndsAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getOrganizationByID = `-- name: GetOrganizationByID :one
 SELECT id, name, status, created_at, updated_at, deleted_at
 FROM organizations
@@ -127,6 +211,67 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id uuid.UUID) (Organi
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const listBackofficeOrganizationMembers = `-- name: ListBackofficeOrganizationMembers :many
+SELECT
+    u.id::TEXT AS user_id,
+    COALESCE(u.name, '—') AS name,
+    u.email::TEXT AS email,
+    om.role,
+    om.status,
+    u.email_verified,
+    u.is_platform_admin,
+    CASE WHEN u.disabled_at IS NULL THEN 'active' ELSE 'disabled' END AS user_status,
+    to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS joined_at
+FROM organization_members AS om
+JOIN users AS u ON u.id = om.user_id
+WHERE om.organization_id = $1
+ORDER BY
+    CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
+    om.created_at ASC
+`
+
+type ListBackofficeOrganizationMembersRow struct {
+	UserID          string `db:"user_id" json:"user_id"`
+	Name            string `db:"name" json:"name"`
+	Email           string `db:"email" json:"email"`
+	Role            string `db:"role" json:"role"`
+	Status          string `db:"status" json:"status"`
+	EmailVerified   bool   `db:"email_verified" json:"email_verified"`
+	IsPlatformAdmin bool   `db:"is_platform_admin" json:"is_platform_admin"`
+	UserStatus      string `db:"user_status" json:"user_status"`
+	JoinedAt        string `db:"joined_at" json:"joined_at"`
+}
+
+func (q *Queries) ListBackofficeOrganizationMembers(ctx context.Context, organizationID uuid.UUID) ([]ListBackofficeOrganizationMembersRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeOrganizationMembers, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeOrganizationMembersRow{}
+	for rows.Next() {
+		var i ListBackofficeOrganizationMembersRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Name,
+			&i.Email,
+			&i.Role,
+			&i.Status,
+			&i.EmailVerified,
+			&i.IsPlatformAdmin,
+			&i.UserStatus,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBackofficeOrganizations = `-- name: ListBackofficeOrganizations :many

@@ -1,4 +1,4 @@
-package organizations
+package users
 
 import (
 	"bytes"
@@ -20,38 +20,38 @@ func NewHandler(repository *Repository) *Handler {
 }
 
 func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
-	organizations, err := h.repository.List(r.Context())
+	users, err := h.repository.List(r.Context())
 	if err != nil {
-		http.Error(w, "load organizations", http.StatusInternalServerError)
+		http.Error(w, "load users", http.StatusInternalServerError)
 		return
 	}
-	render(w, r, Page(organizations))
+	render(w, r, Page(users))
 }
 
 func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
-	organizationID, err := uuid.Parse(chi.URLParam(r, "organization_id"))
+	userID, err := uuid.Parse(chi.URLParam(r, "user_id"))
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
 
-	organization, err := h.repository.Get(r.Context(), organizationID)
+	user, err := h.repository.Get(r.Context(), userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.NotFound(w, r)
 		return
 	}
 	if err != nil {
-		http.Error(w, "load organization", http.StatusInternalServerError)
+		http.Error(w, "load user", http.StatusInternalServerError)
 		return
 	}
 
-	render(w, r, DetailPage(organization))
+	render(w, r, DetailPage(user))
 }
 
 func render(w http.ResponseWriter, r *http.Request, view templ.Component) {
 	var body bytes.Buffer
 	if err := view.Render(r.Context(), &body); err != nil {
-		http.Error(w, "render organizations view", http.StatusInternalServerError)
+		http.Error(w, "render users view", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

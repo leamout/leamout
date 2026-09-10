@@ -28,6 +28,7 @@ func registerRoutes(
 		}
 
 		modules.Dashboard.Routes(protected)
+		protected.Mount("/users", modules.Users.Routes())
 		protected.Mount("/organizations", modules.Organizations.Routes())
 		protected.Mount("/calls", modules.Calls.Routes())
 		protected.Mount("/numbers", modules.Numbers.Routes())

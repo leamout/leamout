@@ -1,0 +1,108 @@
+package users
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+templ Page(users []User) {
+	@components.Layout("Users", "users", PageContent(users))
+}
+
+templ PageContent(users []User) {
+	<div class="mb-6">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Identity</p>
+		<h1 class="mt-2 text-3xl font-bold">Users</h1>
+		<p class="mt-2 text-base-content/70">Inspect user accounts, verification state, platform access, organization membership, and recent session activity.</p>
+	</div>
+	if len(users) == 0 {
+		<div class="alert"><span>No users found.</span></div>
+	} else {
+		@UserTable(users)
+	}
+}
+
+templ DetailPage(user Detail) {
+	@components.Layout(user.Email, "users", DetailContent(user))
+}
+
+templ DetailContent(user Detail) {
+	@components.Breadcrumbs(components.BreadcrumbsProps{
+		{Label: "Users", Attrs: templ.Attributes{"href": "/users/"}},
+		{Label: user.Email},
+	})
+
+	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+		<div>
+			<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">User</p>
+			<h1 class="mt-2 text-3xl font-bold">{ user.Name }</h1>
+			<p class="mt-1 text-base-content/70">{ user.Email }</p>
+			<p class="mt-2 font-mono text-xs text-base-content/60">{ user.ID }</p>
+		</div>
+		<div class="flex flex-wrap gap-2">
+			<span class="badge badge-outline badge-lg">{ user.Status }</span>
+			if user.PlatformAdmin {
+				<span class="badge badge-secondary badge-lg">platform admin</span>
+			}
+			if user.EmailVerified {
+				<span class="badge badge-success badge-lg">verified</span>
+			} else {
+				<span class="badge badge-ghost badge-lg">unverified</span>
+			}
+		</div>
+	</div>
+
+	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
+		<div class="stat">
+			<div class="stat-title">Organizations</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(user.OrganizationCount) }</div>
+			<div class="stat-desc">Active memberships</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Active sessions</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(user.ActiveSessions) }</div>
+			<div class="stat-desc">Unrevoked and unexpired</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Last seen</div>
+			<div class="stat-value text-xl">{ user.LastSeenAt }</div>
+			<div class="stat-desc">Latest session activity</div>
+		</div>
+	</div>
+
+	<section class="mt-6 rounded-box border border-base-300 bg-base-100 p-6">
+		<h2 class="text-lg font-semibold">Account details</h2>
+		<dl class="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+			@DetailField("Status", user.Status)
+			@DetailField("Email verified", yesNo(user.EmailVerified))
+			@DetailField("Platform admin", yesNo(user.PlatformAdmin))
+			@DetailField("Created", user.CreatedAt)
+			@DetailField("Updated", user.UpdatedAt)
+			@DetailField("Disabled", user.DisabledAt)
+		</dl>
+	</section>
+
+	<section class="mt-6">
+		<div class="mb-4">
+			<h2 class="text-xl font-semibold">Organizations</h2>
+			<p class="mt-1 text-sm text-base-content/60">Membership roles and organization lifecycle state.</p>
+		</div>
+		@MembershipTable(user.Organizations)
+	</section>
+
+	<section class="mt-6">
+		<div class="mb-4">
+			<h2 class="text-xl font-semibold">Sessions</h2>
+			<p class="mt-1 text-sm text-base-content/60">Recent authentication sessions. Session tokens and token hashes are never exposed.</p>
+		</div>
+		@SessionTable(user.Sessions)
+	</section>
+}
+
+func yesNo(value bool) string {
+	if value {
+		return "yes"
+	}
+	return "no"
+}
