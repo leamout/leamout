@@ -112,6 +112,29 @@ services:
     networks:
       - private-control
 
+  # Operator UI. It reads the same database and validates the same
+  # leamout-session cookie as the customer API; it has no separate login.
+  backoffice:
+    image: leamout/server:1.0.0
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    command: ["/leamout/backoffice"]
+    restart: unless-stopped
+    environment: *leamout-environment
+    ports:
+      - "8081:8081"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - private-control
+
   worker:
     image: leamout/worker:1.0.0
     build:

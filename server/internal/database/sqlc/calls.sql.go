@@ -78,6 +78,122 @@ func (q *Queries) CreateCall(ctx context.Context, arg CreateCallParams) (Call, e
 	return i, err
 }
 
+const getBackofficeCall = `-- name: GetBackofficeCall :one
+SELECT
+    c.id::TEXT AS id,
+    c.organization_id::TEXT AS organization_id,
+    o.name AS organization_name,
+    c.direction,
+    c.state,
+    c.media_state,
+    c.from_uri,
+    c.to_uri,
+    COALESCE(c.sip_call_id, '—')::TEXT AS sip_call_id,
+    COALESCE(c.application_id::TEXT, '—')::TEXT AS application_id,
+    COALESCE(va.name, '—')::TEXT AS application_name,
+    COALESCE(c.carrier_connection_id::TEXT, '—')::TEXT AS carrier_connection_id,
+    COALESCE(cc.name, '—')::TEXT AS carrier_connection_name,
+    COALESCE(cp.id::TEXT, '—')::TEXT AS provider_id,
+    COALESCE(cp.name, '—')::TEXT AS provider_name,
+    COALESCE(c.trunk_id::TEXT, '—')::TEXT AS trunk_id,
+    COALESCE(t.name, '—')::TEXT AS trunk_name,
+    COALESCE(c.trunk_endpoint_id::TEXT, '—')::TEXT AS trunk_endpoint_id,
+    COALESCE(c.hangup_reason, '—')::TEXT AS hangup_reason,
+    CAST(
+        GREATEST(
+            0::BIGINT,
+            COALESCE(
+                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
+                0::BIGINT
+            )
+        ) AS BIGINT
+    ) AS duration_seconds,
+    COUNT(DISTINCT r.id)::BIGINT AS recording_count,
+    COALESCE(string_agg(DISTINCT r.status, ', ' ORDER BY r.status), 'none')::TEXT AS recording_status,
+    COALESCE(to_char(c.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS started_at,
+    COALESCE(to_char(c.answered_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS answered_at,
+    COALESCE(to_char(c.ended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS ended_at,
+    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS created_at,
+    to_char(c.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS updated_at
+FROM calls AS c
+JOIN organizations AS o ON o.id = c.organization_id
+LEFT JOIN voice_applications AS va ON va.id = c.application_id
+LEFT JOIN carrier_connections AS cc ON cc.id = c.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN trunks AS t ON t.id = c.trunk_id
+LEFT JOIN recordings AS r
+  ON r.call_id = c.id
+ AND r.organization_id = c.organization_id
+WHERE c.id = $1
+GROUP BY c.id, o.name, va.name, cc.name, cp.id, cp.name, t.name
+LIMIT 1
+`
+
+type GetBackofficeCallRow struct {
+	ID                    string `db:"id" json:"id"`
+	OrganizationID        string `db:"organization_id" json:"organization_id"`
+	OrganizationName      string `db:"organization_name" json:"organization_name"`
+	Direction             string `db:"direction" json:"direction"`
+	State                 string `db:"state" json:"state"`
+	MediaState            string `db:"media_state" json:"media_state"`
+	FromUri               string `db:"from_uri" json:"from_uri"`
+	ToUri                 string `db:"to_uri" json:"to_uri"`
+	SipCallID             string `db:"sip_call_id" json:"sip_call_id"`
+	ApplicationID         string `db:"application_id" json:"application_id"`
+	ApplicationName       string `db:"application_name" json:"application_name"`
+	CarrierConnectionID   string `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionName string `db:"carrier_connection_name" json:"carrier_connection_name"`
+	ProviderID            string `db:"provider_id" json:"provider_id"`
+	ProviderName          string `db:"provider_name" json:"provider_name"`
+	TrunkID               string `db:"trunk_id" json:"trunk_id"`
+	TrunkName             string `db:"trunk_name" json:"trunk_name"`
+	TrunkEndpointID       string `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
+	HangupReason          string `db:"hangup_reason" json:"hangup_reason"`
+	DurationSeconds       int64  `db:"duration_seconds" json:"duration_seconds"`
+	RecordingCount        int64  `db:"recording_count" json:"recording_count"`
+	RecordingStatus       string `db:"recording_status" json:"recording_status"`
+	StartedAt             string `db:"started_at" json:"started_at"`
+	AnsweredAt            string `db:"answered_at" json:"answered_at"`
+	EndedAt               string `db:"ended_at" json:"ended_at"`
+	CreatedAt             string `db:"created_at" json:"created_at"`
+	UpdatedAt             string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeCall(ctx context.Context, id uuid.UUID) (GetBackofficeCallRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeCall, id)
+	var i GetBackofficeCallRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.Direction,
+		&i.State,
+		&i.MediaState,
+		&i.FromUri,
+		&i.ToUri,
+		&i.SipCallID,
+		&i.ApplicationID,
+		&i.ApplicationName,
+		&i.CarrierConnectionID,
+		&i.CarrierConnectionName,
+		&i.ProviderID,
+		&i.ProviderName,
+		&i.TrunkID,
+		&i.TrunkName,
+		&i.TrunkEndpointID,
+		&i.HangupReason,
+		&i.DurationSeconds,
+		&i.RecordingCount,
+		&i.RecordingStatus,
+		&i.StartedAt,
+		&i.AnsweredAt,
+		&i.EndedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getCall = `-- name: GetCall :one
 SELECT id, organization_id, application_id, carrier_connection_id, trunk_id, trunk_endpoint_id, direction, state, media_state, from_uri, to_uri, sip_call_id, provider_id, started_at, answered_at, ended_at, hangup_reason, created_at, updated_at
 FROM calls
@@ -266,6 +382,7 @@ func (q *Queries) GetInboundCallContext(ctx context.Context, arg GetInboundCallC
 const listBackofficeCalls = `-- name: ListBackofficeCalls :many
 SELECT
     c.id::TEXT AS id,
+    c.organization_id::TEXT AS organization_id,
     o.name AS organization_name,
     c.from_uri,
     c.to_uri,
@@ -289,6 +406,7 @@ LIMIT 100
 
 type ListBackofficeCallsRow struct {
 	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
 	OrganizationName string `db:"organization_name" json:"organization_name"`
 	FromUri          string `db:"from_uri" json:"from_uri"`
 	ToUri            string `db:"to_uri" json:"to_uri"`
@@ -309,6 +427,7 @@ func (q *Queries) ListBackofficeCalls(ctx context.Context) ([]ListBackofficeCall
 		var i ListBackofficeCallsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.OrganizationID,
 			&i.OrganizationName,
 			&i.FromUri,
 			&i.ToUri,

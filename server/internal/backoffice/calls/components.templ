@@ -1,12 +1,37 @@
 package calls
 
-import "github.com/leamout/leamout/internal/backoffice/components"
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
 
 templ CallTable(calls []Call) {
-	@components.Table(
+	@components.TableWithLinks(
 		[]string{"Call ID", "Organization", "From", "To", "Direction", "Duration", "Status", "Created"},
 		callRows(calls),
+		callLinks(calls),
 	)
+}
+
+templ DetailField(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">{ value }</dd>
+	</div>
+}
+
+templ LinkedDetailField(label string, value string, href string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">
+			if value == "—" {
+				{ value }
+			} else {
+				<a class="link link-primary" href={ templ.SafeURL(href) }>{ value }</a>
+			}
+		</dd>
+	</div>
 }
 
 func callRows(calls []Call) [][]string {
@@ -24,4 +49,29 @@ func callRows(calls []Call) [][]string {
 		})
 	}
 	return rows
+}
+
+func callLinks(calls []Call) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(calls)*2)
+	for row, call := range calls {
+		links = append(links,
+			components.TableCellLink{
+				Row:    row,
+				Column: 0,
+				Href:   "/calls/" + call.ID,
+				Class:  "link link-primary font-mono text-xs",
+			},
+			components.TableCellLink{
+				Row:    row,
+				Column: 1,
+				Href:   "/organizations/" + call.OrganizationID,
+				Class:  "link link-primary",
+			},
+		)
+	}
+	return links
+}
+
+func recordingSummary(call Detail) string {
+	return fmt.Sprintf("%d (%s)", call.RecordingCount, call.RecordingStatus)
 }

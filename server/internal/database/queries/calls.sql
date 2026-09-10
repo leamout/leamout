@@ -207,6 +207,7 @@ RETURNING *;
 -- name: ListBackofficeCalls :many
 SELECT
     c.id::TEXT AS id,
+    c.organization_id::TEXT AS organization_id,
     o.name AS organization_name,
     c.from_uri,
     c.to_uri,
@@ -226,3 +227,53 @@ FROM calls AS c
 JOIN organizations AS o ON o.id = c.organization_id
 ORDER BY c.created_at DESC
 LIMIT 100;
+
+-- name: GetBackofficeCall :one
+SELECT
+    c.id::TEXT AS id,
+    c.organization_id::TEXT AS organization_id,
+    o.name AS organization_name,
+    c.direction,
+    c.state,
+    c.media_state,
+    c.from_uri,
+    c.to_uri,
+    COALESCE(c.sip_call_id, '—')::TEXT AS sip_call_id,
+    COALESCE(c.application_id::TEXT, '—')::TEXT AS application_id,
+    COALESCE(va.name, '—')::TEXT AS application_name,
+    COALESCE(c.carrier_connection_id::TEXT, '—')::TEXT AS carrier_connection_id,
+    COALESCE(cc.name, '—')::TEXT AS carrier_connection_name,
+    COALESCE(cp.id::TEXT, '—')::TEXT AS provider_id,
+    COALESCE(cp.name, '—')::TEXT AS provider_name,
+    COALESCE(c.trunk_id::TEXT, '—')::TEXT AS trunk_id,
+    COALESCE(t.name, '—')::TEXT AS trunk_name,
+    COALESCE(c.trunk_endpoint_id::TEXT, '—')::TEXT AS trunk_endpoint_id,
+    COALESCE(c.hangup_reason, '—')::TEXT AS hangup_reason,
+    CAST(
+        GREATEST(
+            0::BIGINT,
+            COALESCE(
+                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
+                0::BIGINT
+            )
+        ) AS BIGINT
+    ) AS duration_seconds,
+    COUNT(DISTINCT r.id)::BIGINT AS recording_count,
+    COALESCE(string_agg(DISTINCT r.status, ', ' ORDER BY r.status), 'none')::TEXT AS recording_status,
+    COALESCE(to_char(c.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS started_at,
+    COALESCE(to_char(c.answered_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS answered_at,
+    COALESCE(to_char(c.ended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS ended_at,
+    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS created_at,
+    to_char(c.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS updated_at
+FROM calls AS c
+JOIN organizations AS o ON o.id = c.organization_id
+LEFT JOIN voice_applications AS va ON va.id = c.application_id
+LEFT JOIN carrier_connections AS cc ON cc.id = c.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN trunks AS t ON t.id = c.trunk_id
+LEFT JOIN recordings AS r
+  ON r.call_id = c.id
+ AND r.organization_id = c.organization_id
+WHERE c.id = sqlc.arg(id)
+GROUP BY c.id, o.name, va.name, cc.name, cp.id, cp.name, t.name
+LIMIT 1;
