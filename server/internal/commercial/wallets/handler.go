@@ -56,16 +56,24 @@ func (h *TopupHandler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
+
 	request, err := helper.DecodeJSON[createRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Create(r.Context(), organizationID, walletID, TopupCreateInput(request))
+
+	result, err := h.service.Create(
+		r.Context(),
+		organizationID,
+		walletID,
+		TopupCreateInput(request),
+	)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
+
 	httputil.Created(w, responseFromCheckout(result))
 }
 
@@ -75,16 +83,22 @@ func (h *TopupHandler) Get(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
+
 	result, err := h.service.Get(r.Context(), organizationID, orderID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
+
 	httputil.OK(w, checkoutResponse{
-		OrderID: result.Order.ID, PaymentID: result.Payment.ID,
-		Reference: result.Order.Reference, Provider: result.Order.Provider,
-		AmountMinor: result.Order.AmountMinor, Currency: result.Order.Currency,
-		Status: result.Order.Status, NextAction: result.Order.NextAction,
+		OrderID:         result.Order.ID,
+		PaymentID:       result.Payment.ID,
+		Reference:       result.Order.Reference,
+		Provider:        result.Order.Provider,
+		AmountMinor:     result.Order.AmountMinor,
+		Currency:        result.Order.Currency,
+		Status:          result.Order.Status,
+		NextAction:      result.Order.NextAction,
 		ProviderMessage: result.Order.ProviderMessage,
 	})
 }
@@ -95,31 +109,42 @@ func (h *TopupHandler) Continue(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
+
 	request, err := helper.DecodeJSON[continueRequest](r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Continue(r.Context(), organizationID, orderID, TopupContinueInput(request))
+
+	result, err := h.service.Continue(
+		r.Context(),
+		organizationID,
+		orderID,
+		TopupContinueInput(request),
+	)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
+
 	httputil.OK(w, responseFromCheckout(result))
 }
 
 func (h *TopupHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "provider")
 	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBytes)
+
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		httputil.Error(w, apperror.NewBadRequest("invalid webhook payload"))
 		return
 	}
+
 	if _, err = h.service.Webhook(r.Context(), provider, payload, r.Header); err != nil {
 		httputil.Error(w, apperror.NewBadRequest("invalid payment webhook"))
 		return
 	}
+
 	httputil.OK(w, map[string]bool{"received": true})
 }
 
@@ -128,19 +153,26 @@ func requestIDs(r *http.Request, resourceParam string) (uuid.UUID, uuid.UUID, er
 	if !ok {
 		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("organization context required")
 	}
+
 	resourceID, err := uuid.Parse(chi.URLParam(r, resourceParam))
 	if err != nil {
 		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid " + resourceParam)
 	}
+
 	return organizationID, resourceID, nil
 }
 
 func responseFromCheckout(result TopupCheckout) checkoutResponse {
 	return checkoutResponse{
-		OrderID: result.Order.ID, PaymentID: result.Payment.ID,
-		Reference: result.Order.Reference, Provider: result.Order.Provider,
-		AmountMinor: result.Order.AmountMinor, Currency: result.Order.Currency,
-		Status: result.Order.Status, NextAction: result.Order.NextAction,
-		ProviderMessage: result.Order.ProviderMessage, ClientSecret: result.Session.ClientSecret,
+		OrderID:         result.Order.ID,
+		PaymentID:       result.Payment.ID,
+		Reference:       result.Order.Reference,
+		Provider:        result.Order.Provider,
+		AmountMinor:     result.Order.AmountMinor,
+		Currency:        result.Order.Currency,
+		Status:          result.Order.Status,
+		NextAction:      result.Order.NextAction,
+		ProviderMessage: result.Order.ProviderMessage,
+		ClientSecret:    result.Session.ClientSecret,
 	}
 }
