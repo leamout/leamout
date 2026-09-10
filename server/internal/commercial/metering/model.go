@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	ErrMeterNotFound       = apperror.NewNotFound("commercial meter not found")
-	ErrInvalidUsageEvent   = apperror.NewBadRequest("invalid usage event")
-	ErrUsageEventConflict  = apperror.NewConflict("usage event idempotency key conflicts with an existing event")
+	ErrMeterNotFound      = apperror.NewNotFound("commercial meter not found")
+	ErrInvalidUsageEvent  = apperror.NewBadRequest("invalid usage event")
+	ErrUsageEventConflict = apperror.NewConflict("usage event idempotency key conflicts with an existing event")
 )
 
 // Meter identifies a quantity measured from authoritative domain events.
