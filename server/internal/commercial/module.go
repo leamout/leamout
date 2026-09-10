@@ -14,28 +14,72 @@ import (
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-// Module owns the Commercial services used by the application.
+// Module is the composition boundary for Leamout's Commercial domain.
+// Runtime and telecom code should depend on this module rather than assembling
+// Commercial subdomains independently.
 type Module struct {
-	Catalog       *catalog.Service
-	Subscriptions *subscriptions.Service
-	Entitlements  *entitlements.Service
-	Licensing     *licensing.Service
-	Metering      *metering.Service
-	Wallets       *wallets.Repository
-	Topups        *wallets.TopupService
-	State         *commercialstate.Service
-
-	handlers handlers
+	Catalog  CatalogModule
+	Access   AccessModule
+	Metering MeteringModule
+	Money    MoneyModule
+	Payments PaymentsModule
+	State    StateModule
 }
 
-type handlers struct {
-	catalog       *catalog.Handler
-	subscriptions *subscriptions.Handler
-	licensing     *licensing.Handler
-	topups        *wallets.TopupHandler
-	state         *commercialstate.Handler
+type CatalogModule struct {
+	Repository *catalog.Repository
+	Service    *catalog.Service
+	Handler    *catalog.Handler
 }
 
+type AccessModule struct {
+	Subscriptions SubscriptionsModule
+	Entitlements  EntitlementsModule
+	Licensing     LicensingModule
+}
+
+type SubscriptionsModule struct {
+	Repository *subscriptions.Repository
+	Service    *subscriptions.Service
+	Handler    *subscriptions.Handler
+}
+
+type EntitlementsModule struct {
+	Repository *entitlements.Repository
+	Service    *entitlements.Service
+}
+
+type LicensingModule struct {
+	Repository *licensing.Repository
+	Service    *licensing.Service
+	Handler    *licensing.Handler
+}
+
+type MeteringModule struct {
+	Repository *metering.Repository
+	Service    *metering.Service
+}
+
+type MoneyModule struct {
+	Wallets         *wallets.Repository
+	TopupRepository *wallets.TopupRepository
+	TopupService    *wallets.TopupService
+	TopupHandler    *wallets.TopupHandler
+}
+
+type PaymentsModule struct {
+	Checkouts *checkout.Repository
+	Payments  *payments.Repository
+}
+
+type StateModule struct {
+	Service *commercialstate.Service
+	Handler *commercialstate.Handler
+}
+
+// New composes Commercial from its durable subdomains. Payment providers are
+// registered after construction so provider adapters remain outside Commercial
+// state and can be configured by the runtime.
 func New(db *pgxpool.Pool) *Module {
 	catalogRepository := catalog.NewRepository(db)
 	catalogService := catalog.NewService(catalogRepository)
@@ -67,20 +111,44 @@ func New(db *pgxpool.Pool) *Module {
 	)
 
 	return &Module{
-		Catalog:       catalogService,
-		Subscriptions: subscriptionsService,
-		Entitlements:  entitlementsService,
-		Licensing:     licensingService,
-		Metering:      meteringService,
-		Wallets:       walletRepository,
-		Topups:        topupService,
-		State:         stateService,
-		handlers: handlers{
-			catalog:       catalog.NewHandler(catalogService),
-			subscriptions: subscriptions.NewHandler(subscriptionsService),
-			licensing:     licensing.NewHandler(licensingService),
-			topups:        wallets.NewTopupHandler(topupService),
-			state:         commercialstate.NewHandler(stateService),
+		Catalog: CatalogModule{
+			Repository: catalogRepository,
+			Service:    catalogService,
+			Handler:    catalog.NewHandler(catalogService),
+		},
+		Access: AccessModule{
+			Subscriptions: SubscriptionsModule{
+				Repository: subscriptionsRepository,
+				Service:    subscriptionsService,
+				Handler:    subscriptions.NewHandler(subscriptionsService),
+			},
+			Entitlements: EntitlementsModule{
+				Repository: entitlementsRepository,
+				Service:    entitlementsService,
+			},
+			Licensing: LicensingModule{
+				Repository: licensingRepository,
+				Service:    licensingService,
+				Handler:    licensing.NewHandler(licensingService),
+			},
+		},
+		Metering: MeteringModule{
+			Repository: meteringRepository,
+			Service:    meteringService,
+		},
+		Money: MoneyModule{
+			Wallets:         walletRepository,
+			TopupRepository: topupRepository,
+			TopupService:    topupService,
+			TopupHandler:    wallets.NewTopupHandler(topupService),
+		},
+		Payments: PaymentsModule{
+			Checkouts: checkoutRepository,
+			Payments:  paymentRepository,
+		},
+		State: StateModule{
+			Service: stateService,
+			Handler: commercialstate.NewHandler(stateService),
 		},
 	}
 }
