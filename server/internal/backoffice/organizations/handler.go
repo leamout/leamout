@@ -2,9 +2,13 @@ package organizations
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 
 	"github.com/a-h/templ"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type Handler struct {
@@ -22,6 +26,26 @@ func (h *Handler) index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	render(w, r, Page(organizations))
+}
+
+func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
+	organizationID, err := uuid.Parse(chi.URLParam(r, "organization_id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	organization, err := h.repository.Get(r.Context(), organizationID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "load organization", http.StatusInternalServerError)
+		return
+	}
+
+	render(w, r, DetailPage(organization))
 }
 
 func render(w http.ResponseWriter, r *http.Request, view templ.Component) {
