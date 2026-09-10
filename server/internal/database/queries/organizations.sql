@@ -101,8 +101,8 @@ SELECT
     COALESCE(subscription.status, 'none') AS subscription_status,
     COALESCE(subscription.billing_provider, '—') AS billing_provider,
     COALESCE(subscription.provider_subscription_id, '—') AS provider_subscription_id,
-    COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS renews_at,
-    COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS ends_at,
+    COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS renews_at,
+    COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS ends_at,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
     to_char(o.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
 FROM organizations AS o
