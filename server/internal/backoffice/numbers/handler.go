@@ -2,13 +2,35 @@ package numbers
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 
 	"github.com/a-h/templ"
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type Handler struct {
 	repository *Repository
+}
+
+func (h *Handler) detail(w http.ResponseWriter, r *http.Request) {
+	id, err := uuid.Parse(chi.URLParam(r, "number_id"))
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	number, err := h.repository.Get(r.Context(), id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, "load phone number", http.StatusInternalServerError)
+		return
+	}
+	render(w, r, DetailPage(number))
 }
 
 func NewHandler(repository *Repository) *Handler {

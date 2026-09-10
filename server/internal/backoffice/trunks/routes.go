@@ -9,5 +9,6 @@ import (
 func (h *Handler) Routes() http.Handler {
 	router := chi.NewRouter()
 	router.Get("/", h.index)
+	router.Get("/{trunk_id}", h.detail)
 	return router
 }

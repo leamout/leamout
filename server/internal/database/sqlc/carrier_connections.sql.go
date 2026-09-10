@@ -362,6 +362,92 @@ func (q *Queries) EnableCarrierConnection(ctx context.Context, arg EnableCarrier
 	return err
 }
 
+const getBackofficeCarrierConnection = `-- name: GetBackofficeCarrierConnection :one
+SELECT
+    cc.id::TEXT AS id,
+    CAST(COALESCE(cc.organization_id::TEXT, '—') AS TEXT) AS organization_id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    cc.provider_id::TEXT AS provider_id,
+    cp.name AS provider_name,
+    cc.name,
+    cc.scope,
+    cc.status,
+    cc.outbound_auth_method,
+    cc.inbound_enabled,
+    cc.inbound_auth_method,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    CAST(COALESCE(cc.max_daily_minutes::TEXT, '—') AS TEXT) AS max_daily_minutes,
+    array_to_string(cc.codecs, ', ') AS codecs,
+    cc.supports_video,
+    cc.supports_fax,
+    COUNT(DISTINCT t.id)::BIGINT AS trunk_count,
+    COUNT(DISTINCT src.id)::BIGINT AS source_ip_count,
+    to_char(cc.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(cc.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM carrier_connections AS cc
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN organizations AS o ON o.id = cc.organization_id
+LEFT JOIN trunks AS t ON t.carrier_connection_id = cc.id
+LEFT JOIN carrier_connection_source_ips AS src ON src.carrier_connection_id = cc.id
+WHERE cc.id = $1
+GROUP BY cc.id, o.name, cp.name
+LIMIT 1
+`
+
+type GetBackofficeCarrierConnectionRow struct {
+	ID                 string `db:"id" json:"id"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	ProviderID         string `db:"provider_id" json:"provider_id"`
+	ProviderName       string `db:"provider_name" json:"provider_name"`
+	Name               string `db:"name" json:"name"`
+	Scope              string `db:"scope" json:"scope"`
+	Status             string `db:"status" json:"status"`
+	OutboundAuthMethod string `db:"outbound_auth_method" json:"outbound_auth_method"`
+	InboundEnabled     bool   `db:"inbound_enabled" json:"inbound_enabled"`
+	InboundAuthMethod  string `db:"inbound_auth_method" json:"inbound_auth_method"`
+	MaxCps             int32  `db:"max_cps" json:"max_cps"`
+	MaxConcurrentCalls int32  `db:"max_concurrent_calls" json:"max_concurrent_calls"`
+	MaxDailyMinutes    string `db:"max_daily_minutes" json:"max_daily_minutes"`
+	Codecs             string `db:"codecs" json:"codecs"`
+	SupportsVideo      bool   `db:"supports_video" json:"supports_video"`
+	SupportsFax        bool   `db:"supports_fax" json:"supports_fax"`
+	TrunkCount         int64  `db:"trunk_count" json:"trunk_count"`
+	SourceIpCount      int64  `db:"source_ip_count" json:"source_ip_count"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+	UpdatedAt          string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeCarrierConnection(ctx context.Context, id uuid.UUID) (GetBackofficeCarrierConnectionRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeCarrierConnection, id)
+	var i GetBackofficeCarrierConnectionRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.ProviderID,
+		&i.ProviderName,
+		&i.Name,
+		&i.Scope,
+		&i.Status,
+		&i.OutboundAuthMethod,
+		&i.InboundEnabled,
+		&i.InboundAuthMethod,
+		&i.MaxCps,
+		&i.MaxConcurrentCalls,
+		&i.MaxDailyMinutes,
+		&i.Codecs,
+		&i.SupportsVideo,
+		&i.SupportsFax,
+		&i.TrunkCount,
+		&i.SourceIpCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getCarrierConnectionByID = `-- name: GetCarrierConnectionByID :one
 SELECT
     id,
@@ -718,9 +804,85 @@ func (q *Queries) ListActivePlatformCarrierConnections(ctx context.Context) ([]C
 	return items, nil
 }
 
+const listBackofficeCarrierConnectionResources = `-- name: ListBackofficeCarrierConnectionResources :many
+SELECT resource_type, provider_resource_id,
+       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM carrier_connection_provider_resources
+WHERE carrier_connection_id = $1
+ORDER BY resource_type
+`
+
+type ListBackofficeCarrierConnectionResourcesRow struct {
+	ResourceType       string `db:"resource_type" json:"resource_type"`
+	ProviderResourceID string `db:"provider_resource_id" json:"provider_resource_id"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+	UpdatedAt          string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListBackofficeCarrierConnectionResources(ctx context.Context, carrierConnectionID uuid.UUID) ([]ListBackofficeCarrierConnectionResourcesRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeCarrierConnectionResources, carrierConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeCarrierConnectionResourcesRow{}
+	for rows.Next() {
+		var i ListBackofficeCarrierConnectionResourcesRow
+		if err := rows.Scan(
+			&i.ResourceType,
+			&i.ProviderResourceID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBackofficeCarrierConnectionSourceIPs = `-- name: ListBackofficeCarrierConnectionSourceIPs :many
+SELECT src.id::TEXT AS id, src.cidr::TEXT AS cidr,
+       to_char(src.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM carrier_connection_source_ips AS src
+WHERE src.carrier_connection_id = $1
+ORDER BY src.created_at
+`
+
+type ListBackofficeCarrierConnectionSourceIPsRow struct {
+	ID        string `db:"id" json:"id"`
+	Cidr      string `db:"cidr" json:"cidr"`
+	CreatedAt string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeCarrierConnectionSourceIPs(ctx context.Context, carrierConnectionID uuid.UUID) ([]ListBackofficeCarrierConnectionSourceIPsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeCarrierConnectionSourceIPs, carrierConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeCarrierConnectionSourceIPsRow{}
+	for rows.Next() {
+		var i ListBackofficeCarrierConnectionSourceIPsRow
+		if err := rows.Scan(&i.ID, &i.Cidr, &i.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBackofficeCarrierConnections = `-- name: ListBackofficeCarrierConnections :many
 SELECT
     cc.id::TEXT AS id,
+    CAST(COALESCE(cc.organization_id::TEXT, '—') AS TEXT) AS organization_id,
     COALESCE(o.name, 'Platform') AS organization_name,
     cc.name,
     cp.name AS provider_name,
@@ -751,6 +913,7 @@ LIMIT 100
 
 type ListBackofficeCarrierConnectionsRow struct {
 	ID                 string `db:"id" json:"id"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
 	OrganizationName   string `db:"organization_name" json:"organization_name"`
 	Name               string `db:"name" json:"name"`
 	ProviderName       string `db:"provider_name" json:"provider_name"`
@@ -773,6 +936,7 @@ func (q *Queries) ListBackofficeCarrierConnections(ctx context.Context) ([]ListB
 		var i ListBackofficeCarrierConnectionsRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.OrganizationID,
 			&i.OrganizationName,
 			&i.Name,
 			&i.ProviderName,

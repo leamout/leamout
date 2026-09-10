@@ -6,10 +6,43 @@ import (
 )
 
 templ TrunkTable(trunks []Trunk) {
-	@components.Table(
+	@components.TableWithLinks(
 		[]string{"Trunk", "Organization", "Mode", "Provider", "Direction", "Endpoints", "Status"},
 		trunkRows(trunks),
+		trunkLinks(trunks),
 	)
+}
+
+func trunkLinks(trunks []Trunk) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(trunks)*2)
+	for row, trunk := range trunks {
+		links = append(links, components.TableCellLink{Row: row, Column: 0, Href: "/trunks/" + trunk.ID, Class: "link link-primary"})
+		if trunk.OrganizationID != "—" {
+			links = append(links, components.TableCellLink{Row: row, Column: 1, Href: "/organizations/" + trunk.OrganizationID, Class: "link link-primary"})
+		}
+	}
+	return links
+}
+
+templ EndpointTable(endpoints []Endpoint) {
+	if len(endpoints) == 0 {
+		<div class="alert"><span>No endpoints configured.</span></div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead><tr><th>Target</th><th>Direction</th><th>Priority</th><th>Enabled</th><th>Health</th><th>Last check</th><th>Last error</th></tr></thead>
+				<tbody>
+					for _, endpoint := range endpoints {
+						<tr><td class="font-mono text-xs">{ endpoint.Host }:{ fmt.Sprint(endpoint.Port) }/{ endpoint.Transport }</td><td>{ endpoint.Direction }</td><td>{ fmt.Sprint(endpoint.Priority) }</td><td>{ fmt.Sprint(endpoint.Enabled) }</td><td><span class="badge badge-outline badge-sm">{ endpoint.Health }</span></td><td>{ endpoint.LastChecked }</td><td class="max-w-xs truncate" title={ endpoint.LastError }>{ endpoint.LastError }</td></tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ DetailField(label, value string) {
+	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">{ value }</dd></div>
 }
 
 func trunkRows(trunks []Trunk) [][]string {

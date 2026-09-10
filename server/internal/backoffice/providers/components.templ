@@ -6,10 +6,40 @@ import (
 )
 
 templ ProviderTable(providers []Provider) {
-	@components.Table(
+	@components.TableWithLinks(
 		[]string{"Provider", "Slug", "Adapter", "Connections", "Pending Ops", "Failed Ops", "Status"},
 		providerRows(providers),
+		providerLinks(providers),
 	)
+}
+
+func providerLinks(providers []Provider) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(providers))
+	for row, p := range providers {
+		links = append(links, components.TableCellLink{Row: row, Column: 0, Href: "/providers/" + p.ID, Class: "link link-primary"})
+	}
+	return links
+}
+
+templ OperationTable(operations []Operation) {
+	if len(operations) == 0 {
+		<div class="alert"><span>No provider operations found.</span></div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead><tr><th>Operation</th><th>Organization</th><th>Number</th><th>State</th><th>Attempts</th><th>Updated</th><th>Error</th></tr></thead>
+				<tbody>
+					for _, operation := range operations {
+						<tr><td><div class="font-medium">{ operation.Type }</div><div class="font-mono text-xs text-base-content/60">{ operation.ID }</div></td><td>{ operation.Organization }</td><td class="font-mono">{ operation.Number }</td><td><span class="badge badge-outline badge-sm">{ operation.State }</span></td><td>{ fmt.Sprint(operation.Attempts) }</td><td>{ operation.UpdatedAt }</td><td class="max-w-xs truncate" title={ operation.LastError }>{ operation.LastError }</td></tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ DetailField(label, value string) {
+	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">{ value }</dd></div>
 }
 
 func providerRows(providers []Provider) [][]string {

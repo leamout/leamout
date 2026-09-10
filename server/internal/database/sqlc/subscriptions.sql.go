@@ -185,6 +185,75 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 	return i, err
 }
 
+const getBackofficeCommercialAccount = `-- name: GetBackofficeCommercialAccount :one
+SELECT
+    o.id::TEXT AS organization_id,
+    o.name AS organization_name,
+    CAST(COALESCE(s.id::TEXT, '—') AS TEXT) AS subscription_id,
+    CAST(COALESCE(p.id::TEXT, '—') AS TEXT) AS plan_id,
+    COALESCE(p.name, '—') AS plan_name,
+    CAST(COALESCE(pr.id::TEXT, '—') AS TEXT) AS price_id,
+    COALESCE(pr.pricing_type, '—') AS pricing_type,
+    COALESCE(pr.currency, '—') AS currency,
+    CAST(COALESCE(pr.amount_minor::TEXT, '—') AS TEXT) AS amount_minor,
+    COALESCE(pr.billing_interval, '—') AS billing_interval,
+    COALESCE(s.status, 'none') AS subscription_status,
+    'prepaid'::TEXT AS billing_model,
+    CAST(COALESCE(to_char(s.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS starts_at,
+    CAST(COALESCE(to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS renews_at,
+    CAST(COALESCE(to_char(s.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS ends_at,
+    to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS organization_created_at
+FROM organizations AS o
+LEFT JOIN subscriptions AS s ON s.organization_id = o.id AND s.status IN ('active', 'past_due')
+LEFT JOIN plans AS p ON p.id = s.plan_id
+LEFT JOIN prices AS pr ON pr.id = s.price_id
+WHERE o.id = $1 AND o.deleted_at IS NULL
+LIMIT 1
+`
+
+type GetBackofficeCommercialAccountRow struct {
+	OrganizationID        string `db:"organization_id" json:"organization_id"`
+	OrganizationName      string `db:"organization_name" json:"organization_name"`
+	SubscriptionID        string `db:"subscription_id" json:"subscription_id"`
+	PlanID                string `db:"plan_id" json:"plan_id"`
+	PlanName              string `db:"plan_name" json:"plan_name"`
+	PriceID               string `db:"price_id" json:"price_id"`
+	PricingType           string `db:"pricing_type" json:"pricing_type"`
+	Currency              string `db:"currency" json:"currency"`
+	AmountMinor           string `db:"amount_minor" json:"amount_minor"`
+	BillingInterval       string `db:"billing_interval" json:"billing_interval"`
+	SubscriptionStatus    string `db:"subscription_status" json:"subscription_status"`
+	BillingModel          string `db:"billing_model" json:"billing_model"`
+	StartsAt              string `db:"starts_at" json:"starts_at"`
+	RenewsAt              string `db:"renews_at" json:"renews_at"`
+	EndsAt                string `db:"ends_at" json:"ends_at"`
+	OrganizationCreatedAt string `db:"organization_created_at" json:"organization_created_at"`
+}
+
+func (q *Queries) GetBackofficeCommercialAccount(ctx context.Context, organizationID uuid.UUID) (GetBackofficeCommercialAccountRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeCommercialAccount, organizationID)
+	var i GetBackofficeCommercialAccountRow
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.SubscriptionID,
+		&i.PlanID,
+		&i.PlanName,
+		&i.PriceID,
+		&i.PricingType,
+		&i.Currency,
+		&i.AmountMinor,
+		&i.BillingInterval,
+		&i.SubscriptionStatus,
+		&i.BillingModel,
+		&i.StartsAt,
+		&i.RenewsAt,
+		&i.EndsAt,
+		&i.OrganizationCreatedAt,
+	)
+	return i, err
+}
+
 const getCurrentSubscription = `-- name: GetCurrentSubscription :one
 SELECT s.id, s.organization_id, s.plan_id, s.price_id, s.status, s.starts_at, s.renews_at, s.ends_at, s.created_at, s.updated_at
 FROM subscriptions AS s

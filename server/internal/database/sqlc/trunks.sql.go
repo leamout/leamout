@@ -401,6 +401,74 @@ func (q *Queries) EnableTrunk(ctx context.Context, arg EnableTrunkParams) error 
 	return err
 }
 
+const getBackofficeTrunk = `-- name: GetBackofficeTrunk :one
+SELECT
+    t.id::TEXT AS id,
+    CAST(COALESCE(t.organization_id::TEXT, '—') AS TEXT) AS organization_id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    t.name,
+    t.provisioning_mode,
+    t.direction,
+    t.status,
+    t.managed_default,
+    CAST(COALESCE(t.carrier_connection_id::TEXT, '—') AS TEXT) AS carrier_connection_id,
+    COALESCE(cc.name, '—') AS carrier_connection_name,
+    COALESCE(cp.name, '—') AS provider_name,
+    COUNT(te.id)::BIGINT AS endpoint_count,
+    COUNT(te.id) FILTER (WHERE te.enabled)::BIGINT AS enabled_endpoint_count,
+    to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM trunks AS t
+LEFT JOIN organizations AS o ON o.id = t.organization_id
+LEFT JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN trunk_endpoints AS te ON te.trunk_id = t.id
+WHERE t.id = $1
+GROUP BY t.id, o.name, cc.name, cp.name
+LIMIT 1
+`
+
+type GetBackofficeTrunkRow struct {
+	ID                    string `db:"id" json:"id"`
+	OrganizationID        string `db:"organization_id" json:"organization_id"`
+	OrganizationName      string `db:"organization_name" json:"organization_name"`
+	Name                  string `db:"name" json:"name"`
+	ProvisioningMode      string `db:"provisioning_mode" json:"provisioning_mode"`
+	Direction             string `db:"direction" json:"direction"`
+	Status                string `db:"status" json:"status"`
+	ManagedDefault        bool   `db:"managed_default" json:"managed_default"`
+	CarrierConnectionID   string `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionName string `db:"carrier_connection_name" json:"carrier_connection_name"`
+	ProviderName          string `db:"provider_name" json:"provider_name"`
+	EndpointCount         int64  `db:"endpoint_count" json:"endpoint_count"`
+	EnabledEndpointCount  int64  `db:"enabled_endpoint_count" json:"enabled_endpoint_count"`
+	CreatedAt             string `db:"created_at" json:"created_at"`
+	UpdatedAt             string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeTrunk(ctx context.Context, id uuid.UUID) (GetBackofficeTrunkRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeTrunk, id)
+	var i GetBackofficeTrunkRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.Name,
+		&i.ProvisioningMode,
+		&i.Direction,
+		&i.Status,
+		&i.ManagedDefault,
+		&i.CarrierConnectionID,
+		&i.CarrierConnectionName,
+		&i.ProviderName,
+		&i.EndpointCount,
+		&i.EnabledEndpointCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPlatformTrunkByID = `-- name: GetPlatformTrunkByID :one
 SELECT t.id, t.organization_id, t.carrier_connection_id, t.provisioning_mode, t.name, t.direction, t.status, t.managed_default, t.created_at, t.updated_at
 FROM trunks AS t
@@ -578,9 +646,83 @@ func (q *Queries) ListActiveOutboundTrunkEndpoints(ctx context.Context, arg List
 	return items, nil
 }
 
+const listBackofficeTrunkEndpoints = `-- name: ListBackofficeTrunkEndpoints :many
+SELECT
+    te.id::TEXT AS id,
+    te.host,
+    te.port,
+    te.transport,
+    te.direction,
+    te.priority,
+    te.weight,
+    te.enabled,
+    te.health_status,
+    te.consecutive_failures,
+    CAST(COALESCE(te.last_response_code::TEXT, '—') AS TEXT) AS last_response_code,
+    CAST(COALESCE(te.last_latency_ms::TEXT, '—') AS TEXT) AS last_latency_ms,
+    COALESCE(te.last_error, '—') AS last_error,
+    CAST(COALESCE(to_char(te.last_checked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS last_checked_at
+FROM trunk_endpoints AS te
+WHERE te.trunk_id = $1
+ORDER BY te.priority, te.host, te.port
+`
+
+type ListBackofficeTrunkEndpointsRow struct {
+	ID                  string `db:"id" json:"id"`
+	Host                string `db:"host" json:"host"`
+	Port                int32  `db:"port" json:"port"`
+	Transport           string `db:"transport" json:"transport"`
+	Direction           string `db:"direction" json:"direction"`
+	Priority            int32  `db:"priority" json:"priority"`
+	Weight              int32  `db:"weight" json:"weight"`
+	Enabled             bool   `db:"enabled" json:"enabled"`
+	HealthStatus        string `db:"health_status" json:"health_status"`
+	ConsecutiveFailures int32  `db:"consecutive_failures" json:"consecutive_failures"`
+	LastResponseCode    string `db:"last_response_code" json:"last_response_code"`
+	LastLatencyMs       string `db:"last_latency_ms" json:"last_latency_ms"`
+	LastError           string `db:"last_error" json:"last_error"`
+	LastCheckedAt       string `db:"last_checked_at" json:"last_checked_at"`
+}
+
+func (q *Queries) ListBackofficeTrunkEndpoints(ctx context.Context, trunkID uuid.UUID) ([]ListBackofficeTrunkEndpointsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeTrunkEndpoints, trunkID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeTrunkEndpointsRow{}
+	for rows.Next() {
+		var i ListBackofficeTrunkEndpointsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Host,
+			&i.Port,
+			&i.Transport,
+			&i.Direction,
+			&i.Priority,
+			&i.Weight,
+			&i.Enabled,
+			&i.HealthStatus,
+			&i.ConsecutiveFailures,
+			&i.LastResponseCode,
+			&i.LastLatencyMs,
+			&i.LastError,
+			&i.LastCheckedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listBackofficeTrunks = `-- name: ListBackofficeTrunks :many
 SELECT
     t.id::TEXT AS id,
+    CAST(COALESCE(t.organization_id::TEXT, '—') AS TEXT) AS organization_id,
     COALESCE(o.name, 'Platform') AS organization_name,
     t.name,
     t.provisioning_mode,
@@ -608,6 +750,7 @@ LIMIT 100
 
 type ListBackofficeTrunksRow struct {
 	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
 	OrganizationName string `db:"organization_name" json:"organization_name"`
 	Name             string `db:"name" json:"name"`
 	ProvisioningMode string `db:"provisioning_mode" json:"provisioning_mode"`
@@ -628,6 +771,7 @@ func (q *Queries) ListBackofficeTrunks(ctx context.Context) ([]ListBackofficeTru
 		var i ListBackofficeTrunksRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.OrganizationID,
 			&i.OrganizationName,
 			&i.Name,
 			&i.ProvisioningMode,

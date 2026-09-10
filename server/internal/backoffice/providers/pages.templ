@@ -1,9 +1,30 @@
 package providers
 
-import "github.com/leamout/leamout/internal/backoffice/components"
+import (
+	"fmt"
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
 
 templ Page(providers []Provider) {
 	@components.Layout("Managed Providers", "providers", Content(providers))
+}
+
+templ DetailPage(provider Detail) {
+	@components.Layout(provider.Name, "providers", DetailContent(provider))
+}
+
+templ DetailContent(provider Detail) {
+	@components.Breadcrumbs(components.BreadcrumbsProps{{Label: "Managed Providers", Attrs: templ.Attributes{"href": "/providers/"}}, {Label: provider.Name}})
+	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Managed provider</p><h1 class="mt-2 text-3xl font-bold">{ provider.Name }</h1><p class="mt-2 font-mono text-xs text-base-content/60">{ provider.ID }</p></div><span class="badge badge-outline badge-lg">{ provider.Status }</span></div>
+	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm"><div class="stat"><div class="stat-title">Connections</div><div class="stat-value text-3xl">{ fmt.Sprint(provider.Connections) }</div></div><div class="stat"><div class="stat-title">Managed numbers</div><div class="stat-value text-3xl">{ fmt.Sprint(provider.PhoneNumbers) }</div></div><div class="stat"><div class="stat-title">Operation health</div><div class="stat-value text-3xl">{ fmt.Sprint(provider.FailedOperations) }</div><div class="stat-desc">failed · { fmt.Sprint(provider.PendingOperations) } pending</div></div></div>
+	<section class="mt-6 rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Provider configuration</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">@DetailField("Slug", provider.Slug)
+@DetailField("Adapter", provider.Adapter)
+@DetailField("Status", provider.Status)
+@DetailField("Created", provider.CreatedAt)
+@DetailField("Updated", provider.UpdatedAt)
+</dl></section>
+	<section class="mt-6"><div class="mb-4"><h2 class="text-xl font-semibold">Recent operations</h2><p class="mt-1 text-sm text-base-content/60">Latest managed-number provisioning, release, and reconciliation attempts.</p></div>@OperationTable(provider.Operations)
+</section>
 }
 
 templ Content(providers []Provider) {

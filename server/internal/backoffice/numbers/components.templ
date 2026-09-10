@@ -6,10 +6,26 @@ import (
 )
 
 templ NumberTable(numbers []Number) {
-	@components.Table(
+	@components.TableWithLinks(
 		[]string{"Number", "Organization", "Country", "Mode", "Provider", "Voice", "SMS", "Status", "Created"},
 		numberRows(numbers),
+		numberLinks(numbers),
 	)
+}
+
+func numberLinks(numbers []Number) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(numbers)*2)
+	for row, number := range numbers {
+		links = append(links,
+			components.TableCellLink{Row: row, Column: 0, Href: "/numbers/" + number.ID, Class: "link link-primary font-mono"},
+			components.TableCellLink{Row: row, Column: 1, Href: "/organizations/" + number.OrganizationID, Class: "link link-primary"},
+		)
+	}
+	return links
+}
+
+templ DetailField(label string, value string) {
+	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">{ value }</dd></div>
 }
 
 func numberRows(numbers []Number) [][]string {

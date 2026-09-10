@@ -6,6 +6,29 @@ templ Page(accounts []Account) {
 	@components.Layout("Commercial", "commercial", Content(accounts))
 }
 
+templ DetailPage(account Detail) {
+	@components.Layout(account.Organization, "commercial", DetailContent(account))
+}
+
+templ DetailContent(account Detail) {
+	@components.Breadcrumbs(components.BreadcrumbsProps{{Label: "Commercial", Attrs: templ.Attributes{"href": "/commercial/"}}, {Label: account.Organization}})
+	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Commercial account</p><h1 class="mt-2 text-3xl font-bold">{ account.Organization }</h1><p class="mt-2 font-mono text-xs text-base-content/60">{ account.OrganizationID }</p></div><span class="badge badge-outline badge-lg">{ account.SubscriptionStatus }</span></div>
+	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm"><div class="stat"><div class="stat-title">Plan</div><div class="stat-value text-3xl">{ account.Plan }</div><div class="stat-desc">{ account.SubscriptionStatus }</div></div><div class="stat"><div class="stat-title">Pricing</div><div class="stat-value text-2xl">{ account.PricingType }</div><div class="stat-desc">{ account.Currency } { account.AmountMinor } minor units</div></div><div class="stat"><div class="stat-title">Renews</div><div class="stat-value text-xl">{ account.RenewsAt }</div><div class="stat-desc">{ account.BillingInterval }</div></div></div>
+	<div class="mt-6 grid gap-6 xl:grid-cols-2"><section class="rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Subscription</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2">@DetailField("Subscription ID", account.SubscriptionID)
+@DetailField("Status", account.SubscriptionStatus)
+@DetailField("Starts", account.StartsAt)
+@DetailField("Renews", account.RenewsAt)
+@DetailField("Ends", account.EndsAt)
+@DetailField("Billing model", account.BillingModel)
+</dl></section><section class="rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Catalog assignment</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2">@DetailField("Plan", account.Plan)
+@DetailField("Plan ID", account.PlanID)
+@DetailField("Price ID", account.PriceID)
+@DetailField("Pricing type", account.PricingType)
+@DetailField("Currency", account.Currency)
+@DetailField("Amount (minor)", account.AmountMinor)
+</dl></section></div>
+}
+
 templ Content(accounts []Account) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Commercial</p>

@@ -3,10 +3,23 @@ package commercial
 import "github.com/leamout/leamout/internal/backoffice/components"
 
 templ AccountTable(accounts []Account) {
-	@components.Table(
+	@components.TableWithLinks(
 		[]string{"Organization", "Plan", "Subscription", "Billing Model", "Renews"},
 		accountRows(accounts),
+		accountLinks(accounts),
 	)
+}
+
+func accountLinks(accounts []Account) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(accounts))
+	for row, a := range accounts {
+		links = append(links, components.TableCellLink{Row: row, Column: 0, Href: "/commercial/" + a.OrganizationID, Class: "link link-primary"})
+	}
+	return links
+}
+
+templ DetailField(label, value string) {
+	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">{ value }</dd></div>
 }
 
 func accountRows(accounts []Account) [][]string {
