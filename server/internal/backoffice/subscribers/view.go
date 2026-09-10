@@ -1,0 +1,85 @@
+package subscribers
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
+
+func listProps(items []Subscriber) components.ResourceListProps {
+	rows := make([][]string, 0, len(items))
+	links := make([]components.TableCellLink, 0, len(items)*2)
+	for i, v := range items {
+		rows = append(
+			rows,
+			[]string{v.Username + "@" + v.Domain, v.DisplayName, v.OrganizationName, v.Status, v.CreatedAt},
+		)
+		links = append(
+			links,
+			components.TableCellLink{
+				Row:    i,
+				Column: 0,
+				Href:   "/subscribers/" + v.ID,
+				Class:  "link link-primary font-mono",
+			},
+			components.TableCellLink{
+				Row:    i,
+				Column: 2,
+				Href:   "/organizations/" + v.OrganizationID,
+				Class:  "link link-primary",
+			},
+		)
+	}
+	return components.ResourceListProps{
+		Title:       "Subscribers",
+		Eyebrow:     "Telecom",
+		Description: "Inspect SIP subscriber identities, domains, ownership, and lifecycle state.",
+		Active:      "subscribers",
+		Headers:     []string{"Address", "Display name", "Organization", "Status", "Created"},
+		Rows:        rows,
+		Links:       links,
+	}
+}
+
+func detailProps(v Detail) components.ResourceDetailProps {
+	return components.ResourceDetailProps{
+		Title:     v.Username + "@" + v.Domain,
+		Eyebrow:   "Subscriber",
+		Active:    "subscribers",
+		BackLabel: "Subscribers",
+		BackHref:  "/subscribers/",
+		ID:        v.ID,
+		Status:    v.Status,
+		Stats: []components.ResourceField{
+			{Label: "Bindings", Value: fmt.Sprint(v.BindingCount)},
+			{Label: "Credentials", Value: configured(v.CredentialsConfigured)},
+		},
+		Sections: []components.ResourceSection{
+			{
+				Title: "Identity",
+				Fields: []components.ResourceField{
+					{Label: "Username", Value: v.Username},
+					{Label: "Domain", Value: v.Domain},
+					{Label: "Display name", Value: v.DisplayName},
+					{Label: "SIP domain ID", Value: v.SipDomainID},
+				},
+			},
+			{
+				Title: "Ownership and lifecycle",
+				Fields: []components.ResourceField{
+					{Label: "Organization", Value: v.OrganizationName},
+					{Label: "Organization ID", Value: v.OrganizationID},
+					{Label: "Created", Value: v.CreatedAt},
+					{Label: "Updated", Value: v.UpdatedAt},
+				},
+			},
+		},
+	}
+}
+
+func configured(v *bool) string {
+	if v != nil && *v {
+		return "configured"
+	}
+	return "not configured"
+}

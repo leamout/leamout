@@ -1,0 +1,99 @@
+package recordings
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+func listProps(items []Recording) components.ResourceListProps {
+	rows := make([][]string, 0, len(items))
+	links := make([]components.TableCellLink, 0, len(items)*3)
+	for i, v := range items {
+		rows = append(
+			rows,
+			[]string{
+				v.ID,
+				v.OrganizationName,
+				v.CallID,
+				v.Status,
+				v.Format,
+				v.DurationSeconds,
+				v.FileSizeBytes,
+				v.CreatedAt,
+			},
+		)
+		links = append(
+			links,
+			components.TableCellLink{
+				Row:    i,
+				Column: 0,
+				Href:   "/recordings/" + v.ID,
+				Class:  "link link-primary font-mono text-xs",
+			},
+			components.TableCellLink{
+				Row:    i,
+				Column: 1,
+				Href:   "/organizations/" + v.OrganizationID,
+				Class:  "link link-primary",
+			},
+			components.TableCellLink{
+				Row:    i,
+				Column: 2,
+				Href:   "/calls/" + v.CallID,
+				Class:  "link link-primary font-mono text-xs",
+			},
+		)
+	}
+	return components.ResourceListProps{
+		Title:       "Recordings",
+		Eyebrow:     "Telecom",
+		Description: "Inspect call recordings, processing state, storage metadata, duration, and file size.",
+		Active:      "recordings",
+		Headers:     []string{"Recording", "Organization", "Call", "Status", "Format", "Duration", "Bytes", "Created"},
+		Rows:        rows,
+		Links:       links,
+	}
+}
+
+func detailProps(v Detail) components.ResourceDetailProps {
+	return components.ResourceDetailProps{
+		Title:     "Recording " + v.ID,
+		Eyebrow:   "Recording",
+		Active:    "recordings",
+		BackLabel: "Recordings",
+		BackHref:  "/recordings/",
+		ID:        v.ID,
+		Status:    v.Status,
+		Stats: []components.ResourceField{
+			{Label: "Duration", Value: v.DurationSeconds + " seconds"},
+			{Label: "File size", Value: v.FileSizeBytes + " bytes"},
+			{Label: "Format", Value: v.Format},
+		},
+		Sections: []components.ResourceSection{
+			{
+				Title: "Call ownership",
+				Fields: []components.ResourceField{
+					{Label: "Organization", Value: v.OrganizationName},
+					{Label: "Organization ID", Value: v.OrganizationID},
+					{Label: "Call ID", Value: v.CallID},
+					{Label: "Status", Value: v.Status},
+				},
+			},
+			{
+				Title: "Storage",
+				Fields: []components.ResourceField{
+					{Label: "Provider", Value: v.StorageProvider},
+					{Label: "Bucket", Value: v.StorageBucket},
+					{Label: "Key", Value: v.StorageKey},
+					{Label: "URL", Value: v.StorageUrl},
+				},
+			},
+			{
+				Title: "Timeline",
+				Fields: []components.ResourceField{
+					{Label: "Started", Value: v.StartedAt},
+					{Label: "Completed", Value: v.CompletedAt},
+					{Label: "Created", Value: v.CreatedAt},
+					{Label: "Updated", Value: v.UpdatedAt},
+				},
+			},
+		},
+	}
+}

@@ -49,7 +49,19 @@ func (r *Repository) Get(ctx context.Context, numberID uuid.UUID) (Detail, error
 		return Detail{}, err
 	}
 	return Detail{
-		PhoneNumber:         Number{ID: row.ID, OrganizationID: row.OrganizationID, Organization: row.OrganizationName, Number: row.Number, CountryCode: row.CountryCode, Mode: row.ProvisioningMode, Provider: row.ProviderName, Voice: row.VoiceEnabled, SMS: row.SmsEnabled, Status: row.Status, CreatedAt: row.CreatedAt},
+		PhoneNumber: Number{
+			ID:             row.ID,
+			OrganizationID: row.OrganizationID,
+			Organization:   row.OrganizationName,
+			Number:         row.Number,
+			CountryCode:    row.CountryCode,
+			Mode:           row.ProvisioningMode,
+			Provider:       row.ProviderName,
+			Voice:          row.VoiceEnabled,
+			SMS:            row.SmsEnabled,
+			Status:         row.Status,
+			CreatedAt:      row.CreatedAt,
+		},
 		CarrierConnectionID: row.CarrierConnectionID, CarrierConnection: row.CarrierConnectionName,
 		ProviderID: row.ProviderID, ProviderResourceID: row.ProviderResourceID,
 		ErrorCode: row.ErrorCode, ErrorMessage: row.ErrorMessage, UpdatedAt: row.UpdatedAt,

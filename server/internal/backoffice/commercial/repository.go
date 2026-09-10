@@ -17,7 +17,26 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	if err != nil {
 		return Detail{}, err
 	}
-	return Detail{Account: Account{OrganizationID: row.OrganizationID, Organization: row.OrganizationName, Plan: row.PlanName, SubscriptionStatus: row.SubscriptionStatus, BillingModel: row.BillingModel, RenewsAt: row.RenewsAt}, SubscriptionID: row.SubscriptionID, PlanID: row.PlanID, PriceID: row.PriceID, PricingType: row.PricingType, Currency: row.Currency, AmountMinor: row.AmountMinor, BillingInterval: row.BillingInterval, StartsAt: row.StartsAt, EndsAt: row.EndsAt, OrganizationCreatedAt: row.OrganizationCreatedAt}, nil
+	return Detail{
+		Account: Account{
+			OrganizationID:     row.OrganizationID,
+			Organization:       row.OrganizationName,
+			Plan:               row.PlanName,
+			SubscriptionStatus: row.SubscriptionStatus,
+			BillingModel:       row.BillingModel,
+			RenewsAt:           row.RenewsAt,
+		},
+		SubscriptionID:        row.SubscriptionID,
+		PlanID:                row.PlanID,
+		PriceID:               row.PriceID,
+		PricingType:           row.PricingType,
+		Currency:              row.Currency,
+		AmountMinor:           row.AmountMinor,
+		BillingInterval:       row.BillingInterval,
+		StartsAt:              row.StartsAt,
+		EndsAt:                row.EndsAt,
+		OrganizationCreatedAt: row.OrganizationCreatedAt,
+	}, nil
 }
 
 func NewRepository(queries *sqlc.Queries) *Repository {

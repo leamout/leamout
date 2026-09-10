@@ -62,7 +62,40 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	}
 	resources := make([]ProviderResource, 0, len(resourceRows))
 	for _, v := range resourceRows {
-		resources = append(resources, ProviderResource{Type: v.ResourceType, ProviderResourceID: v.ProviderResourceID, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt})
+		resources = append(
+			resources,
+			ProviderResource{
+				Type:               v.ResourceType,
+				ProviderResourceID: v.ProviderResourceID,
+				CreatedAt:          v.CreatedAt,
+				UpdatedAt:          v.UpdatedAt,
+			},
+		)
 	}
-	return Detail{CarrierConnection: CarrierConnection{ID: row.ID, OrganizationID: row.OrganizationID, Organization: row.OrganizationName, Name: row.Name, Provider: row.ProviderName, Scope: row.Scope, Status: row.Status, InboundEnabled: row.InboundEnabled, MaxCPS: row.MaxCps, MaxConcurrentCalls: row.MaxConcurrentCalls, Trunks: row.TrunkCount}, ProviderID: row.ProviderID, OutboundAuth: row.OutboundAuthMethod, InboundAuth: row.InboundAuthMethod, MaxDailyMinutes: row.MaxDailyMinutes, Codecs: row.Codecs, SupportsVideo: row.SupportsVideo, SupportsFax: row.SupportsFax, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, SourceIPs: ips, Resources: resources}, nil
+	return Detail{
+		CarrierConnection: CarrierConnection{
+			ID:                 row.ID,
+			OrganizationID:     row.OrganizationID,
+			Organization:       row.OrganizationName,
+			Name:               row.Name,
+			Provider:           row.ProviderName,
+			Scope:              row.Scope,
+			Status:             row.Status,
+			InboundEnabled:     row.InboundEnabled,
+			MaxCPS:             row.MaxCps,
+			MaxConcurrentCalls: row.MaxConcurrentCalls,
+			Trunks:             row.TrunkCount,
+		},
+		ProviderID:      row.ProviderID,
+		OutboundAuth:    row.OutboundAuthMethod,
+		InboundAuth:     row.InboundAuthMethod,
+		MaxDailyMinutes: row.MaxDailyMinutes,
+		Codecs:          row.Codecs,
+		SupportsVideo:   row.SupportsVideo,
+		SupportsFax:     row.SupportsFax,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		SourceIPs:       ips,
+		Resources:       resources,
+	}, nil
 }

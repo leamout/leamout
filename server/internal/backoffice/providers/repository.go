@@ -23,9 +23,38 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	}
 	operations := make([]Operation, 0, len(operationRows))
 	for _, v := range operationRows {
-		operations = append(operations, Operation{ID: v.ID, Organization: v.OrganizationName, Number: v.Number, Type: v.OperationType, State: v.State, Attempts: v.Attempts, ProviderOperationID: v.ProviderOperationID, LastError: v.LastError, CreatedAt: v.CreatedAt, UpdatedAt: v.UpdatedAt})
+		operations = append(
+			operations,
+			Operation{
+				ID:                  v.ID,
+				Organization:        v.OrganizationName,
+				Number:              v.Number,
+				Type:                v.OperationType,
+				State:               v.State,
+				Attempts:            v.Attempts,
+				ProviderOperationID: v.ProviderOperationID,
+				LastError:           v.LastError,
+				CreatedAt:           v.CreatedAt,
+				UpdatedAt:           v.UpdatedAt,
+			},
+		)
 	}
-	return Detail{Provider: Provider{ID: row.ID, Slug: row.Slug, Name: row.Name, Adapter: row.Adapter, Status: row.Status, Connections: row.ConnectionCount, PendingOperations: row.PendingOperationCount, FailedOperations: row.FailedOperationCount}, PhoneNumbers: row.PhoneNumberCount, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Operations: operations}, nil
+	return Detail{
+		Provider: Provider{
+			ID:                row.ID,
+			Slug:              row.Slug,
+			Name:              row.Name,
+			Adapter:           row.Adapter,
+			Status:            row.Status,
+			Connections:       row.ConnectionCount,
+			PendingOperations: row.PendingOperationCount,
+			FailedOperations:  row.FailedOperationCount,
+		},
+		PhoneNumbers: row.PhoneNumberCount,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
+		Operations:   operations,
+	}, nil
 }
 
 func NewRepository(queries *sqlc.Queries) *Repository {

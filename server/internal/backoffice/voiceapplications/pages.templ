@@ -1,9 +1,6 @@
 package voiceapplications
 
-import (
-	"fmt"
-	"github.com/leamout/leamout/internal/backoffice/components"
-)
+import "github.com/leamout/leamout/internal/backoffice/components"
 
 templ Page(items []VoiceApplication) {
 	@components.ResourceListPage(listProps(items))
@@ -11,17 +8,4 @@ templ Page(items []VoiceApplication) {
 
 templ DetailPage(item Detail) {
 	@components.ResourceDetailPage(detailProps(item))
-}
-
-func listProps(items []VoiceApplication) components.ResourceListProps {
-	rows := make([][]string, 0, len(items))
-	links := make([]components.TableCellLink, 0, len(items)*2)
-	for i, v := range items {
-		rows = append(rows, []string{v.Name, v.OrganizationName, fmt.Sprint(v.BindingCount), fmt.Sprint(v.RingTimeoutSeconds) + "s", v.Status, v.CreatedAt})
-		links = append(links, components.TableCellLink{Row: i, Column: 0, Href: "/voice-applications/" + v.ID, Class: "link link-primary"}, components.TableCellLink{Row: i, Column: 1, Href: "/organizations/" + v.OrganizationID, Class: "link link-primary"})
-	}
-	return components.ResourceListProps{Title: "Voice Applications", Eyebrow: "Telecom", Description: "Inspect call control applications, routing bindings, callbacks, and lifecycle state.", Active: "voiceapplications", Headers: []string{"Application", "Organization", "Bindings", "Ring timeout", "Status", "Created"}, Rows: rows, Links: links}
-}
-func detailProps(v Detail) components.ResourceDetailProps {
-	return components.ResourceDetailProps{Title: v.Name, Eyebrow: "Voice application", Active: "voiceapplications", BackLabel: "Voice Applications", BackHref: "/voice-applications/", ID: v.ID, Status: v.Status, Stats: []components.ResourceField{{Label: "Bindings", Value: fmt.Sprint(v.BindingCount)}, {Label: "Ring timeout", Value: fmt.Sprint(v.RingTimeoutSeconds) + " seconds"}}, Sections: []components.ResourceSection{{Title: "Routing", Fields: []components.ResourceField{{Label: "Caller ID", Value: v.CallerID}, {Label: "Voice URL", Value: v.VoiceUrl}, {Label: "Callback URL", Value: v.CallbackUrl}}}, {Title: "Ownership and lifecycle", Fields: []components.ResourceField{{Label: "Organization", Value: v.OrganizationName}, {Label: "Organization ID", Value: v.OrganizationID}, {Label: "Created", Value: v.CreatedAt}, {Label: "Updated", Value: v.UpdatedAt}}}}}
 }

@@ -52,7 +52,44 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	}
 	endpoints := make([]Endpoint, 0, len(endpointRows))
 	for _, e := range endpointRows {
-		endpoints = append(endpoints, Endpoint{ID: e.ID, Host: e.Host, Port: e.Port, Transport: e.Transport, Direction: e.Direction, Priority: e.Priority, Weight: e.Weight, Enabled: e.Enabled, Health: e.HealthStatus, Failures: e.ConsecutiveFailures, LastResponse: e.LastResponseCode, LastLatency: e.LastLatencyMs, LastError: e.LastError, LastChecked: e.LastCheckedAt})
+		endpoints = append(
+			endpoints,
+			Endpoint{
+				ID:           e.ID,
+				Host:         e.Host,
+				Port:         e.Port,
+				Transport:    e.Transport,
+				Direction:    e.Direction,
+				Priority:     e.Priority,
+				Weight:       e.Weight,
+				Enabled:      e.Enabled,
+				Health:       e.HealthStatus,
+				Failures:     e.ConsecutiveFailures,
+				LastResponse: e.LastResponseCode,
+				LastLatency:  e.LastLatencyMs,
+				LastError:    e.LastError,
+				LastChecked:  e.LastCheckedAt,
+			},
+		)
 	}
-	return Detail{Trunk: Trunk{ID: row.ID, OrganizationID: row.OrganizationID, Organization: row.OrganizationName, Name: row.Name, Mode: row.ProvisioningMode, Provider: row.ProviderName, Direction: row.Direction, Status: row.Status, Endpoints: row.EndpointCount}, ManagedDefault: row.ManagedDefault, CarrierConnectionID: row.CarrierConnectionID, CarrierConnection: row.CarrierConnectionName, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, EnabledEndpoints: row.EnabledEndpointCount, EndpointList: endpoints}, nil
+	return Detail{
+		Trunk: Trunk{
+			ID:             row.ID,
+			OrganizationID: row.OrganizationID,
+			Organization:   row.OrganizationName,
+			Name:           row.Name,
+			Mode:           row.ProvisioningMode,
+			Provider:       row.ProviderName,
+			Direction:      row.Direction,
+			Status:         row.Status,
+			Endpoints:      row.EndpointCount,
+		},
+		ManagedDefault:      row.ManagedDefault,
+		CarrierConnectionID: row.CarrierConnectionID,
+		CarrierConnection:   row.CarrierConnectionName,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
+		EnabledEndpoints:    row.EnabledEndpointCount,
+		EndpointList:        endpoints,
+	}, nil
 }

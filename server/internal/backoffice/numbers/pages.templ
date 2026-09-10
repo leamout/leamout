@@ -2,6 +2,7 @@ package numbers
 
 import (
 	"fmt"
+
 	"github.com/leamout/leamout/internal/backoffice/components"
 )
 
@@ -16,29 +17,53 @@ templ DetailPage(number Detail) {
 templ DetailContent(number Detail) {
 	@components.Breadcrumbs(components.BreadcrumbsProps{{Label: "Phone Numbers", Attrs: templ.Attributes{"href": "/numbers/"}}, {Label: number.PhoneNumber.Number}})
 	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-		<div><p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Phone number</p><h1 class="mt-2 font-mono text-3xl font-bold">{ number.PhoneNumber.Number }</h1><p class="mt-2 font-mono text-xs text-base-content/60">{ number.ID }</p></div>
+		<div>
+			<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Phone number</p>
+			<h1 class="mt-2 font-mono text-3xl font-bold">{ number.PhoneNumber.Number }</h1>
+			<p class="mt-2 font-mono text-xs text-base-content/60">{ number.ID }</p>
+		</div>
 		<span class="badge badge-outline badge-lg">{ number.Status }</span>
 	</div>
 	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
-		<div class="stat"><div class="stat-title">Provisioning</div><div class="stat-value text-2xl">{ number.Mode }</div><div class="stat-desc">{ number.Provider }</div></div>
-		<div class="stat"><div class="stat-title">Voice</div><div class="stat-value text-2xl">{ fmt.Sprint(number.Voice) }</div><div class="stat-desc">Calling capability</div></div>
-		<div class="stat"><div class="stat-title">SMS</div><div class="stat-value text-2xl">{ fmt.Sprint(number.SMS) }</div><div class="stat-desc">Messaging capability</div></div>
+		<div class="stat">
+			<div class="stat-title">Provisioning</div>
+			<div class="stat-value text-2xl">{ number.Mode }</div>
+			<div class="stat-desc">{ number.Provider }</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Voice</div>
+			<div class="stat-value text-2xl">{ fmt.Sprint(number.Voice) }</div>
+			<div class="stat-desc">Calling capability</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">SMS</div>
+			<div class="stat-value text-2xl">{ fmt.Sprint(number.SMS) }</div>
+			<div class="stat-desc">Messaging capability</div>
+		</div>
 	</div>
 	<div class="mt-6 grid gap-6 xl:grid-cols-2">
-		<section class="rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Ownership and routing</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2">@DetailField("Organization", number.Organization)
-@DetailField("Organization ID", number.OrganizationID)
-@DetailField("Carrier connection", number.CarrierConnection)
-@DetailField("Carrier connection ID", number.CarrierConnectionID)
-@DetailField("Provider", number.Provider)
-@DetailField("Provider resource ID", number.ProviderResourceID)
-</dl></section>
-		<section class="rounded-box border border-base-300 bg-base-100 p-6"><h2 class="text-lg font-semibold">Lifecycle</h2><dl class="mt-5 grid gap-5 sm:grid-cols-2">@DetailField("Country", number.CountryCode)
-@DetailField("Status", number.Status)
-@DetailField("Error code", number.ErrorCode)
-@DetailField("Error message", number.ErrorMessage)
-@DetailField("Created", number.CreatedAt)
-@DetailField("Updated", number.UpdatedAt)
-</dl></section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Ownership and routing</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("Organization", number.Organization)
+				@DetailField("Organization ID", number.OrganizationID)
+				@DetailField("Carrier connection", number.CarrierConnection)
+				@DetailField("Carrier connection ID", number.CarrierConnectionID)
+				@DetailField("Provider", number.Provider)
+				@DetailField("Provider resource ID", number.ProviderResourceID)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Lifecycle</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("Country", number.CountryCode)
+				@DetailField("Status", number.Status)
+				@DetailField("Error code", number.ErrorCode)
+				@DetailField("Error message", number.ErrorMessage)
+				@DetailField("Created", number.CreatedAt)
+				@DetailField("Updated", number.UpdatedAt)
+			</dl>
+		</section>
 	</div>
 }
 
