@@ -49,7 +49,7 @@ WHERE o.id = $9
             AND s.organization_id = o.id
       )
   )
-ON CONFLICT (idempotency_key) DO NOTHING
+ON CONFLICT (organization_id, idempotency_key) DO NOTHING
 RETURNING id, organization_id, subscription_id, meter_id, quantity, source_type, source_id, idempotency_key, dimensions, occurred_at, created_at
 `
 
