@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
     wallet_id UUID,
     price_id UUID REFERENCES prices(id) ON DELETE RESTRICT,
-    invoice_id UUID,
     order_type TEXT NOT NULL,
     provider TEXT NOT NULL,
     payment_method TEXT NOT NULL,
@@ -29,14 +28,10 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
         FOREIGN KEY (price_id, currency)
         REFERENCES prices (id, currency)
         ON DELETE RESTRICT,
-    CONSTRAINT fk_checkout_orders_invoice_terms
-        FOREIGN KEY (invoice_id, organization_id, amount, currency)
-        REFERENCES invoices (id, organization_id, total, currency)
-        ON DELETE RESTRICT,
     CONSTRAINT chk_checkout_orders_type CHECK (order_type IN ('subscription', 'wallet_topup')),
     CONSTRAINT chk_checkout_orders_target CHECK (
         (order_type = 'subscription' AND price_id IS NOT NULL AND wallet_id IS NULL)
-        OR (order_type = 'wallet_topup' AND wallet_id IS NOT NULL AND price_id IS NULL AND invoice_id IS NULL)
+        OR (order_type = 'wallet_topup' AND wallet_id IS NOT NULL AND price_id IS NULL)
     ),
     CONSTRAINT chk_checkout_orders_provider CHECK (provider IN ('stripe', 'paystack')),
     CONSTRAINT chk_checkout_orders_method CHECK (
@@ -69,7 +64,7 @@ CREATE TABLE IF NOT EXISTS checkout_orders (
 );
 
 COMMENT ON TABLE checkout_orders IS
-    'Server-priced intent to collect money. Provider success is required before subscription activation or wallet credit.';
+    'Server-priced intent to collect prepaid money. Provider success is required before subscription activation or wallet credit.';
 
 CREATE INDEX IF NOT EXISTS idx_checkout_orders_organization_created
     ON checkout_orders (organization_id, created_at DESC);

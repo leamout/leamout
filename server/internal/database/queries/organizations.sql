@@ -99,8 +99,8 @@ SELECT
     COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
     COALESCE(subscription.plan_name, '—') AS plan_name,
     COALESCE(subscription.status, 'none') AS subscription_status,
-    COALESCE(subscription.billing_provider, '—') AS billing_provider,
-    COALESCE(subscription.provider_subscription_id, '—') AS provider_subscription_id,
+    'prepaid'::TEXT AS billing_model,
+    COALESCE(subscription.pricing_type, '—') AS pricing_type,
     COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS renews_at,
     COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS ends_at,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
@@ -111,12 +111,12 @@ LEFT JOIN LATERAL (
     SELECT
         p.name AS plan_name,
         s.status,
-        s.billing_provider,
-        s.provider_subscription_id,
+        pr.pricing_type,
         s.renews_at,
         s.ends_at
     FROM subscriptions AS s
     JOIN plans AS p ON p.id = s.plan_id
+    JOIN prices AS pr ON pr.id = s.price_id
     WHERE s.organization_id = o.id
     ORDER BY
         CASE WHEN s.status IN ('active', 'past_due') THEN 0 ELSE 1 END,
@@ -133,8 +133,7 @@ GROUP BY
     o.updated_at,
     subscription.plan_name,
     subscription.status,
-    subscription.billing_provider,
-    subscription.provider_subscription_id,
+    subscription.pricing_type,
     subscription.renews_at,
     subscription.ends_at
 LIMIT 1;

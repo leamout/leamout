@@ -1,13 +1,12 @@
 -- name: CreateCheckoutOrder :one
 INSERT INTO checkout_orders (
-    organization_id, wallet_id, price_id, invoice_id, order_type,
+    organization_id, wallet_id, price_id, order_type,
     provider, payment_method, reference, amount, currency, expires_at, metadata
 )
 SELECT
     sqlc.arg(organization_id) AS organization_id,
     sqlc.narg(wallet_id)::UUID AS wallet_id,
     sqlc.narg(price_id)::UUID AS price_id,
-    sqlc.narg(invoice_id)::UUID AS invoice_id,
     sqlc.arg(order_type) AS order_type,
     sqlc.arg(provider) AS provider,
     sqlc.arg(payment_method) AS payment_method,
