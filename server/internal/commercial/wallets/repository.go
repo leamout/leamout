@@ -19,11 +19,17 @@ type Repository struct {
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db, queries: sqlc.New(db)}
+	return &Repository{
+		db:      db,
+		queries: sqlc.New(db),
+	}
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
-	row, err := r.queries.CreateWallet(ctx, sqlc.CreateWalletParams{OrganizationID: organizationID, Currency: currency})
+	row, err := r.queries.CreateWallet(ctx, sqlc.CreateWalletParams{
+		OrganizationID: organizationID,
+		Currency:       currency,
+	})
 	if err != nil {
 		return Wallet{}, mapWalletWriteError(err)
 	}
@@ -31,7 +37,10 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, curre
 }
 
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Wallet, error) {
-	row, err := r.queries.GetWallet(ctx, sqlc.GetWalletParams{OrganizationID: organizationID, ID: id})
+	row, err := r.queries.GetWallet(ctx, sqlc.GetWalletParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
 	if err != nil {
 		return Wallet{}, mapWalletReadError(err)
 	}
@@ -39,7 +48,10 @@ func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Wal
 }
 
 func (r *Repository) GetByCurrency(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
-	row, err := r.queries.GetWalletByCurrency(ctx, sqlc.GetWalletByCurrencyParams{OrganizationID: organizationID, Currency: currency})
+	row, err := r.queries.GetWalletByCurrency(ctx, sqlc.GetWalletByCurrencyParams{
+		OrganizationID: organizationID,
+		Currency:       currency,
+	})
 	if err != nil {
 		return Wallet{}, mapWalletReadError(err)
 	}
@@ -47,11 +59,18 @@ func (r *Repository) GetByCurrency(ctx context.Context, organizationID uuid.UUID
 }
 
 func (r *Repository) Balance(ctx context.Context, organizationID, walletID uuid.UUID) (Balance, error) {
-	row, err := r.queries.GetWalletBalance(ctx, sqlc.GetWalletBalanceParams{OrganizationID: organizationID, WalletID: walletID})
+	row, err := r.queries.GetWalletBalance(ctx, sqlc.GetWalletBalanceParams{
+		OrganizationID: organizationID,
+		WalletID:       walletID,
+	})
 	if err != nil {
 		return Balance{}, mapWalletReadError(err)
 	}
-	return Balance{Posted: row.Posted, Reserved: row.Reserved, Available: row.Available}, nil
+	return Balance{
+		Posted:    row.Posted,
+		Reserved:  row.Reserved,
+		Available: row.Available,
+	}, nil
 }
 
 func (r *Repository) Post(ctx context.Context, organizationID, walletID uuid.UUID, input PostEntryInput) (LedgerEntry, error) {
@@ -66,7 +85,10 @@ func (r *Repository) Post(ctx context.Context, organizationID, walletID uuid.UUI
 }
 
 func (r *Repository) ListEntries(ctx context.Context, organizationID, walletID uuid.UUID) ([]LedgerEntry, error) {
-	rows, err := r.queries.ListWalletLedgerEntries(ctx, sqlc.ListWalletLedgerEntriesParams{WalletID: walletID, OrganizationID: organizationID})
+	rows, err := r.queries.ListWalletLedgerEntries(ctx, sqlc.ListWalletLedgerEntriesParams{
+		WalletID:       walletID,
+		OrganizationID: organizationID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +113,16 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := r.queries.WithTx(tx)
-	if _, err = q.LockActiveWallet(ctx, sqlc.LockActiveWalletParams{ID: walletID, OrganizationID: organizationID}); err != nil {
+	if _, err = q.LockActiveWallet(ctx, sqlc.LockActiveWalletParams{
+		ID:             walletID,
+		OrganizationID: organizationID,
+	}); err != nil {
 		return Reservation{}, mapWalletReadError(err)
 	}
-	balance, err := q.GetWalletBalance(ctx, sqlc.GetWalletBalanceParams{OrganizationID: organizationID, WalletID: walletID})
+	balance, err := q.GetWalletBalance(ctx, sqlc.GetWalletBalanceParams{
+		OrganizationID: organizationID,
+		WalletID:       walletID,
+	})
 	if err != nil {
 		return Reservation{}, mapWalletReadError(err)
 	}
@@ -102,9 +130,12 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 		return Reservation{}, ErrInsufficientFunds
 	}
 	row, err := q.InsertWalletReservation(ctx, sqlc.InsertWalletReservationParams{
-		WalletID: walletID, OrganizationID: organizationID, Amount: input.AmountMinor,
-		OperationType: input.OperationType, OperationID: input.OperationID,
-		ExpiresAt: pgconv.NullableTimestamptz(&input.ExpiresAt),
+		WalletID:       walletID,
+		OrganizationID: organizationID,
+		Amount:         input.AmountMinor,
+		OperationType:  input.OperationType,
+		OperationID:    input.OperationID,
+		ExpiresAt:      pgconv.NullableTimestamptz(&input.ExpiresAt),
 	})
 	if err != nil {
 		return Reservation{}, mapWalletWriteError(err)
@@ -116,7 +147,10 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 }
 
 func (r *Repository) GetReservation(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
-	row, err := r.queries.GetWalletReservation(ctx, sqlc.GetWalletReservationParams{OrganizationID: organizationID, ID: id})
+	row, err := r.queries.GetWalletReservation(ctx, sqlc.GetWalletReservationParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
 	if err != nil {
 		return Reservation{}, mapReservationReadError(err)
 	}
@@ -137,14 +171,19 @@ func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, 
 
 	q := r.queries.WithTx(tx)
 	row, err := q.CaptureWalletReservation(ctx, sqlc.CaptureWalletReservationParams{
-		CapturedAmount: &amountMinor, OrganizationID: organizationID, ID: id,
+		CapturedAmount: &amountMinor,
+		OrganizationID: organizationID,
+		ID:             id,
 	})
 	if err != nil {
 		return Reservation{}, mapReservationTransitionError(err)
 	}
 	_, err = q.CreateWalletLedgerEntry(ctx, entryParams(organizationID, row.WalletID, PostEntryInput{
-		Type: EntryCapture, AmountMinor: -amountMinor, SourceType: "wallet_reservation",
-		SourceID: row.ID.String(), IdempotencyKey: idempotencyKey,
+		Type:           EntryCapture,
+		AmountMinor:    -amountMinor,
+		SourceType:     "wallet_reservation",
+		SourceID:       row.ID.String(),
+		IdempotencyKey: idempotencyKey,
 	}))
 	if err != nil {
 		return Reservation{}, mapWalletWriteError(err)
@@ -156,7 +195,10 @@ func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, 
 }
 
 func (r *Repository) Release(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
-	row, err := r.queries.ReleaseWalletReservation(ctx, sqlc.ReleaseWalletReservationParams{OrganizationID: organizationID, ID: id})
+	row, err := r.queries.ReleaseWalletReservation(ctx, sqlc.ReleaseWalletReservationParams{
+		OrganizationID: organizationID,
+		ID:             id,
+	})
 	if err != nil {
 		return Reservation{}, mapReservationTransitionError(err)
 	}
@@ -177,22 +219,62 @@ func (r *Repository) Expire(ctx context.Context) ([]Reservation, error) {
 
 func entryParams(organizationID, walletID uuid.UUID, input PostEntryInput) sqlc.CreateWalletLedgerEntryParams {
 	return sqlc.CreateWalletLedgerEntryParams{
-		EntryType: string(input.Type), Amount: input.AmountMinor, SourceType: input.SourceType,
-		SourceID: input.SourceID, IdempotencyKey: input.IdempotencyKey, Metadata: input.Metadata,
-		OccurredAt: pgconv.NullableTimestamptz(input.OccurredAt), WalletID: walletID, OrganizationID: organizationID,
+		EntryType:      string(input.Type),
+		Amount:         input.AmountMinor,
+		SourceType:     input.SourceType,
+		SourceID:       input.SourceID,
+		IdempotencyKey: input.IdempotencyKey,
+		Metadata:       input.Metadata,
+		OccurredAt:     pgconv.NullableTimestamptz(input.OccurredAt),
+		WalletID:       walletID,
+		OrganizationID: organizationID,
 	}
 }
 
 func walletFromRow(row sqlc.Wallet) Wallet {
-	return Wallet{ID: row.ID, OrganizationID: row.OrganizationID, Currency: row.Currency, Status: Status(row.Status), CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt)}
+	return Wallet{
+		ID:             row.ID,
+		OrganizationID: row.OrganizationID,
+		Currency:       row.Currency,
+		Status:         Status(row.Status),
+		CreatedAt:      pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(row.UpdatedAt),
+	}
 }
 
 func ledgerEntryFromRow(row sqlc.WalletLedgerEntry) LedgerEntry {
-	return LedgerEntry{ID: row.ID, WalletID: row.WalletID, OrganizationID: row.OrganizationID, Type: EntryType(row.EntryType), AmountMinor: row.Amount, SourceType: row.SourceType, SourceID: row.SourceID, IdempotencyKey: row.IdempotencyKey, Metadata: row.Metadata, OccurredAt: pgconv.TimestamptzToTime(row.OccurredAt), CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt)}
+	return LedgerEntry{
+		ID:             row.ID,
+		WalletID:       row.WalletID,
+		OrganizationID: row.OrganizationID,
+		Type:           EntryType(row.EntryType),
+		AmountMinor:    row.Amount,
+		SourceType:     row.SourceType,
+		SourceID:       row.SourceID,
+		IdempotencyKey: row.IdempotencyKey,
+		Metadata:       row.Metadata,
+		OccurredAt:     pgconv.TimestamptzToTime(row.OccurredAt),
+		CreatedAt:      pgconv.TimestamptzToTime(row.CreatedAt),
+	}
 }
 
 func reservationFromRow(row sqlc.WalletReservation) Reservation {
-	return Reservation{ID: row.ID, WalletID: row.WalletID, OrganizationID: row.OrganizationID, AmountMinor: row.Amount, CapturedMinor: row.CapturedAmount, OperationType: row.OperationType, OperationID: row.OperationID, Status: ReservationStatus(row.Status), ExpiresAt: pgconv.TimestamptzToTime(row.ExpiresAt), CapturedAt: pgconv.TimestamptzToTimePtr(row.CapturedAt), ReleasedAt: pgconv.TimestamptzToTimePtr(row.ReleasedAt), ExpiredAt: pgconv.TimestamptzToTimePtr(row.ExpiredAt), CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt)}
+	return Reservation{
+		ID:             row.ID,
+		WalletID:       row.WalletID,
+		OrganizationID: row.OrganizationID,
+		AmountMinor:    row.Amount,
+		CapturedMinor:  row.CapturedAmount,
+		OperationType:  row.OperationType,
+		OperationID:    row.OperationID,
+		Status:         ReservationStatus(row.Status),
+		ExpiresAt:      pgconv.TimestamptzToTime(row.ExpiresAt),
+		CapturedAt:     pgconv.TimestamptzToTimePtr(row.CapturedAt),
+		ReleasedAt:     pgconv.TimestamptzToTimePtr(row.ReleasedAt),
+		ExpiredAt:      pgconv.TimestamptzToTimePtr(row.ExpiredAt),
+		CreatedAt:      pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(row.UpdatedAt),
+	}
 }
 
 func mapWalletReadError(err error) error {
