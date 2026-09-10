@@ -165,15 +165,26 @@ func planFromRow(row sqlc.Plan) Plan {
 }
 
 func priceFromRow(row sqlc.Price) Price {
+	var billingInterval *BillingInterval
+	if row.BillingInterval != nil {
+		value := BillingInterval(*row.BillingInterval)
+		billingInterval = &value
+	}
+
 	return Price{
-		ID:              row.ID,
-		PlanID:          row.PlanID,
-		Currency:        row.Currency,
-		AmountMinor:     row.AmountMinor,
-		BillingInterval: BillingInterval(row.BillingInterval),
-		Active:          row.Active,
-		EffectiveFrom:   pgconv.TimestamptzToTime(row.EffectiveFrom),
-		EffectiveUntil:  pgconv.TimestamptzToTimePtr(row.EffectiveUntil),
-		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
+		ID:               row.ID,
+		PlanID:           row.PlanID,
+		MeterID:          row.MeterID,
+		PricingType:      PricingType(row.PricingType),
+		Currency:         row.Currency,
+		AmountMinor:      row.AmountMinor,
+		BillingInterval:  billingInterval,
+		UnitAmountMicros: row.UnitAmountMicros,
+		UnitSize:         row.UnitSize,
+		Dimensions:       row.Dimensions,
+		Active:           row.Active,
+		EffectiveFrom:    pgconv.TimestamptzToTime(row.EffectiveFrom),
+		EffectiveUntil:   pgconv.TimestamptzToTimePtr(row.EffectiveUntil),
+		CreatedAt:        pgconv.TimestamptzToTime(row.CreatedAt),
 	}
 }

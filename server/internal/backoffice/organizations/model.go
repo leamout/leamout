@@ -10,19 +10,19 @@ type Organization struct {
 }
 
 type Detail struct {
-	ID                     string
-	Name                   string
-	Status                 string
-	Members                int64
-	Plan                   string
-	SubscriptionStatus     string
-	BillingProvider        string
-	ProviderSubscriptionID string
-	RenewsAt               string
-	EndsAt                 string
-	CreatedAt              string
-	UpdatedAt              string
-	MembersList            []Member
+	ID                 string
+	Name               string
+	Status             string
+	Members            int64
+	Plan               string
+	SubscriptionStatus string
+	BillingModel       string
+	PricingType        string
+	RenewsAt           string
+	EndsAt             string
+	CreatedAt          string
+	UpdatedAt          string
+	MembersList        []Member
 }
 
 type Member struct {

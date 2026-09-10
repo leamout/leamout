@@ -47,7 +47,6 @@ type Order struct {
 	OrganizationID  uuid.UUID
 	WalletID        *uuid.UUID
 	PriceID         *uuid.UUID
-	InvoiceID       *uuid.UUID
 	Type            OrderType
 	Provider        Provider
 	PaymentMethod   PaymentMethod
@@ -67,7 +66,6 @@ type Order struct {
 type CreateInput struct {
 	WalletID      *uuid.UUID
 	PriceID       *uuid.UUID
-	InvoiceID     *uuid.UUID
 	Type          OrderType
 	Provider      Provider
 	PaymentMethod PaymentMethod

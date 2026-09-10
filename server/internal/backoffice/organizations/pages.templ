@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"fmt"
+
 	"github.com/leamout/leamout/internal/backoffice/components"
 )
 
@@ -52,9 +53,9 @@ templ DetailContent(organization Detail) {
 			<div class="stat-desc">Subscription: { organization.SubscriptionStatus }</div>
 		</div>
 		<div class="stat">
-			<div class="stat-title">Billing provider</div>
-			<div class="stat-value text-3xl">{ organization.BillingProvider }</div>
-			<div class="stat-desc">Current or latest subscription</div>
+			<div class="stat-title">Billing model</div>
+			<div class="stat-value text-3xl">{ organization.BillingModel }</div>
+			<div class="stat-desc">Pay before use</div>
 		</div>
 	</div>
 
@@ -74,8 +75,8 @@ templ DetailContent(organization Detail) {
 			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
 				@DetailField("Plan", organization.Plan)
 				@DetailField("Subscription status", organization.SubscriptionStatus)
-				@DetailField("Billing provider", organization.BillingProvider)
-				@DetailField("Provider subscription ID", organization.ProviderSubscriptionID)
+				@DetailField("Billing model", organization.BillingModel)
+				@DetailField("Pricing type", organization.PricingType)
 				@DetailField("Renews", organization.RenewsAt)
 				@DetailField("Ends", organization.EndsAt)
 			</dl>

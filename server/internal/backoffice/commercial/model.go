@@ -5,6 +5,6 @@ type Account struct {
 	Organization       string
 	Plan               string
 	SubscriptionStatus string
-	BillingProvider    string
+	BillingModel       string
 	RenewsAt           string
 }

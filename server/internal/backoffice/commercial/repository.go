@@ -30,7 +30,7 @@ func (r *Repository) List(ctx context.Context) ([]Account, error) {
 			Organization:       row.OrganizationName,
 			Plan:               row.PlanName,
 			SubscriptionStatus: row.SubscriptionStatus,
-			BillingProvider:    row.BillingProvider,
+			BillingModel:       row.BillingModel,
 			RenewsAt:           row.RenewsAt,
 		})
 	}
