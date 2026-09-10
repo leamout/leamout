@@ -35,7 +35,7 @@ WHERE o.id = sqlc.arg(organization_id)
             AND s.organization_id = o.id
       )
   )
-ON CONFLICT (idempotency_key) DO NOTHING
+ON CONFLICT (organization_id, idempotency_key) DO NOTHING
 RETURNING *;
 
 -- name: GetUsageEventByIdempotencyKey :one
