@@ -135,11 +135,17 @@ type TopupCheckout struct {
 	Checkout checkout.Checkout
 	Payment  payments.Payment
 	Session  paymentprovider.CheckoutSession
+
+	// Deprecated: use Checkout.
+	Order checkout.Checkout
 }
 
 type TopupDetails struct {
 	Checkout checkout.Checkout
 	Payment  payments.Payment
+
+	// Deprecated: use Checkout.
+	Order checkout.Checkout
 }
 
 type TopupSettlement struct {
