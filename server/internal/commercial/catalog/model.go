@@ -25,6 +25,7 @@ var (
 	ErrProductNotFound = apperror.NewNotFound("catalog product not found")
 	ErrPlanNotFound    = apperror.NewNotFound("catalog plan not found")
 	ErrPriceNotFound   = apperror.NewNotFound("catalog price not found")
+	ErrMeterNotFound   = apperror.NewNotFound("catalog meter not found")
 	ErrCodeRequired    = errors.New("catalog code is required")
 	ErrInvalidCode     = errors.New("catalog code must not contain whitespace")
 	ErrIDRequired      = errors.New("catalog id is required")
@@ -51,6 +52,17 @@ type Plan struct {
 	Active      bool
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+}
+
+// Meter identifies a quantity that can be referenced by metered prices.
+type Meter struct {
+	ID        uuid.UUID
+	Key       string
+	Name      string
+	Unit      string
+	Active    bool
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 // Price is an immutable set of customer-facing commercial terms for a plan.
