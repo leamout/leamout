@@ -60,7 +60,7 @@ type paymentStub struct{ payment commercialpayments.Payment }
 
 func (s *paymentStub) Create(_ context.Context, organizationID uuid.UUID, provider string, input commercialpayments.CreateInput) (commercialpayments.Payment, error) {
 	s.payment = commercialpayments.Payment{
-		ID: uuid.New(), CheckoutOrderID: input.CheckoutOrderID, OrganizationID: organizationID,
+		ID: uuid.New(), CheckoutID: input.CheckoutID, OrganizationID: organizationID,
 		Provider: provider, Status: input.Status, AmountMinor: input.AmountMinor, Currency: input.Currency,
 	}
 	return s.payment, nil
@@ -277,7 +277,7 @@ func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
 		Provider: checkout.ProviderPaystack, Reference: "topup.123", AmountMinor: 2500,
 		Currency: "GHS", Status: checkout.StatusProcessing, UpdatedAt: now.Add(-11 * time.Second),
 	}}
-	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutOrderID: orderID}}
+	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutID: orderID}}
 	provider := &providerStub{payment: paymentprovider.Payment{
 		Provider: "paystack", ProviderID: "42", Reference: "topup.123",
 		AmountMinor: 2500, Currency: "GHS", Status: paymentprovider.StatusSucceeded,
