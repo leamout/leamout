@@ -66,7 +66,7 @@ Voice and messaging usage may still be observed in every mode. Billability is re
 
 ## Pricing
 
-`prices` is the single customer-facing pricing table. It must support both recurring software prices and metered prices. A separate `usage_rates` table is not part of the target model.
+`prices` is the single customer-facing pricing table. It supports one-time, recurring, and metered prices. A separate `usage_rates` table is not part of the target model.
 
 Examples:
 
@@ -105,4 +105,4 @@ A managed-provider obligation must not be created unless sufficient prepaid fund
 
 The target prepaid model does not require invoice-centric settlement. `invoices` and `invoice_items` are deferred until Leamout has a concrete need for invoices or postpaid accounts.
 
-Historical migrations are append-only. Existing deployed databases must be moved toward this model using forward migrations rather than rewriting already-applied migration files.
+The current Commercial migration series is still pre-release and has not been applied, so it is consolidated in place around this model. Once this schema has been applied or released, subsequent schema changes must be introduced through forward migrations rather than rewriting migration history.
