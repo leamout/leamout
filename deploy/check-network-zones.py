@@ -47,8 +47,6 @@ expected = {
     "nats": {"private-control"},
     "server": {"private-control"},
     "worker": {"private-control"},
-    "web": {"private-control"},
-    "console": {"private-control"},
     "freeswitch": {"private-control"},
     "opensips": {"private-control", "public-signaling"},
     "rtpengine": {"private-control", "public-media"},

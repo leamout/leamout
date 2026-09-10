@@ -21,23 +21,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  image:
-    name: Build ${{ matrix.app }} image
+  clients:
+    name: Validate clients
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        app:
-          - web
-          - console
+
+    defaults:
+      run:
+        working-directory: clients
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Build ${{ matrix.app }}
-        run: |
-          docker build \
-            --file "clients/apps/${{ matrix.app }}/Dockerfile" \
-            --tag "leamout/${{ matrix.app }}:ci" \
-            clients
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build

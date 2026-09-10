@@ -9,8 +9,8 @@ import {
   Tailwind,
 } from "react-email";
 import { leamoutTailwindConfig } from "../theme";
-import { EmailFooter } from "./footer";
 import { LeamoutFonts } from "./fonts";
+import { EmailFooter } from "./footer";
 import { EmailHeader } from "./header";
 
 type EmailLayoutProps = {
