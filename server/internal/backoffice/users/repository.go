@@ -75,7 +75,7 @@ func (r *Repository) Get(ctx context.Context, userID uuid.UUID) (Detail, error) 
 		sessions = append(sessions, Session{
 			ID:         session.SessionID,
 			Assurance:  session.Assurance,
-			IPAddress:  session.IPAddress,
+			IPAddress:  session.IpAddress,
 			UserAgent:  session.UserAgent,
 			Status:     session.Status,
 			CreatedAt:  session.CreatedAt,
