@@ -29,7 +29,7 @@ func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
 				t.Fatalf("body %s does not contain %s", body, expected)
 			}
 		}
-		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"invoice-1","status":"pending","message":"Authorize the payment on your phone"}}`))
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"reference":"invoice-1","status":"pending","message":"Authorize the payment on your phone"}}`))
 	}))
 	defer server.Close()
 
@@ -44,7 +44,8 @@ func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if session.Provider != "paystack" || session.NextAction != paymentprovider.NextActionWait || session.Reference != "invoice-1" {
+	if session.Provider != "paystack" || session.ProviderID != "" ||
+		session.NextAction != paymentprovider.NextActionWait || session.Reference != "invoice-1" {
 		t.Fatalf("session = %+v", session)
 	}
 }
