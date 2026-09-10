@@ -2,15 +2,20 @@ package backoffice
 
 import (
 	"context"
-	"errors"
 	"net/http"
+	"net/url"
+	"strings"
 
-	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
+	"github.com/google/uuid"
+
+	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/security/authn"
+	"github.com/leamout/leamout/pkg/apperror"
+	"github.com/leamout/leamout/pkg/httputil"
 )
 
-type authenticator interface {
-	Authenticate(context.Context, string) (authn.Principal, error)
+type userLookup interface {
+	GetUserByID(context.Context, uuid.UUID) (sqlc.User, error)
 }
 
 func securityHeaders(next http.Handler) http.Handler {
@@ -24,28 +29,60 @@ func securityHeaders(next http.Handler) http.Handler {
 	})
 }
 
-func requireBackoffice(authentication authenticator) func(http.Handler) http.Handler {
+func requirePlatformAdmin(users userLookup) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie(backofficeauth.CookieName)
-			if err != nil || cookie.Value == "" || authentication == nil {
-				http.Redirect(w, r, "/login", http.StatusSeeOther)
+			userID, ok := authn.UserIDFromContext(r.Context())
+			if !ok || users == nil {
+				httputil.Error(w, apperror.NewUnauthorized("authentication required"))
 				return
 			}
 
-			principal, err := authentication.Authenticate(r.Context(), cookie.Value)
+			user, err := users.GetUserByID(r.Context(), userID)
 			if err != nil {
-				if errors.Is(err, backofficeauth.ErrForbidden) {
-					http.Error(w, "Forbidden", http.StatusForbidden)
-					return
-				}
-				backofficeauth.ClearCookie(w)
-				http.Redirect(w, r, "/login", http.StatusSeeOther)
+				httputil.Error(w, apperror.NewUnauthorized("authentication required"))
+				return
+			}
+			if !user.IsPlatformAdmin {
+				httputil.Error(w, apperror.NewForbidden("backoffice access forbidden"))
 				return
 			}
 
-			ctx := authn.WithPrincipal(r.Context(), principal)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+func protectUnsafeRequests(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isSafeMethod(r.Method) || hasSameOrigin(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		httputil.Error(w, apperror.NewForbidden("cross-site request forbidden"))
+	})
+}
+
+func isSafeMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodOptions:
+		return true
+	default:
+		return false
+	}
+}
+
+func hasSameOrigin(r *http.Request) bool {
+	origin := strings.TrimSpace(r.Header.Get("Origin"))
+	if origin == "" {
+		return false
+	}
+
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+
+	return strings.EqualFold(parsed.Host, r.Host)
 }

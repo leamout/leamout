@@ -581,7 +581,7 @@ type Session struct {
 	ID         uuid.UUID          `db:"id" json:"id"`
 	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
 	TokenHash  string             `db:"token_hash" json:"token_hash"`
-	Audience   string             `db:"audience" json:"audience"`
+	Assurance  string             `db:"assurance" json:"assurance"`
 	IpAddress  *netip.Addr        `db:"ip_address" json:"ip_address"`
 	UserAgent  *string            `db:"user_agent" json:"user_agent"`
 	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`

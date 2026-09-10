@@ -12,13 +12,9 @@ import (
 	"github.com/leamout/leamout/internal/security/token"
 )
 
-const sessionTokenBytes = 32
-
-type Audience string
-
 const (
-	AudienceUser       Audience = "user"
-	AudienceBackoffice Audience = "backoffice"
+	sessionTokenBytes = 32
+	sessionTTL        = 30 * 24 * time.Hour
 )
 
 type Service struct {
@@ -37,20 +33,26 @@ func (s *Service) Create(
 	ipAddress *string,
 	userAgent *string,
 ) (string, sqlc.Session, error) {
-	return s.CreateForAudience(ctx, userID, ipAddress, userAgent, AudienceUser)
+	return s.CreateWithAssurance(
+		ctx,
+		userID,
+		ipAddress,
+		userAgent,
+		authn.AssuranceUnknown,
+	)
 }
 
-func (s *Service) CreateForAudience(
+func (s *Service) CreateWithAssurance(
 	ctx context.Context,
 	userID uuid.UUID,
 	ipAddress *string,
 	userAgent *string,
-	audience Audience,
+	assurance authn.AssuranceLevel,
 ) (string, sqlc.Session, error) {
 	if err := validateUserID(userID); err != nil {
 		return "", sqlc.Session{}, err
 	}
-	if !audience.valid() {
+	if !validAssurance(assurance) {
 		return "", sqlc.Session{}, ErrInvalidSession
 	}
 
@@ -59,14 +61,14 @@ func (s *Service) CreateForAudience(
 		return "", sqlc.Session{}, err
 	}
 
-	expiresAt := time.Now().Add(sessionTTL(audience))
+	expiresAt := time.Now().Add(sessionTTL)
 
 	session, err := s.repo.Create(
 		ctx,
 		sqlc.CreateSessionParams{
 			UserID:    userID,
 			TokenHash: token.Hash(value),
-			Audience:  string(audience),
+			Assurance: assurance.String(),
 			IpAddress: parseIP(ipAddress),
 			UserAgent: userAgent,
 			ExpiresAt: pgconv.NullableTimestamptz(&expiresAt),
@@ -83,23 +85,11 @@ func (s *Service) Get(
 	ctx context.Context,
 	value string,
 ) (sqlc.Session, error) {
-	return s.GetForAudience(ctx, value, AudienceUser)
-}
-
-func (s *Service) GetForAudience(
-	ctx context.Context,
-	value string,
-	audience Audience,
-) (sqlc.Session, error) {
-	if err := validateToken(value); err != nil || !audience.valid() {
+	if err := validateToken(value); err != nil {
 		return sqlc.Session{}, ErrInvalidSession
 	}
 
-	session, err := s.repo.GetByTokenHashAndAudience(
-		ctx,
-		token.Hash(value),
-		string(audience),
-	)
+	session, err := s.repo.GetByTokenHash(ctx, token.Hash(value))
 	if err != nil {
 		return sqlc.Session{}, ErrInvalidSession
 	}
@@ -111,7 +101,6 @@ func (s *Service) GetForAudience(
 	return session, nil
 }
 
-// ResolveSession resolves a normal user session token for the authentication layer.
 func (s *Service) ResolveSession(
 	ctx context.Context,
 	value string,
@@ -122,8 +111,9 @@ func (s *Service) ResolveSession(
 	}
 
 	return authn.Session{
-		ID:     session.ID,
-		UserID: session.UserID,
+		ID:        session.ID,
+		UserID:    session.UserID,
+		Assurance: parseAssurance(session.Assurance),
 	}, nil
 }
 
@@ -171,18 +161,27 @@ func (s *Service) RevokeAll(
 	return s.repo.RevokeUserSessions(ctx, userID)
 }
 
-func (a Audience) valid() bool {
-	switch a {
-	case AudienceUser, AudienceBackoffice:
+func validAssurance(assurance authn.AssuranceLevel) bool {
+	switch assurance {
+	case authn.AssuranceUnknown,
+		authn.AssurancePassword,
+		authn.AssuranceOTP,
+		authn.AssuranceMFA:
 		return true
 	default:
 		return false
 	}
 }
 
-func sessionTTL(audience Audience) time.Duration {
-	if audience == AudienceBackoffice {
-		return 12 * time.Hour
+func parseAssurance(value string) authn.AssuranceLevel {
+	switch value {
+	case authn.AssurancePassword.String():
+		return authn.AssurancePassword
+	case authn.AssuranceOTP.String():
+		return authn.AssuranceOTP
+	case authn.AssuranceMFA.String():
+		return authn.AssuranceMFA
+	default:
+		return authn.AssuranceUnknown
 	}
-	return 30 * 24 * time.Hour
 }

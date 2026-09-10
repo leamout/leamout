@@ -2,6 +2,8 @@ package session
 
 import (
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -136,9 +138,10 @@ func SetCookie(
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     "leamout-session",
+		Name:     authn.SessionCookieName,
 		Value:    token,
 		Path:     "/",
+		Domain:   sessionCookieDomain(),
 		MaxAge:   maxAge,
 		HttpOnly: true,
 		Secure:   true,
@@ -148,12 +151,17 @@ func SetCookie(
 
 func ClearCookie(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
-		Name:     "leamout-session",
+		Name:     authn.SessionCookieName,
 		Value:    "",
 		Path:     "/",
+		Domain:   sessionCookieDomain(),
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteLaxMode,
 	})
+}
+
+func sessionCookieDomain() string {
+	return strings.TrimSpace(os.Getenv("LEAMOUT_SESSION_COOKIE_DOMAIN"))
 }

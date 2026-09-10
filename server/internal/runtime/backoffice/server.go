@@ -7,11 +7,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	backofficeauth "github.com/leamout/leamout/internal/backoffice/auth"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	identityauth "github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/platform/config"
+	runtimemiddleware "github.com/leamout/leamout/internal/runtime/middleware"
+	"github.com/leamout/leamout/internal/security/authn"
 )
 
 type Server struct {
@@ -39,33 +39,26 @@ func New(ctx context.Context, cfg config.BackofficeConfig) (*Server, error) {
 
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
-	identityAuthRepository := identityauth.NewRepository(queries)
-	identityAuthService := identityauth.NewService(identityAuthRepository)
-	backofficeAuthRepository := backofficeauth.NewRepository(queries)
-	backofficeAuthService := backofficeauth.NewService(
-		identityAuthService,
-		sessionService,
-		backofficeAuthRepository,
-	)
-	backofficeAuthHandler := backofficeauth.NewHandler(backofficeAuthService)
+	resolver := authn.NewResolver(sessionService, nil)
+	authMiddleware := runtimemiddleware.NewAuthnMiddleware(resolver)
 
 	return newServer(
 		db,
 		modules,
-		backofficeAuthHandler,
-		backofficeAuthService,
+		authMiddleware.RequireSession,
+		requirePlatformAdmin(queries),
+		protectUnsafeRequests,
 	), nil
 }
 
 func newServer(
 	db *pgxpool.Pool,
 	modules Modules,
-	authHandler *backofficeauth.Handler,
-	authentication authenticator,
+	access ...accessMiddleware,
 ) *Server {
 	router := chi.NewRouter()
 	router.Use(securityHeaders)
-	registerRoutes(router, modules, authHandler, authentication)
+	registerRoutes(router, modules, access...)
 	return &Server{DB: db, Router: router, Modules: modules}
 }
 

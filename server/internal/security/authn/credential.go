@@ -6,6 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const SessionCookieName = "leamout-session"
+
 type CredentialType string
 
 const (
