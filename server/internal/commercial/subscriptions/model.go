@@ -80,16 +80,5 @@ type subscriptionResponse struct {
 }
 
 func newSubscriptionResponse(subscription Subscription) subscriptionResponse {
-	return subscriptionResponse{
-		ID:             subscription.ID,
-		OrganizationID: subscription.OrganizationID,
-		PlanID:         subscription.PlanID,
-		PriceID:        subscription.PriceID,
-		Status:         subscription.Status,
-		StartsAt:       subscription.StartsAt,
-		RenewsAt:       subscription.RenewsAt,
-		EndsAt:         subscription.EndsAt,
-		CreatedAt:      subscription.CreatedAt,
-		UpdatedAt:      subscription.UpdatedAt,
-	}
+	return subscriptionResponse(subscription)
 }
