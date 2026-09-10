@@ -101,14 +101,14 @@ func (s *TopupService) Create(
 	now := s.now().UTC()
 	reference := "topup." + uuid.NewString()
 	order, err := s.checkouts.Create(ctx, organizationID, checkout.CreateInput{
-		WalletID:       &walletID,
-		Type:           checkout.OrderWalletTopup,
-		Provider:       input.Provider,
-		PaymentMethod:  method,
-		Reference:      reference,
-		AmountMinor:    input.AmountMinor,
-		Currency:       wallet.Currency,
-		ExpiresAt:      now.Add(30 * time.Minute),
+		WalletID:      &walletID,
+		Type:          checkout.OrderWalletTopup,
+		Provider:      input.Provider,
+		PaymentMethod: method,
+		Reference:     reference,
+		AmountMinor:   input.AmountMinor,
+		Currency:      wallet.Currency,
+		ExpiresAt:     now.Add(30 * time.Minute),
 	})
 	if err != nil {
 		return TopupCheckout{}, err
