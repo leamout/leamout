@@ -61,10 +61,9 @@ type MeteringModule struct {
 }
 
 type MoneyModule struct {
-	Wallets         *wallets.Repository
-	TopupRepository *wallets.TopupRepository
-	TopupService    *wallets.TopupService
-	TopupHandler    *wallets.TopupHandler
+	Wallets      *wallets.Repository
+	TopupService *wallets.TopupService
+	TopupHandler *wallets.TopupHandler
 }
 
 type PaymentsModule struct {
@@ -101,12 +100,11 @@ func New(db *pgxpool.Pool) *Module {
 	walletRepository := wallets.NewRepository(db)
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
-	topupRepository := wallets.NewTopupRepository(db)
 	topupService := wallets.NewTopupService(
 		walletRepository,
 		checkoutRepository,
 		paymentRepository,
-		topupRepository,
+		walletRepository,
 		map[string]paymentprovider.Provider{},
 	)
 
@@ -137,10 +135,9 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    meteringService,
 		},
 		Money: MoneyModule{
-			Wallets:         walletRepository,
-			TopupRepository: topupRepository,
-			TopupService:    topupService,
-			TopupHandler:    wallets.NewTopupHandler(topupService),
+			Wallets:      walletRepository,
+			TopupService: topupService,
+			TopupHandler: wallets.NewTopupHandler(topupService),
 		},
 		Payments: PaymentsModule{
 			Checkouts: checkoutRepository,

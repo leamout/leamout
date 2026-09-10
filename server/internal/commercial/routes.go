@@ -38,7 +38,7 @@ func RegisterRoutes(
 		organizationAccess("subscriptions"),
 		idempotency,
 	)
-	wallets.RegisterTopupRoutes(
+	wallets.RegisterRoutes(
 		router,
 		module.Money.TopupHandler,
 		organizationAccess("billing"),
