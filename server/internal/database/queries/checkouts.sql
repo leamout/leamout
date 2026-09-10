@@ -42,16 +42,16 @@ LIMIT 1;
 
 -- name: CompareAndSetCheckoutOrderState :one
 WITH updated AS (
-    UPDATE checkouts
+    UPDATE checkouts AS c
     SET status = sqlc.arg(status),
         next_action = sqlc.arg(next_action),
         provider_message = sqlc.narg(provider_message),
         completed_at = sqlc.narg(completed_at),
         updated_at = NOW()
-    WHERE organization_id = sqlc.arg(organization_id)
-      AND id = sqlc.arg(id)
-      AND status = sqlc.arg(expected_status)
-    RETURNING *
+    WHERE c.organization_id = sqlc.arg(organization_id)
+      AND c.id = sqlc.arg(id)
+      AND c.status = sqlc.arg(expected_status)
+    RETURNING c.*
 ), created_order AS (
     INSERT INTO orders (
         organization_id,
