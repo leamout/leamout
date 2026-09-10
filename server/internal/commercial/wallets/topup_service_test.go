@@ -2,6 +2,7 @@ package wallets
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"testing"
 	"time"
@@ -117,7 +118,7 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	_, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: "payer@example.com",
 	})
-	if err != ErrPaymentMismatch {
+	if !errors.Is(err, ErrPaymentMismatch) {
 		t.Fatalf("Create() error = %v, want %v", err, ErrPaymentMismatch)
 	}
 	if payments.payment.Status != commercialpayments.StatusFailed {
@@ -183,7 +184,7 @@ func TestCreateRejectsPaystackForNonGHSWallet(t *testing.T) {
 		AmountMinor: 100, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
 		MobileMoney: &paymentprovider.MobileMoney{Phone: "+233200000000", Provider: "mtn"},
 	})
-	if err != ErrInvalidTopup {
+	if !errors.Is(err, ErrInvalidTopup) {
 		t.Fatalf("Create() error = %v, want %v", err, ErrInvalidTopup)
 	}
 	if provider.request.Reference != "" {

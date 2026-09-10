@@ -61,13 +61,7 @@ func (h *TopupHandler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Create(r.Context(), organizationID, walletID, TopupCreateInput{
-		AmountMinor: request.AmountMinor,
-		Provider:    request.Provider,
-		Email:       request.Email,
-		CallbackURL: request.CallbackURL,
-		MobileMoney: request.MobileMoney,
-	})
+	result, err := h.service.Create(r.Context(), organizationID, walletID, TopupCreateInput(request))
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -106,10 +100,7 @@ func (h *TopupHandler) Continue(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Continue(r.Context(), organizationID, orderID, TopupContinueInput{
-		Action: request.Action,
-		Value:  request.Value,
-	})
+	result, err := h.service.Continue(r.Context(), organizationID, orderID, TopupContinueInput(request))
 	if err != nil {
 		httputil.Error(w, err)
 		return

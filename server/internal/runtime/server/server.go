@@ -439,7 +439,7 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 func configurePaymentProviders(cfg config.Config, service *wallets.TopupService) error {
 	if cfg.Stripe.SecretKey != "" {
 		if cfg.Stripe.WebhookSecret == "" {
-			return fmt.Errorf("Stripe webhook secret is required when Stripe is enabled")
+			return fmt.Errorf("stripe webhook secret is required when Stripe is enabled")
 		}
 		client, err := stripe.NewClient(stripe.Config{
 			BaseURL:       cfg.Stripe.APIBaseURL,
