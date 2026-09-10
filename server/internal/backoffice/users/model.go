@@ -18,7 +18,7 @@ type OrganizationMembership struct {
 	DetailAvailable    bool
 	Role               string
 	MembershipStatus   string
-	JoinedAt            string
+	JoinedAt           string
 }
 
 type Session struct {
