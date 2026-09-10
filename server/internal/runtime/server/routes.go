@@ -5,11 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/licensing"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/wallets"
+	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/identity/users"
@@ -62,26 +58,11 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	}
 
 	r.Route("/v1", func(r chi.Router) {
-		catalog.RegisterRoutes(r, modules.Catalog.Handler, modules.Authn.RequireSession)
-		licensing.RegisterRoutes(
-			r,
-			modules.Licensing.Handler,
-			organizationAccess("licensing"),
-			modules.Idempotency.Middleware.Handle,
-		)
-		commercialstate.RegisterRoutes(r, modules.CommercialState.Handler, organizationAccess("commercial-state"))
-		subscriptions.RegisterRoutes(
-			r,
-			modules.Subscriptions.Handler,
-			organizationAccess("subscriptions"),
-			modules.Idempotency.Middleware.Handle,
-		)
-		wallets.RegisterTopupRoutes(
-			r,
-			modules.Wallets.TopupHandler,
-			organizationAccess("billing"),
-			modules.Idempotency.Middleware.Handle,
-		)
+		commercial.RegisterRoutes(r, modules.Commercial, commercial.RouteMiddleware{
+			Session:            modules.Authn.RequireSession,
+			OrganizationAccess: organizationAccess,
+			Idempotency:        modules.Idempotency.Middleware.Handle,
+		})
 		auth.RegisterRoutes(r, modules.Auth.Handler, modules.Authn.RequireSession)
 		session.RegisterRoutes(r, modules.Session.Handler, modules.Authn.RequireSession)
 		users.RegisterRoutes(r, modules.Users.Handler, modules.Authn.RequireSession)
