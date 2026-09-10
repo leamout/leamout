@@ -101,7 +101,12 @@ WITH updated AS (
     ON CONFLICT (checkout_id) DO NOTHING
     RETURNING id
 )
-SELECT id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at FROM updated
+SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+FROM checkouts AS c
+JOIN updated AS u
+  ON u.id = c.id
+ AND u.organization_id = c.organization_id
+LEFT JOIN created_order AS o ON TRUE
 `
 
 type CompareAndSetCheckoutOrderStateParams struct {
@@ -114,28 +119,7 @@ type CompareAndSetCheckoutOrderStateParams struct {
 	ExpectedStatus  string             `db:"expected_status" json:"expected_status"`
 }
 
-type CompareAndSetCheckoutOrderStateRow struct {
-	ID              uuid.UUID          `db:"id" json:"id"`
-	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
-	WalletID        *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
-	PriceID         *uuid.UUID         `db:"price_id" json:"price_id"`
-	CheckoutType    string             `db:"checkout_type" json:"checkout_type"`
-	Provider        string             `db:"provider" json:"provider"`
-	PaymentMethod   string             `db:"payment_method" json:"payment_method"`
-	Reference       string             `db:"reference" json:"reference"`
-	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
-	Currency        string             `db:"currency" json:"currency"`
-	Status          string             `db:"status" json:"status"`
-	NextAction      string             `db:"next_action" json:"next_action"`
-	ProviderMessage *string            `db:"provider_message" json:"provider_message"`
-	ExpiresAt       pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CompletedAt     pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
-	Metadata        []byte             `db:"metadata" json:"metadata"`
-	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg CompareAndSetCheckoutOrderStateParams) (CompareAndSetCheckoutOrderStateRow, error) {
+func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg CompareAndSetCheckoutOrderStateParams) (Checkout, error) {
 	row := q.db.QueryRow(ctx, compareAndSetCheckoutOrderState,
 		arg.Status,
 		arg.NextAction,
@@ -145,7 +129,7 @@ func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg Compa
 		arg.ID,
 		arg.ExpectedStatus,
 	)
-	var i CompareAndSetCheckoutOrderStateRow
+	var i Checkout
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
