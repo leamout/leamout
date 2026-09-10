@@ -18,7 +18,7 @@ INSERT INTO payments (
     organization_id,
     provider,
     provider_payment_id,
-    amount,
+    amount_minor,
     currency,
     status,
     paid_at,
@@ -29,7 +29,7 @@ SELECT
     co.organization_id,
     co.provider,
     $1 AS provider_payment_id,
-    $2 AS amount,
+    $2 AS amount_minor,
     $3 AS currency,
     COALESCE($4, 'pending') AS status,
     $5 AS paid_at,
@@ -39,16 +39,16 @@ JOIN organizations AS o ON o.id = co.organization_id
 WHERE co.id = $7
   AND co.organization_id = $8
   AND co.provider = $9
-  AND co.amount = $2
+  AND co.amount_minor = $2
   AND co.currency = $3
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING id, checkout_order_id, organization_id, provider, provider_payment_id, amount, currency, status, paid_at, metadata, created_at, updated_at
+RETURNING id, checkout_order_id, organization_id, provider, provider_payment_id, amount_minor, currency, status, paid_at, metadata, created_at, updated_at
 `
 
 type CreatePaymentParams struct {
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
-	Amount            int64              `db:"amount" json:"amount"`
+	AmountMinor       int64              `db:"amount_minor" json:"amount_minor"`
 	Currency          string             `db:"currency" json:"currency"`
 	Status            *string            `db:"status" json:"status"`
 	PaidAt            pgtype.Timestamptz `db:"paid_at" json:"paid_at"`
@@ -61,7 +61,7 @@ type CreatePaymentParams struct {
 func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
 	row := q.db.QueryRow(ctx, createPayment,
 		arg.ProviderPaymentID,
-		arg.Amount,
+		arg.AmountMinor,
 		arg.Currency,
 		arg.Status,
 		arg.PaidAt,
@@ -77,7 +77,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.PaidAt,
@@ -89,7 +89,7 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 }
 
 const getPayment = `-- name: GetPayment :one
-SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.organization_id = $1
@@ -113,7 +113,7 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.PaidAt,
@@ -125,7 +125,7 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 }
 
 const getPaymentByCheckoutOrder = `-- name: GetPaymentByCheckoutOrder :one
-SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.organization_id = $1
@@ -149,7 +149,7 @@ func (q *Queries) GetPaymentByCheckoutOrder(ctx context.Context, arg GetPaymentB
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.PaidAt,
@@ -161,7 +161,7 @@ func (q *Queries) GetPaymentByCheckoutOrder(ctx context.Context, arg GetPaymentB
 }
 
 const getPaymentByProviderID = `-- name: GetPaymentByProviderID :one
-SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.provider = $1
@@ -185,7 +185,7 @@ func (q *Queries) GetPaymentByProviderID(ctx context.Context, arg GetPaymentByPr
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.PaidAt,
@@ -197,7 +197,7 @@ func (q *Queries) GetPaymentByProviderID(ctx context.Context, arg GetPaymentByPr
 }
 
 const listPaymentsByOrganization = `-- name: ListPaymentsByOrganization :many
-SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+SELECT p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
 WHERE p.organization_id = $1
@@ -221,7 +221,7 @@ func (q *Queries) ListPaymentsByOrganization(ctx context.Context, organizationID
 			&i.OrganizationID,
 			&i.Provider,
 			&i.ProviderPaymentID,
-			&i.Amount,
+			&i.AmountMinor,
 			&i.Currency,
 			&i.Status,
 			&i.PaidAt,
@@ -251,7 +251,7 @@ WHERE p.organization_id = $3
   AND o.id = p.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+RETURNING p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 `
 
 type SetPaymentProviderIDParams struct {
@@ -275,7 +275,7 @@ func (q *Queries) SetPaymentProviderID(ctx context.Context, arg SetPaymentProvid
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.PaidAt,
@@ -299,7 +299,7 @@ WHERE p.organization_id = $4
   AND o.id = p.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
+RETURNING p.id, p.checkout_order_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 `
 
 type UpdatePaymentStatusParams struct {
@@ -325,7 +325,7 @@ func (q *Queries) UpdatePaymentStatus(ctx context.Context, arg UpdatePaymentStat
 		&i.OrganizationID,
 		&i.Provider,
 		&i.ProviderPaymentID,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.PaidAt,

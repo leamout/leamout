@@ -20,7 +20,7 @@ WHERE organization_id = $1
   AND provider = 'paystack'
   AND status = 'processing'
   AND updated_at <= $3
-RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 type ClaimCheckoutOrderRefreshParams struct {
@@ -41,7 +41,7 @@ func (q *Queries) ClaimCheckoutOrderRefresh(ctx context.Context, arg ClaimChecko
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.NextAction,
@@ -65,7 +65,7 @@ SET status = $1,
 WHERE organization_id = $5
   AND id = $6
   AND status = $7
-RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 type CompareAndSetCheckoutOrderStateParams struct {
@@ -98,7 +98,7 @@ func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg Compa
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.NextAction,
@@ -115,7 +115,7 @@ func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg Compa
 const createCheckoutOrder = `-- name: CreateCheckoutOrder :one
 INSERT INTO checkout_orders (
     organization_id, wallet_id, price_id, order_type,
-    provider, payment_method, reference, amount, currency, expires_at, metadata
+    provider, payment_method, reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     $1 AS organization_id,
@@ -125,7 +125,7 @@ SELECT
     $5 AS provider,
     $6 AS payment_method,
     $7 AS reference,
-    $8 AS amount,
+    $8 AS amount_minor,
     $9 AS currency,
     $10 AS expires_at,
     COALESCE($11, '{}'::jsonb) AS metadata
@@ -133,7 +133,7 @@ FROM organizations AS o
 WHERE o.id = $1
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 type CreateCheckoutOrderParams struct {
@@ -144,7 +144,7 @@ type CreateCheckoutOrderParams struct {
 	Provider       string             `db:"provider" json:"provider"`
 	PaymentMethod  string             `db:"payment_method" json:"payment_method"`
 	Reference      string             `db:"reference" json:"reference"`
-	Amount         int64              `db:"amount" json:"amount"`
+	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	Currency       string             `db:"currency" json:"currency"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 	Metadata       []byte             `db:"metadata" json:"metadata"`
@@ -159,7 +159,7 @@ func (q *Queries) CreateCheckoutOrder(ctx context.Context, arg CreateCheckoutOrd
 		arg.Provider,
 		arg.PaymentMethod,
 		arg.Reference,
-		arg.Amount,
+		arg.AmountMinor,
 		arg.Currency,
 		arg.ExpiresAt,
 		arg.Metadata,
@@ -174,7 +174,7 @@ func (q *Queries) CreateCheckoutOrder(ctx context.Context, arg CreateCheckoutOrd
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.NextAction,
@@ -193,7 +193,7 @@ UPDATE checkout_orders
 SET status = 'expired', next_action = 'none', completed_at = NOW(), updated_at = NOW()
 WHERE status IN ('pending', 'processing')
   AND expires_at <= NOW()
-RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, price_id, order_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 func (q *Queries) ExpireCheckoutOrders(ctx context.Context) ([]CheckoutOrder, error) {
@@ -214,7 +214,7 @@ func (q *Queries) ExpireCheckoutOrders(ctx context.Context) ([]CheckoutOrder, er
 			&i.Provider,
 			&i.PaymentMethod,
 			&i.Reference,
-			&i.Amount,
+			&i.AmountMinor,
 			&i.Currency,
 			&i.Status,
 			&i.NextAction,
@@ -236,7 +236,7 @@ func (q *Queries) ExpireCheckoutOrders(ctx context.Context) ([]CheckoutOrder, er
 }
 
 const getCheckoutOrder = `-- name: GetCheckoutOrder :one
-SELECT co.id, co.organization_id, co.wallet_id, co.price_id, co.order_type, co.provider, co.payment_method, co.reference, co.amount, co.currency, co.status, co.next_action, co.provider_message, co.expires_at, co.completed_at, co.metadata, co.created_at, co.updated_at
+SELECT co.id, co.organization_id, co.wallet_id, co.price_id, co.order_type, co.provider, co.payment_method, co.reference, co.amount_minor, co.currency, co.status, co.next_action, co.provider_message, co.expires_at, co.completed_at, co.metadata, co.created_at, co.updated_at
 FROM checkout_orders AS co
 JOIN organizations AS o ON o.id = co.organization_id
 WHERE co.organization_id = $1
@@ -263,7 +263,7 @@ func (q *Queries) GetCheckoutOrder(ctx context.Context, arg GetCheckoutOrderPara
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.NextAction,
@@ -278,7 +278,7 @@ func (q *Queries) GetCheckoutOrder(ctx context.Context, arg GetCheckoutOrderPara
 }
 
 const getCheckoutOrderByReference = `-- name: GetCheckoutOrderByReference :one
-SELECT co.id, co.organization_id, co.wallet_id, co.price_id, co.order_type, co.provider, co.payment_method, co.reference, co.amount, co.currency, co.status, co.next_action, co.provider_message, co.expires_at, co.completed_at, co.metadata, co.created_at, co.updated_at
+SELECT co.id, co.organization_id, co.wallet_id, co.price_id, co.order_type, co.provider, co.payment_method, co.reference, co.amount_minor, co.currency, co.status, co.next_action, co.provider_message, co.expires_at, co.completed_at, co.metadata, co.created_at, co.updated_at
 FROM checkout_orders AS co
 JOIN organizations AS o ON o.id = co.organization_id
 WHERE co.reference = $1
@@ -299,7 +299,7 @@ func (q *Queries) GetCheckoutOrderByReference(ctx context.Context, reference str
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.Currency,
 		&i.Status,
 		&i.NextAction,

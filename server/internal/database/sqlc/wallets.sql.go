@@ -15,32 +15,32 @@ import (
 const captureWalletReservation = `-- name: CaptureWalletReservation :one
 UPDATE wallet_reservations AS wr
 SET status = 'captured',
-    captured_amount = $1,
+    captured_amount_minor = $1,
     captured_at = NOW(),
     updated_at = NOW()
 WHERE wr.organization_id = $2
   AND wr.id = $3
   AND wr.status = 'active'
   AND wr.expires_at > NOW()
-  AND $1 <= wr.amount
-RETURNING wr.id, wr.wallet_id, wr.organization_id, wr.amount, wr.captured_amount, wr.operation_type, wr.operation_id, wr.status, wr.expires_at, wr.captured_at, wr.released_at, wr.expired_at, wr.created_at, wr.updated_at
+  AND $1 <= wr.amount_minor
+RETURNING wr.id, wr.wallet_id, wr.organization_id, wr.amount_minor, wr.captured_amount_minor, wr.operation_type, wr.operation_id, wr.status, wr.expires_at, wr.captured_at, wr.released_at, wr.expired_at, wr.created_at, wr.updated_at
 `
 
 type CaptureWalletReservationParams struct {
-	CapturedAmount *int64    `db:"captured_amount" json:"captured_amount"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	ID             uuid.UUID `db:"id" json:"id"`
+	CapturedAmountMinor *int64    `db:"captured_amount_minor" json:"captured_amount_minor"`
+	OrganizationID      uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID                  uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) CaptureWalletReservation(ctx context.Context, arg CaptureWalletReservationParams) (WalletReservation, error) {
-	row := q.db.QueryRow(ctx, captureWalletReservation, arg.CapturedAmount, arg.OrganizationID, arg.ID)
+	row := q.db.QueryRow(ctx, captureWalletReservation, arg.CapturedAmountMinor, arg.OrganizationID, arg.ID)
 	var i WalletReservation
 	err := row.Scan(
 		&i.ID,
 		&i.WalletID,
 		&i.OrganizationID,
-		&i.Amount,
-		&i.CapturedAmount,
+		&i.AmountMinor,
+		&i.CapturedAmountMinor,
 		&i.OperationType,
 		&i.OperationID,
 		&i.Status,
@@ -85,14 +85,14 @@ func (q *Queries) CreateWallet(ctx context.Context, arg CreateWalletParams) (Wal
 
 const createWalletLedgerEntry = `-- name: CreateWalletLedgerEntry :one
 INSERT INTO wallet_ledger_entries (
-    wallet_id, organization_id, entry_type, amount, source_type,
+    wallet_id, organization_id, entry_type, amount_minor, source_type,
     source_id, idempotency_key, metadata, occurred_at
 )
 SELECT
     w.id AS wallet_id,
     w.organization_id,
     $1 AS entry_type,
-    $2 AS amount,
+    $2 AS amount_minor,
     $3 AS source_type,
     $4 AS source_id,
     $5 AS idempotency_key,
@@ -105,12 +105,12 @@ WHERE w.id = $8
   AND w.status != 'closed'
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING id, wallet_id, organization_id, entry_type, amount, source_type, source_id, idempotency_key, metadata, occurred_at, created_at
+RETURNING id, wallet_id, organization_id, entry_type, amount_minor, source_type, source_id, idempotency_key, metadata, occurred_at, created_at
 `
 
 type CreateWalletLedgerEntryParams struct {
 	EntryType      string             `db:"entry_type" json:"entry_type"`
-	Amount         int64              `db:"amount" json:"amount"`
+	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	SourceType     string             `db:"source_type" json:"source_type"`
 	SourceID       string             `db:"source_id" json:"source_id"`
 	IdempotencyKey string             `db:"idempotency_key" json:"idempotency_key"`
@@ -123,7 +123,7 @@ type CreateWalletLedgerEntryParams struct {
 func (q *Queries) CreateWalletLedgerEntry(ctx context.Context, arg CreateWalletLedgerEntryParams) (WalletLedgerEntry, error) {
 	row := q.db.QueryRow(ctx, createWalletLedgerEntry,
 		arg.EntryType,
-		arg.Amount,
+		arg.AmountMinor,
 		arg.SourceType,
 		arg.SourceID,
 		arg.IdempotencyKey,
@@ -138,7 +138,7 @@ func (q *Queries) CreateWalletLedgerEntry(ctx context.Context, arg CreateWalletL
 		&i.WalletID,
 		&i.OrganizationID,
 		&i.EntryType,
-		&i.Amount,
+		&i.AmountMinor,
 		&i.SourceType,
 		&i.SourceID,
 		&i.IdempotencyKey,
@@ -154,7 +154,7 @@ UPDATE wallet_reservations
 SET status = 'expired', expired_at = NOW(), updated_at = NOW()
 WHERE status = 'active'
   AND expires_at <= NOW()
-RETURNING id, wallet_id, organization_id, amount, captured_amount, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
+RETURNING id, wallet_id, organization_id, amount_minor, captured_amount_minor, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
 `
 
 func (q *Queries) ExpireWalletReservations(ctx context.Context) ([]WalletReservation, error) {
@@ -170,8 +170,8 @@ func (q *Queries) ExpireWalletReservations(ctx context.Context) ([]WalletReserva
 			&i.ID,
 			&i.WalletID,
 			&i.OrganizationID,
-			&i.Amount,
-			&i.CapturedAmount,
+			&i.AmountMinor,
+			&i.CapturedAmountMinor,
 			&i.OperationType,
 			&i.OperationID,
 			&i.Status,
@@ -224,12 +224,12 @@ func (q *Queries) GetWallet(ctx context.Context, arg GetWalletParams) (Wallet, e
 
 const getWalletBalance = `-- name: GetWalletBalance :one
 SELECT
-    COALESCE((SELECT SUM(amount) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)::BIGINT AS posted,
-    COALESCE((SELECT SUM(amount) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)::BIGINT AS reserved,
+    COALESCE((SELECT SUM(amount_minor) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)::BIGINT AS posted_minor,
+    COALESCE((SELECT SUM(amount_minor) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)::BIGINT AS reserved_minor,
     (
-        COALESCE((SELECT SUM(amount) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)
-        - COALESCE((SELECT SUM(amount) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)
-    )::BIGINT AS available
+        COALESCE((SELECT SUM(amount_minor) FROM wallet_ledger_entries WHERE wallet_id = w.id), 0)
+        - COALESCE((SELECT SUM(amount_minor) FROM wallet_reservations WHERE wallet_id = w.id AND status = 'active'), 0)
+    )::BIGINT AS available_minor
 FROM wallets AS w
 JOIN organizations AS o ON o.id = w.organization_id
 WHERE w.organization_id = $1
@@ -245,15 +245,15 @@ type GetWalletBalanceParams struct {
 }
 
 type GetWalletBalanceRow struct {
-	Posted    int64 `db:"posted" json:"posted"`
-	Reserved  int64 `db:"reserved" json:"reserved"`
-	Available int64 `db:"available" json:"available"`
+	PostedMinor    int64 `db:"posted_minor" json:"posted_minor"`
+	ReservedMinor  int64 `db:"reserved_minor" json:"reserved_minor"`
+	AvailableMinor int64 `db:"available_minor" json:"available_minor"`
 }
 
 func (q *Queries) GetWalletBalance(ctx context.Context, arg GetWalletBalanceParams) (GetWalletBalanceRow, error) {
 	row := q.db.QueryRow(ctx, getWalletBalance, arg.OrganizationID, arg.WalletID)
 	var i GetWalletBalanceRow
-	err := row.Scan(&i.Posted, &i.Reserved, &i.Available)
+	err := row.Scan(&i.PostedMinor, &i.ReservedMinor, &i.AvailableMinor)
 	return i, err
 }
 
@@ -288,7 +288,7 @@ func (q *Queries) GetWalletByCurrency(ctx context.Context, arg GetWalletByCurren
 }
 
 const getWalletReservation = `-- name: GetWalletReservation :one
-SELECT id, wallet_id, organization_id, amount, captured_amount, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
+SELECT id, wallet_id, organization_id, amount_minor, captured_amount_minor, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
 FROM wallet_reservations
 WHERE organization_id = $1
   AND id = $2
@@ -307,8 +307,8 @@ func (q *Queries) GetWalletReservation(ctx context.Context, arg GetWalletReserva
 		&i.ID,
 		&i.WalletID,
 		&i.OrganizationID,
-		&i.Amount,
-		&i.CapturedAmount,
+		&i.AmountMinor,
+		&i.CapturedAmountMinor,
 		&i.OperationType,
 		&i.OperationID,
 		&i.Status,
@@ -324,19 +324,19 @@ func (q *Queries) GetWalletReservation(ctx context.Context, arg GetWalletReserva
 
 const insertWalletReservation = `-- name: InsertWalletReservation :one
 INSERT INTO wallet_reservations (
-    wallet_id, organization_id, amount, operation_type, operation_id, expires_at
+    wallet_id, organization_id, amount_minor, operation_type, operation_id, expires_at
 )
 VALUES (
     $1, $2, $3,
     $4, $5, $6
 )
-RETURNING id, wallet_id, organization_id, amount, captured_amount, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
+RETURNING id, wallet_id, organization_id, amount_minor, captured_amount_minor, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
 `
 
 type InsertWalletReservationParams struct {
 	WalletID       uuid.UUID          `db:"wallet_id" json:"wallet_id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Amount         int64              `db:"amount" json:"amount"`
+	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	OperationType  string             `db:"operation_type" json:"operation_type"`
 	OperationID    string             `db:"operation_id" json:"operation_id"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
@@ -346,7 +346,7 @@ func (q *Queries) InsertWalletReservation(ctx context.Context, arg InsertWalletR
 	row := q.db.QueryRow(ctx, insertWalletReservation,
 		arg.WalletID,
 		arg.OrganizationID,
-		arg.Amount,
+		arg.AmountMinor,
 		arg.OperationType,
 		arg.OperationID,
 		arg.ExpiresAt,
@@ -356,8 +356,8 @@ func (q *Queries) InsertWalletReservation(ctx context.Context, arg InsertWalletR
 		&i.ID,
 		&i.WalletID,
 		&i.OrganizationID,
-		&i.Amount,
-		&i.CapturedAmount,
+		&i.AmountMinor,
+		&i.CapturedAmountMinor,
 		&i.OperationType,
 		&i.OperationID,
 		&i.Status,
@@ -372,7 +372,7 @@ func (q *Queries) InsertWalletReservation(ctx context.Context, arg InsertWalletR
 }
 
 const listWalletLedgerEntries = `-- name: ListWalletLedgerEntries :many
-SELECT id, wallet_id, organization_id, entry_type, amount, source_type, source_id, idempotency_key, metadata, occurred_at, created_at
+SELECT id, wallet_id, organization_id, entry_type, amount_minor, source_type, source_id, idempotency_key, metadata, occurred_at, created_at
 FROM wallet_ledger_entries
 WHERE wallet_id = $1
   AND organization_id = $2
@@ -398,7 +398,7 @@ func (q *Queries) ListWalletLedgerEntries(ctx context.Context, arg ListWalletLed
 			&i.WalletID,
 			&i.OrganizationID,
 			&i.EntryType,
-			&i.Amount,
+			&i.AmountMinor,
 			&i.SourceType,
 			&i.SourceID,
 			&i.IdempotencyKey,
@@ -453,7 +453,7 @@ SET status = 'released', released_at = NOW(), updated_at = NOW()
 WHERE organization_id = $1
   AND id = $2
   AND status = 'active'
-RETURNING id, wallet_id, organization_id, amount, captured_amount, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
+RETURNING id, wallet_id, organization_id, amount_minor, captured_amount_minor, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
 `
 
 type ReleaseWalletReservationParams struct {
@@ -468,8 +468,8 @@ func (q *Queries) ReleaseWalletReservation(ctx context.Context, arg ReleaseWalle
 		&i.ID,
 		&i.WalletID,
 		&i.OrganizationID,
-		&i.Amount,
-		&i.CapturedAmount,
+		&i.AmountMinor,
+		&i.CapturedAmountMinor,
 		&i.OperationType,
 		&i.OperationID,
 		&i.Status,
