@@ -6,22 +6,84 @@ import (
 )
 
 templ OrganizationTable(organizations []Organization) {
-	@components.Table(
-		[]string{"Organization", "Plan", "Members", "Status", "Created"},
-		organizationRows(organizations),
-	)
+	<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+		<table class="table">
+			<thead>
+				<tr>
+					<th>Organization</th>
+					<th>Plan</th>
+					<th>Members</th>
+					<th>Status</th>
+					<th>Created</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, organization := range organizations {
+					<tr>
+						<td><a class="link link-primary font-medium" href={ templ.SafeURL("/organizations/" + organization.ID) }>{ organization.Name }</a></td>
+						<td>{ organization.Plan }</td>
+						<td>{ fmt.Sprint(organization.Members) }</td>
+						<td>{ organization.Status }</td>
+						<td>{ organization.CreatedAt }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
 }
 
-func organizationRows(organizations []Organization) [][]string {
-	rows := make([][]string, 0, len(organizations))
-	for _, organization := range organizations {
-		rows = append(rows, []string{
-			organization.Name,
-			organization.Plan,
-			fmt.Sprint(organization.Members),
-			organization.Status,
-			organization.CreatedAt,
-		})
+templ MemberTable(members []Member) {
+	if len(members) == 0 {
+		<div class="alert"><span>No members found.</span></div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th>Member</th>
+						<th>Role</th>
+						<th>Membership</th>
+						<th>User</th>
+						<th>Email</th>
+						<th>Joined</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, member := range members {
+						<tr>
+							<td>
+								<div class="font-medium">{ member.Name }</div>
+								<div class="text-xs text-base-content/60">{ member.Email }</div>
+							</td>
+							<td>{ member.Role }</td>
+							<td>{ member.MembershipStatus }</td>
+							<td>
+								<span>{ member.UserStatus }</span>
+								if member.PlatformAdmin {
+									<span class="badge badge-secondary badge-sm ml-2">platform admin</span>
+								}
+							</td>
+							<td>
+								if member.EmailVerified {
+									<span class="badge badge-success badge-sm">verified</span>
+								} else {
+									<span class="badge badge-ghost badge-sm">unverified</span>
+								}
+							</td>
+							<td>{ member.JoinedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
 	}
-	return rows
 }
+
+templ DetailField(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 font-medium break-all">{ value }</dd>
+	</div>
+}
+
+var _ = components.Table
