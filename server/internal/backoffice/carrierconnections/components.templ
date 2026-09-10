@@ -6,10 +6,26 @@ import (
 )
 
 templ CarrierConnectionTable(connections []CarrierConnection) {
-	@components.Table(
+	@components.TableWithLinks(
 		[]string{"Connection", "Organization", "Provider", "Scope", "Inbound", "Max CPS", "Max Calls", "Trunks", "Status"},
 		carrierConnectionRows(connections),
+		carrierConnectionLinks(connections),
 	)
+}
+
+func carrierConnectionLinks(connections []CarrierConnection) []components.TableCellLink {
+	links := make([]components.TableCellLink, 0, len(connections)*2)
+	for row, c := range connections {
+		links = append(links, components.TableCellLink{Row: row, Column: 0, Href: "/carrier-connections/" + c.ID, Class: "link link-primary"})
+		if c.OrganizationID != "—" {
+			links = append(links, components.TableCellLink{Row: row, Column: 1, Href: "/organizations/" + c.OrganizationID, Class: "link link-primary"})
+		}
+	}
+	return links
+}
+
+templ DetailField(label, value string) {
+	<div><dt class="text-sm text-base-content/60">{ label }</dt><dd class="mt-1 break-all font-medium">{ value }</dd></div>
 }
 
 func carrierConnectionRows(connections []CarrierConnection) [][]string {

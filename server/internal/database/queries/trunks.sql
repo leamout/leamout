@@ -404,6 +404,7 @@ RETURNING *;
 -- name: ListBackofficeTrunks :many
 SELECT
     t.id::TEXT AS id,
+    CAST(COALESCE(t.organization_id::TEXT, '—') AS TEXT) AS organization_id,
     COALESCE(o.name, 'Platform') AS organization_name,
     t.name,
     t.provisioning_mode,
@@ -427,3 +428,49 @@ GROUP BY
     t.created_at
 ORDER BY t.created_at DESC
 LIMIT 100;
+
+-- name: GetBackofficeTrunk :one
+SELECT
+    t.id::TEXT AS id,
+    CAST(COALESCE(t.organization_id::TEXT, '—') AS TEXT) AS organization_id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    t.name,
+    t.provisioning_mode,
+    t.direction,
+    t.status,
+    t.managed_default,
+    CAST(COALESCE(t.carrier_connection_id::TEXT, '—') AS TEXT) AS carrier_connection_id,
+    COALESCE(cc.name, '—') AS carrier_connection_name,
+    COALESCE(cp.name, '—') AS provider_name,
+    COUNT(te.id)::BIGINT AS endpoint_count,
+    COUNT(te.id) FILTER (WHERE te.enabled)::BIGINT AS enabled_endpoint_count,
+    to_char(t.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(t.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM trunks AS t
+LEFT JOIN organizations AS o ON o.id = t.organization_id
+LEFT JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN trunk_endpoints AS te ON te.trunk_id = t.id
+WHERE t.id = sqlc.arg(id)
+GROUP BY t.id, o.name, cc.name, cp.name
+LIMIT 1;
+
+-- name: ListBackofficeTrunkEndpoints :many
+SELECT
+    te.id::TEXT AS id,
+    te.host,
+    te.port,
+    te.transport,
+    te.direction,
+    te.priority,
+    te.weight,
+    te.enabled,
+    te.health_status,
+    te.consecutive_failures,
+    CAST(COALESCE(te.last_response_code::TEXT, '—') AS TEXT) AS last_response_code,
+    CAST(COALESCE(te.last_latency_ms::TEXT, '—') AS TEXT) AS last_latency_ms,
+    COALESCE(te.last_error, '—') AS last_error,
+    CAST(COALESCE(to_char(te.last_checked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS last_checked_at
+FROM trunk_endpoints AS te
+WHERE te.trunk_id = sqlc.arg(trunk_id)
+ORDER BY te.priority, te.host, te.port;

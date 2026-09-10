@@ -293,6 +293,81 @@ func (q *Queries) DisableManagedPhoneNumberForRelease(ctx context.Context, arg D
 	return i, err
 }
 
+const getBackofficePhoneNumber = `-- name: GetBackofficePhoneNumber :one
+SELECT
+    pn.id::TEXT AS id,
+    pn.organization_id::TEXT AS organization_id,
+    o.name AS organization_name,
+    pn.number,
+    pn.country_code::TEXT AS country_code,
+    pn.provisioning_mode,
+    CAST(COALESCE(pn.carrier_connection_id::TEXT, '—') AS TEXT) AS carrier_connection_id,
+    COALESCE(cc.name, '—') AS carrier_connection_name,
+    CAST(COALESCE(pn.provider_id::TEXT, '—') AS TEXT) AS provider_id,
+    COALESCE(cp.name, 'BYOC') AS provider_name,
+    COALESCE(pn.provider_resource_id, '—') AS provider_resource_id,
+    pn.voice_enabled,
+    pn.sms_enabled,
+    pn.status,
+    COALESCE(pn.error_code, '—') AS error_code,
+    COALESCE(pn.error_message, '—') AS error_message,
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(pn.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM phone_numbers AS pn
+JOIN organizations AS o ON o.id = pn.organization_id
+LEFT JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id
+LEFT JOIN carrier_providers AS cp ON cp.id = pn.provider_id
+WHERE pn.id = $1
+LIMIT 1
+`
+
+type GetBackofficePhoneNumberRow struct {
+	ID                    string `db:"id" json:"id"`
+	OrganizationID        string `db:"organization_id" json:"organization_id"`
+	OrganizationName      string `db:"organization_name" json:"organization_name"`
+	Number                string `db:"number" json:"number"`
+	CountryCode           string `db:"country_code" json:"country_code"`
+	ProvisioningMode      string `db:"provisioning_mode" json:"provisioning_mode"`
+	CarrierConnectionID   string `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionName string `db:"carrier_connection_name" json:"carrier_connection_name"`
+	ProviderID            string `db:"provider_id" json:"provider_id"`
+	ProviderName          string `db:"provider_name" json:"provider_name"`
+	ProviderResourceID    string `db:"provider_resource_id" json:"provider_resource_id"`
+	VoiceEnabled          bool   `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled            bool   `db:"sms_enabled" json:"sms_enabled"`
+	Status                string `db:"status" json:"status"`
+	ErrorCode             string `db:"error_code" json:"error_code"`
+	ErrorMessage          string `db:"error_message" json:"error_message"`
+	CreatedAt             string `db:"created_at" json:"created_at"`
+	UpdatedAt             string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficePhoneNumber(ctx context.Context, id uuid.UUID) (GetBackofficePhoneNumberRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficePhoneNumber, id)
+	var i GetBackofficePhoneNumberRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.Number,
+		&i.CountryCode,
+		&i.ProvisioningMode,
+		&i.CarrierConnectionID,
+		&i.CarrierConnectionName,
+		&i.ProviderID,
+		&i.ProviderName,
+		&i.ProviderResourceID,
+		&i.VoiceEnabled,
+		&i.SmsEnabled,
+		&i.Status,
+		&i.ErrorCode,
+		&i.ErrorMessage,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getPhoneNumberByID = `-- name: GetPhoneNumberByID :one
 SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provisioning_mode, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
@@ -466,6 +541,7 @@ func (q *Queries) GetVoiceBindingByNumber(ctx context.Context, number string) (G
 const listBackofficePhoneNumbers = `-- name: ListBackofficePhoneNumbers :many
 SELECT
     pn.id::TEXT AS id,
+    pn.organization_id::TEXT AS organization_id,
     o.name AS organization_name,
     pn.number,
     pn.country_code::TEXT AS country_code,
@@ -484,6 +560,7 @@ LIMIT 100
 
 type ListBackofficePhoneNumbersRow struct {
 	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
 	OrganizationName string `db:"organization_name" json:"organization_name"`
 	Number           string `db:"number" json:"number"`
 	CountryCode      string `db:"country_code" json:"country_code"`
@@ -506,6 +583,7 @@ func (q *Queries) ListBackofficePhoneNumbers(ctx context.Context) ([]ListBackoff
 		var i ListBackofficePhoneNumbersRow
 		if err := rows.Scan(
 			&i.ID,
+			&i.OrganizationID,
 			&i.OrganizationName,
 			&i.Number,
 			&i.CountryCode,

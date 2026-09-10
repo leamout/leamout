@@ -1,9 +1,64 @@
 package trunks
 
-import "github.com/leamout/leamout/internal/backoffice/components"
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
 
 templ Page(trunks []Trunk) {
 	@components.Layout("SIP Trunks", "trunks", Content(trunks))
+}
+
+templ DetailPage(trunk Detail) {
+	@components.Layout(trunk.Name, "trunks", DetailContent(trunk))
+}
+
+templ DetailContent(trunk Detail) {
+	@components.Breadcrumbs(components.BreadcrumbsProps{{Label: "SIP Trunks", Attrs: templ.Attributes{"href": "/trunks/"}}, {Label: trunk.Name}})
+	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+		<div>
+			<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">SIP trunk</p>
+			<h1 class="mt-2 text-3xl font-bold">{ trunk.Name }</h1>
+			<p class="mt-2 font-mono text-xs text-base-content/60">{ trunk.ID }</p>
+		</div>
+		<span class="badge badge-outline badge-lg">{ trunk.Status }</span>
+	</div>
+	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
+		<div class="stat">
+			<div class="stat-title">Endpoints</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(trunk.Endpoints) }</div>
+			<div class="stat-desc">{ fmt.Sprint(trunk.EnabledEndpoints) } enabled</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Direction</div>
+			<div class="stat-value text-2xl">{ trunk.Direction }</div>
+			<div class="stat-desc">Traffic policy</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Provisioning</div>
+			<div class="stat-value text-2xl">{ trunk.Mode }</div>
+			<div class="stat-desc">{ trunk.Provider }</div>
+		</div>
+	</div>
+	<section class="mt-6 rounded-box border border-base-300 bg-base-100 p-6">
+		<h2 class="text-lg font-semibold">Configuration</h2>
+		<dl class="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
+			@DetailField("Organization", trunk.Organization)
+			@DetailField("Organization ID", trunk.OrganizationID)
+			@DetailField("Carrier connection", trunk.CarrierConnection)
+			@DetailField("Carrier connection ID", trunk.CarrierConnectionID)
+			@DetailField("Managed default", fmt.Sprint(trunk.ManagedDefault))
+			@DetailField("Created", trunk.CreatedAt)
+			@DetailField("Updated", trunk.UpdatedAt)
+		</dl>
+	</section>
+	<section class="mt-6">
+		<div class="mb-4">
+			<h2 class="text-xl font-semibold">Endpoints</h2>
+			<p class="mt-1 text-sm text-base-content/60">Targets and recent health probe results.</p>
+		</div>@EndpointTable(trunk.EndpointList)
+	</section>
 }
 
 templ Content(trunks []Trunk) {

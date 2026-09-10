@@ -1,0 +1,11 @@
+package sipdomains
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page(items []SIPDomain) {
+	@components.ResourceListPage(listProps(items))
+}
+
+templ DetailPage(item Detail) {
+	@components.ResourceDetailPage(detailProps(item))
+}

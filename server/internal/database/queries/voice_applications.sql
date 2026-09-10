@@ -166,3 +166,23 @@ WHERE voice_bindings.id = sqlc.arg(id)
       SELECT va.id FROM voice_applications AS va
       WHERE va.organization_id = sqlc.arg(organization_id)
   );
+-- name: ListBackofficeVoiceApplications :many
+SELECT va.id::TEXT AS id, va.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       va.name, va.status, va.ring_timeout_seconds, COUNT(vb.id)::BIGINT AS binding_count,
+       to_char(va.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM voice_applications va JOIN organizations o ON o.id=va.organization_id
+LEFT JOIN voice_bindings vb ON vb.voice_application_id=va.id
+GROUP BY va.id,o.name ORDER BY va.created_at DESC LIMIT 100;
+
+-- name: GetBackofficeVoiceApplication :one
+SELECT va.id::TEXT AS id, va.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       va.name, va.status, va.ring_timeout_seconds,
+       CAST(COALESCE(va.caller_id, '—') AS TEXT) AS caller_id,
+       CAST(COALESCE(va.voice_url, '—') AS TEXT) AS voice_url,
+       CAST(COALESCE(va.callback_url, '—') AS TEXT) AS callback_url,
+       COUNT(vb.id)::BIGINT AS binding_count,
+       to_char(va.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(va.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM voice_applications va JOIN organizations o ON o.id=va.organization_id
+LEFT JOIN voice_bindings vb ON vb.voice_application_id=va.id
+WHERE va.id=sqlc.arg(id) GROUP BY va.id,o.name LIMIT 1;

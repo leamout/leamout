@@ -11,6 +11,61 @@ import (
 	"github.com/google/uuid"
 )
 
+const getBackofficeProvider = `-- name: GetBackofficeProvider :one
+SELECT
+    cp.id::TEXT AS id,
+    cp.slug,
+    cp.name,
+    cp.adapter,
+    cp.status,
+    COUNT(DISTINCT cc.id)::BIGINT AS connection_count,
+    COUNT(DISTINCT pn.id)::BIGINT AS phone_number_count,
+    COUNT(DISTINCT po.id) FILTER (WHERE po.state IN ('pending', 'provider_accepted'))::BIGINT AS pending_operation_count,
+    COUNT(DISTINCT po.id) FILTER (WHERE po.state = 'failed')::BIGINT AS failed_operation_count,
+    to_char(cp.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(cp.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM carrier_providers AS cp
+LEFT JOIN carrier_connections AS cc ON cc.provider_id = cp.id
+LEFT JOIN phone_numbers AS pn ON pn.provider_id = cp.id
+LEFT JOIN provider_operations AS po ON po.carrier_provider_id = cp.id
+WHERE cp.id = $1
+GROUP BY cp.id
+LIMIT 1
+`
+
+type GetBackofficeProviderRow struct {
+	ID                    string `db:"id" json:"id"`
+	Slug                  string `db:"slug" json:"slug"`
+	Name                  string `db:"name" json:"name"`
+	Adapter               string `db:"adapter" json:"adapter"`
+	Status                string `db:"status" json:"status"`
+	ConnectionCount       int64  `db:"connection_count" json:"connection_count"`
+	PhoneNumberCount      int64  `db:"phone_number_count" json:"phone_number_count"`
+	PendingOperationCount int64  `db:"pending_operation_count" json:"pending_operation_count"`
+	FailedOperationCount  int64  `db:"failed_operation_count" json:"failed_operation_count"`
+	CreatedAt             string `db:"created_at" json:"created_at"`
+	UpdatedAt             string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeProvider(ctx context.Context, id uuid.UUID) (GetBackofficeProviderRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeProvider, id)
+	var i GetBackofficeProviderRow
+	err := row.Scan(
+		&i.ID,
+		&i.Slug,
+		&i.Name,
+		&i.Adapter,
+		&i.Status,
+		&i.ConnectionCount,
+		&i.PhoneNumberCount,
+		&i.PendingOperationCount,
+		&i.FailedOperationCount,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getCarrierProviderByID = `-- name: GetCarrierProviderByID :one
 SELECT id, slug, name, adapter, status, created_at, updated_at
 FROM carrier_providers
@@ -55,6 +110,65 @@ func (q *Queries) GetCarrierProviderBySlug(ctx context.Context, slug string) (Ca
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeProviderOperations = `-- name: ListBackofficeProviderOperations :many
+SELECT po.id::TEXT AS id, o.name AS organization_name, pn.number,
+       po.operation_type, po.state, po.attempts,
+       COALESCE(po.provider_operation_id, '—') AS provider_operation_id,
+       COALESCE(po.last_error, '—') AS last_error,
+       to_char(po.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(po.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM provider_operations AS po
+JOIN organizations AS o ON o.id = po.organization_id
+JOIN phone_numbers AS pn ON pn.id = po.phone_number_id
+WHERE po.carrier_provider_id = $1
+ORDER BY po.created_at DESC
+LIMIT 50
+`
+
+type ListBackofficeProviderOperationsRow struct {
+	ID                  string `db:"id" json:"id"`
+	OrganizationName    string `db:"organization_name" json:"organization_name"`
+	Number              string `db:"number" json:"number"`
+	OperationType       string `db:"operation_type" json:"operation_type"`
+	State               string `db:"state" json:"state"`
+	Attempts            int32  `db:"attempts" json:"attempts"`
+	ProviderOperationID string `db:"provider_operation_id" json:"provider_operation_id"`
+	LastError           string `db:"last_error" json:"last_error"`
+	CreatedAt           string `db:"created_at" json:"created_at"`
+	UpdatedAt           string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) ListBackofficeProviderOperations(ctx context.Context, carrierProviderID uuid.UUID) ([]ListBackofficeProviderOperationsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeProviderOperations, carrierProviderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeProviderOperationsRow{}
+	for rows.Next() {
+		var i ListBackofficeProviderOperationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationName,
+			&i.Number,
+			&i.OperationType,
+			&i.State,
+			&i.Attempts,
+			&i.ProviderOperationID,
+			&i.LastError,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBackofficeProviders = `-- name: ListBackofficeProviders :many

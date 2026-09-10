@@ -137,3 +137,28 @@ LEFT JOIN plans AS p ON p.id = s.plan_id
 WHERE o.deleted_at IS NULL
 ORDER BY o.created_at DESC
 LIMIT 100;
+
+-- name: GetBackofficeCommercialAccount :one
+SELECT
+    o.id::TEXT AS organization_id,
+    o.name AS organization_name,
+    CAST(COALESCE(s.id::TEXT, '—') AS TEXT) AS subscription_id,
+    CAST(COALESCE(p.id::TEXT, '—') AS TEXT) AS plan_id,
+    COALESCE(p.name, '—') AS plan_name,
+    CAST(COALESCE(pr.id::TEXT, '—') AS TEXT) AS price_id,
+    COALESCE(pr.pricing_type, '—') AS pricing_type,
+    COALESCE(pr.currency, '—') AS currency,
+    CAST(COALESCE(pr.amount_minor::TEXT, '—') AS TEXT) AS amount_minor,
+    COALESCE(pr.billing_interval, '—') AS billing_interval,
+    COALESCE(s.status, 'none') AS subscription_status,
+    'prepaid'::TEXT AS billing_model,
+    CAST(COALESCE(to_char(s.starts_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS starts_at,
+    CAST(COALESCE(to_char(s.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS renews_at,
+    CAST(COALESCE(to_char(s.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS TEXT) AS ends_at,
+    to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS organization_created_at
+FROM organizations AS o
+LEFT JOIN subscriptions AS s ON s.organization_id = o.id AND s.status IN ('active', 'past_due')
+LEFT JOIN plans AS p ON p.id = s.plan_id
+LEFT JOIN prices AS pr ON pr.id = s.price_id
+WHERE o.id = sqlc.arg(organization_id) AND o.deleted_at IS NULL
+LIMIT 1;

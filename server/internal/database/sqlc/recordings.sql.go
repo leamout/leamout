@@ -230,6 +230,63 @@ func (q *Queries) FailRecording(ctx context.Context, arg FailRecordingParams) (R
 	return i, err
 }
 
+const getBackofficeRecording = `-- name: GetBackofficeRecording :one
+SELECT r.id::TEXT AS id, r.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       r.call_id::TEXT AS call_id, r.status, COALESCE(r.storage_provider,'—') AS storage_provider,
+       COALESCE(r.storage_bucket,'—') AS storage_bucket, COALESCE(r.storage_key,'—') AS storage_key,
+       COALESCE(r.storage_url,'—') AS storage_url, COALESCE(r.format,'—') AS format,
+       CAST(COALESCE(r.duration_seconds::TEXT,'—') AS TEXT) AS duration_seconds,
+       CAST(COALESCE(r.file_size_bytes::TEXT,'—') AS TEXT) AS file_size_bytes,
+       CAST(COALESCE(to_char(r.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS started_at,
+       CAST(COALESCE(to_char(r.completed_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS completed_at,
+       to_char(r.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(r.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS updated_at
+FROM recordings r JOIN organizations o ON o.id=r.organization_id WHERE r.id=$1 LIMIT 1
+`
+
+type GetBackofficeRecordingRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	CallID           string `db:"call_id" json:"call_id"`
+	Status           string `db:"status" json:"status"`
+	StorageProvider  string `db:"storage_provider" json:"storage_provider"`
+	StorageBucket    string `db:"storage_bucket" json:"storage_bucket"`
+	StorageKey       string `db:"storage_key" json:"storage_key"`
+	StorageUrl       string `db:"storage_url" json:"storage_url"`
+	Format           string `db:"format" json:"format"`
+	DurationSeconds  string `db:"duration_seconds" json:"duration_seconds"`
+	FileSizeBytes    string `db:"file_size_bytes" json:"file_size_bytes"`
+	StartedAt        string `db:"started_at" json:"started_at"`
+	CompletedAt      string `db:"completed_at" json:"completed_at"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+	UpdatedAt        string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeRecording(ctx context.Context, id uuid.UUID) (GetBackofficeRecordingRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeRecording, id)
+	var i GetBackofficeRecordingRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.CallID,
+		&i.Status,
+		&i.StorageProvider,
+		&i.StorageBucket,
+		&i.StorageKey,
+		&i.StorageUrl,
+		&i.Format,
+		&i.DurationSeconds,
+		&i.FileSizeBytes,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getRecording = `-- name: GetRecording :one
 SELECT id, organization_id, call_id, status, storage_key, storage_provider, storage_bucket, storage_url, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 FROM recordings
@@ -337,6 +394,58 @@ func (q *Queries) GetRecordingIncludingDeleted(ctx context.Context, arg GetRecor
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeRecordings = `-- name: ListBackofficeRecordings :many
+SELECT r.id::TEXT AS id, r.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       r.call_id::TEXT AS call_id, r.status, COALESCE(r.format,'—') AS format,
+       CAST(COALESCE(r.duration_seconds::TEXT,'—') AS TEXT) AS duration_seconds,
+       CAST(COALESCE(r.file_size_bytes::TEXT,'—') AS TEXT) AS file_size_bytes,
+       to_char(r.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at
+FROM recordings r JOIN organizations o ON o.id=r.organization_id
+ORDER BY r.created_at DESC LIMIT 100
+`
+
+type ListBackofficeRecordingsRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	CallID           string `db:"call_id" json:"call_id"`
+	Status           string `db:"status" json:"status"`
+	Format           string `db:"format" json:"format"`
+	DurationSeconds  string `db:"duration_seconds" json:"duration_seconds"`
+	FileSizeBytes    string `db:"file_size_bytes" json:"file_size_bytes"`
+	CreatedAt        string `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) ListBackofficeRecordings(ctx context.Context) ([]ListBackofficeRecordingsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeRecordings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeRecordingsRow{}
+	for rows.Next() {
+		var i ListBackofficeRecordingsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.CallID,
+			&i.Status,
+			&i.Format,
+			&i.DurationSeconds,
+			&i.FileSizeBytes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listCallRecordings = `-- name: ListCallRecordings :many

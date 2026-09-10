@@ -1,0 +1,11 @@
+package recordings
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page(items []Recording) {
+	@components.ResourceListPage(listProps(items))
+}
+
+templ DetailPage(item Detail) {
+	@components.ResourceDetailPage(detailProps(item))
+}

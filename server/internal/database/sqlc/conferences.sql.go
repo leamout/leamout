@@ -146,6 +146,58 @@ func (q *Queries) EndConferenceParticipants(ctx context.Context, arg EndConferen
 	return items, nil
 }
 
+const getBackofficeConference = `-- name: GetBackofficeConference :one
+SELECT c.id::TEXT AS id, c.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       CAST(COALESCE(c.application_id::TEXT,'—') AS TEXT) AS application_id,
+       COALESCE(va.name,'—') AS application_name, c.name, c.state,
+       COUNT(cp.id)::BIGINT AS participant_count,
+       COUNT(cp.id) FILTER (WHERE cp.left_at IS NULL)::BIGINT AS active_participant_count,
+       CAST(COALESCE(to_char(c.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS started_at,
+       CAST(COALESCE(to_char(c.ended_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS ended_at,
+       to_char(c.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(c.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS updated_at
+FROM conferences c JOIN organizations o ON o.id=c.organization_id
+LEFT JOIN voice_applications va ON va.id=c.application_id LEFT JOIN conference_participants cp ON cp.conference_id=c.id
+WHERE c.id=$1 GROUP BY c.id,o.name,va.name LIMIT 1
+`
+
+type GetBackofficeConferenceRow struct {
+	ID                     string `db:"id" json:"id"`
+	OrganizationID         string `db:"organization_id" json:"organization_id"`
+	OrganizationName       string `db:"organization_name" json:"organization_name"`
+	ApplicationID          string `db:"application_id" json:"application_id"`
+	ApplicationName        string `db:"application_name" json:"application_name"`
+	Name                   string `db:"name" json:"name"`
+	State                  string `db:"state" json:"state"`
+	ParticipantCount       int64  `db:"participant_count" json:"participant_count"`
+	ActiveParticipantCount int64  `db:"active_participant_count" json:"active_participant_count"`
+	StartedAt              string `db:"started_at" json:"started_at"`
+	EndedAt                string `db:"ended_at" json:"ended_at"`
+	CreatedAt              string `db:"created_at" json:"created_at"`
+	UpdatedAt              string `db:"updated_at" json:"updated_at"`
+}
+
+func (q *Queries) GetBackofficeConference(ctx context.Context, id uuid.UUID) (GetBackofficeConferenceRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeConference, id)
+	var i GetBackofficeConferenceRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.ApplicationID,
+		&i.ApplicationName,
+		&i.Name,
+		&i.State,
+		&i.ParticipantCount,
+		&i.ActiveParticipantCount,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getConference = `-- name: GetConference :one
 SELECT id, organization_id, application_id, name, state, started_at, ended_at, created_at, updated_at
 FROM conferences
@@ -204,6 +256,56 @@ func (q *Queries) GetConferenceByName(ctx context.Context, arg GetConferenceByNa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeConferences = `-- name: ListBackofficeConferences :many
+SELECT c.id::TEXT AS id, c.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       c.name, c.state, COUNT(cp.id)::BIGINT AS participant_count,
+       CAST(COALESCE(to_char(c.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS started_at,
+       CAST(COALESCE(to_char(c.ended_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS ended_at
+FROM conferences c JOIN organizations o ON o.id=c.organization_id
+LEFT JOIN conference_participants cp ON cp.conference_id=c.id
+GROUP BY c.id,o.name ORDER BY c.created_at DESC LIMIT 100
+`
+
+type ListBackofficeConferencesRow struct {
+	ID               string `db:"id" json:"id"`
+	OrganizationID   string `db:"organization_id" json:"organization_id"`
+	OrganizationName string `db:"organization_name" json:"organization_name"`
+	Name             string `db:"name" json:"name"`
+	State            string `db:"state" json:"state"`
+	ParticipantCount int64  `db:"participant_count" json:"participant_count"`
+	StartedAt        string `db:"started_at" json:"started_at"`
+	EndedAt          string `db:"ended_at" json:"ended_at"`
+}
+
+func (q *Queries) ListBackofficeConferences(ctx context.Context) ([]ListBackofficeConferencesRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeConferences)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeConferencesRow{}
+	for rows.Next() {
+		var i ListBackofficeConferencesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.Name,
+			&i.State,
+			&i.ParticipantCount,
+			&i.StartedAt,
+			&i.EndedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listConferences = `-- name: ListConferences :many

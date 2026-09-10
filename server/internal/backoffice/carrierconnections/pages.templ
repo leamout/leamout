@@ -1,9 +1,115 @@
 package carrierconnections
 
-import "github.com/leamout/leamout/internal/backoffice/components"
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/internal/backoffice/components"
+)
 
 templ Page(connections []CarrierConnection) {
 	@components.Layout("Carrier Connections", "carrierconnections", Content(connections))
+}
+
+templ DetailPage(connection Detail) {
+	@components.Layout(connection.Name, "carrierconnections", DetailContent(connection))
+}
+
+templ DetailContent(connection Detail) {
+	@components.Breadcrumbs(components.BreadcrumbsProps{{Label: "Carrier Connections", Attrs: templ.Attributes{"href": "/carrier-connections/"}}, {Label: connection.Name}})
+	<div class="mt-2 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+		<div>
+			<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Carrier connection</p>
+			<h1 class="mt-2 text-3xl font-bold">{ connection.Name }</h1>
+			<p class="mt-2 font-mono text-xs text-base-content/60">{ connection.ID }</p>
+		</div>
+		<span class="badge badge-outline badge-lg">{ connection.Status }</span>
+	</div>
+	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
+		<div class="stat">
+			<div class="stat-title">Trunks</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(connection.Trunks) }</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Max CPS</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(connection.MaxCPS) }</div>
+		</div>
+		<div class="stat">
+			<div class="stat-title">Concurrent calls</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(connection.MaxConcurrentCalls) }</div>
+		</div>
+	</div>
+	<div class="mt-6 grid gap-6 xl:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Ownership</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("Organization", connection.Organization)
+				@DetailField("Organization ID", connection.OrganizationID)
+				@DetailField("Provider", connection.Provider)
+				@DetailField("Provider ID", connection.ProviderID)
+				@DetailField("Scope", connection.Scope)
+				@DetailField("Created", connection.CreatedAt)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Traffic and capabilities</h2>
+			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
+				@DetailField("Outbound auth", connection.OutboundAuth)
+				@DetailField("Inbound enabled", fmt.Sprint(connection.InboundEnabled))
+				@DetailField("Inbound auth", connection.InboundAuth)
+				@DetailField("Daily minute limit", connection.MaxDailyMinutes)
+				@DetailField("Codecs", connection.Codecs)
+				@DetailField("Video", fmt.Sprint(connection.SupportsVideo))
+				@DetailField("Fax", fmt.Sprint(connection.SupportsFax))
+				@DetailField("Updated", connection.UpdatedAt)
+			</dl>
+		</section>
+	</div>
+	<div class="mt-6 grid gap-6 xl:grid-cols-2">
+		<section>
+			<h2 class="mb-4 text-xl font-semibold">Inbound source IPs</h2>
+			<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+				<table class="table">
+					<thead>
+						<tr>
+							<th>CIDR</th>
+							<th>Created</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, ip := range connection.SourceIPs {
+							<tr>
+								<td class="font-mono">{ ip.CIDR }</td>
+								<td>{ ip.CreatedAt }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</section>
+		<section>
+			<h2 class="mb-4 text-xl font-semibold">Provider resources</h2>
+			<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+				<table class="table">
+					<thead>
+						<tr>
+							<th>Type</th>
+							<th>Provider resource</th>
+							<th>Updated</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, resource := range connection.Resources {
+							<tr>
+								<td>{ resource.Type }</td>
+								<td class="font-mono text-xs">{ resource.ProviderResourceID }</td>
+								<td>{ resource.UpdatedAt }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</section>
+	</div>
 }
 
 templ Content(connections []CarrierConnection) {

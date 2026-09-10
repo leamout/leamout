@@ -1,0 +1,11 @@
+package conferences
+
+import "github.com/leamout/leamout/internal/backoffice/components"
+
+templ Page(items []Conference) {
+	@components.ResourceListPage(listProps(items))
+}
+
+templ DetailPage(item Detail) {
+	@components.ResourceDetailPage(detailProps(item))
+}

@@ -117,11 +117,10 @@ feature/
 └── components.templ
 ```
 
-Current feature modules are `users`, `organizations`, `calls`, `numbers`,
-`trunks`, `carrierconnections`, `providers`, and `commercial`. Users,
-organizations, and calls currently have detail pages; the remaining modules
-provide cross-tenant list projections while their safe detail projections are
-built out.
+Current resource modules include customer identity, commercial accounts, core
+telecom configuration and activity, carrier connections, managed providers,
+provider CDRs, and wholesale reconciliation. Each provides cross-tenant list
+and detail projections for safe operator inspection.
 
 ## Component conventions
 

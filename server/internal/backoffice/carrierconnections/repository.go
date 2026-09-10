@@ -3,6 +3,7 @@ package carrierconnections
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
@@ -27,6 +28,7 @@ func (r *Repository) List(ctx context.Context) ([]CarrierConnection, error) {
 	for _, row := range rows {
 		connections = append(connections, CarrierConnection{
 			ID:                 row.ID,
+			OrganizationID:     row.OrganizationID,
 			Organization:       row.OrganizationName,
 			Name:               row.Name,
 			Provider:           row.ProviderName,
@@ -39,4 +41,61 @@ func (r *Repository) List(ctx context.Context) ([]CarrierConnection, error) {
 		})
 	}
 	return connections, nil
+}
+
+func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
+	row, err := r.queries.GetBackofficeCarrierConnection(ctx, id)
+	if err != nil {
+		return Detail{}, err
+	}
+	ipRows, err := r.queries.ListBackofficeCarrierConnectionSourceIPs(ctx, id)
+	if err != nil {
+		return Detail{}, err
+	}
+	ips := make([]SourceIP, 0, len(ipRows))
+	for _, v := range ipRows {
+		ips = append(ips, SourceIP{ID: v.ID, CIDR: v.Cidr, CreatedAt: v.CreatedAt})
+	}
+	resourceRows, err := r.queries.ListBackofficeCarrierConnectionResources(ctx, id)
+	if err != nil {
+		return Detail{}, err
+	}
+	resources := make([]ProviderResource, 0, len(resourceRows))
+	for _, v := range resourceRows {
+		resources = append(
+			resources,
+			ProviderResource{
+				Type:               v.ResourceType,
+				ProviderResourceID: v.ProviderResourceID,
+				CreatedAt:          v.CreatedAt,
+				UpdatedAt:          v.UpdatedAt,
+			},
+		)
+	}
+	return Detail{
+		CarrierConnection: CarrierConnection{
+			ID:                 row.ID,
+			OrganizationID:     row.OrganizationID,
+			Organization:       row.OrganizationName,
+			Name:               row.Name,
+			Provider:           row.ProviderName,
+			Scope:              row.Scope,
+			Status:             row.Status,
+			InboundEnabled:     row.InboundEnabled,
+			MaxCPS:             row.MaxCps,
+			MaxConcurrentCalls: row.MaxConcurrentCalls,
+			Trunks:             row.TrunkCount,
+		},
+		ProviderID:      row.ProviderID,
+		OutboundAuth:    row.OutboundAuthMethod,
+		InboundAuth:     row.InboundAuthMethod,
+		MaxDailyMinutes: row.MaxDailyMinutes,
+		Codecs:          row.Codecs,
+		SupportsVideo:   row.SupportsVideo,
+		SupportsFax:     row.SupportsFax,
+		CreatedAt:       row.CreatedAt,
+		UpdatedAt:       row.UpdatedAt,
+		SourceIPs:       ips,
+		Resources:       resources,
+	}, nil
 }

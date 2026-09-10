@@ -412,6 +412,7 @@ LIMIT 1;
 -- name: ListBackofficeCarrierConnections :many
 SELECT
     cc.id::TEXT AS id,
+    CAST(COALESCE(cc.organization_id::TEXT, '—') AS TEXT) AS organization_id,
     COALESCE(o.name, 'Platform') AS organization_name,
     cc.name,
     cp.name AS provider_name,
@@ -438,3 +439,50 @@ GROUP BY
     cc.created_at
 ORDER BY cc.created_at DESC
 LIMIT 100;
+
+-- name: GetBackofficeCarrierConnection :one
+SELECT
+    cc.id::TEXT AS id,
+    CAST(COALESCE(cc.organization_id::TEXT, '—') AS TEXT) AS organization_id,
+    COALESCE(o.name, 'Platform') AS organization_name,
+    cc.provider_id::TEXT AS provider_id,
+    cp.name AS provider_name,
+    cc.name,
+    cc.scope,
+    cc.status,
+    cc.outbound_auth_method,
+    cc.inbound_enabled,
+    cc.inbound_auth_method,
+    cc.max_cps,
+    cc.max_concurrent_calls,
+    CAST(COALESCE(cc.max_daily_minutes::TEXT, '—') AS TEXT) AS max_daily_minutes,
+    array_to_string(cc.codecs, ', ') AS codecs,
+    cc.supports_video,
+    cc.supports_fax,
+    COUNT(DISTINCT t.id)::BIGINT AS trunk_count,
+    COUNT(DISTINCT src.id)::BIGINT AS source_ip_count,
+    to_char(cc.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+    to_char(cc.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM carrier_connections AS cc
+JOIN carrier_providers AS cp ON cp.id = cc.provider_id
+LEFT JOIN organizations AS o ON o.id = cc.organization_id
+LEFT JOIN trunks AS t ON t.carrier_connection_id = cc.id
+LEFT JOIN carrier_connection_source_ips AS src ON src.carrier_connection_id = cc.id
+WHERE cc.id = sqlc.arg(id)
+GROUP BY cc.id, o.name, cp.name
+LIMIT 1;
+
+-- name: ListBackofficeCarrierConnectionSourceIPs :many
+SELECT src.id::TEXT AS id, src.cidr::TEXT AS cidr,
+       to_char(src.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+FROM carrier_connection_source_ips AS src
+WHERE src.carrier_connection_id = sqlc.arg(carrier_connection_id)
+ORDER BY src.created_at;
+
+-- name: ListBackofficeCarrierConnectionResources :many
+SELECT resource_type, provider_resource_id,
+       to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
+FROM carrier_connection_provider_resources
+WHERE carrier_connection_id = sqlc.arg(carrier_connection_id)
+ORDER BY resource_type;

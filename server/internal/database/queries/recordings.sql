@@ -112,3 +112,24 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND status <> 'deleted'
 RETURNING *;
+-- name: ListBackofficeRecordings :many
+SELECT r.id::TEXT AS id, r.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       r.call_id::TEXT AS call_id, r.status, COALESCE(r.format,'—') AS format,
+       CAST(COALESCE(r.duration_seconds::TEXT,'—') AS TEXT) AS duration_seconds,
+       CAST(COALESCE(r.file_size_bytes::TEXT,'—') AS TEXT) AS file_size_bytes,
+       to_char(r.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at
+FROM recordings r JOIN organizations o ON o.id=r.organization_id
+ORDER BY r.created_at DESC LIMIT 100;
+
+-- name: GetBackofficeRecording :one
+SELECT r.id::TEXT AS id, r.organization_id::TEXT AS organization_id, o.name AS organization_name,
+       r.call_id::TEXT AS call_id, r.status, COALESCE(r.storage_provider,'—') AS storage_provider,
+       COALESCE(r.storage_bucket,'—') AS storage_bucket, COALESCE(r.storage_key,'—') AS storage_key,
+       COALESCE(r.storage_url,'—') AS storage_url, COALESCE(r.format,'—') AS format,
+       CAST(COALESCE(r.duration_seconds::TEXT,'—') AS TEXT) AS duration_seconds,
+       CAST(COALESCE(r.file_size_bytes::TEXT,'—') AS TEXT) AS file_size_bytes,
+       CAST(COALESCE(to_char(r.started_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS started_at,
+       CAST(COALESCE(to_char(r.completed_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI'),'—') AS TEXT) AS completed_at,
+       to_char(r.created_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS created_at,
+       to_char(r.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI') AS updated_at
+FROM recordings r JOIN organizations o ON o.id=r.organization_id WHERE r.id=sqlc.arg(id) LIMIT 1;
