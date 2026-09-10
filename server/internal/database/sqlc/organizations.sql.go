@@ -116,8 +116,8 @@ SELECT
     COALESCE(subscription.status, 'none') AS subscription_status,
     COALESCE(subscription.billing_provider, '—') AS billing_provider,
     COALESCE(subscription.provider_subscription_id, '—') AS provider_subscription_id,
-    COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS renews_at,
-    COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—') AS ends_at,
+    COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS renews_at,
+    COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS ends_at,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
     to_char(o.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
 FROM organizations AS o
@@ -156,18 +156,18 @@ LIMIT 1
 `
 
 type GetBackofficeOrganizationRow struct {
-	ID                     string      `db:"id" json:"id"`
-	Name                   string      `db:"name" json:"name"`
-	Status                 string      `db:"status" json:"status"`
-	MemberCount            int64       `db:"member_count" json:"member_count"`
-	PlanName               string      `db:"plan_name" json:"plan_name"`
-	SubscriptionStatus     string      `db:"subscription_status" json:"subscription_status"`
-	BillingProvider        string      `db:"billing_provider" json:"billing_provider"`
-	ProviderSubscriptionID string      `db:"provider_subscription_id" json:"provider_subscription_id"`
-	RenewsAt               interface{} `db:"renews_at" json:"renews_at"`
-	EndsAt                 interface{} `db:"ends_at" json:"ends_at"`
-	CreatedAt              string      `db:"created_at" json:"created_at"`
-	UpdatedAt              string      `db:"updated_at" json:"updated_at"`
+	ID                     string `db:"id" json:"id"`
+	Name                   string `db:"name" json:"name"`
+	Status                 string `db:"status" json:"status"`
+	MemberCount            int64  `db:"member_count" json:"member_count"`
+	PlanName               string `db:"plan_name" json:"plan_name"`
+	SubscriptionStatus     string `db:"subscription_status" json:"subscription_status"`
+	BillingProvider        string `db:"billing_provider" json:"billing_provider"`
+	ProviderSubscriptionID string `db:"provider_subscription_id" json:"provider_subscription_id"`
+	RenewsAt               string `db:"renews_at" json:"renews_at"`
+	EndsAt                 string `db:"ends_at" json:"ends_at"`
+	CreatedAt              string `db:"created_at" json:"created_at"`
+	UpdatedAt              string `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (GetBackofficeOrganizationRow, error) {
