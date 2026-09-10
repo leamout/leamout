@@ -20,27 +20,27 @@ func RegisterRoutes(
 	organizationAccess func(string) func(http.Handler) http.Handler,
 	idempotency func(http.Handler) http.Handler,
 ) {
-	catalog.RegisterRoutes(router, module.Catalog.Handler, requireSession)
+	catalog.RegisterRoutes(router, module.handlers.catalog, requireSession)
 	licensing.RegisterRoutes(
 		router,
-		module.Access.Licensing.Handler,
+		module.handlers.licensing,
 		organizationAccess("licensing"),
 		idempotency,
 	)
 	commercialstate.RegisterRoutes(
 		router,
-		module.State.Handler,
+		module.handlers.state,
 		organizationAccess("commercial-state"),
 	)
 	subscriptions.RegisterRoutes(
 		router,
-		module.Access.Subscriptions.Handler,
+		module.handlers.subscriptions,
 		organizationAccess("subscriptions"),
 		idempotency,
 	)
 	wallets.RegisterTopupRoutes(
 		router,
-		module.Money.TopupHandler,
+		module.handlers.topups,
 		organizationAccess("billing"),
 		idempotency,
 	)
