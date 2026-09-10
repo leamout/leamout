@@ -85,14 +85,52 @@ func (s *settlementStub) Reconcile(_ context.Context, event paymentprovider.Even
 type providerStub struct {
 	request paymentprovider.CheckoutRequest
 	event   paymentprovider.Event
+	session *paymentprovider.CheckoutSession
 }
 
 func (s *providerStub) CreateCheckout(_ context.Context, request paymentprovider.CheckoutRequest) (paymentprovider.CheckoutSession, error) {
 	s.request = request
+	if s.session != nil {
+		return *s.session, nil
+	}
 	return paymentprovider.CheckoutSession{
 		Provider: "stripe", ProviderID: "pi_123", Reference: request.Reference,
 		ClientSecret: "secret", Status: paymentprovider.StatusPending, NextAction: paymentprovider.NextActionWait,
 	}, nil
+}
+
+func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
+	organizationID := uuid.New()
+	walletID := uuid.New()
+	checkouts := &checkoutStub{}
+	payments := &paymentStub{}
+	provider := &providerStub{session: &paymentprovider.CheckoutSession{
+		Provider: "stripe", ProviderID: "pi_123", Reference: "topup.wrong",
+	}}
+	service := NewService(
+		walletStub{wallet: wallets.Wallet{
+			ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive,
+		}},
+		checkouts, payments, &settlementStub{},
+		map[string]paymentprovider.Provider{"stripe": provider},
+	)
+
+	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
+		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: "payer@example.com",
+	})
+	if err != ErrPaymentMismatch {
+		t.Fatalf("Create() error = %v, want %v", err, ErrPaymentMismatch)
+	}
+	if payments.payment.Status != commercialpayments.StatusFailed {
+		t.Fatalf("payment status = %q, want %q", payments.payment.Status, commercialpayments.StatusFailed)
+	}
+	if checkouts.order.Status != checkout.StatusFailed || len(checkouts.transitions) != 1 {
+		t.Fatalf("checkout was not failed: %+v", checkouts.order)
+	}
+	transition := checkouts.transitions[0]
+	if transition.Expected != checkout.StatusPending || transition.NextAction != checkout.ActionNone || transition.CompletedAt == nil {
+		t.Fatalf("unexpected failure transition: %+v", transition)
+	}
 }
 
 func (s *providerStub) GetPayment(context.Context, string) (paymentprovider.Payment, error) {

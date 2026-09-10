@@ -101,15 +101,11 @@ func (s *Service) Create(ctx context.Context, organizationID, walletID uuid.UUID
 		MobileMoney: input.MobileMoney,
 	})
 	if err != nil {
-		completedAt := s.now().UTC()
-		_, _ = s.payments.UpdateStatus(ctx, organizationID, payment.ID, commercialpayments.StatusFailed, nil)
-		_, _ = s.checkouts.Transition(ctx, organizationID, order.ID, checkout.Transition{
-			Expected: checkout.StatusPending, Status: checkout.StatusFailed,
-			NextAction: checkout.ActionNone, CompletedAt: &completedAt,
-		})
+		s.failPendingCheckout(ctx, organizationID, order, payment)
 		return Checkout{}, err
 	}
 	if session.Provider != providerName || session.ProviderID == "" || session.Reference != reference {
+		s.failPendingCheckout(ctx, organizationID, order, payment)
 		return Checkout{}, ErrPaymentMismatch
 	}
 	payment, err = s.payments.SetProviderID(ctx, organizationID, payment.ID, session.ProviderID, commercialpayments.StatusProcessing)
@@ -129,6 +125,22 @@ func (s *Service) Create(ctx context.Context, organizationID, walletID uuid.UUID
 		return Checkout{}, err
 	}
 	return Checkout{Order: order, Payment: payment, Session: session}, nil
+}
+
+func (s *Service) failPendingCheckout(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	order checkout.Order,
+	payment commercialpayments.Payment,
+) {
+	completedAt := s.now().UTC()
+	_, _ = s.payments.UpdateStatus(ctx, organizationID, payment.ID, commercialpayments.StatusFailed, nil)
+	_, _ = s.checkouts.Transition(ctx, organizationID, order.ID, checkout.Transition{
+		Expected:    checkout.StatusPending,
+		Status:      checkout.StatusFailed,
+		NextAction:  checkout.ActionNone,
+		CompletedAt: &completedAt,
+	})
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, orderID uuid.UUID) (Details, error) {
