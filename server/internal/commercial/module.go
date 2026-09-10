@@ -7,11 +7,11 @@ import (
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
-	"github.com/leamout/leamout/internal/commercial/metering"
 	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
@@ -21,11 +21,11 @@ import (
 // Commercial subdomains independently.
 type Module struct {
 	Catalog  CatalogModule
+	Purchase PurchaseModule
 	Access   AccessModule
-	Metering MeteringModule
-	Money    MoneyModule
+	Usage    UsageModule
+	Prepaid  PrepaidModule
 	Payments PaymentsModule
-	State    StateModule
 }
 
 type CatalogModule struct {
@@ -34,10 +34,16 @@ type CatalogModule struct {
 	Handler    *catalog.Handler
 }
 
+type PurchaseModule struct {
+	Checkouts *checkout.Repository
+	Orders    *orders.Repository
+}
+
 type AccessModule struct {
 	Subscriptions SubscriptionsModule
+	Licenses      LicensesModule
 	Entitlements  EntitlementsModule
-	Licensing     LicensingModule
+	State         StateModule
 }
 
 type SubscriptionsModule struct {
@@ -46,37 +52,35 @@ type SubscriptionsModule struct {
 	Handler    *subscriptions.Handler
 }
 
-type EntitlementsModule struct {
-	Repository *entitlements.Repository
-	Service    *entitlements.Service
-}
-
-type LicensingModule struct {
+type LicensesModule struct {
 	Repository *licensing.Repository
 	Service    *licensing.Service
 	Handler    *licensing.Handler
 }
 
-type MeteringModule struct {
-	Repository *metering.Repository
-	Service    *metering.Service
+type EntitlementsModule struct {
+	Repository *entitlements.Repository
+	Service    *entitlements.Service
 }
 
-type MoneyModule struct {
+type StateModule struct {
+	Service *commercialstate.Service
+	Handler *commercialstate.Handler
+}
+
+type UsageModule struct {
+	Repository *usage.Repository
+	Service    *usage.Service
+}
+
+type PrepaidModule struct {
 	Wallets      *wallets.Repository
 	TopupService *wallets.TopupService
 	TopupHandler *wallets.TopupHandler
 }
 
 type PaymentsModule struct {
-	Checkouts *checkout.Repository
-	Orders    *orders.Repository
-	Payments  *payments.Repository
-}
-
-type StateModule struct {
-	Service *commercialstate.Service
-	Handler *commercialstate.Handler
+	Repository *payments.Repository
 }
 
 // New composes the Commercial domain from its durable submodules. Payment
@@ -109,8 +113,8 @@ func New(db *pgxpool.Pool) *Module {
 		commercialStateService,
 	)
 
-	meteringRepository := metering.NewRepository(db)
-	meteringService := metering.NewService(meteringRepository)
+	usageRepository := usage.NewRepository(db)
+	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
 	checkoutRepository := checkout.NewRepository(db)
@@ -130,39 +134,41 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    catalogService,
 			Handler:    catalog.NewHandler(catalogService),
 		},
+		Purchase: PurchaseModule{
+			Checkouts: checkoutRepository,
+			Orders:    orderRepository,
+		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{
 				Repository: subscriptionsRepository,
 				Service:    subscriptionsService,
 				Handler:    subscriptions.NewHandler(subscriptionsService),
 			},
-			Entitlements: EntitlementsModule{
-				Repository: entitlementsRepository,
-				Service:    entitlementsService,
-			},
-			Licensing: LicensingModule{
+			Licenses: LicensesModule{
 				Repository: licensingRepository,
 				Service:    licensingService,
 				Handler:    licensing.NewHandler(licensingService),
 			},
+			Entitlements: EntitlementsModule{
+				Repository: entitlementsRepository,
+				Service:    entitlementsService,
+			},
+			State: StateModule{
+				Service: commercialStateService,
+				Handler: commercialstate.NewHandler(commercialStateService),
+			},
 		},
-		Metering: MeteringModule{
-			Repository: meteringRepository,
-			Service:    meteringService,
+		Usage: UsageModule{
+			Repository: usageRepository,
+			Service:    usageService,
 		},
-		Money: MoneyModule{
+		Prepaid: PrepaidModule{
 			Wallets:      walletRepository,
 			TopupService: topupService,
 			TopupHandler: wallets.NewTopupHandler(topupService),
 		},
 		Payments: PaymentsModule{
-			Checkouts: checkoutRepository,
-			Orders:    orderRepository,
-			Payments:  paymentRepository,
-		},
-		State: StateModule{
-			Service: commercialStateService,
-			Handler: commercialstate.NewHandler(commercialStateService),
+			Repository: paymentRepository,
 		},
 	}
 }
