@@ -3,11 +3,12 @@ package conferences
 import (
 	"bytes"
 	"errors"
+	"net/http"
+
 	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"net/http"
 )
 
 type Handler struct{ repository *Repository }
