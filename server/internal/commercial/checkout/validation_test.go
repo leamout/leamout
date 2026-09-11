@@ -1,4 +1,4 @@
-package checkouts
+package checkout
 
 import (
 	"errors"

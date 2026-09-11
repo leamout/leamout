@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	checkouts "github.com/leamout/leamout/internal/commercial/purchase/checkouts"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
@@ -19,10 +18,10 @@ type walletStore interface {
 }
 
 type checkoutStore interface {
-	Create(context.Context, uuid.UUID, checkouts.CreateInput) (checkouts.Checkout, error)
-	Get(context.Context, uuid.UUID, uuid.UUID) (checkouts.Checkout, error)
-	ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (checkouts.Checkout, error)
-	Transition(context.Context, uuid.UUID, uuid.UUID, checkouts.Transition) (checkouts.Checkout, error)
+	Create(context.Context, uuid.UUID, checkout.CreateInput) (checkout.Checkout, error)
+	Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Checkout, error)
+	ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (checkout.Checkout, error)
+	Transition(context.Context, uuid.UUID, uuid.UUID, checkout.Transition) (checkout.Checkout, error)
 }
 
 type paymentStore interface {
@@ -41,7 +40,7 @@ type Service struct {
 	checkouts     checkoutStore
 	payments      paymentStore
 	paymentEvents paymentEventProcessor
-	providers     map[string]commercialpayments.Provider
+	providers     *commercialpayments.ProviderRegistry
 	now           func() time.Time
 }
 
@@ -50,7 +49,7 @@ func NewService(
 	checkouts checkoutStore,
 	payments paymentStore,
 	paymentEvents paymentEventProcessor,
-	providers map[string]commercialpayments.Provider,
+	providers *commercialpayments.ProviderRegistry,
 ) *Service {
 	return &Service{
 		wallets:       wallets,
@@ -62,12 +61,6 @@ func NewService(
 	}
 }
 
-func (s *Service) SetProvider(name string, provider commercialpayments.Provider) {
-	if provider != nil {
-		s.providers[name] = provider
-	}
-}
-
 func (s *Service) Create(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -75,7 +68,7 @@ func (s *Service) Create(
 	input CreateInput,
 ) (Checkout, error) {
 	providerName := string(input.Provider)
-	provider, ok := s.providers[providerName]
+	provider, ok := s.providers.Get(providerName)
 	if !ok {
 		return Checkout{}, ErrProviderUnavailable
 	}
@@ -88,21 +81,21 @@ func (s *Service) Create(
 		return Checkout{}, ErrInvalidTopup
 	}
 
-	method := checkouts.MethodCard
-	if input.Provider == checkouts.ProviderPaystack {
-		method = checkouts.MethodMobileMoney
+	method := checkout.MethodCard
+	if input.Provider == checkout.ProviderPaystack {
+		method = checkout.MethodMobileMoney
 		if wallet.Currency != "GHS" || input.MobileMoney == nil {
 			return Checkout{}, ErrInvalidTopup
 		}
-	} else if input.Provider != checkouts.ProviderStripe || input.MobileMoney != nil {
+	} else if input.Provider != checkout.ProviderStripe || input.MobileMoney != nil {
 		return Checkout{}, ErrInvalidTopup
 	}
 
 	now := s.now().UTC()
 	reference := "topup." + uuid.NewString()
-	checkoutRecord, err := s.checkouts.Create(ctx, organizationID, checkouts.CreateInput{
+	checkoutRecord, err := s.checkouts.Create(ctx, organizationID, checkout.CreateInput{
 		WalletID:      &walletID,
-		Type:          checkouts.TypeWalletTopup,
+		Type:          checkout.TypeWalletTopup,
 		Provider:      input.Provider,
 		PaymentMethod: method,
 		Reference:     reference,
@@ -141,7 +134,7 @@ func (s *Service) Create(
 		return Checkout{}, err
 	}
 	if session.Provider != providerName || session.Reference != reference ||
-		(input.Provider == checkouts.ProviderStripe && session.ProviderID == "") {
+		(input.Provider == checkout.ProviderStripe && session.ProviderID == "") {
 		s.failPendingCheckout(ctx, organizationID, checkoutRecord, payment)
 		return Checkout{}, ErrPaymentMismatch
 	}
@@ -177,10 +170,10 @@ func (s *Service) Create(
 		ctx,
 		organizationID,
 		checkoutRecord.ID,
-		checkouts.Transition{
-			Expected:        checkouts.StatusPending,
-			Status:          checkouts.StatusProcessing,
-			NextAction:      checkouts.NextAction(session.NextAction),
+		checkout.Transition{
+			Expected:        checkout.StatusPending,
+			Status:          checkout.StatusProcessing,
+			NextAction:      checkout.NextAction(session.NextAction),
 			ProviderMessage: providerMessage,
 		},
 	)
@@ -198,7 +191,7 @@ func (s *Service) Create(
 func (s *Service) failPendingCheckout(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	checkoutRecord checkouts.Checkout,
+	checkoutRecord checkout.Checkout,
 	payment commercialpayments.Payment,
 ) {
 	completedAt := s.now().UTC()
@@ -214,10 +207,10 @@ func (s *Service) failPendingCheckout(
 		ctx,
 		organizationID,
 		checkoutRecord.ID,
-		checkouts.Transition{
-			Expected:    checkouts.StatusPending,
-			Status:      checkouts.StatusFailed,
-			NextAction:  checkouts.ActionNone,
+		checkout.Transition{
+			Expected:    checkout.StatusPending,
+			Status:      checkout.StatusFailed,
+			NextAction:  checkout.ActionNone,
 			CompletedAt: &completedAt,
 		},
 	)
@@ -238,7 +231,7 @@ func (s *Service) Get(
 		return Details{}, err
 	}
 
-	if checkoutRecord.Provider == checkouts.ProviderPaystack && checkoutRecord.Status == checkouts.StatusProcessing {
+	if checkoutRecord.Provider == checkout.ProviderPaystack && checkoutRecord.Status == checkout.StatusProcessing {
 		claimed, claimErr := s.checkouts.ClaimRefresh(
 			ctx,
 			organizationID,
@@ -261,7 +254,7 @@ func (s *Service) Get(
 					return Details{}, err
 				}
 			}
-		} else if !errors.Is(claimErr, checkouts.ErrCheckoutNotFound) {
+		} else if !errors.Is(claimErr, checkout.ErrCheckoutNotFound) {
 			return Details{}, claimErr
 		}
 	}
@@ -274,9 +267,9 @@ func (s *Service) Get(
 
 func (s *Service) refreshPaystack(
 	ctx context.Context,
-	checkoutRecord checkouts.Checkout,
+	checkoutRecord checkout.Checkout,
 ) (commercialpayments.ProviderEvent, bool) {
-	provider, ok := s.providers["paystack"]
+	provider, ok := s.providers.Get("paystack")
 	if !ok {
 		return commercialpayments.ProviderEvent{}, false
 	}
@@ -317,14 +310,14 @@ func (s *Service) Continue(
 		return Checkout{}, err
 	}
 
-	provider, ok := s.providers[string(details.Checkout.Provider)]
+	provider, ok := s.providers.Get(string(details.Checkout.Provider))
 	if !ok {
 		return Checkout{}, ErrProviderUnavailable
 	}
 
 	continuation, ok := provider.(commercialpayments.ContinuationProvider)
-	if !ok || details.Checkout.Provider != checkouts.ProviderPaystack ||
-		details.Checkout.Status != checkouts.StatusProcessing {
+	if !ok || details.Checkout.Provider != checkout.ProviderPaystack ||
+		details.Checkout.Status != checkout.StatusProcessing {
 		return Checkout{}, ErrInvalidTopup
 	}
 
@@ -347,10 +340,10 @@ func (s *Service) Continue(
 		ctx,
 		organizationID,
 		checkoutID,
-		checkouts.Transition{
-			Expected:        checkouts.StatusProcessing,
-			Status:          checkouts.StatusProcessing,
-			NextAction:      checkouts.NextAction(session.NextAction),
+		checkout.Transition{
+			Expected:        checkout.StatusProcessing,
+			Status:          checkout.StatusProcessing,
+			NextAction:      checkout.NextAction(session.NextAction),
 			ProviderMessage: providerMessage,
 		},
 	)
@@ -363,25 +356,4 @@ func (s *Service) Continue(
 		Payment:  details.Payment,
 		Session:  session,
 	}, nil
-}
-
-func (s *Service) Webhook(
-	ctx context.Context,
-	providerName string,
-	payload []byte,
-	headers http.Header,
-) (Settlement, error) {
-	provider, ok := s.providers[providerName]
-	if !ok {
-		return Settlement{}, ErrProviderUnavailable
-	}
-
-	event, err := provider.ParseWebhook(payload, headers)
-	if err != nil {
-		return Settlement{}, err
-	}
-	if event.Provider != providerName {
-		return Settlement{}, ErrPaymentMismatch
-	}
-	return s.paymentEvents.ProcessProviderEvent(ctx, event)
 }

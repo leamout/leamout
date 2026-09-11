@@ -15,5 +15,4 @@ func RegisterRoutes(
 	router.With(auth, idempotency).Post("/wallets/{wallet_id}/topups", handler.Create)
 	router.With(auth).Get("/checkouts/{checkout_id}", handler.Get)
 	router.With(auth, idempotency).Post("/checkouts/{checkout_id}/continue", handler.Continue)
-	router.Post("/payment-webhooks/{provider}", handler.Webhook)
 }

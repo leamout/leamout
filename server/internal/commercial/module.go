@@ -4,15 +4,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
+	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/commercial/purchase"
-	checkouts "github.com/leamout/leamout/internal/commercial/purchase/checkouts"
-	"github.com/leamout/leamout/internal/commercial/purchase/orders"
-	"github.com/leamout/leamout/internal/commercial/purchase/topups"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/topups"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
@@ -36,7 +36,7 @@ type CatalogModule struct {
 }
 
 type PurchaseModule struct {
-	Checkouts *checkouts.Repository
+	Checkouts *checkout.Repository
 	Orders    *orders.Repository
 	Service   *purchase.Service
 	Topups    TopupsModule
@@ -88,6 +88,8 @@ type PrepaidModule struct {
 type PaymentsModule struct {
 	Repository *payments.Repository
 	Service    *payments.Service
+	Providers  *payments.ProviderRegistry
+	Handler    *payments.Handler
 }
 
 // New composes the Commercial domain from its durable submodules. Payment
@@ -124,17 +126,18 @@ func New(db *pgxpool.Pool) *Module {
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
-	checkoutRepository := checkouts.NewRepository(db)
+	checkoutRepository := checkout.NewRepository(db)
 	orderRepository := orders.NewRepository(db)
 	purchaseService := purchase.NewService()
 	paymentRepository := payments.NewRepository(db, purchaseService)
 	paymentService := payments.NewService(paymentRepository)
+	providerRegistry := payments.NewProviderRegistry()
 	topupService := topups.NewService(
 		walletRepository,
 		checkoutRepository,
 		paymentRepository,
 		paymentService,
-		map[string]payments.Provider{},
+		providerRegistry,
 	)
 	topupHandler := topups.NewHandler(topupService)
 	stateModule := StateModule{
@@ -185,6 +188,8 @@ func New(db *pgxpool.Pool) *Module {
 		Payments: PaymentsModule{
 			Repository: paymentRepository,
 			Service:    paymentService,
+			Providers:  providerRegistry,
+			Handler:    payments.NewHandler(paymentService, providerRegistry),
 		},
 	}
 }

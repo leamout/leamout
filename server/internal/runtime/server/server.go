@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial"
-	"github.com/leamout/leamout/internal/commercial/purchase/topups"
+	"github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
@@ -121,7 +121,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Commercial.Purchase.Topups.Service); err != nil {
+	if err := configurePaymentProviders(cfg, modules.Commercial.Payments.Providers); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -385,7 +385,7 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 	return nil
 }
 
-func configurePaymentProviders(cfg config.Config, service *topups.Service) error {
+func configurePaymentProviders(cfg config.Config, providers *payments.ProviderRegistry) error {
 	if cfg.Stripe.SecretKey != "" {
 		if cfg.Stripe.WebhookSecret == "" {
 			return fmt.Errorf("stripe webhook secret is required when Stripe is enabled")
@@ -398,7 +398,7 @@ func configurePaymentProviders(cfg config.Config, service *topups.Service) error
 		if err != nil {
 			return err
 		}
-		service.SetProvider("stripe", client)
+		providers.Set("stripe", client)
 	}
 	if cfg.Paystack.SecretKey != "" {
 		client, err := paystack.NewClient(paystack.Config{
@@ -408,7 +408,7 @@ func configurePaymentProviders(cfg config.Config, service *topups.Service) error
 		if err != nil {
 			return err
 		}
-		service.SetProvider("paystack", client)
+		providers.Set("paystack", client)
 	}
 	return nil
 }
