@@ -28,7 +28,7 @@ func TestWebhookAuthenticatesAdapterBeforeCommercialProcessing(t *testing.T) {
 	registry := NewProviderRegistry(map[string]Provider{"stripe": webhookProviderStub{event: event}})
 	router := chi.NewRouter()
 	RegisterRoutes(router, NewHandler(NewService(store), registry))
-	request := httptest.NewRequest(http.MethodPost, "/payment-webhooks/stripe", bytes.NewBufferString(`{}`))
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/payment-webhooks/stripe", bytes.NewBufferString(`{}`))
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
