@@ -10,6 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/commercial/purchase"
+	"github.com/leamout/leamout/internal/commercial/purchase/topups"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
@@ -39,6 +40,12 @@ type PurchaseModule struct {
 	Checkouts *checkout.Repository
 	Orders    *orders.Repository
 	Service   *purchase.Service
+	Topups    TopupsModule
+}
+
+type TopupsModule struct {
+	Service *topups.Service
+	Handler *topups.Handler
 }
 
 type AccessModule struct {
@@ -76,9 +83,7 @@ type UsageModule struct {
 }
 
 type PrepaidModule struct {
-	Wallets      *wallets.Repository
-	TopupService *wallets.TopupService
-	TopupHandler *wallets.TopupHandler
+	Wallets *wallets.Repository
 }
 
 type PaymentsModule struct {
@@ -125,22 +130,20 @@ func New(db *pgxpool.Pool) *Module {
 	purchaseService := purchase.NewService()
 	paymentRepository := payments.NewRepository(db, purchaseService)
 	paymentService := payments.NewService(paymentRepository)
-	topupService := wallets.NewTopupService(
+	topupService := topups.NewService(
 		walletRepository,
 		checkoutRepository,
 		paymentRepository,
 		paymentService,
 		map[string]paymentprovider.Provider{},
 	)
-	topupHandler := wallets.NewTopupHandler(topupService)
+	topupHandler := topups.NewHandler(topupService)
 	stateModule := StateModule{
 		Service: commercialStateService,
 		Handler: commercialstate.NewHandler(commercialStateService),
 	}
 	prepaidModule := PrepaidModule{
-		Wallets:      walletRepository,
-		TopupService: topupService,
-		TopupHandler: topupHandler,
+		Wallets: walletRepository,
 	}
 
 	return &Module{
@@ -153,6 +156,10 @@ func New(db *pgxpool.Pool) *Module {
 			Checkouts: checkoutRepository,
 			Orders:    orderRepository,
 			Service:   purchaseService,
+			Topups: TopupsModule{
+				Service: topupService,
+				Handler: topupHandler,
+			},
 		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{

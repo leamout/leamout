@@ -1,4 +1,4 @@
-package wallets
+package topups
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 
 func RegisterRoutes(
 	router chi.Router,
-	handler *TopupHandler,
+	handler *Handler,
 	auth func(http.Handler) http.Handler,
 	idempotency func(http.Handler) http.Handler,
 ) {

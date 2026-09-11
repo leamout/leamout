@@ -1,4 +1,4 @@
-package wallets
+package topups
 
 import (
 	"context"
@@ -10,12 +10,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-type walletStub struct{ wallet Wallet }
+type walletStub struct{ wallet wallets.Wallet }
 
-func (s walletStub) Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error) {
+func (s walletStub) Get(context.Context, uuid.UUID, uuid.UUID) (wallets.Wallet, error) {
 	return s.wallet, nil
 }
 
@@ -85,9 +86,9 @@ type settlementStub struct {
 	event paymentprovider.Event
 }
 
-func (s *settlementStub) ProcessProviderEvent(_ context.Context, event paymentprovider.Event) (TopupSettlement, error) {
+func (s *settlementStub) ProcessProviderEvent(_ context.Context, event paymentprovider.Event) (Settlement, error) {
 	s.event = event
-	return TopupSettlement{Applied: true}, nil
+	return Settlement{Applied: true}, nil
 }
 
 type providerStub struct {
@@ -116,15 +117,15 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	provider := &providerStub{session: &paymentprovider.CheckoutSession{
 		Provider: "stripe", ProviderID: "pi_123", Reference: "topup.wrong",
 	}}
-	service := NewTopupService(
-		walletStub{wallet: Wallet{
-			ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive,
+	service := NewService(
+		walletStub{wallet: wallets.Wallet{
+			ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive,
 		}},
 		checkouts, payments, &settlementStub{},
 		map[string]paymentprovider.Provider{"stripe": provider},
 	)
 
-	_, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
+	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: "payer@example.com",
 	})
 	if !errors.Is(err, ErrPaymentMismatch) {
@@ -156,14 +157,14 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 	checkouts := &checkoutStub{}
 	payments := &paymentStub{}
 	provider := &providerStub{}
-	service := NewTopupService(
-		walletStub{wallet: Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive}},
+	service := NewService(
+		walletStub{wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive}},
 		checkouts, payments, &settlementStub{},
 		map[string]paymentprovider.Provider{"stripe": provider},
 	)
 	service.now = func() time.Time { return time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC) }
 
-	result, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
+	result, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: " payer@example.com ",
 	})
 	if err != nil {
@@ -184,12 +185,12 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 
 func TestCreateRejectsPaystackForNonGHSWallet(t *testing.T) {
 	provider := &providerStub{}
-	service := NewTopupService(
-		walletStub{wallet: Wallet{ID: uuid.New(), Currency: "USD", Status: StatusActive}},
+	service := NewService(
+		walletStub{wallet: wallets.Wallet{ID: uuid.New(), Currency: "USD", Status: wallets.StatusActive}},
 		&checkoutStub{}, &paymentStub{}, &settlementStub{},
 		map[string]paymentprovider.Provider{"paystack": provider},
 	)
-	_, err := service.Create(context.Background(), uuid.New(), uuid.New(), TopupCreateInput{
+	_, err := service.Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
 		AmountMinor: 100, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
 		MobileMoney: &paymentprovider.MobileMoney{Phone: "+233200000000", Provider: "mtn"},
 	})
@@ -207,12 +208,12 @@ func TestCreateAcceptsPaystackChargeWithoutTransactionID(t *testing.T) {
 	payments := &paymentStub{}
 	checkouts := &checkoutStub{}
 	provider := &referenceProviderStub{provider: "paystack"}
-	service := NewTopupService(
-		walletStub{wallet: Wallet{ID: walletID, OrganizationID: organizationID, Currency: "GHS", Status: StatusActive}},
+	service := NewService(
+		walletStub{wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "GHS", Status: wallets.StatusActive}},
 		checkouts, payments, &settlementStub{}, map[string]paymentprovider.Provider{"paystack": provider},
 	)
 
-	_, err := service.Create(context.Background(), organizationID, walletID, TopupCreateInput{
+	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
 		MobileMoney: &paymentprovider.MobileMoney{Phone: "0240000000", Provider: "mtn"},
 	})
@@ -242,7 +243,7 @@ func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 	}
 	provider := &providerStub{event: event}
 	settlements := &settlementStub{}
-	service := NewTopupService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"stripe": provider})
+	service := NewService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"stripe": provider})
 
 	result, err := service.Webhook(context.Background(), "stripe", []byte(`{}`), http.Header{})
 	if err != nil {
@@ -259,7 +260,7 @@ func TestWebhookDelegatesAuthenticatedEventClassificationToPayments(t *testing.T
 		Payment: paymentprovider.Payment{Status: paymentprovider.StatusSucceeded}, Raw: []byte(`{"event":"refund.processed"}`),
 	}}
 	settlements := &settlementStub{}
-	service := NewTopupService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"paystack": provider})
+	service := NewService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"paystack": provider})
 
 	result, err := service.Webhook(context.Background(), "paystack", []byte(`{}`), http.Header{})
 	if err != nil || !result.Applied || settlements.event.ProviderEventID != "refund:1" {
@@ -283,7 +284,7 @@ func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
 		AmountMinor: 2500, Currency: "GHS", Status: paymentprovider.StatusSucceeded,
 	}}
 	settlements := &settlementStub{}
-	service := NewTopupService(nil, checkouts, payments, settlements, map[string]paymentprovider.Provider{"paystack": provider})
+	service := NewService(nil, checkouts, payments, settlements, map[string]paymentprovider.Provider{"paystack": provider})
 	service.now = func() time.Time { return now }
 
 	if _, err := service.Get(context.Background(), organizationID, checkoutID); err != nil {
