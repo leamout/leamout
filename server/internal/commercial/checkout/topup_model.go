@@ -1,11 +1,9 @@
-package topups
+package checkout
 
 import (
 	"errors"
 
-	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
@@ -15,28 +13,27 @@ var (
 	ErrPaymentMismatch     = apperror.NewConflict("provider payment does not match checkout")
 )
 
-type CreateInput struct {
+type TopupCreateInput struct {
 	AmountMinor int64
-	Provider    checkout.Provider
+	Provider    Provider
 	Email       string
 	CallbackURL string
-	MobileMoney *commercialpayments.MobileMoney
+	MobileMoney *payments.MobileMoney
 }
 
-type ContinueInput struct {
-	Action commercialpayments.NextAction
+type TopupContinueInput struct {
+	Action payments.NextAction
 	Value  string
 }
 
-type Checkout struct {
-	Checkout checkout.Checkout
+type TopupResult struct {
+	Checkout Checkout
 	Payment  payments.Payment
-	Session  commercialpayments.CheckoutSession
+	Session  payments.CheckoutSession
 }
 
-type Details struct {
-	Checkout checkout.Checkout
+type TopupDetails struct {
+	Checkout Checkout
 	Payment  payments.Payment
 }
-
-type Settlement = payments.Settlement
+type TopupSettlement = payments.Settlement

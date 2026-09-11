@@ -1,6 +1,9 @@
 package commercial
 
 import (
+	"context"
+
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
@@ -12,7 +15,6 @@ import (
 	"github.com/leamout/leamout/internal/commercial/purchase"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/topups"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
@@ -39,17 +41,12 @@ type PurchaseModule struct {
 	Checkouts CheckoutModule
 	Orders    *orders.Repository
 	Service   *purchase.Service
-	Topups    TopupsModule
 }
 
 type CheckoutModule struct {
 	Repository *checkout.Repository
 	Service    *checkout.Service
-}
-
-type TopupsModule struct {
-	Service *topups.Service
-	Handler *topups.Handler
+	Handler    *checkout.Handler
 }
 
 type AccessModule struct {
@@ -93,6 +90,7 @@ type PrepaidModule struct {
 type WalletModule struct {
 	Repository *wallets.Repository
 	Service    *wallets.Service
+	Handler    *wallets.Handler
 }
 
 type PaymentsModule struct {
@@ -144,20 +142,21 @@ func New(db *pgxpool.Pool) *Module {
 	paymentRepository := payments.NewRepository(db, purchaseService)
 	paymentService := payments.NewService(paymentRepository)
 	providerRegistry := payments.NewProviderRegistry()
-	topupService := topups.NewService(
+	topupService := checkout.NewTopupService(
 		walletService,
 		checkoutService,
 		paymentRepository,
 		paymentService,
 		providerRegistry,
 	)
-	topupHandler := topups.NewHandler(topupService)
+	checkoutHandler := checkout.NewHandler(topupService)
+	walletHandler := wallets.NewHandler(walletTopupCreator(topupService))
 	stateModule := StateModule{
 		Service: commercialStateService,
 		Handler: commercialstate.NewHandler(commercialStateService),
 	}
 	prepaidModule := PrepaidModule{
-		Wallets: WalletModule{Repository: walletRepository, Service: walletService},
+		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
 	}
 
 	return &Module{
@@ -167,13 +166,9 @@ func New(db *pgxpool.Pool) *Module {
 			Handler:    catalog.NewHandler(catalogService),
 		},
 		Purchase: PurchaseModule{
-			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService},
+			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService, Handler: checkoutHandler},
 			Orders:    orderRepository,
 			Service:   purchaseService,
-			Topups: TopupsModule{
-				Service: topupService,
-				Handler: topupHandler,
-			},
 		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{
@@ -203,5 +198,28 @@ func New(db *pgxpool.Pool) *Module {
 			Providers:  providerRegistry,
 			Handler:    payments.NewHandler(paymentService, providerRegistry),
 		},
+	}
+}
+
+func walletTopupCreator(service *checkout.TopupService) wallets.TopupCreator {
+	return func(ctx context.Context, organizationID, walletID uuid.UUID, input wallets.TopupRequest) (wallets.TopupResponse, error) {
+		var mobileMoney *payments.MobileMoney
+		if input.MobileMoney != nil {
+			mobileMoney = &payments.MobileMoney{Phone: input.MobileMoney.Phone, Provider: input.MobileMoney.Provider}
+		}
+		result, err := service.Create(ctx, organizationID, walletID, checkout.TopupCreateInput{
+			AmountMinor: input.AmountMinor, Provider: checkout.Provider(input.Provider), Email: input.Email,
+			CallbackURL: input.CallbackURL, MobileMoney: mobileMoney,
+		})
+		if err != nil {
+			return wallets.TopupResponse{}, err
+		}
+		response := checkout.Response(result)
+		return wallets.TopupResponse{
+			CheckoutID: response.CheckoutID, PaymentID: response.PaymentID, Reference: response.Reference,
+			Provider: string(response.Provider), AmountMinor: response.AmountMinor, Currency: response.Currency,
+			Status: string(response.Status), NextAction: string(response.NextAction),
+			ProviderMessage: response.ProviderMessage, ClientSecret: response.ClientSecret,
+		}, nil
 	}
 }

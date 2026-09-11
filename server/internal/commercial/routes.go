@@ -5,11 +5,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leamout/leamout/internal/commercial/catalog"
+	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/topups"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 // RegisterRoutes exposes Commercial HTTP routes. Authentication, organization
@@ -39,11 +40,7 @@ func RegisterRoutes(
 		organizationAccess("subscriptions"),
 		idempotency,
 	)
-	topups.RegisterRoutes(
-		router,
-		module.Purchase.Topups.Handler,
-		organizationAccess("billing"),
-		idempotency,
-	)
+	wallets.RegisterRoutes(router, module.Prepaid.Wallets.Handler, organizationAccess("billing"), idempotency)
+	checkout.RegisterRoutes(router, module.Purchase.Checkouts.Handler, organizationAccess("billing"), idempotency)
 	payments.RegisterRoutes(router, module.Payments.Handler)
 }
