@@ -60,6 +60,38 @@ type Server struct {
 }
 
 func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	switch cfg.DeploymentMode {
+	case config.DeploymentModeCloud:
+		return NewCloud(ctx, cfg)
+	case config.DeploymentModeSelfHosted:
+		return NewSelfHosted(ctx, cfg)
+	default:
+		return nil, fmt.Errorf("unsupported deployment mode %q", cfg.DeploymentMode)
+	}
+}
+
+// NewCloud assembles the Cloud control plane, including Leamout-operated
+// provider integrations and internal managed-carrier endpoints.
+func NewCloud(ctx context.Context, cfg config.Config) (*Server, error) {
+	if cfg.DeploymentMode != config.DeploymentModeCloud {
+		return nil, fmt.Errorf("cloud server requires deployment mode %q", config.DeploymentModeCloud)
+	}
+	return newServer(ctx, cfg, true)
+}
+
+// NewSelfHosted assembles the sovereign runtime without Cloud provider clients
+// or managed-carrier internal endpoints.
+func NewSelfHosted(ctx context.Context, cfg config.Config) (*Server, error) {
+	if cfg.DeploymentMode != config.DeploymentModeSelfHosted {
+		return nil, fmt.Errorf("self-hosted server requires deployment mode %q", config.DeploymentModeSelfHosted)
+	}
+	if err := cfg.ValidateDeployment(); err != nil {
+		return nil, err
+	}
+	return newServer(ctx, cfg, false)
+}
+
+func newServer(ctx context.Context, cfg config.Config, cloud bool) (*Server, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("database URL is required")
 	}
@@ -121,36 +153,14 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Commercial.Billing.Payments.Providers); err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize payment providers: %w", err)
+	if cloud {
+		if err := configureCloud(cfg, modules); err != nil {
+			_ = freeSwitch.Close()
+			_ = redisClient.Close()
+			db.Close()
+			return nil, err
+		}
 	}
-	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
-	}
-	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.Access.Service); err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize managed SIP: %w", err)
-	}
-	modules.Edge.Handler = edge.NewHandler(
-		modules.Edge.Service,
-		cfg.ManagedSIP.AdmissionSecret,
-	)
-	modules.Wholesale.Handler = wholesale.NewHandler(
-		modules.Wholesale.Service,
-		cfg.ManagedSIP.AdmissionSecret,
-	)
-	modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(
-		modules.ProviderDiagnostics.Service,
-		cfg.OperatorAPISecret,
-	)
 
 	router := chi.NewRouter()
 	router.Use(
@@ -167,14 +177,35 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 	RegisterRoutes(router, modules)
 
 	return &Server{
-		DB:         db,
-		Router:     router,
-		Modules:    modules,
-		FreeSWITCH: freeSwitch,
-		Redis:      redisClient,
-		Logger:     logger,
-		Metrics:    metricsRegistry,
+		DB: db, Router: router, Modules: modules, FreeSWITCH: freeSwitch,
+		Redis: redisClient, Logger: logger, Metrics: metricsRegistry,
 	}, nil
+}
+
+func configureCloud(cfg config.Config, modules Modules) error {
+	if err := configurePaymentProviders(cfg, modules.Commercial.Billing.Payments.Providers); err != nil {
+		return fmt.Errorf("initialize payment providers: %w", err)
+	}
+	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
+		return fmt.Errorf("initialize managed number acquisition: %w", err)
+	}
+	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.Access.Service); err != nil {
+		return fmt.Errorf("initialize managed SIP: %w", err)
+	}
+	modules.Edge.Handler = edge.NewHandler(
+		modules.Edge.Service,
+		cfg.ManagedSIP.AdmissionSecret,
+	)
+	modules.Wholesale.Handler = wholesale.NewHandler(
+		modules.Wholesale.Service,
+		cfg.ManagedSIP.AdmissionSecret,
+	)
+	modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(
+		modules.ProviderDiagnostics.Service,
+		cfg.OperatorAPISecret,
+	)
+
+	return nil
 }
 
 func NewModules(

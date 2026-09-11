@@ -66,6 +66,36 @@ var componentNames = []string{
 }
 
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
+	switch cfg.DeploymentMode {
+	case config.DeploymentModeCloud:
+		return NewCloud(ctx, cfg)
+	case config.DeploymentModeSelfHosted:
+		return NewSelfHosted(ctx, cfg)
+	default:
+		return nil, fmt.Errorf("unsupported deployment mode %q", cfg.DeploymentMode)
+	}
+}
+
+// NewCloud assembles background jobs with Leamout-operated provider clients.
+func NewCloud(ctx context.Context, cfg config.Config) (*Worker, error) {
+	if cfg.DeploymentMode != config.DeploymentModeCloud {
+		return nil, fmt.Errorf("cloud worker requires deployment mode %q", config.DeploymentModeCloud)
+	}
+	return newWorker(ctx, cfg, true)
+}
+
+// NewSelfHosted assembles background jobs without Cloud provider clients.
+func NewSelfHosted(ctx context.Context, cfg config.Config) (*Worker, error) {
+	if cfg.DeploymentMode != config.DeploymentModeSelfHosted {
+		return nil, fmt.Errorf("self-hosted worker requires deployment mode %q", config.DeploymentModeSelfHosted)
+	}
+	if err := cfg.ValidateDeployment(); err != nil {
+		return nil, err
+	}
+	return newWorker(ctx, cfg, false)
+}
+
+func newWorker(ctx context.Context, cfg config.Config, cloud bool) (*Worker, error) {
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect worker database: %w", err)
@@ -170,7 +200,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 
 	numbersRepository := numbers.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
-	if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
+	if cloud && strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
 		didwwClient, err := didww.NewClient(didww.Config{BaseURL: cfg.DIDWW.APIBaseURL, APIKey: cfg.DIDWW.APIKey})
 		if err != nil {
 			_ = redisClient.Close()
@@ -195,7 +225,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 
 	var commpeakSource wholesale.CDRPageSource
-	if strings.TrimSpace(cfg.CommPeak.Authorization) != "" {
+	if cloud && strings.TrimSpace(cfg.CommPeak.Authorization) != "" {
 		commpeakClient, err := commpeak.NewClient(commpeak.Config{
 			BaseURL:       cfg.CommPeak.APIBaseURL,
 			Authorization: cfg.CommPeak.Authorization,

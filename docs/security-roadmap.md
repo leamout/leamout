@@ -51,6 +51,11 @@ Before adding more controls, make the deployment boundary executable:
 This is the immediate implementation milestone because it prevents later work
 from accidentally coupling the two trust models.
 
+Current status: the typed mode, startup validation, API and worker composition
+roots, Cloud-only provider wiring, and rejection of Cloud provider credentials
+in self-hosted mode are implemented. The remaining gate for this milestone is
+the network-isolated self-hosted startup and acceptance harness.
+
 ## Cloud track: multi-tenant isolation
 
 After composition is separated, implement the Cloud track independently:
