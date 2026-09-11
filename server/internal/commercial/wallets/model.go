@@ -135,17 +135,11 @@ type TopupCheckout struct {
 	Checkout checkout.Checkout
 	Payment  payments.Payment
 	Session  paymentprovider.CheckoutSession
-
-	// Compatibility mirror for callers migrating from the old checkout/order terminology.
-	Order checkout.Checkout
 }
 
 type TopupDetails struct {
 	Checkout checkout.Checkout
 	Payment  payments.Payment
-
-	// Compatibility mirror for callers migrating from the old checkout/order terminology.
-	Order checkout.Checkout
 }
 
 type TopupSettlement struct {
@@ -153,6 +147,7 @@ type TopupSettlement struct {
 	OrganizationID uuid.UUID
 	WalletID       uuid.UUID
 	PaymentID      uuid.UUID
+	OrderID        uuid.UUID
 	AmountMinor    int64
 	SettledAt      *time.Time
 }

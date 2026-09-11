@@ -124,7 +124,7 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 	return i, err
 }
 
-const getPaymentByCheckoutOrder = `-- name: GetPaymentByCheckoutOrder :one
+const getPaymentByCheckout = `-- name: GetPaymentByCheckout :one
 SELECT p.id, p.checkout_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
@@ -135,13 +135,13 @@ WHERE p.organization_id = $1
 LIMIT 1
 `
 
-type GetPaymentByCheckoutOrderParams struct {
+type GetPaymentByCheckoutParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	CheckoutID     uuid.UUID `db:"checkout_id" json:"checkout_id"`
 }
 
-func (q *Queries) GetPaymentByCheckoutOrder(ctx context.Context, arg GetPaymentByCheckoutOrderParams) (Payment, error) {
-	row := q.db.QueryRow(ctx, getPaymentByCheckoutOrder, arg.OrganizationID, arg.CheckoutID)
+func (q *Queries) GetPaymentByCheckout(ctx context.Context, arg GetPaymentByCheckoutParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, getPaymentByCheckout, arg.OrganizationID, arg.CheckoutID)
 	var i Payment
 	err := row.Scan(
 		&i.ID,

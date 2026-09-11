@@ -32,9 +32,6 @@ type Payment struct {
 	Metadata       json.RawMessage
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
-
-	// Deprecated: use CheckoutID.
-	CheckoutOrderID uuid.UUID
 }
 
 type CreateInput struct {
@@ -44,7 +41,4 @@ type CreateInput struct {
 	AmountMinor int64
 	Currency    string
 	Metadata    json.RawMessage
-
-	// Deprecated: use CheckoutID.
-	CheckoutOrderID uuid.UUID
 }

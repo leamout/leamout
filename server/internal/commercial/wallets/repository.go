@@ -291,6 +291,17 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 		AmountMinor:    topup.AmountMinor,
 	}
 	if topup.PaymentStatus == "succeeded" {
+		order, orderErr := q.CreateOrderFromCheckoutPayment(ctx, sqlc.CreateOrderFromCheckoutPaymentParams{
+			CheckoutID:     topup.CheckoutID,
+			PaymentID:      topup.PaymentID,
+			OrganizationID: topup.OrganizationID,
+		})
+		if orderErr != nil && !errors.Is(orderErr, pgx.ErrNoRows) {
+			return TopupSettlement{}, orderErr
+		}
+		if orderErr == nil {
+			result.OrderID = order.ID
+		}
 		if err = q.MarkPaymentProviderEventProcessed(ctx, providerEvent.ID); err != nil {
 			return TopupSettlement{}, err
 		}
@@ -311,16 +322,25 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 		}); err != nil {
 			return TopupSettlement{}, err
 		}
-		if _, err = q.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
+		if _, err = q.CompareAndSetCheckoutState(ctx, sqlc.CompareAndSetCheckoutStateParams{
 			Status:         "succeeded",
 			NextAction:     "none",
 			CompletedAt:    pgconv.NullableTimestamptz(&now),
 			OrganizationID: topup.OrganizationID,
-			ID:             topup.CheckoutOrderID,
+			ID:             topup.CheckoutID,
 			ExpectedStatus: topup.CheckoutStatus,
 		}); err != nil {
 			return TopupSettlement{}, err
 		}
+		order, orderErr := q.CreateOrderFromCheckoutPayment(ctx, sqlc.CreateOrderFromCheckoutPaymentParams{
+			CheckoutID:     topup.CheckoutID,
+			PaymentID:      topup.PaymentID,
+			OrganizationID: topup.OrganizationID,
+		})
+		if orderErr != nil {
+			return TopupSettlement{}, orderErr
+		}
+		result.OrderID = order.ID
 		if _, err = q.CreateWalletLedgerEntry(ctx, sqlc.CreateWalletLedgerEntryParams{
 			EntryType:      "topup",
 			AmountMinor:    topup.AmountMinor,
@@ -343,12 +363,12 @@ func (r *Repository) Reconcile(ctx context.Context, event paymentprovider.Event)
 		}); err != nil {
 			return TopupSettlement{}, err
 		}
-		if _, err = q.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
+		if _, err = q.CompareAndSetCheckoutState(ctx, sqlc.CompareAndSetCheckoutStateParams{
 			Status:         status,
 			NextAction:     "none",
 			CompletedAt:    pgconv.NullableTimestamptz(&now),
 			OrganizationID: topup.OrganizationID,
-			ID:             topup.CheckoutOrderID,
+			ID:             topup.CheckoutID,
 			ExpectedStatus: topup.CheckoutStatus,
 		}); err != nil {
 			return TopupSettlement{}, err

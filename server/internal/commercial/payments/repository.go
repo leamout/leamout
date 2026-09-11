@@ -29,11 +29,6 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provider string, input CreateInput) (Payment, error) {
-	checkoutID := input.CheckoutID
-	if checkoutID == uuid.Nil {
-		checkoutID = input.CheckoutOrderID
-	}
-
 	status := string(input.Status)
 	row, err := r.queries.CreatePayment(ctx, sqlc.CreatePaymentParams{
 		ProviderPaymentID: input.ProviderID,
@@ -41,7 +36,7 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provi
 		Currency:          input.Currency,
 		Status:            &status,
 		Metadata:          input.Metadata,
-		CheckoutID:        checkoutID,
+		CheckoutID:        input.CheckoutID,
 		OrganizationID:    organizationID,
 		Provider:          provider,
 	})
@@ -63,7 +58,7 @@ func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Pay
 }
 
 func (r *Repository) GetByCheckout(ctx context.Context, organizationID, checkoutID uuid.UUID) (Payment, error) {
-	row, err := r.queries.GetPaymentByCheckoutOrder(ctx, sqlc.GetPaymentByCheckoutOrderParams{
+	row, err := r.queries.GetPaymentByCheckout(ctx, sqlc.GetPaymentByCheckoutParams{
 		OrganizationID: organizationID,
 		CheckoutID:     checkoutID,
 	})
@@ -71,12 +66,6 @@ func (r *Repository) GetByCheckout(ctx context.Context, organizationID, checkout
 		return Payment{}, mapReadError(err)
 	}
 	return paymentFromRow(row), nil
-}
-
-// GetByCheckoutOrder is kept while wallet top-up callers migrate to checkout
-// terminology. New code should use GetByCheckout.
-func (r *Repository) GetByCheckoutOrder(ctx context.Context, organizationID, checkoutID uuid.UUID) (Payment, error) {
-	return r.GetByCheckout(ctx, organizationID, checkoutID)
 }
 
 func (r *Repository) SetProviderID(ctx context.Context, organizationID, id uuid.UUID, providerID string, status Status) (Payment, error) {
@@ -107,19 +96,18 @@ func (r *Repository) UpdateStatus(ctx context.Context, organizationID, id uuid.U
 
 func paymentFromRow(row sqlc.Payment) Payment {
 	return Payment{
-		ID:              row.ID,
-		CheckoutID:      row.CheckoutID,
-		CheckoutOrderID: row.CheckoutID,
-		OrganizationID:  row.OrganizationID,
-		Provider:        row.Provider,
-		ProviderID:      row.ProviderPaymentID,
-		Status:          Status(row.Status),
-		AmountMinor:     row.AmountMinor,
-		Currency:        row.Currency,
-		PaidAt:          pgconv.TimestamptzToTimePtr(row.PaidAt),
-		Metadata:        row.Metadata,
-		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
-		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
+		ID:             row.ID,
+		CheckoutID:     row.CheckoutID,
+		OrganizationID: row.OrganizationID,
+		Provider:       row.Provider,
+		ProviderID:     row.ProviderPaymentID,
+		Status:         Status(row.Status),
+		AmountMinor:    row.AmountMinor,
+		Currency:       row.Currency,
+		PaidAt:         pgconv.TimestamptzToTimePtr(row.PaidAt),
+		Metadata:       row.Metadata,
+		CreatedAt:      pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt:      pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
 }
 

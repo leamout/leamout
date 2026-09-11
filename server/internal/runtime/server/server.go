@@ -121,7 +121,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Commercial.Money.TopupService); err != nil {
+	if err := configurePaymentProviders(cfg, modules.Commercial.Prepaid.TopupService); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -133,7 +133,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
 	}
-	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.State.Service); err != nil {
+	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.Access.State.Service); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -234,7 +234,7 @@ func NewModules(
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
 	edgeRepository := edge.NewRepository(db)
-	edgeService := edge.NewService(edgeRepository, commercialModule.State.Service)
+	edgeService := edge.NewService(edgeRepository, commercialModule.Access.State.Service)
 	wholesaleRepository := wholesale.NewRepository(db)
 	wholesaleService := wholesale.NewService(wholesaleRepository)
 	providerDiagnosticsRepository := providerdiagnostics.NewRepository(queries)

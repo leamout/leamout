@@ -26,11 +26,6 @@ type Module struct {
 	Usage    UsageModule
 	Prepaid  PrepaidModule
 	Payments PaymentsModule
-
-	// Compatibility bridge for runtime callers migrating to Prepaid.
-	Money PrepaidModule
-	// Compatibility bridge for runtime callers migrating to Access.State.
-	State StateModule
 }
 
 type CatalogModule struct {
@@ -178,7 +173,5 @@ func New(db *pgxpool.Pool) *Module {
 		Payments: PaymentsModule{
 			Repository: paymentRepository,
 		},
-		Money: prepaidModule,
-		State: stateModule,
 	}
 }

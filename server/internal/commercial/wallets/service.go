@@ -192,7 +192,6 @@ func (s *TopupService) Create(
 		Checkout: checkoutRecord,
 		Payment:  payment,
 		Session:  session,
-		Order:    checkoutRecord,
 	}, nil
 }
 
@@ -270,7 +269,6 @@ func (s *TopupService) Get(
 	return TopupDetails{
 		Checkout: checkoutRecord,
 		Payment:  payment,
-		Order:    checkoutRecord,
 	}, nil
 }
 
@@ -364,7 +362,6 @@ func (s *TopupService) Continue(
 		Checkout: checkoutRecord,
 		Payment:  details.Payment,
 		Session:  session,
-		Order:    checkoutRecord,
 	}, nil
 }
 

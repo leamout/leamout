@@ -1,4 +1,4 @@
--- name: CreateCheckoutOrder :one
+-- name: CreateCheckout :one
 INSERT INTO checkouts (
     organization_id, wallet_id, price_id, checkout_type,
     provider, payment_method, reference, amount_minor, currency, expires_at, metadata
@@ -21,7 +21,7 @@ WHERE o.id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 RETURNING *;
 
--- name: GetCheckoutOrder :one
+-- name: GetCheckout :one
 SELECT c.*
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
@@ -31,7 +31,7 @@ WHERE c.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
--- name: GetCheckoutOrderByReference :one
+-- name: GetCheckoutByReference :one
 SELECT c.*
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
@@ -40,7 +40,7 @@ WHERE c.reference = sqlc.arg(reference)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
--- name: CompareAndSetCheckoutOrderState :one
+-- name: CompareAndSetCheckoutState :one
 WITH updated AS (
     UPDATE checkouts AS c
     SET status = sqlc.arg(status),
@@ -93,14 +93,14 @@ JOIN updated AS u
  AND u.organization_id = c.organization_id
 LEFT JOIN created_order AS o ON TRUE;
 
--- name: ExpireCheckoutOrders :many
+-- name: ExpireCheckouts :many
 UPDATE checkouts
 SET status = 'expired', next_action = 'none', completed_at = NOW(), updated_at = NOW()
 WHERE status IN ('pending', 'processing')
   AND expires_at <= NOW()
 RETURNING *;
 
--- name: ClaimCheckoutOrderRefresh :one
+-- name: ClaimCheckoutRefresh :one
 UPDATE checkouts
 SET updated_at = NOW()
 WHERE organization_id = sqlc.arg(organization_id)

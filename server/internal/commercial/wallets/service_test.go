@@ -21,39 +21,39 @@ func (s walletStub) Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error) {
 
 type checkoutStub struct {
 	created     checkout.CreateInput
-	order       checkout.Order
+	checkout    checkout.Checkout
 	transitions []checkout.Transition
 }
 
-func (s *checkoutStub) Create(_ context.Context, organizationID uuid.UUID, input checkout.CreateInput) (checkout.Order, error) {
+func (s *checkoutStub) Create(_ context.Context, organizationID uuid.UUID, input checkout.CreateInput) (checkout.Checkout, error) {
 	s.created = input
-	s.order = checkout.Order{
+	s.checkout = checkout.Checkout{
 		ID: uuid.New(), OrganizationID: organizationID, WalletID: input.WalletID,
 		Type: input.Type, Provider: input.Provider, PaymentMethod: input.PaymentMethod,
 		Reference: input.Reference, AmountMinor: input.AmountMinor, Currency: input.Currency,
 		Status: checkout.StatusPending, NextAction: checkout.ActionWait, ExpiresAt: input.ExpiresAt,
 	}
-	return s.order, nil
+	return s.checkout, nil
 }
 
-func (s *checkoutStub) Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Order, error) {
-	return s.order, nil
+func (s *checkoutStub) Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Checkout, error) {
+	return s.checkout, nil
 }
 
-func (s *checkoutStub) ClaimRefresh(_ context.Context, _, _ uuid.UUID, refreshBefore time.Time) (checkout.Order, error) {
-	if s.order.UpdatedAt.After(refreshBefore) {
-		return checkout.Order{}, checkout.ErrOrderNotFound
+func (s *checkoutStub) ClaimRefresh(_ context.Context, _, _ uuid.UUID, refreshBefore time.Time) (checkout.Checkout, error) {
+	if s.checkout.UpdatedAt.After(refreshBefore) {
+		return checkout.Checkout{}, checkout.ErrCheckoutNotFound
 	}
-	s.order.UpdatedAt = refreshBefore.Add(10 * time.Second)
-	return s.order, nil
+	s.checkout.UpdatedAt = refreshBefore.Add(10 * time.Second)
+	return s.checkout, nil
 }
 
-func (s *checkoutStub) Transition(_ context.Context, _ uuid.UUID, _ uuid.UUID, transition checkout.Transition) (checkout.Order, error) {
+func (s *checkoutStub) Transition(_ context.Context, _ uuid.UUID, _ uuid.UUID, transition checkout.Transition) (checkout.Checkout, error) {
 	s.transitions = append(s.transitions, transition)
-	s.order.Status = transition.Status
-	s.order.NextAction = transition.NextAction
-	s.order.ProviderMessage = transition.ProviderMessage
-	return s.order, nil
+	s.checkout.Status = transition.Status
+	s.checkout.NextAction = transition.NextAction
+	s.checkout.ProviderMessage = transition.ProviderMessage
+	return s.checkout, nil
 }
 
 type paymentStub struct{ payment commercialpayments.Payment }
@@ -66,7 +66,7 @@ func (s *paymentStub) Create(_ context.Context, organizationID uuid.UUID, provid
 	return s.payment, nil
 }
 
-func (s *paymentStub) GetByCheckoutOrder(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error) {
+func (s *paymentStub) GetByCheckout(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error) {
 	return s.payment, nil
 }
 
@@ -133,8 +133,8 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	if payments.payment.Status != commercialpayments.StatusFailed {
 		t.Fatalf("payment status = %q, want %q", payments.payment.Status, commercialpayments.StatusFailed)
 	}
-	if checkouts.order.Status != checkout.StatusFailed || len(checkouts.transitions) != 1 {
-		t.Fatalf("checkout was not failed: %+v", checkouts.order)
+	if checkouts.checkout.Status != checkout.StatusFailed || len(checkouts.transitions) != 1 {
+		t.Fatalf("checkout was not failed: %+v", checkouts.checkout)
 	}
 	transition := checkouts.transitions[0]
 	if transition.Expected != checkout.StatusPending || transition.NextAction != checkout.ActionNone || transition.CompletedAt == nil {
@@ -173,11 +173,11 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 		checkouts.created.WalletID == nil || *checkouts.created.WalletID != walletID {
 		t.Fatalf("checkout terms were not derived from wallet: %+v", checkouts.created)
 	}
-	if provider.request.Reference != result.Order.Reference || provider.request.Currency != "USD" ||
+	if provider.request.Reference != result.Checkout.Reference || provider.request.Currency != "USD" ||
 		provider.request.Metadata["wallet_id"] != walletID.String() || provider.request.Email != "payer@example.com" {
 		t.Fatalf("provider request mismatch: %+v", provider.request)
 	}
-	if result.Payment.ProviderID == nil || *result.Payment.ProviderID != "pi_123" || result.Order.Status != checkout.StatusProcessing {
+	if result.Payment.ProviderID == nil || *result.Payment.ProviderID != "pi_123" || result.Checkout.Status != checkout.StatusProcessing {
 		t.Fatalf("unexpected checkout result: %+v", result)
 	}
 }
@@ -271,13 +271,13 @@ func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
 	now := time.Date(2026, 9, 10, 1, 0, 0, 0, time.UTC)
 	organizationID := uuid.New()
 	walletID := uuid.New()
-	orderID := uuid.New()
-	checkouts := &checkoutStub{order: checkout.Order{
-		ID: orderID, OrganizationID: organizationID, WalletID: &walletID,
+	checkoutID := uuid.New()
+	checkouts := &checkoutStub{checkout: checkout.Checkout{
+		ID: checkoutID, OrganizationID: organizationID, WalletID: &walletID,
 		Provider: checkout.ProviderPaystack, Reference: "topup.123", AmountMinor: 2500,
 		Currency: "GHS", Status: checkout.StatusProcessing, UpdatedAt: now.Add(-11 * time.Second),
 	}}
-	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutID: orderID}}
+	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutID: checkoutID}}
 	provider := &providerStub{payment: paymentprovider.Payment{
 		Provider: "paystack", ProviderID: "42", Reference: "topup.123",
 		AmountMinor: 2500, Currency: "GHS", Status: paymentprovider.StatusSucceeded,
@@ -286,7 +286,7 @@ func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
 	service := NewTopupService(nil, checkouts, payments, settlements, map[string]paymentprovider.Provider{"paystack": provider})
 	service.now = func() time.Time { return now }
 
-	if _, err := service.Get(context.Background(), organizationID, orderID); err != nil {
+	if _, err := service.Get(context.Background(), organizationID, checkoutID); err != nil {
 		t.Fatalf("Get() error = %v", err)
 	}
 	if settlements.event.Type != "charge.success" || settlements.event.Payment.ProviderID != "42" {

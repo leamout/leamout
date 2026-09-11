@@ -60,7 +60,7 @@ WHERE p.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 ORDER BY p.created_at DESC;
 
--- name: GetPaymentByCheckoutOrder :one
+-- name: GetPaymentByCheckout :one
 SELECT p.*
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
