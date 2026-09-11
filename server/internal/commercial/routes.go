@@ -40,7 +40,7 @@ func RegisterRoutes(
 		organizationAccess("subscriptions"),
 		idempotency,
 	)
-	wallets.RegisterRoutes(router, module.Prepaid.Wallets.Handler, organizationAccess("billing"), idempotency)
+	wallets.RegisterRoutes(router, module.Prepaid.Wallets.Handler, organizationAccess("billing"))
 	checkout.RegisterRoutes(router, module.Billing.Checkouts.Handler, organizationAccess("billing"), idempotency)
 	payments.RegisterRoutes(router, module.Billing.Payments.Handler)
 }

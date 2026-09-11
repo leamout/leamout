@@ -21,6 +21,16 @@ type ContinueRequest struct {
 	Value  string              `json:"value"`
 }
 
+type CreateRequest struct {
+	Type        Type                  `json:"type"`
+	WalletID    uuid.UUID             `json:"wallet_id"`
+	AmountMinor int64                 `json:"amount_minor"`
+	Provider    Provider              `json:"provider"`
+	Email       string                `json:"email"`
+	CallbackURL string                `json:"callback_url"`
+	MobileMoney *payments.MobileMoney `json:"mobile_money,omitempty"`
+}
+
 type CheckoutResponse struct {
 	CheckoutID      uuid.UUID  `json:"checkout_id"`
 	PaymentID       uuid.UUID  `json:"payment_id"`
@@ -32,6 +42,35 @@ type CheckoutResponse struct {
 	NextAction      NextAction `json:"next_action"`
 	ProviderMessage *string    `json:"provider_message,omitempty"`
 	ClientSecret    string     `json:"client_secret,omitempty"`
+}
+
+func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
+	organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
+	if !ok {
+		httputil.Error(w, apperror.NewBadRequest("organization context required"))
+		return
+	}
+	request, err := helper.DecodeJSON[CreateRequest](r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	if request.Type != TypeWalletTopup || request.WalletID == uuid.Nil {
+		httputil.Error(w, ErrInvalidCheckout)
+		return
+	}
+	result, err := h.topups.Create(r.Context(), organizationID, request.WalletID, TopupCreateInput{
+		AmountMinor: request.AmountMinor,
+		Provider:    request.Provider,
+		Email:       request.Email,
+		CallbackURL: request.CallbackURL,
+		MobileMoney: request.MobileMoney,
+	})
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.Created(w, Response(result))
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {

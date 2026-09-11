@@ -13,13 +13,17 @@ import (
 func TestReadRoutesAreRegistered(t *testing.T) {
 	router := chi.NewRouter()
 	identity := func(next http.Handler) http.Handler { return next }
-	RegisterRoutes(router, &Handler{}, identity, identity)
+	RegisterRoutes(router, &Handler{}, identity)
 
 	for _, path := range []string{"/wallets", "/wallets/" + uuid.NewString(), "/wallets/" + uuid.NewString() + "/ledger"} {
 		routeContext := chi.NewRouteContext()
 		if !router.Match(routeContext, http.MethodGet, path) {
 			t.Fatalf("GET %s is not registered", path)
 		}
+	}
+	routeContext := chi.NewRouteContext()
+	if router.Match(routeContext, http.MethodPost, "/wallets/"+uuid.NewString()+"/topups") {
+		t.Fatal("wallet top-up initiation route is still registered")
 	}
 }
 

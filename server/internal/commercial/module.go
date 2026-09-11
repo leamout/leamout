@@ -1,9 +1,6 @@
 package commercial
 
 import (
-	"context"
-
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
@@ -140,7 +137,7 @@ func New(db *pgxpool.Pool) *Module {
 		providerRegistry,
 	)
 	checkoutHandler := checkout.NewHandler(topupService)
-	walletHandler := wallets.NewHandler(walletService, walletTopupCreator(topupService))
+	walletHandler := wallets.NewHandler(walletService)
 	prepaidModule := PrepaidModule{
 		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
 	}
@@ -183,28 +180,5 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    usageService,
 		},
 		Prepaid: prepaidModule,
-	}
-}
-
-func walletTopupCreator(service *checkout.TopupService) wallets.TopupCreator {
-	return func(ctx context.Context, organizationID, walletID uuid.UUID, input wallets.TopupRequest) (wallets.TopupResponse, error) {
-		var mobileMoney *payments.MobileMoney
-		if input.MobileMoney != nil {
-			mobileMoney = &payments.MobileMoney{Phone: input.MobileMoney.Phone, Provider: input.MobileMoney.Provider}
-		}
-		result, err := service.Create(ctx, organizationID, walletID, checkout.TopupCreateInput{
-			AmountMinor: input.AmountMinor, Provider: checkout.Provider(input.Provider), Email: input.Email,
-			CallbackURL: input.CallbackURL, MobileMoney: mobileMoney,
-		})
-		if err != nil {
-			return wallets.TopupResponse{}, err
-		}
-		response := checkout.Response(result)
-		return wallets.TopupResponse{
-			CheckoutID: response.CheckoutID, PaymentID: response.PaymentID, Reference: response.Reference,
-			Provider: string(response.Provider), AmountMinor: response.AmountMinor, Currency: response.Currency,
-			Status: string(response.Status), NextAction: string(response.NextAction),
-			ProviderMessage: response.ProviderMessage, ClientSecret: response.ClientSecret,
-		}, nil
 	}
 }
