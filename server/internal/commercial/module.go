@@ -36,10 +36,15 @@ type CatalogModule struct {
 }
 
 type PurchaseModule struct {
-	Checkouts *checkout.Repository
+	Checkouts CheckoutModule
 	Orders    *orders.Repository
 	Service   *purchase.Service
 	Topups    TopupsModule
+}
+
+type CheckoutModule struct {
+	Repository *checkout.Repository
+	Service    *checkout.Service
 }
 
 type TopupsModule struct {
@@ -82,7 +87,12 @@ type UsageModule struct {
 }
 
 type PrepaidModule struct {
-	Wallets *wallets.Repository
+	Wallets WalletModule
+}
+
+type WalletModule struct {
+	Repository *wallets.Repository
+	Service    *wallets.Service
 }
 
 type PaymentsModule struct {
@@ -126,15 +136,17 @@ func New(db *pgxpool.Pool) *Module {
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
+	walletService := wallets.NewService(walletRepository)
 	checkoutRepository := checkout.NewRepository(db)
+	checkoutService := checkout.NewService(checkoutRepository)
 	orderRepository := orders.NewRepository(db)
 	purchaseService := purchase.NewService()
 	paymentRepository := payments.NewRepository(db, purchaseService)
 	paymentService := payments.NewService(paymentRepository)
 	providerRegistry := payments.NewProviderRegistry()
 	topupService := topups.NewService(
-		walletRepository,
-		checkoutRepository,
+		walletService,
+		checkoutService,
 		paymentRepository,
 		paymentService,
 		providerRegistry,
@@ -145,7 +157,7 @@ func New(db *pgxpool.Pool) *Module {
 		Handler: commercialstate.NewHandler(commercialStateService),
 	}
 	prepaidModule := PrepaidModule{
-		Wallets: walletRepository,
+		Wallets: WalletModule{Repository: walletRepository, Service: walletService},
 	}
 
 	return &Module{
@@ -155,7 +167,7 @@ func New(db *pgxpool.Pool) *Module {
 			Handler:    catalog.NewHandler(catalogService),
 		},
 		Purchase: PurchaseModule{
-			Checkouts: checkoutRepository,
+			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService},
 			Orders:    orderRepository,
 			Service:   purchaseService,
 			Topups: TopupsModule{

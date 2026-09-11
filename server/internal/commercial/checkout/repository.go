@@ -22,10 +22,6 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Checkout, error) {
-	if err := validateCreate(input, time.Now()); err != nil {
-		return Checkout{}, err
-	}
-
 	row, err := r.queries.CreateCheckout(ctx, sqlc.CreateCheckoutParams{
 		OrganizationID: organizationID,
 		WalletID:       input.WalletID,
@@ -68,10 +64,6 @@ func (r *Repository) GetByReference(ctx context.Context, reference string) (Chec
 }
 
 func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUID, transition Transition) (Checkout, error) {
-	if err := validateTransition(transition); err != nil {
-		return Checkout{}, err
-	}
-
 	row, err := r.queries.CompareAndSetCheckoutState(ctx, sqlc.CompareAndSetCheckoutStateParams{
 		Status:          string(transition.Status),
 		NextAction:      string(transition.NextAction),
