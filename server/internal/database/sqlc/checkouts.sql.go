@@ -56,57 +56,16 @@ func (q *Queries) ClaimCheckoutRefresh(ctx context.Context, arg ClaimCheckoutRef
 }
 
 const compareAndSetCheckoutState = `-- name: CompareAndSetCheckoutState :one
-WITH updated AS (
-    UPDATE checkouts AS c
-    SET status = $1,
-        next_action = $2,
-        provider_message = $3,
-        completed_at = $4,
-        updated_at = NOW()
-    WHERE c.organization_id = $5
-      AND c.id = $6
-      AND c.status = $7
-    RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
-), created_order AS (
-    INSERT INTO orders (
-        organization_id,
-        checkout_id,
-        payment_id,
-        wallet_id,
-        price_id,
-        order_type,
-        amount_minor,
-        currency,
-        completed_at,
-        metadata
-    )
-    SELECT
-        c.organization_id,
-        c.id,
-        p.id,
-        c.wallet_id,
-        c.price_id,
-        c.checkout_type,
-        c.amount_minor,
-        c.currency,
-        c.completed_at,
-        c.metadata
-    FROM updated AS c
-    JOIN payments AS p
-      ON p.checkout_id = c.id
-     AND p.organization_id = c.organization_id
-    WHERE c.status = 'succeeded'
-      AND c.completed_at IS NOT NULL
-      AND p.status = 'succeeded'
-    ON CONFLICT (checkout_id) DO NOTHING
-    RETURNING id
-)
-SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
-FROM checkouts AS c
-JOIN updated AS u
-  ON u.id = c.id
- AND u.organization_id = c.organization_id
-LEFT JOIN created_order AS o ON TRUE
+UPDATE checkouts AS c
+SET status = $1,
+    next_action = $2,
+    provider_message = $3,
+    completed_at = $4,
+    updated_at = NOW()
+WHERE c.organization_id = $5
+  AND c.id = $6
+  AND c.status = $7
+RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 `
 
 type CompareAndSetCheckoutStateParams struct {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 )
 
 const (
@@ -48,7 +48,7 @@ type store interface {
 }
 
 type stateResolver interface {
-	Resolve(context.Context, uuid.UUID) (commercialstate.OrganizationState, error)
+	Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error)
 }
 
 type Service struct {
@@ -77,7 +77,7 @@ func (s *Service) Admit(ctx context.Context, req Request) (Decision, error) {
 		return Decision{}, fmt.Errorf("resolve managed SIP commercial state: %w", err)
 	}
 	limit, ok := state.Limit(ManagedDailySpendLimit)
-	if state.Standing != commercialstate.StandingActive || !state.Enabled(ManagedVoiceEntitlement) || !ok || limit <= 0 {
+	if state.Standing != commercialaccess.StandingActive || !state.Enabled(ManagedVoiceEntitlement) || !ok || limit <= 0 {
 		return Decision{}, ErrDenied
 	}
 	now := s.now().UTC()

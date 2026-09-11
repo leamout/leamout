@@ -6,14 +6,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
-	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/purchase"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
@@ -23,12 +21,11 @@ import (
 // Runtime and telecom code should depend on this module rather than assembling
 // Commercial subdomains independently.
 type Module struct {
-	Catalog  CatalogModule
-	Purchase PurchaseModule
-	Access   AccessModule
-	Usage    UsageModule
-	Prepaid  PrepaidModule
-	Payments PaymentsModule
+	Catalog CatalogModule
+	Billing BillingModule
+	Access  AccessModule
+	Usage   UsageModule
+	Prepaid PrepaidModule
 }
 
 type CatalogModule struct {
@@ -37,10 +34,9 @@ type CatalogModule struct {
 	Handler    *catalog.Handler
 }
 
-type PurchaseModule struct {
+type BillingModule struct {
 	Checkouts CheckoutModule
-	Orders    *orders.Repository
-	Service   *purchase.Service
+	Payments  PaymentsModule
 }
 
 type CheckoutModule struct {
@@ -53,7 +49,8 @@ type AccessModule struct {
 	Subscriptions SubscriptionsModule
 	Licenses      LicensesModule
 	Entitlements  EntitlementsModule
-	State         StateModule
+	Service       *commercialaccess.Service
+	Handler       *commercialaccess.Handler
 }
 
 type SubscriptionsModule struct {
@@ -71,11 +68,6 @@ type LicensesModule struct {
 type EntitlementsModule struct {
 	Repository *entitlements.Repository
 	Service    *entitlements.Service
-}
-
-type StateModule struct {
-	Service *commercialstate.Service
-	Handler *commercialstate.Handler
 }
 
 type UsageModule struct {
@@ -119,7 +111,7 @@ func New(db *pgxpool.Pool) *Module {
 		subscriptionsService,
 	)
 
-	commercialStateService := commercialstate.NewService(
+	commercialAccessService := commercialaccess.NewService(
 		subscriptionsService,
 		entitlementsService,
 	)
@@ -127,7 +119,7 @@ func New(db *pgxpool.Pool) *Module {
 	licensingRepository := licensing.NewRepository(db)
 	licensingService := licensing.NewService(
 		licensingRepository,
-		commercialStateService,
+		commercialAccessService,
 	)
 
 	usageRepository := usage.NewRepository(db)
@@ -137,9 +129,7 @@ func New(db *pgxpool.Pool) *Module {
 	walletService := wallets.NewService(walletRepository)
 	checkoutRepository := checkout.NewRepository(db)
 	checkoutService := checkout.NewService(checkoutRepository)
-	orderRepository := orders.NewRepository(db)
-	purchaseService := purchase.NewService()
-	paymentRepository := payments.NewRepository(db, purchaseService)
+	paymentRepository := payments.NewRepository(db)
 	paymentService := payments.NewService(paymentRepository)
 	providerRegistry := payments.NewProviderRegistry()
 	topupService := checkout.NewTopupService(
@@ -151,10 +141,6 @@ func New(db *pgxpool.Pool) *Module {
 	)
 	checkoutHandler := checkout.NewHandler(topupService)
 	walletHandler := wallets.NewHandler(walletTopupCreator(topupService))
-	stateModule := StateModule{
-		Service: commercialStateService,
-		Handler: commercialstate.NewHandler(commercialStateService),
-	}
 	prepaidModule := PrepaidModule{
 		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
 	}
@@ -165,10 +151,14 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    catalogService,
 			Handler:    catalog.NewHandler(catalogService),
 		},
-		Purchase: PurchaseModule{
+		Billing: BillingModule{
 			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService, Handler: checkoutHandler},
-			Orders:    orderRepository,
-			Service:   purchaseService,
+			Payments: PaymentsModule{
+				Repository: paymentRepository,
+				Service:    paymentService,
+				Providers:  providerRegistry,
+				Handler:    payments.NewHandler(paymentService, providerRegistry),
+			},
 		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{
@@ -185,19 +175,14 @@ func New(db *pgxpool.Pool) *Module {
 				Repository: entitlementsRepository,
 				Service:    entitlementsService,
 			},
-			State: stateModule,
+			Service: commercialAccessService,
+			Handler: commercialaccess.NewHandler(commercialAccessService),
 		},
 		Usage: UsageModule{
 			Repository: usageRepository,
 			Service:    usageService,
 		},
 		Prepaid: prepaidModule,
-		Payments: PaymentsModule{
-			Repository: paymentRepository,
-			Service:    paymentService,
-			Providers:  providerRegistry,
-			Handler:    payments.NewHandler(paymentService, providerRegistry),
-		},
 	}
 }
 

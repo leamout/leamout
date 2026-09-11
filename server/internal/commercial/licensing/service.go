@@ -5,17 +5,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 )
 
 // Service owns self-hosted license lifecycle and deployment activation policy.
 type Service struct {
 	repo  *Repository
-	state *commercialstate.Service
+	state *commercialaccess.Service
 	now   func() time.Time
 }
 
-func NewService(repo *Repository, state *commercialstate.Service) *Service {
+func NewService(repo *Repository, state *commercialaccess.Service) *Service {
 	return &Service{repo: repo, state: state, now: time.Now}
 }
 
@@ -33,7 +33,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, input Cr
 	if err != nil {
 		return License{}, err
 	}
-	if resolved.Standing != commercialstate.StandingActive || resolved.SubscriptionID == nil {
+	if resolved.Standing != commercialaccess.StandingActive || resolved.SubscriptionID == nil {
 		return License{}, ErrCommercialStateUnavailable
 	}
 	limit, ok := resolved.Limit(MaxDeploymentsEntitlement)

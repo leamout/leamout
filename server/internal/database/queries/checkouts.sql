@@ -41,57 +41,16 @@ WHERE c.reference = sqlc.arg(reference)
 LIMIT 1;
 
 -- name: CompareAndSetCheckoutState :one
-WITH updated AS (
-    UPDATE checkouts AS c
-    SET status = sqlc.arg(status),
-        next_action = sqlc.arg(next_action),
-        provider_message = sqlc.narg(provider_message),
-        completed_at = sqlc.narg(completed_at),
-        updated_at = NOW()
-    WHERE c.organization_id = sqlc.arg(organization_id)
-      AND c.id = sqlc.arg(id)
-      AND c.status = sqlc.arg(expected_status)
-    RETURNING c.*
-), created_order AS (
-    INSERT INTO orders (
-        organization_id,
-        checkout_id,
-        payment_id,
-        wallet_id,
-        price_id,
-        order_type,
-        amount_minor,
-        currency,
-        completed_at,
-        metadata
-    )
-    SELECT
-        c.organization_id,
-        c.id,
-        p.id,
-        c.wallet_id,
-        c.price_id,
-        c.checkout_type,
-        c.amount_minor,
-        c.currency,
-        c.completed_at,
-        c.metadata
-    FROM updated AS c
-    JOIN payments AS p
-      ON p.checkout_id = c.id
-     AND p.organization_id = c.organization_id
-    WHERE c.status = 'succeeded'
-      AND c.completed_at IS NOT NULL
-      AND p.status = 'succeeded'
-    ON CONFLICT (checkout_id) DO NOTHING
-    RETURNING id
-)
-SELECT c.*
-FROM checkouts AS c
-JOIN updated AS u
-  ON u.id = c.id
- AND u.organization_id = c.organization_id
-LEFT JOIN created_order AS o ON TRUE;
+UPDATE checkouts AS c
+SET status = sqlc.arg(status),
+    next_action = sqlc.arg(next_action),
+    provider_message = sqlc.narg(provider_message),
+    completed_at = sqlc.narg(completed_at),
+    updated_at = NOW()
+WHERE c.organization_id = sqlc.arg(organization_id)
+  AND c.id = sqlc.arg(id)
+  AND c.status = sqlc.arg(expected_status)
+RETURNING c.*;
 
 -- name: ExpireCheckouts :many
 UPDATE checkouts

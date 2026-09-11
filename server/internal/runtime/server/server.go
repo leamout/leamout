@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial"
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/auth"
 	"github.com/leamout/leamout/internal/identity/session"
@@ -121,7 +121,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Commercial.Payments.Providers); err != nil {
+	if err := configurePaymentProviders(cfg, modules.Commercial.Billing.Payments.Providers); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -133,7 +133,7 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
 	}
-	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.Access.State.Service); err != nil {
+	if err := configureManagedSIP(cfg, modules.Trunks.Service, modules.Commercial.Access.Service); err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
@@ -234,7 +234,7 @@ func NewModules(
 	trunksRepository := trunks.NewRepository(queries)
 	trunksService := trunks.NewService(trunksRepository, db)
 	edgeRepository := edge.NewRepository(db)
-	edgeService := edge.NewService(edgeRepository, commercialModule.Access.State.Service)
+	edgeService := edge.NewService(edgeRepository, commercialModule.Access.Service)
 	wholesaleRepository := wholesale.NewRepository(db)
 	wholesaleService := wholesale.NewService(wholesaleRepository)
 	providerDiagnosticsRepository := providerdiagnostics.NewRepository(queries)
@@ -413,7 +413,7 @@ func configurePaymentProviders(cfg config.Config, providers *payments.ProviderRe
 	return nil
 }
 
-func configureManagedSIP(cfg config.Config, service *trunks.Service, state *commercialstate.Service) error {
+func configureManagedSIP(cfg config.Config, service *trunks.Service, state *commercialaccess.Service) error {
 	if strings.TrimSpace(cfg.ManagedSIP.AdmissionSecret) == "" {
 		return nil
 	}

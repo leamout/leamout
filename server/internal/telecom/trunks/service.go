@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/pkg/apperror"
@@ -20,7 +20,7 @@ import (
 )
 
 type managedSIPStateResolver interface {
-	Resolve(context.Context, uuid.UUID) (commercialstate.OrganizationState, error)
+	Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error)
 }
 
 type Service struct {
@@ -387,7 +387,7 @@ func (s *Service) authorizeManagedSIP(ctx context.Context, organizationID uuid.U
 	if err != nil {
 		return apperror.NewServiceUnavailable("managed SIP commercial state is unavailable", err)
 	}
-	if state.Standing != commercialstate.StandingActive {
+	if state.Standing != commercialaccess.StandingActive {
 		return apperror.NewPaymentRequired("managed SIP requires active commercial standing")
 	}
 	if !state.Enabled(ManagedVoiceEntitlement) {

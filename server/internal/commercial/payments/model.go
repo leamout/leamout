@@ -52,7 +52,6 @@ type Settlement struct {
 	OrganizationID uuid.UUID
 	WalletID       uuid.UUID
 	PaymentID      uuid.UUID
-	OrderID        uuid.UUID
 	AmountMinor    int64
 	SettledAt      *time.Time
 }
