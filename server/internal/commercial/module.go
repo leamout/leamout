@@ -140,7 +140,7 @@ func New(db *pgxpool.Pool) *Module {
 		providerRegistry,
 	)
 	checkoutHandler := checkout.NewHandler(topupService)
-	walletHandler := wallets.NewHandler(walletTopupCreator(topupService))
+	walletHandler := wallets.NewHandler(walletService, walletTopupCreator(topupService))
 	prepaidModule := PrepaidModule{
 		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
 	}

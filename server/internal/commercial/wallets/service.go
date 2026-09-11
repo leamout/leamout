@@ -9,6 +9,7 @@ import (
 
 type walletStore interface {
 	Create(context.Context, uuid.UUID, string) (Wallet, error)
+	List(context.Context, uuid.UUID) ([]Wallet, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
 	GetByCurrency(context.Context, uuid.UUID, string) (Wallet, error)
 	Balance(context.Context, uuid.UUID, uuid.UUID) (Balance, error)
@@ -29,6 +30,9 @@ type Service struct {
 }
 
 func NewService(repo walletStore) *Service { return &Service{repo: repo, now: time.Now} }
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Wallet, error) {
+	return s.repo.List(ctx, organizationID)
+}
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
 	return s.repo.Create(ctx, organizationID, currency)
 }

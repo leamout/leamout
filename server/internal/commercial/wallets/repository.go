@@ -46,6 +46,18 @@ func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Wal
 	return walletFromRow(row), nil
 }
 
+func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]Wallet, error) {
+	rows, err := r.queries.ListWallets(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	wallets := make([]Wallet, 0, len(rows))
+	for _, row := range rows {
+		wallets = append(wallets, walletFromRow(row))
+	}
+	return wallets, nil
+}
+
 func (r *Repository) GetByCurrency(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
 	row, err := r.queries.GetWalletByCurrency(ctx, sqlc.GetWalletByCurrencyParams{
 		OrganizationID: organizationID,
