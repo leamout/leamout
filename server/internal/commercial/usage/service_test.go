@@ -11,9 +11,9 @@ import (
 )
 
 type fakeStore struct {
-	created  Event
+	created   Event
 	createErr error
-	existing Event
+	existing  Event
 }
 
 func (f *fakeStore) CreateEvent(context.Context, uuid.UUID, RecordInput) (Event, error) {
