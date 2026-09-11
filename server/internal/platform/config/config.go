@@ -35,18 +35,8 @@ type PaystackConfig struct {
 	APIBaseURL string `env:"API_BASE_URL" envDefault:"https://api.paystack.co"`
 }
 
-// DeploymentMode selects a process-wide composition root. It is deliberately
-// not inferred from request data or enabled integrations.
-type DeploymentMode string
-
-const (
-	DeploymentModeCloud      DeploymentMode = "cloud"
-	DeploymentModeSelfHosted DeploymentMode = "self-hosted"
-)
-
 type Config struct {
 	AppEnv                string           `env:"APP_ENV" envDefault:"development"`
-	DeploymentMode        DeploymentMode   `env:"LEAMOUT_DEPLOYMENT_MODE"`
 	DeploymentID          string           `env:"LEAMOUT_DEPLOYMENT_ID"`
 	DatabaseURL           string           `env:"DATABASE_URL,required"`
 	RedisURL              string           `env:"REDIS_URL,required"`
@@ -77,9 +67,6 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
-	if err := cfg.ValidateDeployment(); err != nil {
-		return Config{}, err
-	}
 
 	return cfg, nil
 }
@@ -88,47 +75,8 @@ func (c Config) IsDevelopment() bool {
 	return strings.EqualFold(c.AppEnv, "development")
 }
 
-// ValidateDeployment rejects ambiguous deployment profiles and prevents a
-// self-hosted process from accepting Leamout-operated provider credentials.
-func (c Config) ValidateDeployment() error {
-	switch c.DeploymentMode {
-	case DeploymentModeCloud:
-		return nil
-	case DeploymentModeSelfHosted:
-		if names := c.cloudOnlyConfiguration(); len(names) != 0 {
-			return fmt.Errorf("cloud-only configuration is not permitted in self-hosted mode: %s", strings.Join(names, ", "))
-		}
-		return nil
-	default:
-		return fmt.Errorf("LEAMOUT_DEPLOYMENT_MODE must be %q or %q", DeploymentModeCloud, DeploymentModeSelfHosted)
-	}
-}
-
-func (c Config) cloudOnlyConfiguration() []string {
-	configured := make([]string, 0, 5)
-	for _, value := range []struct {
-		name  string
-		value string
-	}{
-		{"DIDWW_API_KEY", c.DIDWW.APIKey},
-		{"COMMPEAK_API_AUTHORIZATION", c.CommPeak.Authorization},
-		{"STRIPE_SECRET_KEY", c.Stripe.SecretKey},
-		{"PAYSTACK_SECRET_KEY", c.Paystack.SecretKey},
-		{"MANAGED_SIP_ADMISSION_SECRET", c.ManagedSIP.AdmissionSecret},
-	} {
-		if strings.TrimSpace(value.value) != "" {
-			configured = append(configured, value.name)
-		}
-	}
-	return configured
-}
-
 func (c *Config) normalize() {
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
-	c.DeploymentMode = DeploymentMode(strings.ToLower(strings.TrimSpace(string(c.DeploymentMode))))
-	if c.DeploymentMode == "" && c.IsDevelopment() {
-		c.DeploymentMode = DeploymentModeSelfHosted
-	}
 	c.DeploymentID = strings.TrimSpace(c.DeploymentID)
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)
 	c.RedisURL = strings.TrimSpace(c.RedisURL)

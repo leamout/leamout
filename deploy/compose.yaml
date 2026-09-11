@@ -1,6 +1,5 @@
 x-leamout-environment: &leamout-environment
   APP_ENV: ${APP_ENV:-development}
-  LEAMOUT_DEPLOYMENT_MODE: ${LEAMOUT_DEPLOYMENT_MODE:-self-hosted}
   DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
   REDIS_URL: redis://redis:6379
   NATS_URL: nats://nats:4222
