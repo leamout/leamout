@@ -3,6 +3,7 @@ package wallets
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -122,6 +123,25 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 	}); err != nil {
 		return Reservation{}, mapWalletReadError(err)
 	}
+	existing, err := q.GetWalletReservationByOperation(ctx, sqlc.GetWalletReservationByOperationParams{
+		WalletID:       walletID,
+		OrganizationID: organizationID,
+		OperationType:  input.OperationType,
+		OperationID:    input.OperationID,
+	})
+	if err == nil {
+		reservation := reservationFromRow(existing)
+		if !sameReservationRequest(reservation, input) {
+			return Reservation{}, ErrDuplicateOperation
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return Reservation{}, err
+		}
+		return reservation, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return Reservation{}, mapWalletReadError(err)
+	}
 	balance, err := q.GetWalletBalance(ctx, sqlc.GetWalletBalanceParams{
 		OrganizationID: organizationID,
 		WalletID:       walletID,
@@ -140,6 +160,25 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 		OperationID:    input.OperationID,
 		ExpiresAt:      pgconv.NullableTimestamptz(&input.ExpiresAt),
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		existing, readErr := q.GetWalletReservationByOperation(ctx, sqlc.GetWalletReservationByOperationParams{
+			WalletID:       walletID,
+			OrganizationID: organizationID,
+			OperationType:  input.OperationType,
+			OperationID:    input.OperationID,
+		})
+		if readErr != nil {
+			return Reservation{}, mapWalletReadError(readErr)
+		}
+		reservation := reservationFromRow(existing)
+		if !sameReservationRequest(reservation, input) {
+			return Reservation{}, ErrDuplicateOperation
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return Reservation{}, err
+		}
+		return reservation, nil
+	}
 	if err != nil {
 		return Reservation{}, mapWalletWriteError(err)
 	}
@@ -147,6 +186,13 @@ func (r *Repository) Reserve(ctx context.Context, organizationID, walletID uuid.
 		return Reservation{}, err
 	}
 	return reservationFromRow(row), nil
+}
+
+func sameReservationRequest(reservation Reservation, input ReserveInput) bool {
+	return reservation.AmountMinor == input.AmountMinor &&
+		reservation.OperationType == input.OperationType &&
+		reservation.OperationID == input.OperationID &&
+		reservation.ExpiresAt.Equal(input.ExpiresAt.Truncate(time.Microsecond))
 }
 
 func (r *Repository) GetReservation(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
@@ -174,6 +220,23 @@ func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, 
 		OrganizationID:      organizationID,
 		ID:                  id,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		existing, readErr := q.GetWalletReservation(ctx, sqlc.GetWalletReservationParams{
+			OrganizationID: organizationID,
+			ID:             id,
+		})
+		if readErr != nil {
+			return Reservation{}, mapReservationReadError(readErr)
+		}
+		reservation := reservationFromRow(existing)
+		if !sameCapture(reservation, amountMinor) {
+			return Reservation{}, ErrInvalidReservationState
+		}
+		if err = tx.Commit(ctx); err != nil {
+			return Reservation{}, err
+		}
+		return reservation, nil
+	}
 	if err != nil {
 		return Reservation{}, mapReservationTransitionError(err)
 	}
@@ -198,10 +261,34 @@ func (r *Repository) Release(ctx context.Context, organizationID, id uuid.UUID) 
 		OrganizationID: organizationID,
 		ID:             id,
 	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		existing, readErr := r.queries.GetWalletReservation(ctx, sqlc.GetWalletReservationParams{
+			OrganizationID: organizationID,
+			ID:             id,
+		})
+		if readErr != nil {
+			return Reservation{}, mapReservationReadError(readErr)
+		}
+		reservation := reservationFromRow(existing)
+		if !sameRelease(reservation) {
+			return Reservation{}, ErrInvalidReservationState
+		}
+		return reservation, nil
+	}
 	if err != nil {
 		return Reservation{}, mapReservationTransitionError(err)
 	}
 	return reservationFromRow(row), nil
+}
+
+func sameCapture(reservation Reservation, amountMinor int64) bool {
+	return reservation.Status == ReservationCaptured &&
+		reservation.CapturedAmountMinor != nil &&
+		*reservation.CapturedAmountMinor == amountMinor
+}
+
+func sameRelease(reservation Reservation) bool {
+	return reservation.Status == ReservationReleased
 }
 
 func (r *Repository) Expire(ctx context.Context) ([]Reservation, error) {

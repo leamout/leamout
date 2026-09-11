@@ -30,3 +30,45 @@ func TestReserveRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
 		}
 	}
 }
+
+func TestSameReservationRequestUsesPostgreSQLTimestampPrecision(t *testing.T) {
+	expiresAt := time.Date(2026, time.September, 11, 12, 30, 0, 123456789, time.UTC)
+	input := ReserveInput{
+		AmountMinor:   2500,
+		OperationType: "managed_call",
+		OperationID:   "call-123",
+		ExpiresAt:     expiresAt,
+	}
+	reservation := Reservation{
+		AmountMinor:   input.AmountMinor,
+		OperationType: input.OperationType,
+		OperationID:   input.OperationID,
+		ExpiresAt:     expiresAt.Truncate(time.Microsecond),
+	}
+
+	if !sameReservationRequest(reservation, input) {
+		t.Fatal("sameReservationRequest() = false, want true for a persisted retry")
+	}
+
+	reservation.AmountMinor++
+	if sameReservationRequest(reservation, input) {
+		t.Fatal("sameReservationRequest() = true for conflicting amount")
+	}
+}
+
+func TestCompletedReservationTransitionsAreIdempotentOnlyWhenEquivalent(t *testing.T) {
+	capturedAmount := int64(1800)
+	captured := Reservation{Status: ReservationCaptured, CapturedAmountMinor: &capturedAmount}
+	if !sameCapture(captured, capturedAmount) {
+		t.Fatal("sameCapture() = false for equivalent retry")
+	}
+	if sameCapture(captured, capturedAmount+1) {
+		t.Fatal("sameCapture() = true for conflicting amount")
+	}
+	if sameRelease(captured) {
+		t.Fatal("sameRelease() = true for captured reservation")
+	}
+	if !sameRelease(Reservation{Status: ReservationReleased}) {
+		t.Fatal("sameRelease() = false for released reservation")
+	}
+}

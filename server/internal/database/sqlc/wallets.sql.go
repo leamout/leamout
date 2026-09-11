@@ -322,6 +322,50 @@ func (q *Queries) GetWalletReservation(ctx context.Context, arg GetWalletReserva
 	return i, err
 }
 
+const getWalletReservationByOperation = `-- name: GetWalletReservationByOperation :one
+SELECT id, wallet_id, organization_id, amount_minor, captured_amount_minor, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
+FROM wallet_reservations
+WHERE wallet_id = $1
+  AND organization_id = $2
+  AND operation_type = $3
+  AND operation_id = $4
+LIMIT 1
+`
+
+type GetWalletReservationByOperationParams struct {
+	WalletID       uuid.UUID `db:"wallet_id" json:"wallet_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	OperationType  string    `db:"operation_type" json:"operation_type"`
+	OperationID    string    `db:"operation_id" json:"operation_id"`
+}
+
+func (q *Queries) GetWalletReservationByOperation(ctx context.Context, arg GetWalletReservationByOperationParams) (WalletReservation, error) {
+	row := q.db.QueryRow(ctx, getWalletReservationByOperation,
+		arg.WalletID,
+		arg.OrganizationID,
+		arg.OperationType,
+		arg.OperationID,
+	)
+	var i WalletReservation
+	err := row.Scan(
+		&i.ID,
+		&i.WalletID,
+		&i.OrganizationID,
+		&i.AmountMinor,
+		&i.CapturedAmountMinor,
+		&i.OperationType,
+		&i.OperationID,
+		&i.Status,
+		&i.ExpiresAt,
+		&i.CapturedAt,
+		&i.ReleasedAt,
+		&i.ExpiredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertWalletReservation = `-- name: InsertWalletReservation :one
 INSERT INTO wallet_reservations (
     wallet_id, organization_id, amount_minor, operation_type, operation_id, expires_at
@@ -330,6 +374,7 @@ VALUES (
     $1, $2, $3,
     $4, $5, $6
 )
+ON CONFLICT (wallet_id, operation_type, operation_id) DO NOTHING
 RETURNING id, wallet_id, organization_id, amount_minor, captured_amount_minor, operation_type, operation_id, status, expires_at, captured_at, released_at, expired_at, created_at, updated_at
 `
 

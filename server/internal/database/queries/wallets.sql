@@ -102,7 +102,17 @@ VALUES (
     sqlc.arg(wallet_id), sqlc.arg(organization_id), sqlc.arg(amount_minor),
     sqlc.arg(operation_type), sqlc.arg(operation_id), sqlc.arg(expires_at)
 )
+ON CONFLICT (wallet_id, operation_type, operation_id) DO NOTHING
 RETURNING *;
+
+-- name: GetWalletReservationByOperation :one
+SELECT *
+FROM wallet_reservations
+WHERE wallet_id = sqlc.arg(wallet_id)
+  AND organization_id = sqlc.arg(organization_id)
+  AND operation_type = sqlc.arg(operation_type)
+  AND operation_id = sqlc.arg(operation_id)
+LIMIT 1;
 
 -- name: GetWalletReservation :one
 SELECT *

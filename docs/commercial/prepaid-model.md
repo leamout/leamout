@@ -101,6 +101,8 @@ ledger debit + reservation release/capture
 
 A managed-provider obligation must not be created unless sufficient prepaid funds have been authorized. Fixed charges may post an atomic debit directly; variable-cost operations should reserve funds first.
 
+Reservation creation, capture, and release are idempotent operations. Retrying the same reservation request returns the existing reservation, while reusing an operation identity with different monetary terms is rejected. Retrying capture or release returns the already completed transition; a conflicting terminal transition remains an error.
+
 ## Deferred concepts
 
 The target prepaid model does not require invoice-centric settlement. `invoices` and `invoice_items` are deferred until Leamout has a concrete need for invoices or postpaid accounts.
