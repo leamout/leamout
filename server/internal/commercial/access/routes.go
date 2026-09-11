@@ -1,4 +1,4 @@
-package state
+package access
 
 import (
 	"net/http"
@@ -7,5 +7,5 @@ import (
 )
 
 func RegisterRoutes(router chi.Router, handler *Handler, auth func(http.Handler) http.Handler) {
-	router.With(auth).Get("/organizations/{organization_id}/commercial-state", handler.GetOrganizationState)
+	router.With(auth).Get("/organizations/{organization_id}/commercial-state", handler.GetOrganizationAccess)
 }

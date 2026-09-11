@@ -1,4 +1,4 @@
-package state
+package access
 
 import (
 	"net/http"
@@ -19,7 +19,7 @@ func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
 
-func (h *Handler) GetOrganizationState(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetOrganizationAccess(w http.ResponseWriter, r *http.Request) {
 	organizationID, err := requestOrganizationID(r)
 	if err != nil {
 		httputil.Error(w, err)
@@ -32,7 +32,7 @@ func (h *Handler) GetOrganizationState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httputil.OK(w, newOrganizationStateResponse(resolved))
+	httputil.OK(w, newOrganizationAccessResponse(resolved))
 }
 
 func requestOrganizationID(r *http.Request) (uuid.UUID, error) {

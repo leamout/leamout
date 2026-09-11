@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/pkg/hasher"
 )
 
 type fakeManagedSIPState struct {
-	state commercialstate.OrganizationState
+	state commercialaccess.OrganizationAccess
 	err   error
 }
 
-func (f fakeManagedSIPState) Resolve(context.Context, uuid.UUID) (commercialstate.OrganizationState, error) {
+func (f fakeManagedSIPState) Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error) {
 	return f.state, f.err
 }
 
@@ -48,9 +48,9 @@ func TestCreateManagedTrunkRejectsCarrierConnection(t *testing.T) {
 func TestManagedSIPAuthorityRequiresCommercialEntitlement(t *testing.T) {
 	organizationID := uuid.New()
 	service := NewService(nil)
-	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialstate.OrganizationState{
+	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialaccess.OrganizationAccess{
 		OrganizationID: organizationID,
-		Standing:       commercialstate.StandingActive,
+		Standing:       commercialaccess.StandingActive,
 		Features:       map[string]bool{},
 	}}); err != nil {
 		t.Fatalf("configure managed SIP authority: %v", err)
@@ -63,9 +63,9 @@ func TestManagedSIPAuthorityRequiresCommercialEntitlement(t *testing.T) {
 func TestManagedSIPCredentialIsOneWayDigestMaterial(t *testing.T) {
 	organizationID := uuid.New()
 	service := NewService(nil)
-	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialstate.OrganizationState{
+	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialaccess.OrganizationAccess{
 		OrganizationID: organizationID,
-		Standing:       commercialstate.StandingActive,
+		Standing:       commercialaccess.StandingActive,
 		Features:       map[string]bool{ManagedVoiceEntitlement: true},
 	}}); err != nil {
 		t.Fatalf("configure managed SIP authority: %v", err)

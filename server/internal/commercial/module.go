@@ -3,29 +3,26 @@ package commercial
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/checkout"
+	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
-	"github.com/leamout/leamout/internal/commercial/metering"
-	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 // Module is the composition boundary for Leamout's Commercial domain.
 // Runtime and telecom code should depend on this module rather than assembling
 // Commercial subdomains independently.
 type Module struct {
-	Catalog  CatalogModule
-	Access   AccessModule
-	Metering MeteringModule
-	Money    MoneyModule
-	Payments PaymentsModule
-	State    StateModule
+	Catalog CatalogModule
+	Billing BillingModule
+	Access  AccessModule
+	Usage   UsageModule
+	Prepaid PrepaidModule
 }
 
 type CatalogModule struct {
@@ -34,10 +31,23 @@ type CatalogModule struct {
 	Handler    *catalog.Handler
 }
 
+type BillingModule struct {
+	Checkouts CheckoutModule
+	Payments  PaymentsModule
+}
+
+type CheckoutModule struct {
+	Repository *checkout.Repository
+	Service    *checkout.Service
+	Handler    *checkout.Handler
+}
+
 type AccessModule struct {
 	Subscriptions SubscriptionsModule
+	Licenses      LicensesModule
 	Entitlements  EntitlementsModule
-	Licensing     LicensingModule
+	Service       *commercialaccess.Service
+	Handler       *commercialaccess.Handler
 }
 
 type SubscriptionsModule struct {
@@ -46,37 +56,37 @@ type SubscriptionsModule struct {
 	Handler    *subscriptions.Handler
 }
 
-type EntitlementsModule struct {
-	Repository *entitlements.Repository
-	Service    *entitlements.Service
-}
-
-type LicensingModule struct {
+type LicensesModule struct {
 	Repository *licensing.Repository
 	Service    *licensing.Service
 	Handler    *licensing.Handler
 }
 
-type MeteringModule struct {
-	Repository *metering.Repository
-	Service    *metering.Service
+type EntitlementsModule struct {
+	Repository *entitlements.Repository
+	Service    *entitlements.Service
 }
 
-type MoneyModule struct {
-	Wallets      *wallets.Repository
-	TopupService *wallets.TopupService
-	TopupHandler *wallets.TopupHandler
+type UsageModule struct {
+	Repository *usage.Repository
+	Service    *usage.Service
+}
+
+type PrepaidModule struct {
+	Wallets WalletModule
+}
+
+type WalletModule struct {
+	Repository *wallets.Repository
+	Service    *wallets.Service
+	Handler    *wallets.Handler
 }
 
 type PaymentsModule struct {
-	Checkouts *checkout.Repository
-	Orders    *orders.Repository
-	Payments  *payments.Repository
-}
-
-type StateModule struct {
-	Service *commercialstate.Service
-	Handler *commercialstate.Handler
+	Repository *payments.Repository
+	Service    *payments.Service
+	Providers  *payments.ProviderRegistry
+	Handler    *payments.Handler
 }
 
 // New composes the Commercial domain from its durable submodules. Payment
@@ -98,7 +108,7 @@ func New(db *pgxpool.Pool) *Module {
 		subscriptionsService,
 	)
 
-	commercialStateService := commercialstate.NewService(
+	commercialAccessService := commercialaccess.NewService(
 		subscriptionsService,
 		entitlementsService,
 	)
@@ -106,23 +116,39 @@ func New(db *pgxpool.Pool) *Module {
 	licensingRepository := licensing.NewRepository(db)
 	licensingService := licensing.NewService(
 		licensingRepository,
-		commercialStateService,
+		commercialAccessService,
 	)
 
-	meteringRepository := metering.NewRepository(db)
-	meteringService := metering.NewService(meteringRepository)
+	usageRepository := usage.NewRepository(db)
+	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
+	walletService := wallets.NewService(walletRepository)
+	walletHandler := wallets.NewHandler(walletService)
+
 	checkoutRepository := checkout.NewRepository(db)
-	orderRepository := orders.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
-	topupService := wallets.NewTopupService(
-		walletRepository,
+	paymentService := payments.NewService(paymentRepository)
+	providerRegistry := payments.NewProviderRegistry()
+	checkoutService := checkout.NewService(
 		checkoutRepository,
+		walletService,
+		catalogService,
+		subscriptionsService,
 		paymentRepository,
-		walletRepository,
-		map[string]paymentprovider.Provider{},
+		paymentService,
+		providerRegistry,
 	)
+	checkoutHandler := checkout.NewHandler(checkoutService)
+	paymentHandler := payments.NewHandler(paymentService, providerRegistry, checkoutService)
+
+	prepaidModule := PrepaidModule{
+		Wallets: WalletModule{
+			Repository: walletRepository,
+			Service:    walletService,
+			Handler:    walletHandler,
+		},
+	}
 
 	return &Module{
 		Catalog: CatalogModule{
@@ -130,39 +156,41 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    catalogService,
 			Handler:    catalog.NewHandler(catalogService),
 		},
+		Billing: BillingModule{
+			Checkouts: CheckoutModule{
+				Repository: checkoutRepository,
+				Service:    checkoutService,
+				Handler:    checkoutHandler,
+			},
+			Payments: PaymentsModule{
+				Repository: paymentRepository,
+				Service:    paymentService,
+				Providers:  providerRegistry,
+				Handler:    paymentHandler,
+			},
+		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{
 				Repository: subscriptionsRepository,
 				Service:    subscriptionsService,
 				Handler:    subscriptions.NewHandler(subscriptionsService),
 			},
-			Entitlements: EntitlementsModule{
-				Repository: entitlementsRepository,
-				Service:    entitlementsService,
-			},
-			Licensing: LicensingModule{
+			Licenses: LicensesModule{
 				Repository: licensingRepository,
 				Service:    licensingService,
 				Handler:    licensing.NewHandler(licensingService),
 			},
+			Entitlements: EntitlementsModule{
+				Repository: entitlementsRepository,
+				Service:    entitlementsService,
+			},
+			Service: commercialAccessService,
+			Handler: commercialaccess.NewHandler(commercialAccessService),
 		},
-		Metering: MeteringModule{
-			Repository: meteringRepository,
-			Service:    meteringService,
+		Usage: UsageModule{
+			Repository: usageRepository,
+			Service:    usageService,
 		},
-		Money: MoneyModule{
-			Wallets:      walletRepository,
-			TopupService: topupService,
-			TopupHandler: wallets.NewTopupHandler(topupService),
-		},
-		Payments: PaymentsModule{
-			Checkouts: checkoutRepository,
-			Orders:    orderRepository,
-			Payments:  paymentRepository,
-		},
-		State: StateModule{
-			Service: commercialStateService,
-			Handler: commercialstate.NewHandler(commercialStateService),
-		},
+		Prepaid: prepaidModule,
 	}
 }

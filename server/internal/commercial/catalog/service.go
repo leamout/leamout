@@ -77,3 +77,11 @@ func (s *Service) ListPrices(ctx context.Context, planID uuid.UUID, activeOnly b
 	}
 	return s.repo.ListPrices(ctx, planID, activeOnly, s.now())
 }
+
+func (s *Service) GetMeter(ctx context.Context, key string) (Meter, error) {
+	normalized, err := normalizeCode(key)
+	if err != nil {
+		return Meter{}, err
+	}
+	return s.repo.GetMeter(ctx, normalized)
+}

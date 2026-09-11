@@ -148,15 +148,15 @@ type CarrierProvider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Temporary server-priced purchase sessions. A successful checkout produces a durable order after payment is confirmed.
+// Provider-neutral, short-lived commercial purchase sessions. Payment selection is bound at confirmation and successful settlement is fulfilled by Checkout.
 type Checkout struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
 	WalletID        *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
 	PriceID         *uuid.UUID         `db:"price_id" json:"price_id"`
 	CheckoutType    string             `db:"checkout_type" json:"checkout_type"`
-	Provider        string             `db:"provider" json:"provider"`
-	PaymentMethod   string             `db:"payment_method" json:"payment_method"`
+	Provider        *string            `db:"provider" json:"provider"`
+	PaymentMethod   *string            `db:"payment_method" json:"payment_method"`
 	Reference       string             `db:"reference" json:"reference"`
 	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
 	Currency        string             `db:"currency" json:"currency"`
@@ -300,22 +300,6 @@ type OpensipsOutboundCarrierCredential struct {
 	Password            interface{} `db:"password" json:"password"`
 }
 
-// Durable records of completed Leamout purchases created only after payment is confirmed.
-type Order struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	CheckoutID     uuid.UUID          `db:"checkout_id" json:"checkout_id"`
-	PaymentID      uuid.UUID          `db:"payment_id" json:"payment_id"`
-	WalletID       *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
-	PriceID        *uuid.UUID         `db:"price_id" json:"price_id"`
-	OrderType      string             `db:"order_type" json:"order_type"`
-	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
-	Currency       string             `db:"currency" json:"currency"`
-	CompletedAt    pgtype.Timestamptz `db:"completed_at" json:"completed_at"`
-	Metadata       []byte             `db:"metadata" json:"metadata"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-}
-
 type Organization struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
 	Name      string             `db:"name" json:"name"`
@@ -384,7 +368,7 @@ type OutboxEvent struct {
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Provider-independent payment state associated with a checkout.
+// Provider-independent payment state associated with a checkout. Payment settlement does not apply wallet or subscription effects.
 type Payment struct {
 	ID                uuid.UUID          `db:"id" json:"id"`
 	CheckoutID        uuid.UUID          `db:"checkout_id" json:"checkout_id"`

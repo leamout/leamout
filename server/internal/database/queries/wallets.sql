@@ -17,6 +17,15 @@ WHERE w.organization_id = sqlc.arg(organization_id)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
+-- name: ListWallets :many
+SELECT w.*
+FROM wallets AS w
+JOIN organizations AS o ON o.id = w.organization_id
+WHERE w.organization_id = sqlc.arg(organization_id)
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY w.created_at ASC, w.id ASC;
+
 -- name: GetWalletByCurrency :one
 SELECT w.*
 FROM wallets AS w

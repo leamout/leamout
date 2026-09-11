@@ -22,17 +22,11 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Checkout, error) {
-	if err := validateCreate(input, time.Now()); err != nil {
-		return Checkout{}, err
-	}
-
-	row, err := r.queries.CreateCheckoutOrder(ctx, sqlc.CreateCheckoutOrderParams{
+	row, err := r.queries.CreateCheckout(ctx, sqlc.CreateCheckoutParams{
 		OrganizationID: organizationID,
 		WalletID:       input.WalletID,
 		PriceID:        input.PriceID,
 		CheckoutType:   string(input.Type),
-		Provider:       string(input.Provider),
-		PaymentMethod:  string(input.PaymentMethod),
 		Reference:      input.Reference,
 		AmountMinor:    input.AmountMinor,
 		Currency:       input.Currency,
@@ -46,8 +40,30 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 	return checkoutFromRow(row), nil
 }
 
+func (r *Repository) StartPayment(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+	input StartPayment,
+) (Checkout, error) {
+	provider := string(input.Provider)
+	paymentMethod := string(input.PaymentMethod)
+	row, err := r.queries.StartCheckoutPayment(ctx, sqlc.StartCheckoutPaymentParams{
+		Provider:       &provider,
+		PaymentMethod:  &paymentMethod,
+		OrganizationID: organizationID,
+		ID:             id,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Checkout{}, ErrInvalidTransition
+		}
+		return Checkout{}, mapWriteError(err)
+	}
+	return checkoutFromRow(row), nil
+}
+
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Checkout, error) {
-	row, err := r.queries.GetCheckoutOrder(ctx, sqlc.GetCheckoutOrderParams{
+	row, err := r.queries.GetCheckout(ctx, sqlc.GetCheckoutParams{
 		OrganizationID: organizationID,
 		ID:             id,
 	})
@@ -59,7 +75,7 @@ func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (Che
 }
 
 func (r *Repository) GetByReference(ctx context.Context, reference string) (Checkout, error) {
-	row, err := r.queries.GetCheckoutOrderByReference(ctx, reference)
+	row, err := r.queries.GetCheckoutByReference(ctx, reference)
 	if err != nil {
 		return Checkout{}, mapReadError(err)
 	}
@@ -68,11 +84,7 @@ func (r *Repository) GetByReference(ctx context.Context, reference string) (Chec
 }
 
 func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUID, transition Transition) (Checkout, error) {
-	if err := validateTransition(transition); err != nil {
-		return Checkout{}, err
-	}
-
-	row, err := r.queries.CompareAndSetCheckoutOrderState(ctx, sqlc.CompareAndSetCheckoutOrderStateParams{
+	row, err := r.queries.CompareAndSetCheckoutState(ctx, sqlc.CompareAndSetCheckoutStateParams{
 		Status:          string(transition.Status),
 		NextAction:      string(transition.NextAction),
 		ProviderMessage: transition.ProviderMessage,
@@ -92,7 +104,7 @@ func (r *Repository) Transition(ctx context.Context, organizationID, id uuid.UUI
 }
 
 func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.UUID, refreshBefore time.Time) (Checkout, error) {
-	row, err := r.queries.ClaimCheckoutOrderRefresh(ctx, sqlc.ClaimCheckoutOrderRefreshParams{
+	row, err := r.queries.ClaimCheckoutRefresh(ctx, sqlc.ClaimCheckoutRefreshParams{
 		OrganizationID: organizationID,
 		ID:             id,
 		RefreshBefore:  pgconv.NullableTimestamptz(&refreshBefore),
@@ -105,7 +117,7 @@ func (r *Repository) ClaimRefresh(ctx context.Context, organizationID, id uuid.U
 }
 
 func (r *Repository) Expire(ctx context.Context) ([]Checkout, error) {
-	rows, err := r.queries.ExpireCheckoutOrders(ctx)
+	rows, err := r.queries.ExpireCheckouts(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -125,8 +137,8 @@ func checkoutFromRow(row sqlc.Checkout) Checkout {
 		WalletID:        row.WalletID,
 		PriceID:         row.PriceID,
 		Type:            Type(row.CheckoutType),
-		Provider:        Provider(row.Provider),
-		PaymentMethod:   PaymentMethod(row.PaymentMethod),
+		Provider:        Provider(nullableString(row.Provider)),
+		PaymentMethod:   PaymentMethod(nullableString(row.PaymentMethod)),
 		Reference:       row.Reference,
 		AmountMinor:     row.AmountMinor,
 		Currency:        row.Currency,
@@ -139,6 +151,13 @@ func checkoutFromRow(row sqlc.Checkout) Checkout {
 		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
 		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
+}
+
+func nullableString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func mapReadError(err error) error {

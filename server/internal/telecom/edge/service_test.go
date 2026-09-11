@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 )
 
 type fakeStore struct {
@@ -25,12 +25,12 @@ func (f *fakeStore) DailyWholesaleSpend(context.Context, uuid.UUID, time.Time) (
 	return f.spent, f.spendErr
 }
 
-type fakeState struct {
-	value commercialstate.OrganizationState
+type fakeAccess struct {
+	value commercialaccess.OrganizationAccess
 	err   error
 }
 
-func (f *fakeState) Resolve(context.Context, uuid.UUID) (commercialstate.OrganizationState, error) {
+func (f *fakeAccess) Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error) {
 	return f.value, f.err
 }
 
@@ -40,8 +40,8 @@ func TestAdmitAuthorizesManagedIdentityAndRoute(t *testing.T) {
 		OrganizationID: organizationID, TrunkID: trunkID, CarrierConnectionID: connectionID,
 		Host: "wholesale.example", Port: 5061, Transport: "tls",
 	}, spent: 99}
-	service := NewService(store, &fakeState{value: commercialstate.OrganizationState{
-		Standing: commercialstate.StandingActive,
+	service := NewService(store, &fakeAccess{value: commercialaccess.OrganizationAccess{
+		Standing: commercialaccess.StandingActive,
 		Features: map[string]bool{ManagedVoiceEntitlement: true},
 		Limits:   map[string]int64{ManagedDailySpendLimit: 100},
 	}})
@@ -64,17 +64,17 @@ func TestAdmitFailsClosedForCommercialState(t *testing.T) {
 	route := Route{OrganizationID: uuid.New()}
 	tests := []struct {
 		name  string
-		state commercialstate.OrganizationState
+		state commercialaccess.OrganizationAccess
 		spent int64
 	}{
-		{"inactive", commercialstate.OrganizationState{Standing: commercialstate.StandingPastDue}, 0},
-		{"feature disabled", commercialstate.OrganizationState{Standing: commercialstate.StandingActive, Limits: map[string]int64{ManagedDailySpendLimit: 10}}, 0},
-		{"limit absent", commercialstate.OrganizationState{Standing: commercialstate.StandingActive, Features: map[string]bool{ManagedVoiceEntitlement: true}}, 0},
-		{"limit exhausted", commercialstate.OrganizationState{Standing: commercialstate.StandingActive, Features: map[string]bool{ManagedVoiceEntitlement: true}, Limits: map[string]int64{ManagedDailySpendLimit: 10}}, 10},
+		{"inactive", commercialaccess.OrganizationAccess{Standing: commercialaccess.StandingPastDue}, 0},
+		{"feature disabled", commercialaccess.OrganizationAccess{Standing: commercialaccess.StandingActive, Limits: map[string]int64{ManagedDailySpendLimit: 10}}, 0},
+		{"limit absent", commercialaccess.OrganizationAccess{Standing: commercialaccess.StandingActive, Features: map[string]bool{ManagedVoiceEntitlement: true}}, 0},
+		{"limit exhausted", commercialaccess.OrganizationAccess{Standing: commercialaccess.StandingActive, Features: map[string]bool{ManagedVoiceEntitlement: true}, Limits: map[string]int64{ManagedDailySpendLimit: 10}}, 10},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			service := NewService(&fakeStore{route: route, spent: test.spent}, &fakeState{value: test.state})
+			service := NewService(&fakeStore{route: route, spent: test.spent}, &fakeAccess{value: test.state})
 			if _, err := service.Admit(context.Background(), Request{}); !errors.Is(err, ErrDenied) {
 				t.Fatalf("error = %v, want denied", err)
 			}
@@ -86,8 +86,8 @@ func TestAdmitFailsClosedWhenSpendUnavailable(t *testing.T) {
 	service := NewService(&fakeStore{
 		route:    Route{OrganizationID: uuid.New()},
 		spendErr: errors.New("database unavailable"),
-	}, &fakeState{value: commercialstate.OrganizationState{
-		Standing: commercialstate.StandingActive,
+	}, &fakeAccess{value: commercialaccess.OrganizationAccess{
+		Standing: commercialaccess.StandingActive,
 		Features: map[string]bool{ManagedVoiceEntitlement: true},
 		Limits:   map[string]int64{ManagedDailySpendLimit: 100},
 	}})
@@ -97,7 +97,7 @@ func TestAdmitFailsClosedWhenSpendUnavailable(t *testing.T) {
 }
 
 func TestAdmitMapsMissingRouteToDenied(t *testing.T) {
-	service := NewService(&fakeStore{resolveErr: pgx.ErrNoRows}, &fakeState{})
+	service := NewService(&fakeStore{resolveErr: pgx.ErrNoRows}, &fakeAccess{})
 	if _, err := service.Admit(context.Background(), Request{}); !errors.Is(err, ErrDenied) {
 		t.Fatalf("error = %v, want denied", err)
 	}
@@ -105,7 +105,7 @@ func TestAdmitMapsMissingRouteToDenied(t *testing.T) {
 
 func TestAdmitPreservesRouteLookupFailure(t *testing.T) {
 	databaseErr := errors.New("database unavailable")
-	service := NewService(&fakeStore{resolveErr: databaseErr}, &fakeState{})
+	service := NewService(&fakeStore{resolveErr: databaseErr}, &fakeAccess{})
 	_, err := service.Admit(context.Background(), Request{})
 	if !errors.Is(err, databaseErr) || errors.Is(err, ErrDenied) {
 		t.Fatalf("error = %v, want wrapped database error", err)

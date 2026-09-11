@@ -26,27 +26,29 @@ INSERT INTO payments (
 )
 SELECT
     c.id AS checkout_id,
-    c.organization_id,
-    c.provider,
-    $1 AS provider_payment_id,
-    $2 AS amount_minor,
-    $3 AS currency,
-    COALESCE($4, 'pending') AS status,
-    $5 AS paid_at,
-    COALESCE($6, '{}'::jsonb) AS metadata
+    c.organization_id AS organization_id,
+    $1 AS provider,
+    $2 AS provider_payment_id,
+    $3 AS amount_minor,
+    $4 AS currency,
+    COALESCE($5, 'pending') AS status,
+    $6 AS paid_at,
+    COALESCE($7, '{}'::jsonb) AS metadata
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
-WHERE c.id = $7
-  AND c.organization_id = $8
-  AND c.provider = $9
-  AND c.amount_minor = $2
-  AND c.currency = $3
+WHERE c.id = $8
+  AND c.organization_id = $9
+  AND c.provider = $1
+  AND c.status = 'processing'
+  AND c.amount_minor = $3
+  AND c.currency = $4
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 RETURNING id, checkout_id, organization_id, provider, provider_payment_id, amount_minor, currency, status, paid_at, metadata, created_at, updated_at
 `
 
 type CreatePaymentParams struct {
+	Provider          string             `db:"provider" json:"provider"`
 	ProviderPaymentID *string            `db:"provider_payment_id" json:"provider_payment_id"`
 	AmountMinor       int64              `db:"amount_minor" json:"amount_minor"`
 	Currency          string             `db:"currency" json:"currency"`
@@ -55,11 +57,11 @@ type CreatePaymentParams struct {
 	Metadata          []byte             `db:"metadata" json:"metadata"`
 	CheckoutID        uuid.UUID          `db:"checkout_id" json:"checkout_id"`
 	OrganizationID    uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Provider          string             `db:"provider" json:"provider"`
 }
 
 func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (Payment, error) {
 	row := q.db.QueryRow(ctx, createPayment,
+		arg.Provider,
 		arg.ProviderPaymentID,
 		arg.AmountMinor,
 		arg.Currency,
@@ -68,7 +70,6 @@ func (q *Queries) CreatePayment(ctx context.Context, arg CreatePaymentParams) (P
 		arg.Metadata,
 		arg.CheckoutID,
 		arg.OrganizationID,
-		arg.Provider,
 	)
 	var i Payment
 	err := row.Scan(
@@ -124,7 +125,7 @@ func (q *Queries) GetPayment(ctx context.Context, arg GetPaymentParams) (Payment
 	return i, err
 }
 
-const getPaymentByCheckoutOrder = `-- name: GetPaymentByCheckoutOrder :one
+const getPaymentByCheckout = `-- name: GetPaymentByCheckout :one
 SELECT p.id, p.checkout_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
 JOIN organizations AS o ON o.id = p.organization_id
@@ -135,13 +136,13 @@ WHERE p.organization_id = $1
 LIMIT 1
 `
 
-type GetPaymentByCheckoutOrderParams struct {
+type GetPaymentByCheckoutParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	CheckoutID     uuid.UUID `db:"checkout_id" json:"checkout_id"`
 }
 
-func (q *Queries) GetPaymentByCheckoutOrder(ctx context.Context, arg GetPaymentByCheckoutOrderParams) (Payment, error) {
-	row := q.db.QueryRow(ctx, getPaymentByCheckoutOrder, arg.OrganizationID, arg.CheckoutID)
+func (q *Queries) GetPaymentByCheckout(ctx context.Context, arg GetPaymentByCheckoutParams) (Payment, error) {
+	row := q.db.QueryRow(ctx, getPaymentByCheckout, arg.OrganizationID, arg.CheckoutID)
 	var i Payment
 	err := row.Scan(
 		&i.ID,
@@ -196,6 +197,96 @@ func (q *Queries) GetPaymentByProviderID(ctx context.Context, arg GetPaymentByPr
 	return i, err
 }
 
+const getPaymentProviderEvent = `-- name: GetPaymentProviderEvent :one
+SELECT id, payment_id, organization_id, provider, provider_event_id, event_type, payload_sha256, payload, received_at, processed_at
+FROM payment_provider_events
+WHERE provider = $1
+  AND provider_event_id = $2
+LIMIT 1
+`
+
+type GetPaymentProviderEventParams struct {
+	Provider        string `db:"provider" json:"provider"`
+	ProviderEventID string `db:"provider_event_id" json:"provider_event_id"`
+}
+
+func (q *Queries) GetPaymentProviderEvent(ctx context.Context, arg GetPaymentProviderEventParams) (PaymentProviderEvent, error) {
+	row := q.db.QueryRow(ctx, getPaymentProviderEvent, arg.Provider, arg.ProviderEventID)
+	var i PaymentProviderEvent
+	err := row.Scan(
+		&i.ID,
+		&i.PaymentID,
+		&i.OrganizationID,
+		&i.Provider,
+		&i.ProviderEventID,
+		&i.EventType,
+		&i.PayloadSha256,
+		&i.Payload,
+		&i.ReceivedAt,
+		&i.ProcessedAt,
+	)
+	return i, err
+}
+
+const insertPaymentProviderEvent = `-- name: InsertPaymentProviderEvent :one
+INSERT INTO payment_provider_events (
+    payment_id,
+    organization_id,
+    provider,
+    provider_event_id,
+    event_type,
+    payload_sha256,
+    payload
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7
+)
+ON CONFLICT (provider, provider_event_id) DO NOTHING
+RETURNING id, payment_id, organization_id, provider, provider_event_id, event_type, payload_sha256, payload, received_at, processed_at
+`
+
+type InsertPaymentProviderEventParams struct {
+	PaymentID       uuid.UUID `db:"payment_id" json:"payment_id"`
+	OrganizationID  uuid.UUID `db:"organization_id" json:"organization_id"`
+	Provider        string    `db:"provider" json:"provider"`
+	ProviderEventID string    `db:"provider_event_id" json:"provider_event_id"`
+	EventType       string    `db:"event_type" json:"event_type"`
+	PayloadSha256   string    `db:"payload_sha256" json:"payload_sha256"`
+	Payload         []byte    `db:"payload" json:"payload"`
+}
+
+func (q *Queries) InsertPaymentProviderEvent(ctx context.Context, arg InsertPaymentProviderEventParams) (PaymentProviderEvent, error) {
+	row := q.db.QueryRow(ctx, insertPaymentProviderEvent,
+		arg.PaymentID,
+		arg.OrganizationID,
+		arg.Provider,
+		arg.ProviderEventID,
+		arg.EventType,
+		arg.PayloadSha256,
+		arg.Payload,
+	)
+	var i PaymentProviderEvent
+	err := row.Scan(
+		&i.ID,
+		&i.PaymentID,
+		&i.OrganizationID,
+		&i.Provider,
+		&i.ProviderEventID,
+		&i.EventType,
+		&i.PayloadSha256,
+		&i.Payload,
+		&i.ReceivedAt,
+		&i.ProcessedAt,
+	)
+	return i, err
+}
+
 const listPaymentsByOrganization = `-- name: ListPaymentsByOrganization :many
 SELECT p.id, p.checkout_id, p.organization_id, p.provider, p.provider_payment_id, p.amount_minor, p.currency, p.status, p.paid_at, p.metadata, p.created_at, p.updated_at
 FROM payments AS p
@@ -237,6 +328,69 @@ func (q *Queries) ListPaymentsByOrganization(ctx context.Context, organizationID
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPaymentByReference = `-- name: LockPaymentByReference :one
+SELECT
+    c.id AS checkout_id,
+    c.organization_id AS organization_id,
+    c.reference AS reference,
+    c.amount_minor AS amount_minor,
+    c.currency AS currency,
+    c.status AS checkout_status,
+    p.id AS payment_id,
+    p.provider AS provider,
+    p.provider_payment_id AS provider_payment_id,
+    p.status AS payment_status
+FROM checkouts AS c
+JOIN payments AS p
+  ON p.checkout_id = c.id
+ AND p.organization_id = c.organization_id
+WHERE c.reference = $1
+FOR UPDATE OF c, p
+`
+
+type LockPaymentByReferenceRow struct {
+	CheckoutID        uuid.UUID `db:"checkout_id" json:"checkout_id"`
+	OrganizationID    uuid.UUID `db:"organization_id" json:"organization_id"`
+	Reference         string    `db:"reference" json:"reference"`
+	AmountMinor       int64     `db:"amount_minor" json:"amount_minor"`
+	Currency          string    `db:"currency" json:"currency"`
+	CheckoutStatus    string    `db:"checkout_status" json:"checkout_status"`
+	PaymentID         uuid.UUID `db:"payment_id" json:"payment_id"`
+	Provider          string    `db:"provider" json:"provider"`
+	ProviderPaymentID *string   `db:"provider_payment_id" json:"provider_payment_id"`
+	PaymentStatus     string    `db:"payment_status" json:"payment_status"`
+}
+
+func (q *Queries) LockPaymentByReference(ctx context.Context, reference string) (LockPaymentByReferenceRow, error) {
+	row := q.db.QueryRow(ctx, lockPaymentByReference, reference)
+	var i LockPaymentByReferenceRow
+	err := row.Scan(
+		&i.CheckoutID,
+		&i.OrganizationID,
+		&i.Reference,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.CheckoutStatus,
+		&i.PaymentID,
+		&i.Provider,
+		&i.ProviderPaymentID,
+		&i.PaymentStatus,
+	)
+	return i, err
+}
+
+const markPaymentProviderEventProcessed = `-- name: MarkPaymentProviderEventProcessed :exec
+UPDATE payment_provider_events
+SET processed_at = NOW()
+WHERE id = $1
+  AND processed_at IS NULL
+`
+
+func (q *Queries) MarkPaymentProviderEventProcessed(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, markPaymentProviderEventProcessed, id)
+	return err
 }
 
 const setPaymentProviderID = `-- name: SetPaymentProviderID :one
@@ -288,8 +442,7 @@ func (q *Queries) SetPaymentProviderID(ctx context.Context, arg SetPaymentProvid
 
 const updatePaymentStatus = `-- name: UpdatePaymentStatus :one
 UPDATE payments AS p
-SET
-    status = $1,
+SET status = $1,
     paid_at = COALESCE($2, p.paid_at),
     metadata = COALESCE($3, p.metadata),
     updated_at = NOW()

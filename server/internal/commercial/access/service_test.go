@@ -1,4 +1,4 @@
-package state
+package access
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
 
-func TestOrganizationStateBuildsResolvedState(t *testing.T) {
+func TestOrganizationAccessBuildsResolvedState(t *testing.T) {
 	t.Parallel()
 
 	organizationID := uuid.New()
@@ -27,7 +27,7 @@ func TestOrganizationStateBuildsResolvedState(t *testing.T) {
 		Status:         subscriptions.StatusActive,
 	}
 
-	resolved := organizationState(organizationID, current, entitlements.Resolution{Set: set}, at)
+	resolved := organizationAccess(organizationID, current, entitlements.Resolution{Set: set}, at)
 	if resolved.OrganizationID != organizationID {
 		t.Fatalf("OrganizationID = %v, want %v", resolved.OrganizationID, organizationID)
 	}
@@ -54,13 +54,13 @@ func TestOrganizationStateBuildsResolvedState(t *testing.T) {
 	}
 }
 
-func TestOrganizationStateUsesEarliestKnownChange(t *testing.T) {
+func TestOrganizationAccessUsesEarliestKnownChange(t *testing.T) {
 	t.Parallel()
 
 	at := time.Date(2026, 8, 31, 10, 0, 0, 0, time.UTC)
 	entitlementChange := at.Add(time.Hour)
 	subscriptionEnd := at.Add(2 * time.Hour)
-	resolved := organizationState(
+	resolved := organizationAccess(
 		uuid.New(),
 		subscriptions.Subscription{
 			ID:     uuid.New(),
@@ -83,14 +83,14 @@ func TestOrganizationStateUsesEarliestKnownChange(t *testing.T) {
 	}
 }
 
-func TestOrganizationStateDoesNotAliasEntitlementMaps(t *testing.T) {
+func TestOrganizationAccessDoesNotAliasEntitlementMaps(t *testing.T) {
 	t.Parallel()
 
 	set := entitlements.EntitlementSet{
 		Features: map[entitlements.Feature]bool{"recording.enabled": true},
 		Limits:   map[string]int64{"max.concurrent.calls": 25},
 	}
-	resolved := organizationState(
+	resolved := organizationAccess(
 		uuid.New(),
 		subscriptions.Subscription{ID: uuid.New(), PlanID: uuid.New(), Status: subscriptions.StatusActive},
 		entitlements.Resolution{Set: set},
@@ -114,7 +114,7 @@ func TestUnsubscribedStateIsKnownCommercialState(t *testing.T) {
 	organizationID := uuid.New()
 	at := time.Date(2026, 8, 31, 11, 0, 0, 0, time.UTC)
 
-	resolved := unsubscribedState(organizationID, at)
+	resolved := unsubscribedAccess(organizationID, at)
 	if resolved.OrganizationID != organizationID {
 		t.Fatalf("OrganizationID = %v, want %v", resolved.OrganizationID, organizationID)
 	}

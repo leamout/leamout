@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const claimCheckoutOrderRefresh = `-- name: ClaimCheckoutOrderRefresh :one
+const claimCheckoutRefresh = `-- name: ClaimCheckoutRefresh :one
 UPDATE checkouts
 SET updated_at = NOW()
 WHERE organization_id = $1
@@ -23,14 +23,14 @@ WHERE organization_id = $1
 RETURNING id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
-type ClaimCheckoutOrderRefreshParams struct {
+type ClaimCheckoutRefreshParams struct {
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	ID             uuid.UUID          `db:"id" json:"id"`
 	RefreshBefore  pgtype.Timestamptz `db:"refresh_before" json:"refresh_before"`
 }
 
-func (q *Queries) ClaimCheckoutOrderRefresh(ctx context.Context, arg ClaimCheckoutOrderRefreshParams) (Checkout, error) {
-	row := q.db.QueryRow(ctx, claimCheckoutOrderRefresh, arg.OrganizationID, arg.ID, arg.RefreshBefore)
+func (q *Queries) ClaimCheckoutRefresh(ctx context.Context, arg ClaimCheckoutRefreshParams) (Checkout, error) {
+	row := q.db.QueryRow(ctx, claimCheckoutRefresh, arg.OrganizationID, arg.ID, arg.RefreshBefore)
 	var i Checkout
 	err := row.Scan(
 		&i.ID,
@@ -55,61 +55,20 @@ func (q *Queries) ClaimCheckoutOrderRefresh(ctx context.Context, arg ClaimChecko
 	return i, err
 }
 
-const compareAndSetCheckoutOrderState = `-- name: CompareAndSetCheckoutOrderState :one
-WITH updated AS (
-    UPDATE checkouts AS c
-    SET status = $1,
-        next_action = $2,
-        provider_message = $3,
-        completed_at = $4,
-        updated_at = NOW()
-    WHERE c.organization_id = $5
-      AND c.id = $6
-      AND c.status = $7
-    RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
-), created_order AS (
-    INSERT INTO orders (
-        organization_id,
-        checkout_id,
-        payment_id,
-        wallet_id,
-        price_id,
-        order_type,
-        amount_minor,
-        currency,
-        completed_at,
-        metadata
-    )
-    SELECT
-        c.organization_id,
-        c.id,
-        p.id,
-        c.wallet_id,
-        c.price_id,
-        c.checkout_type,
-        c.amount_minor,
-        c.currency,
-        c.completed_at,
-        c.metadata
-    FROM updated AS c
-    JOIN payments AS p
-      ON p.checkout_id = c.id
-     AND p.organization_id = c.organization_id
-    WHERE c.status = 'succeeded'
-      AND c.completed_at IS NOT NULL
-      AND p.status = 'succeeded'
-    ON CONFLICT (checkout_id) DO NOTHING
-    RETURNING id
-)
-SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
-FROM checkouts AS c
-JOIN updated AS u
-  ON u.id = c.id
- AND u.organization_id = c.organization_id
-LEFT JOIN created_order AS o ON TRUE
+const compareAndSetCheckoutState = `-- name: CompareAndSetCheckoutState :one
+UPDATE checkouts AS c
+SET status = $1,
+    next_action = $2,
+    provider_message = $3,
+    completed_at = $4,
+    updated_at = NOW()
+WHERE c.organization_id = $5
+  AND c.id = $6
+  AND c.status = $7
+RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 `
 
-type CompareAndSetCheckoutOrderStateParams struct {
+type CompareAndSetCheckoutStateParams struct {
 	Status          string             `db:"status" json:"status"`
 	NextAction      string             `db:"next_action" json:"next_action"`
 	ProviderMessage *string            `db:"provider_message" json:"provider_message"`
@@ -119,8 +78,8 @@ type CompareAndSetCheckoutOrderStateParams struct {
 	ExpectedStatus  string             `db:"expected_status" json:"expected_status"`
 }
 
-func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg CompareAndSetCheckoutOrderStateParams) (Checkout, error) {
-	row := q.db.QueryRow(ctx, compareAndSetCheckoutOrderState,
+func (q *Queries) CompareAndSetCheckoutState(ctx context.Context, arg CompareAndSetCheckoutStateParams) (Checkout, error) {
+	row := q.db.QueryRow(ctx, compareAndSetCheckoutState,
 		arg.Status,
 		arg.NextAction,
 		arg.ProviderMessage,
@@ -153,23 +112,21 @@ func (q *Queries) CompareAndSetCheckoutOrderState(ctx context.Context, arg Compa
 	return i, err
 }
 
-const createCheckoutOrder = `-- name: CreateCheckoutOrder :one
+const createCheckout = `-- name: CreateCheckout :one
 INSERT INTO checkouts (
     organization_id, wallet_id, price_id, checkout_type,
-    provider, payment_method, reference, amount_minor, currency, expires_at, metadata
+    reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     $1 AS organization_id,
     $2::UUID AS wallet_id,
     $3::UUID AS price_id,
     $4 AS checkout_type,
-    $5 AS provider,
-    $6 AS payment_method,
-    $7 AS reference,
-    $8 AS amount_minor,
-    $9 AS currency,
-    $10 AS expires_at,
-    COALESCE($11, '{}'::jsonb) AS metadata
+    $5 AS reference,
+    $6 AS amount_minor,
+    $7 AS currency,
+    $8 AS expires_at,
+    COALESCE($9, '{}'::jsonb) AS metadata
 FROM organizations AS o
 WHERE o.id = $1
   AND o.status = 'active'
@@ -177,13 +134,11 @@ WHERE o.id = $1
 RETURNING id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
-type CreateCheckoutOrderParams struct {
+type CreateCheckoutParams struct {
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	WalletID       *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
 	PriceID        *uuid.UUID         `db:"price_id" json:"price_id"`
 	CheckoutType   string             `db:"checkout_type" json:"checkout_type"`
-	Provider       string             `db:"provider" json:"provider"`
-	PaymentMethod  string             `db:"payment_method" json:"payment_method"`
 	Reference      string             `db:"reference" json:"reference"`
 	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	Currency       string             `db:"currency" json:"currency"`
@@ -191,14 +146,12 @@ type CreateCheckoutOrderParams struct {
 	Metadata       []byte             `db:"metadata" json:"metadata"`
 }
 
-func (q *Queries) CreateCheckoutOrder(ctx context.Context, arg CreateCheckoutOrderParams) (Checkout, error) {
-	row := q.db.QueryRow(ctx, createCheckoutOrder,
+func (q *Queries) CreateCheckout(ctx context.Context, arg CreateCheckoutParams) (Checkout, error) {
+	row := q.db.QueryRow(ctx, createCheckout,
 		arg.OrganizationID,
 		arg.WalletID,
 		arg.PriceID,
 		arg.CheckoutType,
-		arg.Provider,
-		arg.PaymentMethod,
 		arg.Reference,
 		arg.AmountMinor,
 		arg.Currency,
@@ -229,7 +182,7 @@ func (q *Queries) CreateCheckoutOrder(ctx context.Context, arg CreateCheckoutOrd
 	return i, err
 }
 
-const expireCheckoutOrders = `-- name: ExpireCheckoutOrders :many
+const expireCheckouts = `-- name: ExpireCheckouts :many
 UPDATE checkouts
 SET status = 'expired', next_action = 'none', completed_at = NOW(), updated_at = NOW()
 WHERE status IN ('pending', 'processing')
@@ -237,8 +190,8 @@ WHERE status IN ('pending', 'processing')
 RETURNING id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
-func (q *Queries) ExpireCheckoutOrders(ctx context.Context) ([]Checkout, error) {
-	rows, err := q.db.Query(ctx, expireCheckoutOrders)
+func (q *Queries) ExpireCheckouts(ctx context.Context) ([]Checkout, error) {
+	rows, err := q.db.Query(ctx, expireCheckouts)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +229,7 @@ func (q *Queries) ExpireCheckoutOrders(ctx context.Context) ([]Checkout, error) 
 	return items, nil
 }
 
-const getCheckoutOrder = `-- name: GetCheckoutOrder :one
+const getCheckout = `-- name: GetCheckout :one
 SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
@@ -287,13 +240,13 @@ WHERE c.organization_id = $1
 LIMIT 1
 `
 
-type GetCheckoutOrderParams struct {
+type GetCheckoutParams struct {
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 	ID             uuid.UUID `db:"id" json:"id"`
 }
 
-func (q *Queries) GetCheckoutOrder(ctx context.Context, arg GetCheckoutOrderParams) (Checkout, error) {
-	row := q.db.QueryRow(ctx, getCheckoutOrder, arg.OrganizationID, arg.ID)
+func (q *Queries) GetCheckout(ctx context.Context, arg GetCheckoutParams) (Checkout, error) {
+	row := q.db.QueryRow(ctx, getCheckout, arg.OrganizationID, arg.ID)
 	var i Checkout
 	err := row.Scan(
 		&i.ID,
@@ -318,7 +271,7 @@ func (q *Queries) GetCheckoutOrder(ctx context.Context, arg GetCheckoutOrderPara
 	return i, err
 }
 
-const getCheckoutOrderByReference = `-- name: GetCheckoutOrderByReference :one
+const getCheckoutByReference = `-- name: GetCheckoutByReference :one
 SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
@@ -328,8 +281,61 @@ WHERE c.reference = $1
 LIMIT 1
 `
 
-func (q *Queries) GetCheckoutOrderByReference(ctx context.Context, reference string) (Checkout, error) {
-	row := q.db.QueryRow(ctx, getCheckoutOrderByReference, reference)
+func (q *Queries) GetCheckoutByReference(ctx context.Context, reference string) (Checkout, error) {
+	row := q.db.QueryRow(ctx, getCheckoutByReference, reference)
+	var i Checkout
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.WalletID,
+		&i.PriceID,
+		&i.CheckoutType,
+		&i.Provider,
+		&i.PaymentMethod,
+		&i.Reference,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.Status,
+		&i.NextAction,
+		&i.ProviderMessage,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const startCheckoutPayment = `-- name: StartCheckoutPayment :one
+UPDATE checkouts AS c
+SET provider = $1,
+    payment_method = $2,
+    status = 'processing',
+    next_action = 'wait',
+    updated_at = NOW()
+WHERE c.organization_id = $3
+  AND c.id = $4
+  AND c.status = 'pending'
+  AND c.provider IS NULL
+  AND c.payment_method IS NULL
+RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+`
+
+type StartCheckoutPaymentParams struct {
+	Provider       *string   `db:"provider" json:"provider"`
+	PaymentMethod  *string   `db:"payment_method" json:"payment_method"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) StartCheckoutPayment(ctx context.Context, arg StartCheckoutPaymentParams) (Checkout, error) {
+	row := q.db.QueryRow(ctx, startCheckoutPayment,
+		arg.Provider,
+		arg.PaymentMethod,
+		arg.OrganizationID,
+		arg.ID,
+	)
 	var i Checkout
 	err := row.Scan(
 		&i.ID,

@@ -12,7 +12,7 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 )
 
-// Repository reads durable product, plan, and price catalog state.
+// Repository reads durable product, plan, price, and meter catalog state.
 type Repository struct {
 	queries *sqlc.Queries
 }
@@ -139,6 +139,17 @@ func (r *Repository) ListPrices(ctx context.Context, planID uuid.UUID, activeOnl
 	return prices, nil
 }
 
+func (r *Repository) GetMeter(ctx context.Context, key string) (Meter, error) {
+	row, err := r.queries.GetMeterByKey(ctx, key)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Meter{}, ErrMeterNotFound
+		}
+		return Meter{}, err
+	}
+	return meterFromRow(row), nil
+}
+
 func productFromRow(row sqlc.Product) Product {
 	return Product{
 		ID:          row.ID,
@@ -186,5 +197,17 @@ func priceFromRow(row sqlc.Price) Price {
 		EffectiveFrom:    pgconv.TimestamptzToTime(row.EffectiveFrom),
 		EffectiveUntil:   pgconv.TimestamptzToTimePtr(row.EffectiveUntil),
 		CreatedAt:        pgconv.TimestamptzToTime(row.CreatedAt),
+	}
+}
+
+func meterFromRow(row sqlc.Meter) Meter {
+	return Meter{
+		ID:        row.ID,
+		Key:       row.Key,
+		Name:      row.Name,
+		Unit:      row.Unit,
+		Active:    row.Active,
+		CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt),
+		UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
 }

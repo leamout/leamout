@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
+	paymentprovider "github.com/leamout/leamout/internal/commercial/payments"
 )
 
 func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
