@@ -17,17 +17,23 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
+// credentialSealer is intentionally encryption-only. The customer-facing
+// carrier service can replace or revoke a credential, but it must never recover
+// or export its plaintext. SIP Digest execution uses the separately persisted
+// realm-bound HA1 value. A future protocol that genuinely requires plaintext
+// must decrypt it in a narrower execution component, not by broadening this
+// API-facing service's authority.
+type credentialSealer interface {
+	EncryptForScope(string, string) (string, error)
+}
+
 type Service struct {
 	repo   *Repository
-	cipher interface {
-		EncryptForScope(string, string) (string, error)
-	}
+	cipher credentialSealer
 	prober routing.EndpointProber
 }
 
-func NewService(repo *Repository, cipher interface {
-	EncryptForScope(string, string) (string, error)
-}) *Service {
+func NewService(repo *Repository, cipher credentialSealer) *Service {
 	return &Service{repo: repo, cipher: cipher, prober: routing.NewSIPOptionsProber()}
 }
 

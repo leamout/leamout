@@ -20,6 +20,13 @@ connection, or credential field therefore makes authentication fail. Provider
 master credentials are platform configuration: customer APIs and tenant data
 models must never return or accept them.
 
+The customer-facing carrier service deliberately receives encryption authority
+without decryption authority. Digest credential rotation replaces the secret and
+its realm-bound HA1 material; it does not read the previous plaintext. Credential
+export is not supported. If a future carrier protocol requires the original
+secret at execution time, decryption belongs in a separate least-privilege
+runtime component that is scoped to that organization, connection, and purpose.
+
 Cloud deployments should additionally use a dedicated secret manager or KMS,
 private database and cache networks, separate workload identities, encrypted
 backups, and database credentials that do not permit schema-owner bypass during
