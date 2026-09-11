@@ -83,6 +83,15 @@ After composition is separated, implement the Cloud track independently:
    observability destinations from the workloads that require them. Database,
    Redis, NATS, metrics, media control, and operator endpoints stay private.
 
+Current status: the database layer now provides a fail-closed tenant transaction
+primitive that binds `leamout.organization_id` with transaction-local
+`set_config`. Tenant-owned carrier repository operations use that transaction
+boundary while retaining their explicit organization predicates. RLS activation
+remains pending until every API, worker, and telecom access path for the first
+protected table set has been moved behind an explicitly tenant-scoped or
+platform-scoped database role; enabling policies earlier would break legitimate
+platform routing jobs rather than safely isolating them.
+
 Cloud completion gate: automated tests demonstrate that compromise of a normal
 API credential, guessed resource UUID, forged organization header, background
 job payload, or copied ciphertext cannot expose or mutate another organization
