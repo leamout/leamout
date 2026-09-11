@@ -3,7 +3,6 @@ package checkout
 import (
 	"context"
 	"errors"
-	"net/http"
 	"testing"
 	"time"
 
@@ -144,90 +143,43 @@ func (s *subscriptionServiceStub) Current(context.Context, uuid.UUID) (subscript
 	return s.current, nil
 }
 
-type paymentStoreStub struct {
-	payment  commercialpayments.Payment
-	created  commercialpayments.CreateInput
-	provider string
+type paymentServiceStub struct {
+	available  bool
+	payment    commercialpayments.Payment
+	startInput commercialpayments.StartInput
+	start      commercialpayments.StartResult
+	startErr   error
 }
 
-func (s *paymentStoreStub) Create(
-	_ context.Context,
-	organizationID uuid.UUID,
-	provider string,
-	input commercialpayments.CreateInput,
-) (commercialpayments.Payment, error) {
-	s.created = input
-	s.provider = provider
-	result := s.payment
-	if result.ID == uuid.Nil {
-		result.ID = uuid.New()
-	}
-	result.OrganizationID = organizationID
-	result.CheckoutID = input.CheckoutID
-	result.Provider = provider
-	result.Status = input.Status
-	result.AmountMinor = input.AmountMinor
-	result.Currency = input.Currency
-	s.payment = result
-	return result, nil
-}
+func (s *paymentServiceStub) ProviderAvailable(string) bool { return s.available }
 
-func (s *paymentStoreStub) GetByCheckout(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error) {
+func (s *paymentServiceStub) GetByCheckout(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error) {
 	if s.payment.ID == uuid.Nil {
 		return commercialpayments.Payment{}, commercialpayments.ErrPaymentNotFound
 	}
 	return s.payment, nil
 }
 
-func (s *paymentStoreStub) SetProviderID(
+func (s *paymentServiceStub) Start(
 	_ context.Context,
-	_, _ uuid.UUID,
-	providerID string,
-	status commercialpayments.Status,
-) (commercialpayments.Payment, error) {
-	s.payment.ProviderID = &providerID
-	s.payment.Status = status
-	return s.payment, nil
+	_ uuid.UUID,
+	input commercialpayments.StartInput,
+) (commercialpayments.StartResult, error) {
+	s.startInput = input
+	return s.start, s.startErr
 }
 
-func (s *paymentStoreStub) UpdateStatus(
-	_ context.Context,
-	_, _ uuid.UUID,
-	status commercialpayments.Status,
-	_ *time.Time,
-) (commercialpayments.Payment, error) {
-	s.payment.Status = status
-	return s.payment, nil
+func (s *paymentServiceStub) Continue(context.Context, commercialpayments.ContinueInput) (commercialpayments.CheckoutSession, error) {
+	return commercialpayments.CheckoutSession{}, nil
 }
 
-type paymentEventsStub struct{}
-
-func (paymentEventsStub) ProcessProviderEvent(
-	context.Context,
-	commercialpayments.ProviderEvent,
-) (commercialpayments.Settlement, error) {
-	return commercialpayments.Settlement{}, nil
-}
-
-type providerStub struct {
-	session commercialpayments.CheckoutSession
-}
-
-func (s providerStub) CreateCheckout(context.Context, commercialpayments.CheckoutRequest) (commercialpayments.CheckoutSession, error) {
-	return s.session, nil
-}
-
-func (providerStub) GetPayment(context.Context, string) (commercialpayments.ProviderPayment, error) {
-	return commercialpayments.ProviderPayment{}, nil
-}
-
-func (providerStub) ParseWebhook([]byte, http.Header) (commercialpayments.ProviderEvent, error) {
-	return commercialpayments.ProviderEvent{}, nil
+func (s *paymentServiceStub) Refresh(context.Context, string, string) (commercialpayments.Settlement, bool, error) {
+	return commercialpayments.Settlement{}, false, nil
 }
 
 func TestServiceRejectsInvalidCheckoutBeforePersistence(t *testing.T) {
 	store := &checkoutStoreStub{}
-	service := NewService(store, nil, nil, nil, nil, nil, nil)
+	service := NewService(store, nil, nil, nil, nil)
 
 	_, err := service.Create(t.Context(), uuid.New(), CreateParams{})
 	if !errors.Is(err, ErrInvalidCheckout) {
@@ -246,7 +198,7 @@ func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
 		Currency: "GHS",
 		Status:   wallets.StatusActive,
 	}}
-	service := NewService(store, walletsService, nil, nil, nil, nil, nil)
+	service := NewService(store, walletsService, nil, nil, nil)
 
 	result, err := service.Create(t.Context(), uuid.New(), CreateParams{
 		Type:        TypeWalletTopup,
@@ -287,7 +239,7 @@ func TestCreateSubscriptionUsesCatalogPrice(t *testing.T) {
 		product: catalog.Product{ID: productID, Active: true},
 	}
 	subscriptionsService := &subscriptionServiceStub{currentErr: subscriptions.ErrSubscriptionNotFound}
-	service := NewService(store, nil, catalogService, subscriptionsService, nil, nil, nil)
+	service := NewService(store, nil, catalogService, subscriptionsService, nil)
 
 	result, err := service.Create(t.Context(), uuid.New(), CreateParams{
 		Type:    TypeSubscription,
@@ -301,7 +253,7 @@ func TestCreateSubscriptionUsesCatalogPrice(t *testing.T) {
 	}
 }
 
-func TestConfirmSelectsProviderFromPaymentMethod(t *testing.T) {
+func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 	organizationID := uuid.New()
 	checkoutID := uuid.New()
 	store := &checkoutStoreStub{checkout: Checkout{
@@ -314,18 +266,22 @@ func TestConfirmSelectsProviderFromPaymentMethod(t *testing.T) {
 		Status:         StatusPending,
 		NextAction:     ActionWait,
 	}}
-	paymentsStore := &paymentStoreStub{}
-	registry := commercialpayments.NewProviderRegistry(map[string]commercialpayments.Provider{
-		"stripe": providerStub{session: commercialpayments.CheckoutSession{
-			Provider:     "stripe",
-			ProviderID:   "cs_123",
-			Reference:    "checkout.test",
-			ClientSecret: "secret",
-			NextAction:   commercialpayments.NextActionWait,
-			Status:       commercialpayments.StatusProcessing,
-		}},
-	})
-	service := NewService(store, nil, nil, nil, paymentsStore, paymentEventsStub{}, registry)
+	paymentID := uuid.New()
+	paymentsService := &paymentServiceStub{
+		available: true,
+		start: commercialpayments.StartResult{
+			Payment: commercialpayments.Payment{ID: paymentID, CheckoutID: checkoutID, Provider: "stripe", Status: commercialpayments.StatusProcessing},
+			Session: commercialpayments.CheckoutSession{
+				Provider:     "stripe",
+				ProviderID:   "cs_123",
+				Reference:    "checkout.test",
+				ClientSecret: "secret",
+				NextAction:   commercialpayments.NextActionWait,
+				Status:       commercialpayments.StatusProcessing,
+			},
+		},
+	}
+	service := NewService(store, nil, nil, nil, paymentsService)
 
 	result, err := service.Confirm(t.Context(), organizationID, checkoutID, ConfirmInput{
 		PaymentMethod: MethodCard,
@@ -334,10 +290,10 @@ func TestConfirmSelectsProviderFromPaymentMethod(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Confirm() error = %v", err)
 	}
-	if store.startedInput.Provider != ProviderStripe || paymentsStore.provider != "stripe" {
-		t.Fatalf("provider selection = %q / %q", store.startedInput.Provider, paymentsStore.provider)
+	if store.startedInput.Provider != ProviderStripe || paymentsService.startInput.Provider != "stripe" {
+		t.Fatalf("provider selection = %q / %q", store.startedInput.Provider, paymentsService.startInput.Provider)
 	}
-	if result.Payment == nil || result.Session == nil {
+	if result.Payment == nil || result.Session == nil || result.Payment.ID != paymentID {
 		t.Fatal("confirmed checkout must include payment and provider session")
 	}
 }

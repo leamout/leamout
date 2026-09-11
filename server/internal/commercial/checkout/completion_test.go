@@ -31,7 +31,7 @@ func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
 		NextAction:     ActionWait,
 	}}
 	walletsService := &walletServiceStub{}
-	service := NewService(store, walletsService, nil, nil, nil, nil, nil)
+	service := NewService(store, walletsService, nil, nil, nil)
 	settledAt := time.Now().UTC()
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
@@ -77,7 +77,7 @@ func TestCompletePaymentTreatsDuplicateWalletCreditAsRetry(t *testing.T) {
 		Status:         StatusProcessing,
 	}}
 	walletsService := &walletServiceStub{postErr: wallets.ErrDuplicateLedgerEntry}
-	service := NewService(store, walletsService, nil, nil, nil, nil, nil)
+	service := NewService(store, walletsService, nil, nil, nil)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
 		CheckoutID:     checkoutID,
@@ -118,7 +118,7 @@ func TestCompletePaymentActivatesSubscription(t *testing.T) {
 		BillingInterval: &interval,
 	}}
 	subscriptionsService := &subscriptionServiceStub{}
-	service := NewService(store, nil, catalogService, subscriptionsService, nil, nil, nil)
+	service := NewService(store, nil, catalogService, subscriptionsService, nil)
 	settledAt := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
@@ -137,12 +137,10 @@ func TestCompletePaymentActivatesSubscription(t *testing.T) {
 	if subscriptionsService.creates != 1 {
 		t.Fatalf("subscription creates = %d, want 1", subscriptionsService.creates)
 	}
-	if subscriptionsService.created.Status == nil ||
-		*subscriptionsService.created.Status != subscriptions.StatusActive {
+	if subscriptionsService.created.Status == nil || *subscriptionsService.created.Status != subscriptions.StatusActive {
 		t.Fatalf("subscription status = %v", subscriptionsService.created.Status)
 	}
-	if subscriptionsService.created.RenewsAt == nil ||
-		!subscriptionsService.created.RenewsAt.Equal(settledAt.AddDate(0, 1, 0)) {
+	if subscriptionsService.created.RenewsAt == nil || !subscriptionsService.created.RenewsAt.Equal(settledAt.AddDate(0, 1, 0)) {
 		t.Fatalf("renews_at = %v", subscriptionsService.created.RenewsAt)
 	}
 }
@@ -157,7 +155,7 @@ func TestCompletePaymentRejectsMismatchedSettlement(t *testing.T) {
 		Currency:       "USD",
 		Status:         StatusProcessing,
 	}}
-	service := NewService(store, &walletServiceStub{}, nil, nil, nil, nil, nil)
+	service := NewService(store, &walletServiceStub{}, nil, nil, nil)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
 		CheckoutID:     store.checkout.ID,
