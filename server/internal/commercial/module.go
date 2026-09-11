@@ -4,12 +4,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
-	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/commercial/purchase"
+	checkouts "github.com/leamout/leamout/internal/commercial/purchase/checkouts"
+	"github.com/leamout/leamout/internal/commercial/purchase/orders"
 	"github.com/leamout/leamout/internal/commercial/purchase/topups"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
@@ -36,7 +36,7 @@ type CatalogModule struct {
 }
 
 type PurchaseModule struct {
-	Checkouts *checkout.Repository
+	Checkouts *checkouts.Repository
 	Orders    *orders.Repository
 	Service   *purchase.Service
 	Topups    TopupsModule
@@ -124,7 +124,7 @@ func New(db *pgxpool.Pool) *Module {
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
-	checkoutRepository := checkout.NewRepository(db)
+	checkoutRepository := checkouts.NewRepository(db)
 	orderRepository := orders.NewRepository(db)
 	purchaseService := purchase.NewService()
 	paymentRepository := payments.NewRepository(db, purchaseService)

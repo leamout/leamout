@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
+	checkouts "github.com/leamout/leamout/internal/commercial/purchase/checkouts"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/helper"
@@ -26,7 +26,7 @@ func NewHandler(service *Service) *Handler {
 
 type createRequest struct {
 	AmountMinor int64                           `json:"amount_minor"`
-	Provider    checkout.Provider               `json:"provider"`
+	Provider    checkouts.Provider              `json:"provider"`
 	Email       string                          `json:"email"`
 	CallbackURL string                          `json:"callback_url"`
 	MobileMoney *commercialpayments.MobileMoney `json:"mobile_money,omitempty"`
@@ -38,16 +38,16 @@ type continueRequest struct {
 }
 
 type checkoutResponse struct {
-	CheckoutID      uuid.UUID           `json:"checkout_id"`
-	PaymentID       uuid.UUID           `json:"payment_id"`
-	Reference       string              `json:"reference"`
-	Provider        checkout.Provider   `json:"provider"`
-	AmountMinor     int64               `json:"amount_minor"`
-	Currency        string              `json:"currency"`
-	Status          checkout.Status     `json:"status"`
-	NextAction      checkout.NextAction `json:"next_action"`
-	ProviderMessage *string             `json:"provider_message,omitempty"`
-	ClientSecret    string              `json:"client_secret,omitempty"`
+	CheckoutID      uuid.UUID            `json:"checkout_id"`
+	PaymentID       uuid.UUID            `json:"payment_id"`
+	Reference       string               `json:"reference"`
+	Provider        checkouts.Provider   `json:"provider"`
+	AmountMinor     int64                `json:"amount_minor"`
+	Currency        string               `json:"currency"`
+	Status          checkouts.Status     `json:"status"`
+	NextAction      checkouts.NextAction `json:"next_action"`
+	ProviderMessage *string              `json:"provider_message,omitempty"`
+	ClientSecret    string               `json:"client_secret,omitempty"`
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {

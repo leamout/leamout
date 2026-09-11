@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
+	checkoutdomain "github.com/leamout/leamout/internal/commercial/purchase/checkouts"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
@@ -20,35 +20,35 @@ func (s walletStub) Get(context.Context, uuid.UUID, uuid.UUID) (wallets.Wallet, 
 }
 
 type checkoutStub struct {
-	created     checkout.CreateInput
-	checkout    checkout.Checkout
-	transitions []checkout.Transition
+	created     checkoutdomain.CreateInput
+	checkout    checkoutdomain.Checkout
+	transitions []checkoutdomain.Transition
 }
 
-func (s *checkoutStub) Create(_ context.Context, organizationID uuid.UUID, input checkout.CreateInput) (checkout.Checkout, error) {
+func (s *checkoutStub) Create(_ context.Context, organizationID uuid.UUID, input checkoutdomain.CreateInput) (checkoutdomain.Checkout, error) {
 	s.created = input
-	s.checkout = checkout.Checkout{
+	s.checkout = checkoutdomain.Checkout{
 		ID: uuid.New(), OrganizationID: organizationID, WalletID: input.WalletID,
 		Type: input.Type, Provider: input.Provider, PaymentMethod: input.PaymentMethod,
 		Reference: input.Reference, AmountMinor: input.AmountMinor, Currency: input.Currency,
-		Status: checkout.StatusPending, NextAction: checkout.ActionWait, ExpiresAt: input.ExpiresAt,
+		Status: checkoutdomain.StatusPending, NextAction: checkoutdomain.ActionWait, ExpiresAt: input.ExpiresAt,
 	}
 	return s.checkout, nil
 }
 
-func (s *checkoutStub) Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Checkout, error) {
+func (s *checkoutStub) Get(context.Context, uuid.UUID, uuid.UUID) (checkoutdomain.Checkout, error) {
 	return s.checkout, nil
 }
 
-func (s *checkoutStub) ClaimRefresh(_ context.Context, _, _ uuid.UUID, refreshBefore time.Time) (checkout.Checkout, error) {
+func (s *checkoutStub) ClaimRefresh(_ context.Context, _, _ uuid.UUID, refreshBefore time.Time) (checkoutdomain.Checkout, error) {
 	if s.checkout.UpdatedAt.After(refreshBefore) {
-		return checkout.Checkout{}, checkout.ErrCheckoutNotFound
+		return checkoutdomain.Checkout{}, checkoutdomain.ErrCheckoutNotFound
 	}
 	s.checkout.UpdatedAt = refreshBefore.Add(10 * time.Second)
 	return s.checkout, nil
 }
 
-func (s *checkoutStub) Transition(_ context.Context, _ uuid.UUID, _ uuid.UUID, transition checkout.Transition) (checkout.Checkout, error) {
+func (s *checkoutStub) Transition(_ context.Context, _ uuid.UUID, _ uuid.UUID, transition checkoutdomain.Transition) (checkoutdomain.Checkout, error) {
 	s.transitions = append(s.transitions, transition)
 	s.checkout.Status = transition.Status
 	s.checkout.NextAction = transition.NextAction
@@ -125,7 +125,7 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	)
 
 	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
-		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: "payer@example.com",
+		AmountMinor: 2500, Provider: checkoutdomain.ProviderStripe, Email: "payer@example.com",
 	})
 	if !errors.Is(err, ErrPaymentMismatch) {
 		t.Fatalf("Create() error = %v, want %v", err, ErrPaymentMismatch)
@@ -133,11 +133,11 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	if payments.payment.Status != commercialpayments.StatusFailed {
 		t.Fatalf("payment status = %q, want %q", payments.payment.Status, commercialpayments.StatusFailed)
 	}
-	if checkouts.checkout.Status != checkout.StatusFailed || len(checkouts.transitions) != 1 {
+	if checkouts.checkout.Status != checkoutdomain.StatusFailed || len(checkouts.transitions) != 1 {
 		t.Fatalf("checkout was not failed: %+v", checkouts.checkout)
 	}
 	transition := checkouts.transitions[0]
-	if transition.Expected != checkout.StatusPending || transition.NextAction != checkout.ActionNone || transition.CompletedAt == nil {
+	if transition.Expected != checkoutdomain.StatusPending || transition.NextAction != checkoutdomain.ActionNone || transition.CompletedAt == nil {
 		t.Fatalf("unexpected failure transition: %+v", transition)
 	}
 }
@@ -164,7 +164,7 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 	service.now = func() time.Time { return time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC) }
 
 	result, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
-		AmountMinor: 2500, Provider: checkout.ProviderStripe, Email: " payer@example.com ",
+		AmountMinor: 2500, Provider: checkoutdomain.ProviderStripe, Email: " payer@example.com ",
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -177,7 +177,7 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 		provider.request.Metadata["wallet_id"] != walletID.String() || provider.request.Email != "payer@example.com" {
 		t.Fatalf("provider request mismatch: %+v", provider.request)
 	}
-	if result.Payment.ProviderID == nil || *result.Payment.ProviderID != "pi_123" || result.Checkout.Status != checkout.StatusProcessing {
+	if result.Payment.ProviderID == nil || *result.Payment.ProviderID != "pi_123" || result.Checkout.Status != checkoutdomain.StatusProcessing {
 		t.Fatalf("unexpected checkout result: %+v", result)
 	}
 }
@@ -190,7 +190,7 @@ func TestCreateRejectsPaystackForNonGHSWallet(t *testing.T) {
 		map[string]commercialpayments.Provider{"paystack": provider},
 	)
 	_, err := service.Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
-		AmountMinor: 100, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
+		AmountMinor: 100, Provider: checkoutdomain.ProviderPaystack, Email: "payer@example.com",
 		MobileMoney: &commercialpayments.MobileMoney{Phone: "+233200000000", Provider: "mtn"},
 	})
 	if !errors.Is(err, ErrInvalidTopup) {
@@ -213,7 +213,7 @@ func TestCreateAcceptsPaystackChargeWithoutTransactionID(t *testing.T) {
 	)
 
 	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
-		AmountMinor: 2500, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
+		AmountMinor: 2500, Provider: checkoutdomain.ProviderPaystack, Email: "payer@example.com",
 		MobileMoney: &commercialpayments.MobileMoney{Phone: "0240000000", Provider: "mtn"},
 	})
 	if err != nil {
@@ -236,7 +236,7 @@ func (s *referenceProviderStub) CreateCheckout(_ context.Context, request commer
 
 func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 	event := commercialpayments.ProviderEvent{
-		Provider: "stripe", ProviderEventID: "evt_123", Type: "checkout.session.completed",
+		Provider: "stripe", ProviderEventID: "evt_123", Type: "checkoutdomain.session.completed",
 		Payment: commercialpayments.ProviderPayment{Reference: "topup.123", Status: commercialpayments.StatusSucceeded},
 		Raw:     []byte(`{"id":"evt_123"}`),
 	}
@@ -272,10 +272,10 @@ func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
 	organizationID := uuid.New()
 	walletID := uuid.New()
 	checkoutID := uuid.New()
-	checkouts := &checkoutStub{checkout: checkout.Checkout{
+	checkouts := &checkoutStub{checkout: checkoutdomain.Checkout{
 		ID: checkoutID, OrganizationID: organizationID, WalletID: &walletID,
-		Provider: checkout.ProviderPaystack, Reference: "topup.123", AmountMinor: 2500,
-		Currency: "GHS", Status: checkout.StatusProcessing, UpdatedAt: now.Add(-11 * time.Second),
+		Provider: checkoutdomain.ProviderPaystack, Reference: "topup.123", AmountMinor: 2500,
+		Currency: "GHS", Status: checkoutdomain.StatusProcessing, UpdatedAt: now.Add(-11 * time.Second),
 	}}
 	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutID: checkoutID}}
 	provider := &providerStub{payment: commercialpayments.ProviderPayment{
