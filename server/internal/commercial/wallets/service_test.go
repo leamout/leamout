@@ -85,7 +85,7 @@ type settlementStub struct {
 	event paymentprovider.Event
 }
 
-func (s *settlementStub) Reconcile(_ context.Context, event paymentprovider.Event) (TopupSettlement, error) {
+func (s *settlementStub) ProcessProviderEvent(_ context.Context, event paymentprovider.Event) (TopupSettlement, error) {
 	s.event = event
 	return TopupSettlement{Applied: true}, nil
 }
@@ -253,7 +253,7 @@ func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 	}
 }
 
-func TestWebhookIgnoresAuthenticatedNonPaymentEvent(t *testing.T) {
+func TestWebhookDelegatesAuthenticatedEventClassificationToPayments(t *testing.T) {
 	provider := &providerStub{event: paymentprovider.Event{
 		Provider: "paystack", ProviderEventID: "refund:1", Type: "refund.processed",
 		Payment: paymentprovider.Payment{Status: paymentprovider.StatusSucceeded}, Raw: []byte(`{"event":"refund.processed"}`),
@@ -262,8 +262,8 @@ func TestWebhookIgnoresAuthenticatedNonPaymentEvent(t *testing.T) {
 	service := NewTopupService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"paystack": provider})
 
 	result, err := service.Webhook(context.Background(), "paystack", []byte(`{}`), http.Header{})
-	if err != nil || result.Applied || settlements.event.ProviderEventID != "" {
-		t.Fatalf("non-payment event was reconciled: result=%+v event=%+v err=%v", result, settlements.event, err)
+	if err != nil || !result.Applied || settlements.event.ProviderEventID != "refund:1" {
+		t.Fatalf("authenticated event was not delegated: result=%+v event=%+v err=%v", result, settlements.event, err)
 	}
 }
 

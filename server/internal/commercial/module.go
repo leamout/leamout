@@ -81,6 +81,7 @@ type PrepaidModule struct {
 
 type PaymentsModule struct {
 	Repository *payments.Repository
+	Service    *payments.Service
 }
 
 // New composes the Commercial domain from its durable submodules. Payment
@@ -120,11 +121,12 @@ func New(db *pgxpool.Pool) *Module {
 	checkoutRepository := checkout.NewRepository(db)
 	orderRepository := orders.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
+	paymentService := payments.NewService(paymentRepository)
 	topupService := wallets.NewTopupService(
 		walletRepository,
 		checkoutRepository,
 		paymentRepository,
-		walletRepository,
+		paymentService,
 		map[string]paymentprovider.Provider{},
 	)
 	topupHandler := wallets.NewTopupHandler(topupService)
@@ -172,6 +174,7 @@ func New(db *pgxpool.Pool) *Module {
 		Prepaid: prepaidModule,
 		Payments: PaymentsModule{
 			Repository: paymentRepository,
+			Service:    paymentService,
 		},
 	}
 }

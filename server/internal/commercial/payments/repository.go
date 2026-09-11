@@ -21,11 +21,12 @@ var (
 )
 
 type Repository struct {
+	db      *pgxpool.Pool
 	queries *sqlc.Queries
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{queries: sqlc.New(db)}
+	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provider string, input CreateInput) (Payment, error) {

@@ -32,33 +32,33 @@ type paymentStore interface {
 	UpdateStatus(context.Context, uuid.UUID, uuid.UUID, commercialpayments.Status, *time.Time) (commercialpayments.Payment, error)
 }
 
-type settlementStore interface {
-	Reconcile(context.Context, paymentprovider.Event) (TopupSettlement, error)
+type paymentEventProcessor interface {
+	ProcessProviderEvent(context.Context, paymentprovider.Event) (commercialpayments.Settlement, error)
 }
 
 type TopupService struct {
-	wallets     walletStore
-	checkouts   checkoutStore
-	payments    paymentStore
-	settlements settlementStore
-	providers   map[string]paymentprovider.Provider
-	now         func() time.Time
+	wallets       walletStore
+	checkouts     checkoutStore
+	payments      paymentStore
+	paymentEvents paymentEventProcessor
+	providers     map[string]paymentprovider.Provider
+	now           func() time.Time
 }
 
 func NewTopupService(
 	wallets walletStore,
 	checkouts checkoutStore,
 	payments paymentStore,
-	settlements settlementStore,
+	paymentEvents paymentEventProcessor,
 	providers map[string]paymentprovider.Provider,
 ) *TopupService {
 	return &TopupService{
-		wallets:     wallets,
-		checkouts:   checkouts,
-		payments:    payments,
-		settlements: settlements,
-		providers:   providers,
-		now:         time.Now,
+		wallets:       wallets,
+		checkouts:     checkouts,
+		payments:      payments,
+		paymentEvents: paymentEvents,
+		providers:     providers,
+		now:           time.Now,
 	}
 }
 
@@ -247,7 +247,7 @@ func (s *TopupService) Get(
 		)
 		if claimErr == nil {
 			if refreshed, ok := s.refreshPaystack(ctx, claimed); ok {
-				if _, err = s.settlements.Reconcile(ctx, refreshed); err != nil {
+				if _, err = s.paymentEvents.ProcessProviderEvent(ctx, refreshed); err != nil {
 					return TopupDetails{}, err
 				}
 
@@ -383,20 +383,5 @@ func (s *TopupService) Webhook(
 	if event.Provider != providerName {
 		return TopupSettlement{}, ErrPaymentMismatch
 	}
-	if !isTopupPaymentEvent(event.Provider, event.Type) {
-		return TopupSettlement{}, nil
-	}
-
-	return s.settlements.Reconcile(ctx, event)
-}
-
-func isTopupPaymentEvent(provider, eventType string) bool {
-	switch provider {
-	case "paystack":
-		return eventType == "charge.success" || eventType == "charge.failed"
-	case "stripe":
-		return eventType == "checkout.session.completed" || eventType == "checkout.session.expired"
-	default:
-		return false
-	}
+	return s.paymentEvents.ProcessProviderEvent(ctx, event)
 }

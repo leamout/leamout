@@ -5,7 +5,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/pkg/apperror"
 )
+
+var ErrPaymentMismatch = apperror.NewConflict("provider payment does not match checkout")
 
 type Status string
 
@@ -41,4 +44,15 @@ type CreateInput struct {
 	AmountMinor int64
 	Currency    string
 	Metadata    json.RawMessage
+}
+
+// Settlement describes the durable effects of processing one provider event.
+type Settlement struct {
+	Applied        bool
+	OrganizationID uuid.UUID
+	WalletID       uuid.UUID
+	PaymentID      uuid.UUID
+	OrderID        uuid.UUID
+	AmountMinor    int64
+	SettledAt      *time.Time
 }
