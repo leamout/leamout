@@ -148,7 +148,7 @@ type CarrierProvider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Temporary billing sessions completed by payment settlement.
+// Temporary server-priced purchase sessions. A successful checkout produces a durable order after payment is confirmed.
 type Checkout struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
