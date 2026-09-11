@@ -16,7 +16,27 @@ import (
 	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
-// ProcessProviderEvent persists and applies an authenticated provider event in
+// checkProviderEventReplay ensures an authenticated but commercially ignored
+// event cannot reuse the identity of a previously persisted payment event.
+func (r *Repository) checkProviderEventReplay(ctx context.Context, event paymentprovider.Event) error {
+	existing, err := r.queries.GetPaymentProviderEvent(ctx, sqlc.GetPaymentProviderEventParams{
+		Provider:        event.Provider,
+		ProviderEventID: event.ProviderEventID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	digest := sha256.Sum256(event.Raw)
+	if existing.EventType != event.Type || existing.PayloadSha256 != hex.EncodeToString(digest[:]) {
+		return ErrPaymentMismatch
+	}
+	return nil
+}
+
+// processProviderEvent persists and applies an authenticated provider event in
 // one transaction. Purchase owns checkout/order fulfillment and only requests
 // prepaid credit after the durable order exists.
 func (r *Repository) processProviderEvent(ctx context.Context, event paymentprovider.Event) (Settlement, error) {

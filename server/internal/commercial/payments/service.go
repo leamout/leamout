@@ -9,6 +9,7 @@ import (
 
 type eventStore interface {
 	processProviderEvent(context.Context, paymentprovider.Event) (Settlement, error)
+	checkProviderEventReplay(context.Context, paymentprovider.Event) error
 }
 
 // Service owns normalized payment-provider event validation and reconciliation.
@@ -25,7 +26,7 @@ func (s *Service) ProcessProviderEvent(ctx context.Context, event paymentprovide
 		return Settlement{}, ErrPaymentMismatch
 	}
 	if !relevant {
-		return Settlement{}, nil
+		return Settlement{}, s.events.checkProviderEventReplay(ctx, event)
 	}
 	return s.events.processProviderEvent(ctx, event)
 }
@@ -45,5 +46,21 @@ func classifyProviderEvent(event paymentprovider.Event) (relevant, valid bool) {
 	if !relevant {
 		return false, true
 	}
-	return true, event.Payment.Reference != ""
+	if event.Payment.Reference == "" || !eventTypeMatchesStatus(event) {
+		return true, false
+	}
+	return true, true
+}
+
+func eventTypeMatchesStatus(event paymentprovider.Event) bool {
+	switch event.Provider + ":" + event.Type {
+	case "stripe:checkout.session.completed", "paystack:charge.success":
+		return event.Payment.Status == paymentprovider.StatusSucceeded
+	case "stripe:checkout.session.expired":
+		return event.Payment.Status == paymentprovider.StatusCancelled
+	case "paystack:charge.failed":
+		return event.Payment.Status == paymentprovider.StatusFailed || event.Payment.Status == paymentprovider.StatusCancelled
+	default:
+		return false
+	}
 }
