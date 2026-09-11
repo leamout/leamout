@@ -115,20 +115,18 @@ func (q *Queries) CompareAndSetCheckoutState(ctx context.Context, arg CompareAnd
 const createCheckout = `-- name: CreateCheckout :one
 INSERT INTO checkouts (
     organization_id, wallet_id, price_id, checkout_type,
-    provider, payment_method, reference, amount_minor, currency, expires_at, metadata
+    reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     $1 AS organization_id,
     $2::UUID AS wallet_id,
     $3::UUID AS price_id,
     $4 AS checkout_type,
-    $5 AS provider,
-    $6 AS payment_method,
-    $7 AS reference,
-    $8 AS amount_minor,
-    $9 AS currency,
-    $10 AS expires_at,
-    COALESCE($11, '{}'::jsonb) AS metadata
+    $5 AS reference,
+    $6 AS amount_minor,
+    $7 AS currency,
+    $8 AS expires_at,
+    COALESCE($9, '{}'::jsonb) AS metadata
 FROM organizations AS o
 WHERE o.id = $1
   AND o.status = 'active'
@@ -141,8 +139,6 @@ type CreateCheckoutParams struct {
 	WalletID       *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
 	PriceID        *uuid.UUID         `db:"price_id" json:"price_id"`
 	CheckoutType   string             `db:"checkout_type" json:"checkout_type"`
-	Provider       string             `db:"provider" json:"provider"`
-	PaymentMethod  string             `db:"payment_method" json:"payment_method"`
 	Reference      string             `db:"reference" json:"reference"`
 	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	Currency       string             `db:"currency" json:"currency"`
@@ -156,8 +152,6 @@ func (q *Queries) CreateCheckout(ctx context.Context, arg CreateCheckoutParams) 
 		arg.WalletID,
 		arg.PriceID,
 		arg.CheckoutType,
-		arg.Provider,
-		arg.PaymentMethod,
 		arg.Reference,
 		arg.AmountMinor,
 		arg.Currency,
@@ -289,6 +283,59 @@ LIMIT 1
 
 func (q *Queries) GetCheckoutByReference(ctx context.Context, reference string) (Checkout, error) {
 	row := q.db.QueryRow(ctx, getCheckoutByReference, reference)
+	var i Checkout
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.WalletID,
+		&i.PriceID,
+		&i.CheckoutType,
+		&i.Provider,
+		&i.PaymentMethod,
+		&i.Reference,
+		&i.AmountMinor,
+		&i.Currency,
+		&i.Status,
+		&i.NextAction,
+		&i.ProviderMessage,
+		&i.ExpiresAt,
+		&i.CompletedAt,
+		&i.Metadata,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const startCheckoutPayment = `-- name: StartCheckoutPayment :one
+UPDATE checkouts AS c
+SET provider = $1,
+    payment_method = $2,
+    status = 'processing',
+    next_action = 'wait',
+    updated_at = NOW()
+WHERE c.organization_id = $3
+  AND c.id = $4
+  AND c.status = 'pending'
+  AND c.provider IS NULL
+  AND c.payment_method IS NULL
+RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+`
+
+type StartCheckoutPaymentParams struct {
+	Provider       *string   `db:"provider" json:"provider"`
+	PaymentMethod  *string   `db:"payment_method" json:"payment_method"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) StartCheckoutPayment(ctx context.Context, arg StartCheckoutPaymentParams) (Checkout, error) {
+	row := q.db.QueryRow(ctx, startCheckoutPayment,
+		arg.Provider,
+		arg.PaymentMethod,
+		arg.OrganizationID,
+		arg.ID,
+	)
 	var i Checkout
 	err := row.Scan(
 		&i.ID,
