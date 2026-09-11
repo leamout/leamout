@@ -39,15 +39,12 @@ type subscriptionService interface {
 	Current(context.Context, uuid.UUID) (subscriptions.Subscription, error)
 }
 
-type paymentStore interface {
-	Create(context.Context, uuid.UUID, string, commercialpayments.CreateInput) (commercialpayments.Payment, error)
+type paymentService interface {
+	ProviderAvailable(string) bool
 	GetByCheckout(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error)
-	SetProviderID(context.Context, uuid.UUID, uuid.UUID, string, commercialpayments.Status) (commercialpayments.Payment, error)
-	UpdateStatus(context.Context, uuid.UUID, uuid.UUID, commercialpayments.Status, *time.Time) (commercialpayments.Payment, error)
-}
-
-type paymentEventProcessor interface {
-	ProcessProviderEvent(context.Context, commercialpayments.ProviderEvent) (commercialpayments.Settlement, error)
+	Start(context.Context, uuid.UUID, commercialpayments.StartInput) (commercialpayments.StartResult, error)
+	Continue(context.Context, commercialpayments.ContinueInput) (commercialpayments.CheckoutSession, error)
+	Refresh(context.Context, string, string) (commercialpayments.Settlement, bool, error)
 }
 
 type Service struct {
@@ -55,9 +52,7 @@ type Service struct {
 	wallets       walletService
 	catalog       catalogService
 	subscriptions subscriptionService
-	payments      paymentStore
-	paymentEvents paymentEventProcessor
-	providers     *commercialpayments.ProviderRegistry
+	payments      paymentService
 	now           func() time.Time
 }
 
@@ -84,9 +79,7 @@ func NewService(
 	wallets walletService,
 	catalog catalogService,
 	subscriptions subscriptionService,
-	payments paymentStore,
-	paymentEvents paymentEventProcessor,
-	providers *commercialpayments.ProviderRegistry,
+	payments paymentService,
 ) *Service {
 	return &Service{
 		repo:          repo,
@@ -94,8 +87,6 @@ func NewService(
 		catalog:       catalog,
 		subscriptions: subscriptions,
 		payments:      payments,
-		paymentEvents: paymentEvents,
-		providers:     providers,
 		now:           time.Now,
 	}
 }
@@ -172,6 +163,9 @@ func (s *Service) Get(ctx context.Context, organizationID, checkoutID uuid.UUID)
 	if err != nil {
 		return Result{}, err
 	}
+	if s.payments == nil {
+		return Result{Checkout: checkoutRecord}, nil
+	}
 
 	payment, err := s.payments.GetByCheckout(ctx, organizationID, checkoutID)
 	if errors.Is(err, commercialpayments.ErrPaymentNotFound) {
@@ -189,17 +183,14 @@ func (s *Service) Get(ctx context.Context, organizationID, checkoutID uuid.UUID)
 			s.now().UTC().Add(-10*time.Second),
 		)
 		if claimErr == nil {
-			if refreshed, ok := s.refreshPaystack(ctx, claimed); ok {
-				settlement, processErr := s.paymentEvents.ProcessProviderEvent(ctx, refreshed)
-				if processErr != nil {
-					return Result{}, processErr
+			settlement, refreshed, refreshErr := s.payments.Refresh(ctx, string(claimed.Provider), claimed.Reference)
+			if refreshErr != nil {
+				return Result{}, refreshErr
+			}
+			if refreshed && settlement.CheckoutID != uuid.Nil {
+				if refreshErr = s.CompletePayment(ctx, settlement); refreshErr != nil {
+					return Result{}, refreshErr
 				}
-				if settlement.CheckoutID != uuid.Nil {
-					if processErr = s.CompletePayment(ctx, settlement); processErr != nil {
-						return Result{}, processErr
-					}
-				}
-
 				checkoutRecord, err = s.repo.Get(ctx, organizationID, checkoutID)
 				if err != nil {
 					return Result{}, err
@@ -222,7 +213,7 @@ func (s *Service) Confirm(
 	organizationID, checkoutID uuid.UUID,
 	input ConfirmInput,
 ) (Result, error) {
-	if organizationID == uuid.Nil || checkoutID == uuid.Nil || validateConfirm(input) != nil {
+	if organizationID == uuid.Nil || checkoutID == uuid.Nil || validateConfirm(input) != nil || s.payments == nil {
 		return Result{}, ErrInvalidCheckout
 	}
 
@@ -241,9 +232,7 @@ func (s *Service) Confirm(
 	if providerName == ProviderPaystack && checkoutRecord.Currency != "GHS" {
 		return Result{}, ErrInvalidCheckout
 	}
-
-	provider, ok := s.providers.Get(string(providerName))
-	if !ok {
+	if !s.payments.ProviderAvailable(string(providerName)) {
 		return Result{}, ErrProviderUnavailable
 	}
 
@@ -252,17 +241,6 @@ func (s *Service) Confirm(
 		PaymentMethod: input.PaymentMethod,
 	})
 	if err != nil {
-		return Result{}, err
-	}
-
-	payment, err := s.payments.Create(ctx, organizationID, string(providerName), commercialpayments.CreateInput{
-		CheckoutID:  checkoutRecord.ID,
-		Status:      commercialpayments.StatusPending,
-		AmountMinor: checkoutRecord.AmountMinor,
-		Currency:    checkoutRecord.Currency,
-	})
-	if err != nil {
-		s.failProcessingCheckout(ctx, organizationID, checkoutRecord, nil)
 		return Result{}, err
 	}
 
@@ -278,52 +256,28 @@ func (s *Service) Confirm(
 		metadata["price_id"] = checkoutRecord.PriceID.String()
 	}
 
-	session, err := provider.CreateCheckout(ctx, commercialpayments.CheckoutRequest{
+	started, err := s.payments.Start(ctx, organizationID, commercialpayments.StartInput{
+		CheckoutID:  checkoutRecord.ID,
+		Provider:    string(providerName),
 		Reference:   checkoutRecord.Reference,
 		AmountMinor: checkoutRecord.AmountMinor,
 		Currency:    checkoutRecord.Currency,
-		Email:       strings.TrimSpace(input.Email),
-		CallbackURL: strings.TrimSpace(input.CallbackURL),
+		Email:       input.Email,
+		CallbackURL: input.CallbackURL,
 		Metadata:    metadata,
 		MobileMoney: input.MobileMoney,
 	})
 	if err != nil {
-		s.failProcessingCheckout(ctx, organizationID, checkoutRecord, &payment)
-		return Result{}, err
-	}
-	if session.Provider != string(providerName) || session.Reference != checkoutRecord.Reference ||
-		(providerName == ProviderStripe && session.ProviderID == "") {
-		s.failProcessingCheckout(ctx, organizationID, checkoutRecord, &payment)
-		return Result{}, ErrPaymentMismatch
-	}
-
-	if session.ProviderID == "" {
-		payment, err = s.payments.UpdateStatus(
-			ctx,
-			organizationID,
-			payment.ID,
-			commercialpayments.StatusProcessing,
-			nil,
-		)
-	} else {
-		payment, err = s.payments.SetProviderID(
-			ctx,
-			organizationID,
-			payment.ID,
-			session.ProviderID,
-			commercialpayments.StatusProcessing,
-		)
-	}
-	if err != nil {
+		s.failProcessingCheckout(ctx, organizationID, checkoutRecord)
 		return Result{}, err
 	}
 
-	message := strings.TrimSpace(session.Message)
+	message := strings.TrimSpace(started.Session.Message)
 	var providerMessage *string
 	if message != "" {
 		providerMessage = &message
 	}
-	nextAction := NextAction(session.NextAction)
+	nextAction := NextAction(started.Session.NextAction)
 	if nextAction == "" {
 		nextAction = ActionWait
 	}
@@ -343,7 +297,7 @@ func (s *Service) Confirm(
 		return Result{}, err
 	}
 
-	return Result{Checkout: checkoutRecord, Payment: &payment, Session: &session}, nil
+	return Result{Checkout: checkoutRecord, Payment: &started.Payment, Session: &started.Session}, nil
 }
 
 func (s *Service) Continue(
@@ -355,21 +309,13 @@ func (s *Service) Continue(
 	if err != nil {
 		return Result{}, err
 	}
-	if details.Payment == nil {
+	if details.Payment == nil || s.payments == nil ||
+		details.Checkout.Provider != ProviderPaystack || details.Checkout.Status != StatusProcessing {
 		return Result{}, ErrInvalidCheckout
 	}
 
-	provider, ok := s.providers.Get(string(details.Checkout.Provider))
-	if !ok {
-		return Result{}, ErrProviderUnavailable
-	}
-	continuation, ok := provider.(commercialpayments.ContinuationProvider)
-	if !ok || details.Checkout.Provider != ProviderPaystack ||
-		details.Checkout.Status != StatusProcessing {
-		return Result{}, ErrInvalidCheckout
-	}
-
-	session, err := continuation.ContinueCheckout(ctx, commercialpayments.ContinueCheckoutRequest{
+	session, err := s.payments.Continue(ctx, commercialpayments.ContinueInput{
+		Provider:  string(details.Checkout.Provider),
 		Reference: details.Checkout.Reference,
 		Action:    input.Action,
 		Value:     input.Value,
@@ -425,22 +371,8 @@ func (s *Service) Expire(ctx context.Context) ([]Checkout, error) {
 	return s.repo.Expire(ctx)
 }
 
-func (s *Service) failProcessingCheckout(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	checkoutRecord Checkout,
-	payment *commercialpayments.Payment,
-) {
+func (s *Service) failProcessingCheckout(ctx context.Context, organizationID uuid.UUID, checkoutRecord Checkout) {
 	completedAt := s.now().UTC()
-	if payment != nil {
-		_, _ = s.payments.UpdateStatus(
-			ctx,
-			organizationID,
-			payment.ID,
-			commercialpayments.StatusFailed,
-			nil,
-		)
-	}
 	_, _ = s.repo.Transition(
 		ctx,
 		organizationID,
@@ -452,38 +384,4 @@ func (s *Service) failProcessingCheckout(
 			CompletedAt: &completedAt,
 		},
 	)
-}
-
-func (s *Service) refreshPaystack(
-	ctx context.Context,
-	checkoutRecord Checkout,
-) (commercialpayments.ProviderEvent, bool) {
-	provider, ok := s.providers.Get(string(ProviderPaystack))
-	if !ok {
-		return commercialpayments.ProviderEvent{}, false
-	}
-
-	payment, err := provider.GetPayment(ctx, checkoutRecord.Reference)
-	if err != nil ||
-		(payment.Status != commercialpayments.StatusSucceeded &&
-			payment.Status != commercialpayments.StatusFailed &&
-			payment.Status != commercialpayments.StatusCancelled) {
-		return commercialpayments.ProviderEvent{}, false
-	}
-
-	eventType := "charge.failed"
-	if payment.Status == commercialpayments.StatusSucceeded {
-		eventType = "charge.success"
-	}
-
-	raw := []byte(`{"source":"charge_lookup","reference":"` + checkoutRecord.Reference +
-		`","status":"` + string(payment.Status) + `"}`)
-
-	return commercialpayments.ProviderEvent{
-		Provider:        string(ProviderPaystack),
-		ProviderEventID: "lookup:" + checkoutRecord.Reference + ":" + string(payment.Status),
-		Type:            eventType,
-		Payment:         payment,
-		Raw:             raw,
-	}, true
 }

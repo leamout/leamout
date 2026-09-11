@@ -18,29 +18,24 @@ type settlementCompleter interface {
 
 type Handler struct {
 	service    *Service
-	providers  *ProviderRegistry
 	completion settlementCompleter
 }
 
-func NewHandler(service *Service, providers *ProviderRegistry, completion settlementCompleter) *Handler {
-	return &Handler{service: service, providers: providers, completion: completion}
+func NewHandler(service *Service, completion settlementCompleter) *Handler {
+	return &Handler{service: service, completion: completion}
 }
 
 func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 	providerName := chi.URLParam(r, "provider")
-	provider, ok := h.providers.Get(providerName)
-	if !ok {
-		httputil.Error(w, apperror.NewBadRequest("invalid payment webhook"))
-		return
-	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBytes)
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
 		httputil.Error(w, apperror.NewBadRequest("invalid webhook payload"))
 		return
 	}
-	event, err := provider.ParseWebhook(payload, r.Header)
-	if err != nil || event.Provider != providerName {
+
+	event, err := h.service.ParseWebhook(providerName, payload, r.Header)
+	if err != nil {
 		httputil.Error(w, apperror.NewBadRequest("invalid payment webhook"))
 		return
 	}
