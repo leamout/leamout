@@ -5,22 +5,10 @@ import (
 	"net/netip"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	"github.com/leamout/leamout/internal/database/tenantdb"
 	"github.com/leamout/leamout/internal/modules/audit"
 )
-
-func withTenantQueries[T any](ctx context.Context, db *pgxpool.Pool, organizationID uuid.UUID, fn func(*sqlc.Queries) (T, error)) (T, error) {
-	var result T
-	err := tenantdb.WithinOrganization(ctx, db, organizationID, func(tx pgx.Tx) error {
-		var err error
-		result, err = fn(sqlc.New(tx))
-		return err
-	})
-	return result, err
-}
 
 type Repository struct {
 	db      *pgxpool.Pool
@@ -35,21 +23,14 @@ func (r *Repository) Create(
 	ctx context.Context,
 	arg sqlc.CreateCarrierConnectionParams,
 ) (sqlc.CarrierConnection, error) {
-	if arg.OrganizationID == nil {
-		return r.queries.CreateCarrierConnection(ctx, arg)
-	}
-	return withTenantQueries(ctx, r.db, *arg.OrganizationID, func(q *sqlc.Queries) (sqlc.CarrierConnection, error) {
-		return q.CreateCarrierConnection(ctx, arg)
-	})
+	return r.queries.CreateCarrierConnection(ctx, arg)
 }
 
 func (r *Repository) List(
 	ctx context.Context,
 	organizationID uuid.UUID,
 ) ([]sqlc.ListCarrierConnectionsByOrganizationIDRow, error) {
-	return withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) ([]sqlc.ListCarrierConnectionsByOrganizationIDRow, error) {
-		return q.ListCarrierConnectionsByOrganizationID(ctx, &organizationID)
-	})
+	return r.queries.ListCarrierConnectionsByOrganizationID(ctx, &organizationID)
 }
 
 func (r *Repository) Get(
@@ -57,24 +38,20 @@ func (r *Repository) Get(
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) (sqlc.GetCarrierConnectionByIDRow, error) {
-	return withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) (sqlc.GetCarrierConnectionByIDRow, error) {
-		return q.GetCarrierConnectionByID(ctx, sqlc.GetCarrierConnectionByIDParams{
+	return r.queries.GetCarrierConnectionByID(
+		ctx,
+		sqlc.GetCarrierConnectionByIDParams{
 			ID:             id,
 			OrganizationID: &organizationID,
-		})
-	})
+		},
+	)
 }
 
 func (r *Repository) Update(
 	ctx context.Context,
 	arg sqlc.UpdateCarrierConnectionParams,
 ) (sqlc.CarrierConnection, error) {
-	if arg.OrganizationID == nil {
-		return r.queries.UpdateCarrierConnection(ctx, arg)
-	}
-	return withTenantQueries(ctx, r.db, *arg.OrganizationID, func(q *sqlc.Queries) (sqlc.CarrierConnection, error) {
-		return q.UpdateCarrierConnection(ctx, arg)
-	})
+	return r.queries.UpdateCarrierConnection(ctx, arg)
 }
 
 func (r *Repository) Disable(
@@ -82,13 +59,13 @@ func (r *Repository) Disable(
 	organizationID uuid.UUID,
 	id uuid.UUID,
 ) error {
-	_, err := withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) (struct{}, error) {
-		return struct{}{}, q.DisableCarrierConnection(ctx, sqlc.DisableCarrierConnectionParams{
+	return r.queries.DisableCarrierConnection(
+		ctx,
+		sqlc.DisableCarrierConnectionParams{
 			ID:             id,
 			OrganizationID: &organizationID,
-		})
-	})
-	return err
+		},
+	)
 }
 
 func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direction, username, realm, ciphertext, ha1 string, event audit.Event) error {
@@ -97,9 +74,6 @@ func (r *Repository) SetDigestAuth(ctx context.Context, org, id uuid.UUID, direc
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := tenantdb.BindOrganization(ctx, tx, org); err != nil {
-		return err
-	}
 	q := r.queries.WithTx(tx)
 	if direction == "outbound" {
 		err = q.SetCarrierConnectionOutboundDigestAuth(ctx, sqlc.SetCarrierConnectionOutboundDigestAuthParams{ID: id, OrganizationID: &org, AuthUsername: &username, AuthSecretCiphertext: &ciphertext})
@@ -125,9 +99,6 @@ func (r *Repository) ClearAuth(ctx context.Context, org, id uuid.UUID, direction
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := tenantdb.BindOrganization(ctx, tx, org); err != nil {
-		return err
-	}
 	q := r.queries.WithTx(tx)
 	if direction == "outbound" {
 		err = q.ClearCarrierConnectionOutboundAuth(ctx, sqlc.ClearCarrierConnectionOutboundAuthParams{ID: id, OrganizationID: &org})
@@ -152,9 +123,6 @@ func (r *Repository) SetInboundIPAuth(ctx context.Context, org, id uuid.UUID, ev
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if err := tenantdb.BindOrganization(ctx, tx, org); err != nil {
-		return err
-	}
 	if err = r.queries.WithTx(tx).SetCarrierConnectionInboundIPAuth(ctx, sqlc.SetCarrierConnectionInboundIPAuthParams{ID: id, OrganizationID: &org}); err != nil {
 		return err
 	}
@@ -173,13 +141,14 @@ func (r *Repository) CreateSourceIP(
 	connectionID uuid.UUID,
 	cidr netip.Prefix,
 ) (sqlc.CarrierConnectionSourceIp, error) {
-	return withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) (sqlc.CarrierConnectionSourceIp, error) {
-		return q.CreateCarrierConnectionSourceIP(ctx, sqlc.CreateCarrierConnectionSourceIPParams{
+	return r.queries.CreateCarrierConnectionSourceIP(
+		ctx,
+		sqlc.CreateCarrierConnectionSourceIPParams{
 			OrganizationID:      &organizationID,
 			CarrierConnectionID: connectionID,
 			Cidr:                cidr,
-		})
-	})
+		},
+	)
 }
 
 func (r *Repository) ListSourceIPs(
@@ -187,12 +156,13 @@ func (r *Repository) ListSourceIPs(
 	organizationID uuid.UUID,
 	connectionID uuid.UUID,
 ) ([]sqlc.CarrierConnectionSourceIp, error) {
-	return withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) ([]sqlc.CarrierConnectionSourceIp, error) {
-		return q.ListCarrierConnectionSourceIPs(ctx, sqlc.ListCarrierConnectionSourceIPsParams{
+	return r.queries.ListCarrierConnectionSourceIPs(
+		ctx,
+		sqlc.ListCarrierConnectionSourceIPsParams{
 			CarrierConnectionID: connectionID,
 			OrganizationID:      &organizationID,
-		})
-	})
+		},
+	)
 }
 
 func (r *Repository) DeleteSourceIP(
@@ -201,14 +171,14 @@ func (r *Repository) DeleteSourceIP(
 	connectionID uuid.UUID,
 	id uuid.UUID,
 ) error {
-	_, err := withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) (struct{}, error) {
-		return struct{}{}, q.DeleteCarrierConnectionSourceIP(ctx, sqlc.DeleteCarrierConnectionSourceIPParams{
+	return r.queries.DeleteCarrierConnectionSourceIP(
+		ctx,
+		sqlc.DeleteCarrierConnectionSourceIPParams{
 			ID:                  id,
 			CarrierConnectionID: connectionID,
 			OrganizationID:      &organizationID,
-		})
-	})
-	return err
+		},
+	)
 }
 
 func (r *Repository) ListProviders(ctx context.Context) ([]sqlc.CarrierProvider, error) {
@@ -220,19 +190,15 @@ func (r *Repository) GetProvider(ctx context.Context, id uuid.UUID) (sqlc.Carrie
 }
 
 func (r *Repository) ListConnectionTrunks(ctx context.Context, organizationID, connectionID uuid.UUID) ([]sqlc.Trunk, error) {
-	return withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) ([]sqlc.Trunk, error) {
-		return q.ListTrunksByCarrierConnectionID(ctx, sqlc.ListTrunksByCarrierConnectionIDParams{
-			CarrierConnectionID: &connectionID,
-			OrganizationID:      &organizationID,
-		})
+	return r.queries.ListTrunksByCarrierConnectionID(ctx, sqlc.ListTrunksByCarrierConnectionIDParams{
+		CarrierConnectionID: &connectionID,
+		OrganizationID:      &organizationID,
 	})
 }
 
 func (r *Repository) ListTrunkEndpoints(ctx context.Context, organizationID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
-	return withTenantQueries(ctx, r.db, organizationID, func(q *sqlc.Queries) ([]sqlc.TrunkEndpoint, error) {
-		return q.ListTrunkEndpoints(ctx, sqlc.ListTrunkEndpointsParams{
-			TrunkID:        trunkID,
-			OrganizationID: &organizationID,
-		})
+	return r.queries.ListTrunkEndpoints(ctx, sqlc.ListTrunkEndpointsParams{
+		TrunkID:        trunkID,
+		OrganizationID: &organizationID,
 	})
 }
