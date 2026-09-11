@@ -4,6 +4,10 @@ Leamout treats organization isolation, deployment sovereignty, and telecom fraud
 controls as separate security boundaries. A control in one boundary must not be
 used as a substitute for a control in another.
 
+The implementation sequence and the rule that Cloud and self-hosted composition
+roots must remain independent are defined in the
+[Cloud and self-hosted security roadmap](security-roadmap.md).
+
 ## Leamout Cloud
 
 The organization selected by an authenticated request is the tenant boundary.
