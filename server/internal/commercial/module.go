@@ -9,6 +9,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
+	"github.com/leamout/leamout/internal/commercial/purchase"
 	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
@@ -37,6 +38,7 @@ type CatalogModule struct {
 type PurchaseModule struct {
 	Checkouts *checkout.Repository
 	Orders    *orders.Repository
+	Service   *purchase.Service
 }
 
 type AccessModule struct {
@@ -120,7 +122,8 @@ func New(db *pgxpool.Pool) *Module {
 	walletRepository := wallets.NewRepository(db)
 	checkoutRepository := checkout.NewRepository(db)
 	orderRepository := orders.NewRepository(db)
-	paymentRepository := payments.NewRepository(db)
+	purchaseService := purchase.NewService()
+	paymentRepository := payments.NewRepository(db, purchaseService)
 	paymentService := payments.NewService(paymentRepository)
 	topupService := wallets.NewTopupService(
 		walletRepository,
@@ -149,6 +152,7 @@ func New(db *pgxpool.Pool) *Module {
 		Purchase: PurchaseModule{
 			Checkouts: checkoutRepository,
 			Orders:    orderRepository,
+			Service:   purchaseService,
 		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{

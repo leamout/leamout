@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/internal/commercial/purchase"
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/pkg/apperror"
@@ -21,12 +22,13 @@ var (
 )
 
 type Repository struct {
-	db      *pgxpool.Pool
-	queries *sqlc.Queries
+	db       *pgxpool.Pool
+	queries  *sqlc.Queries
+	purchase *purchase.Service
 }
 
-func NewRepository(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db, queries: sqlc.New(db)}
+func NewRepository(db *pgxpool.Pool, purchaseService *purchase.Service) *Repository {
+	return &Repository{db: db, queries: sqlc.New(db), purchase: purchaseService}
 }
 
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, provider string, input CreateInput) (Payment, error) {
