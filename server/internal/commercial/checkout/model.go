@@ -37,10 +37,10 @@ const (
 )
 
 var (
-	ErrCheckoutNotFound  = apperror.NewNotFound("checkout not found")
-	ErrReferenceConflict = apperror.NewConflict("checkout reference already exists")
-	ErrInvalidTransition = apperror.NewConflict("invalid checkout transition")
-	ErrInvalidCheckout   = apperror.NewBadRequest("invalid checkout")
+	ErrCheckoutNotFound    = apperror.NewNotFound("checkout not found")
+	ErrReferenceConflict   = apperror.NewConflict("checkout reference already exists")
+	ErrInvalidTransition   = apperror.NewConflict("invalid checkout transition")
+	ErrInvalidCheckout     = apperror.NewBadRequest("invalid checkout")
 	ErrProviderUnavailable = apperror.NewServiceUnavailable(
 		"payment provider is unavailable",
 		errors.New("payment provider is not configured"),
