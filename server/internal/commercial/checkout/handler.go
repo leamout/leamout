@@ -108,12 +108,7 @@ func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Confirm(r.Context(), organizationID, checkoutID, ConfirmInput{
-		PaymentMethod: request.PaymentMethod,
-		Email:         request.Email,
-		CallbackURL:   request.CallbackURL,
-		MobileMoney:   request.MobileMoney,
-	})
+	result, err := h.service.Confirm(r.Context(), organizationID, checkoutID, ConfirmInput(request))
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -132,10 +127,7 @@ func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.service.Continue(r.Context(), organizationID, checkoutID, ContinueInput{
-		Action: request.Action,
-		Value:  request.Value,
-	})
+	result, err := h.service.Continue(r.Context(), organizationID, checkoutID, ContinueInput(request))
 	if err != nil {
 		httputil.Error(w, err)
 		return
