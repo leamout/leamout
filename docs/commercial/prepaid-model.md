@@ -103,6 +103,24 @@ A managed-provider obligation must not be created unless sufficient prepaid fund
 
 Reservation creation, capture, and release are idempotent operations. Retrying the same reservation request returns the existing reservation, while reusing an operation identity with different monetary terms is rejected. Retrying capture or release returns the already completed transition; a conflicting terminal transition remains an error.
 
+## Managed-operation authorization boundary
+
+`commercial/prepaid.Service` is the provider-neutral boundary consumed before managed work. The caller supplies customer-facing terms already resolved by Commercial policy: organization, currency, amount, stable operation type and identity, and a durable expiry. The service resolves the organization's wallet for that currency and creates the funds reservation. It returns only Commercial authorization state; carrier request or response shapes do not cross this boundary.
+
+The managed workflow is:
+
+```text
+resolve customer price
+    ↓
+prepaid.Authorize
+    ↓ authorization ID
+create upstream provider obligation
+    ├── success → prepaid.Capture(final amount)
+    └── failure → prepaid.Release
+```
+
+Callers must persist the authorization ID with their durable operation before contacting a provider. They must use the same operation identity and expiry when retrying authorization. A provider adapter must never decide the customer-facing amount, select a wallet, or mutate wallet state directly.
+
 ## Deferred concepts
 
 The target prepaid model does not require invoice-centric settlement. `invoices` and `invoice_items` are deferred until Leamout has a concrete need for invoices or postpaid accounts.

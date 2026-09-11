@@ -9,6 +9,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/payments"
+	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
@@ -73,7 +74,8 @@ type UsageModule struct {
 }
 
 type PrepaidModule struct {
-	Wallets WalletModule
+	Wallets    WalletModule
+	Authorizer *prepaid.Service
 }
 
 type WalletModule struct {
@@ -146,6 +148,7 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    walletService,
 			Handler:    walletHandler,
 		},
+		Authorizer: prepaid.NewService(walletService),
 	}
 
 	return &Module{
