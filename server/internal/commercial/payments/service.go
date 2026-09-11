@@ -3,13 +3,11 @@ package payments
 import (
 	"context"
 	"encoding/json"
-
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 type eventStore interface {
-	processProviderEvent(context.Context, paymentprovider.Event) (Settlement, error)
-	checkProviderEventReplay(context.Context, paymentprovider.Event) error
+	processProviderEvent(context.Context, ProviderEvent) (Settlement, error)
+	checkProviderEventReplay(context.Context, ProviderEvent) error
 }
 
 // Service owns normalized payment-provider event validation and reconciliation.
@@ -20,7 +18,7 @@ type Service struct {
 
 func NewService(events eventStore) *Service { return &Service{events: events} }
 
-func (s *Service) ProcessProviderEvent(ctx context.Context, event paymentprovider.Event) (Settlement, error) {
+func (s *Service) ProcessProviderEvent(ctx context.Context, event ProviderEvent) (Settlement, error) {
 	relevant, valid := classifyProviderEvent(event)
 	if !valid {
 		return Settlement{}, ErrPaymentMismatch
@@ -31,7 +29,7 @@ func (s *Service) ProcessProviderEvent(ctx context.Context, event paymentprovide
 	return s.events.processProviderEvent(ctx, event)
 }
 
-func classifyProviderEvent(event paymentprovider.Event) (relevant, valid bool) {
+func classifyProviderEvent(event ProviderEvent) (relevant, valid bool) {
 	if event.Provider == "" || event.ProviderEventID == "" || len(event.Raw) == 0 || !json.Valid(event.Raw) {
 		return false, false
 	}
@@ -52,14 +50,14 @@ func classifyProviderEvent(event paymentprovider.Event) (relevant, valid bool) {
 	return true, true
 }
 
-func eventTypeMatchesStatus(event paymentprovider.Event) bool {
+func eventTypeMatchesStatus(event ProviderEvent) bool {
 	switch event.Provider + ":" + event.Type {
 	case "stripe:checkout.session.completed", "paystack:charge.success":
-		return event.Payment.Status == paymentprovider.StatusSucceeded
+		return event.Payment.Status == StatusSucceeded
 	case "stripe:checkout.session.expired":
-		return event.Payment.Status == paymentprovider.StatusCancelled
+		return event.Payment.Status == StatusCancelled
 	case "paystack:charge.failed":
-		return event.Payment.Status == paymentprovider.StatusFailed || event.Payment.Status == paymentprovider.StatusCancelled
+		return event.Payment.Status == StatusFailed || event.Payment.Status == StatusCancelled
 	default:
 		return false
 	}

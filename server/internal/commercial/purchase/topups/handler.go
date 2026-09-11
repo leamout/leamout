@@ -7,7 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/checkout"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
+	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/helper"
@@ -25,16 +25,16 @@ func NewHandler(service *Service) *Handler {
 }
 
 type createRequest struct {
-	AmountMinor int64                        `json:"amount_minor"`
-	Provider    checkout.Provider            `json:"provider"`
-	Email       string                       `json:"email"`
-	CallbackURL string                       `json:"callback_url"`
-	MobileMoney *paymentprovider.MobileMoney `json:"mobile_money,omitempty"`
+	AmountMinor int64                           `json:"amount_minor"`
+	Provider    checkout.Provider               `json:"provider"`
+	Email       string                          `json:"email"`
+	CallbackURL string                          `json:"callback_url"`
+	MobileMoney *commercialpayments.MobileMoney `json:"mobile_money,omitempty"`
 }
 
 type continueRequest struct {
-	Action paymentprovider.NextAction `json:"action"`
-	Value  string                     `json:"value"`
+	Action commercialpayments.NextAction `json:"action"`
+	Value  string                        `json:"value"`
 }
 
 type checkoutResponse struct {

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
+	paymentprovider "github.com/leamout/leamout/internal/commercial/payments"
 )
 
 const DefaultBaseURL = "https://api.paystack.co"
@@ -189,30 +189,30 @@ func validateMobileMoney(request paymentprovider.CheckoutRequest) error {
 	return nil
 }
 
-func (c *Client) GetPayment(ctx context.Context, reference string) (paymentprovider.Payment, error) {
+func (c *Client) GetPayment(ctx context.Context, reference string) (paymentprovider.ProviderPayment, error) {
 	reference = strings.TrimSpace(reference)
 	if reference == "" {
-		return paymentprovider.Payment{}, fmt.Errorf("paystack: payment reference is required")
+		return paymentprovider.ProviderPayment{}, fmt.Errorf("paystack: payment reference is required")
 	}
 	var result response
 	if err := c.do(ctx, http.MethodGet, "/charge/"+url.PathEscape(reference), nil, &result); err != nil {
-		return paymentprovider.Payment{}, err
+		return paymentprovider.ProviderPayment{}, err
 	}
 	if !result.Status {
-		return paymentprovider.Payment{}, fmt.Errorf("paystack: charge lookup failed: %s", result.Message)
+		return paymentprovider.ProviderPayment{}, fmt.Errorf("paystack: charge lookup failed: %s", result.Message)
 	}
 	return normalizePayment(result.Data), nil
 }
 
-func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovider.Event, error) {
+func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovider.ProviderEvent, error) {
 	signature, err := hex.DecodeString(strings.TrimSpace(headers.Get("x-paystack-signature")))
 	if err != nil || len(signature) == 0 {
-		return paymentprovider.Event{}, fmt.Errorf("paystack: valid webhook signature is required")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("paystack: valid webhook signature is required")
 	}
 	mac := hmac.New(sha512.New, []byte(c.secretKey))
 	_, _ = mac.Write(payload)
 	if !hmac.Equal(signature, mac.Sum(nil)) {
-		return paymentprovider.Event{}, fmt.Errorf("paystack: invalid webhook signature")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("paystack: invalid webhook signature")
 	}
 	var envelope struct {
 		Event string      `json:"event"`
@@ -221,22 +221,22 @@ func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovi
 	decoder := json.NewDecoder(bytes.NewReader(payload))
 	decoder.UseNumber()
 	if err := decoder.Decode(&envelope); err != nil {
-		return paymentprovider.Event{}, fmt.Errorf("paystack: decode webhook: %w", err)
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("paystack: decode webhook: %w", err)
 	}
 	eventType := strings.TrimSpace(envelope.Event)
 	transactionID := strings.TrimSpace(envelope.Data.ID.String())
 	if eventType == "" || transactionID == "" {
-		return paymentprovider.Event{}, fmt.Errorf("paystack: webhook event identity is required")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("paystack: webhook event identity is required")
 	}
-	return paymentprovider.Event{
+	return paymentprovider.ProviderEvent{
 		Provider: "paystack", ProviderEventID: eventType + ":" + transactionID, Type: eventType,
 		Payment: normalizePayment(envelope.Data), Raw: append([]byte(nil), payload...),
 	}, nil
 }
 
-func normalizePayment(item transaction) paymentprovider.Payment {
+func normalizePayment(item transaction) paymentprovider.ProviderPayment {
 	status := normalizeStatus(item.Status)
-	return paymentprovider.Payment{Provider: "paystack", ProviderID: item.ID.String(), Reference: item.Reference, AmountMinor: item.Amount, Currency: strings.ToUpper(item.Currency), Status: status}
+	return paymentprovider.ProviderPayment{Provider: "paystack", ProviderID: item.ID.String(), Reference: item.Reference, AmountMinor: item.Amount, Currency: strings.ToUpper(item.Currency), Status: status}
 }
 
 func normalizeStatus(value string) paymentprovider.Status {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
+	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
@@ -20,18 +20,18 @@ type CreateInput struct {
 	Provider    checkout.Provider
 	Email       string
 	CallbackURL string
-	MobileMoney *paymentprovider.MobileMoney
+	MobileMoney *commercialpayments.MobileMoney
 }
 
 type ContinueInput struct {
-	Action paymentprovider.NextAction
+	Action commercialpayments.NextAction
 	Value  string
 }
 
 type Checkout struct {
 	Checkout checkout.Checkout
 	Payment  payments.Payment
-	Session  paymentprovider.CheckoutSession
+	Session  commercialpayments.CheckoutSession
 }
 
 type Details struct {

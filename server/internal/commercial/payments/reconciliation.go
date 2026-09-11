@@ -13,12 +13,11 @@ import (
 	"github.com/leamout/leamout/internal/commercial/purchase"
 	"github.com/leamout/leamout/internal/database/pgconv"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 // checkProviderEventReplay ensures an authenticated but commercially ignored
 // event cannot reuse the identity of a previously persisted payment event.
-func (r *Repository) checkProviderEventReplay(ctx context.Context, event paymentprovider.Event) error {
+func (r *Repository) checkProviderEventReplay(ctx context.Context, event ProviderEvent) error {
 	existing, err := r.queries.GetPaymentProviderEvent(ctx, sqlc.GetPaymentProviderEventParams{
 		Provider:        event.Provider,
 		ProviderEventID: event.ProviderEventID,
@@ -39,7 +38,7 @@ func (r *Repository) checkProviderEventReplay(ctx context.Context, event payment
 // processProviderEvent persists and applies an authenticated provider event in
 // one transaction. Purchase owns checkout/order fulfillment and only requests
 // prepaid credit after the durable order exists.
-func (r *Repository) processProviderEvent(ctx context.Context, event paymentprovider.Event) (Settlement, error) {
+func (r *Repository) processProviderEvent(ctx context.Context, event ProviderEvent) (Settlement, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Settlement{}, err
@@ -120,7 +119,7 @@ func (r *Repository) processProviderEvent(ctx context.Context, event paymentprov
 	now := time.Now().UTC()
 	fulfillment.CompletedAt = now
 	switch event.Payment.Status {
-	case paymentprovider.StatusSucceeded:
+	case StatusSucceeded:
 		if _, err = q.UpdatePaymentStatus(ctx, sqlc.UpdatePaymentStatusParams{Status: "succeeded", PaidAt: pgconv.NullableTimestamptz(&now), OrganizationID: topup.OrganizationID, ID: topup.PaymentID}); err != nil {
 			return Settlement{}, err
 		}
@@ -129,7 +128,7 @@ func (r *Repository) processProviderEvent(ctx context.Context, event paymentprov
 			return Settlement{}, fulfillErr
 		}
 		result.OrderID, result.Applied, result.SettledAt = purchaseResult.OrderID, purchaseResult.Applied, &now
-	case paymentprovider.StatusFailed, paymentprovider.StatusCancelled:
+	case StatusFailed, StatusCancelled:
 		status := string(event.Payment.Status)
 		if _, err = q.UpdatePaymentStatus(ctx, sqlc.UpdatePaymentStatusParams{Status: status, OrganizationID: topup.OrganizationID, ID: topup.PaymentID}); err != nil {
 			return Settlement{}, err

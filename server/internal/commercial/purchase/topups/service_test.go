@@ -11,7 +11,6 @@ import (
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/commercial/wallets"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 type walletStub struct{ wallet wallets.Wallet }
@@ -83,29 +82,29 @@ func (s *paymentStub) UpdateStatus(_ context.Context, _ uuid.UUID, _ uuid.UUID, 
 }
 
 type settlementStub struct {
-	event paymentprovider.Event
+	event commercialpayments.ProviderEvent
 }
 
-func (s *settlementStub) ProcessProviderEvent(_ context.Context, event paymentprovider.Event) (Settlement, error) {
+func (s *settlementStub) ProcessProviderEvent(_ context.Context, event commercialpayments.ProviderEvent) (Settlement, error) {
 	s.event = event
 	return Settlement{Applied: true}, nil
 }
 
 type providerStub struct {
-	request paymentprovider.CheckoutRequest
-	event   paymentprovider.Event
-	payment paymentprovider.Payment
-	session *paymentprovider.CheckoutSession
+	request commercialpayments.CheckoutRequest
+	event   commercialpayments.ProviderEvent
+	payment commercialpayments.ProviderPayment
+	session *commercialpayments.CheckoutSession
 }
 
-func (s *providerStub) CreateCheckout(_ context.Context, request paymentprovider.CheckoutRequest) (paymentprovider.CheckoutSession, error) {
+func (s *providerStub) CreateCheckout(_ context.Context, request commercialpayments.CheckoutRequest) (commercialpayments.CheckoutSession, error) {
 	s.request = request
 	if s.session != nil {
 		return *s.session, nil
 	}
-	return paymentprovider.CheckoutSession{
+	return commercialpayments.CheckoutSession{
 		Provider: "stripe", ProviderID: "pi_123", Reference: request.Reference,
-		ClientSecret: "secret", Status: paymentprovider.StatusPending, NextAction: paymentprovider.NextActionWait,
+		ClientSecret: "secret", Status: commercialpayments.StatusPending, NextAction: commercialpayments.NextActionWait,
 	}, nil
 }
 
@@ -114,7 +113,7 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	walletID := uuid.New()
 	checkouts := &checkoutStub{}
 	payments := &paymentStub{}
-	provider := &providerStub{session: &paymentprovider.CheckoutSession{
+	provider := &providerStub{session: &commercialpayments.CheckoutSession{
 		Provider: "stripe", ProviderID: "pi_123", Reference: "topup.wrong",
 	}}
 	service := NewService(
@@ -122,7 +121,7 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 			ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive,
 		}},
 		checkouts, payments, &settlementStub{},
-		map[string]paymentprovider.Provider{"stripe": provider},
+		map[string]commercialpayments.Provider{"stripe": provider},
 	)
 
 	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
@@ -143,11 +142,11 @@ func TestCreateFailsLocalRecordsForMismatchedProviderSession(t *testing.T) {
 	}
 }
 
-func (s *providerStub) GetPayment(context.Context, string) (paymentprovider.Payment, error) {
+func (s *providerStub) GetPayment(context.Context, string) (commercialpayments.ProviderPayment, error) {
 	return s.payment, nil
 }
 
-func (s *providerStub) ParseWebhook([]byte, http.Header) (paymentprovider.Event, error) {
+func (s *providerStub) ParseWebhook([]byte, http.Header) (commercialpayments.ProviderEvent, error) {
 	return s.event, nil
 }
 
@@ -160,7 +159,7 @@ func TestCreateUsesWalletOwnedPaymentTerms(t *testing.T) {
 	service := NewService(
 		walletStub{wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive}},
 		checkouts, payments, &settlementStub{},
-		map[string]paymentprovider.Provider{"stripe": provider},
+		map[string]commercialpayments.Provider{"stripe": provider},
 	)
 	service.now = func() time.Time { return time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC) }
 
@@ -188,11 +187,11 @@ func TestCreateRejectsPaystackForNonGHSWallet(t *testing.T) {
 	service := NewService(
 		walletStub{wallet: wallets.Wallet{ID: uuid.New(), Currency: "USD", Status: wallets.StatusActive}},
 		&checkoutStub{}, &paymentStub{}, &settlementStub{},
-		map[string]paymentprovider.Provider{"paystack": provider},
+		map[string]commercialpayments.Provider{"paystack": provider},
 	)
 	_, err := service.Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
 		AmountMinor: 100, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
-		MobileMoney: &paymentprovider.MobileMoney{Phone: "+233200000000", Provider: "mtn"},
+		MobileMoney: &commercialpayments.MobileMoney{Phone: "+233200000000", Provider: "mtn"},
 	})
 	if !errors.Is(err, ErrInvalidTopup) {
 		t.Fatalf("Create() error = %v, want %v", err, ErrInvalidTopup)
@@ -210,12 +209,12 @@ func TestCreateAcceptsPaystackChargeWithoutTransactionID(t *testing.T) {
 	provider := &referenceProviderStub{provider: "paystack"}
 	service := NewService(
 		walletStub{wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "GHS", Status: wallets.StatusActive}},
-		checkouts, payments, &settlementStub{}, map[string]paymentprovider.Provider{"paystack": provider},
+		checkouts, payments, &settlementStub{}, map[string]commercialpayments.Provider{"paystack": provider},
 	)
 
 	_, err := service.Create(context.Background(), organizationID, walletID, CreateInput{
 		AmountMinor: 2500, Provider: checkout.ProviderPaystack, Email: "payer@example.com",
-		MobileMoney: &paymentprovider.MobileMoney{Phone: "0240000000", Provider: "mtn"},
+		MobileMoney: &commercialpayments.MobileMoney{Phone: "0240000000", Provider: "mtn"},
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -230,20 +229,20 @@ type referenceProviderStub struct {
 	provider string
 }
 
-func (s *referenceProviderStub) CreateCheckout(_ context.Context, request paymentprovider.CheckoutRequest) (paymentprovider.CheckoutSession, error) {
+func (s *referenceProviderStub) CreateCheckout(_ context.Context, request commercialpayments.CheckoutRequest) (commercialpayments.CheckoutSession, error) {
 	s.request = request
-	return paymentprovider.CheckoutSession{Provider: s.provider, Reference: request.Reference, Status: paymentprovider.StatusProcessing}, nil
+	return commercialpayments.CheckoutSession{Provider: s.provider, Reference: request.Reference, Status: commercialpayments.StatusProcessing}, nil
 }
 
 func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
-	event := paymentprovider.Event{
+	event := commercialpayments.ProviderEvent{
 		Provider: "stripe", ProviderEventID: "evt_123", Type: "checkout.session.completed",
-		Payment: paymentprovider.Payment{Reference: "topup.123", Status: paymentprovider.StatusSucceeded},
+		Payment: commercialpayments.ProviderPayment{Reference: "topup.123", Status: commercialpayments.StatusSucceeded},
 		Raw:     []byte(`{"id":"evt_123"}`),
 	}
 	provider := &providerStub{event: event}
 	settlements := &settlementStub{}
-	service := NewService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"stripe": provider})
+	service := NewService(nil, nil, nil, settlements, map[string]commercialpayments.Provider{"stripe": provider})
 
 	result, err := service.Webhook(context.Background(), "stripe", []byte(`{}`), http.Header{})
 	if err != nil {
@@ -255,12 +254,12 @@ func TestWebhookPassesOnlyAuthenticatedProviderEventToSettlement(t *testing.T) {
 }
 
 func TestWebhookDelegatesAuthenticatedEventClassificationToPayments(t *testing.T) {
-	provider := &providerStub{event: paymentprovider.Event{
+	provider := &providerStub{event: commercialpayments.ProviderEvent{
 		Provider: "paystack", ProviderEventID: "refund:1", Type: "refund.processed",
-		Payment: paymentprovider.Payment{Status: paymentprovider.StatusSucceeded}, Raw: []byte(`{"event":"refund.processed"}`),
+		Payment: commercialpayments.ProviderPayment{Status: commercialpayments.StatusSucceeded}, Raw: []byte(`{"event":"refund.processed"}`),
 	}}
 	settlements := &settlementStub{}
-	service := NewService(nil, nil, nil, settlements, map[string]paymentprovider.Provider{"paystack": provider})
+	service := NewService(nil, nil, nil, settlements, map[string]commercialpayments.Provider{"paystack": provider})
 
 	result, err := service.Webhook(context.Background(), "paystack", []byte(`{}`), http.Header{})
 	if err != nil || !result.Applied || settlements.event.ProviderEventID != "refund:1" {
@@ -279,12 +278,12 @@ func TestGetReconcilesMaturePaystackCharge(t *testing.T) {
 		Currency: "GHS", Status: checkout.StatusProcessing, UpdatedAt: now.Add(-11 * time.Second),
 	}}
 	payments := &paymentStub{payment: commercialpayments.Payment{ID: uuid.New(), CheckoutID: checkoutID}}
-	provider := &providerStub{payment: paymentprovider.Payment{
+	provider := &providerStub{payment: commercialpayments.ProviderPayment{
 		Provider: "paystack", ProviderID: "42", Reference: "topup.123",
-		AmountMinor: 2500, Currency: "GHS", Status: paymentprovider.StatusSucceeded,
+		AmountMinor: 2500, Currency: "GHS", Status: commercialpayments.StatusSucceeded,
 	}}
 	settlements := &settlementStub{}
-	service := NewService(nil, checkouts, payments, settlements, map[string]paymentprovider.Provider{"paystack": provider})
+	service := NewService(nil, checkouts, payments, settlements, map[string]commercialpayments.Provider{"paystack": provider})
 	service.now = func() time.Time { return now }
 
 	if _, err := service.Get(context.Background(), organizationID, checkoutID); err != nil {

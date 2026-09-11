@@ -15,7 +15,6 @@ import (
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 // Module is the composition boundary for Leamout's Commercial domain.
@@ -135,7 +134,7 @@ func New(db *pgxpool.Pool) *Module {
 		checkoutRepository,
 		paymentRepository,
 		paymentService,
-		map[string]paymentprovider.Provider{},
+		map[string]payments.Provider{},
 	)
 	topupHandler := topups.NewHandler(topupService)
 	stateModule := StateModule{

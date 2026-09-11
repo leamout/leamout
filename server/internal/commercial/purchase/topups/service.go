@@ -12,7 +12,6 @@ import (
 	"github.com/leamout/leamout/internal/commercial/checkout"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/commercial/wallets"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 type walletStore interface {
@@ -34,7 +33,7 @@ type paymentStore interface {
 }
 
 type paymentEventProcessor interface {
-	ProcessProviderEvent(context.Context, paymentprovider.Event) (commercialpayments.Settlement, error)
+	ProcessProviderEvent(context.Context, commercialpayments.ProviderEvent) (commercialpayments.Settlement, error)
 }
 
 type Service struct {
@@ -42,7 +41,7 @@ type Service struct {
 	checkouts     checkoutStore
 	payments      paymentStore
 	paymentEvents paymentEventProcessor
-	providers     map[string]paymentprovider.Provider
+	providers     map[string]commercialpayments.Provider
 	now           func() time.Time
 }
 
@@ -51,7 +50,7 @@ func NewService(
 	checkouts checkoutStore,
 	payments paymentStore,
 	paymentEvents paymentEventProcessor,
-	providers map[string]paymentprovider.Provider,
+	providers map[string]commercialpayments.Provider,
 ) *Service {
 	return &Service{
 		wallets:       wallets,
@@ -63,7 +62,7 @@ func NewService(
 	}
 }
 
-func (s *Service) SetProvider(name string, provider paymentprovider.Provider) {
+func (s *Service) SetProvider(name string, provider commercialpayments.Provider) {
 	if provider != nil {
 		s.providers[name] = provider
 	}
@@ -125,7 +124,7 @@ func (s *Service) Create(
 		return Checkout{}, err
 	}
 
-	session, err := provider.CreateCheckout(ctx, paymentprovider.CheckoutRequest{
+	session, err := provider.CreateCheckout(ctx, commercialpayments.CheckoutRequest{
 		Reference:   reference,
 		AmountMinor: checkoutRecord.AmountMinor,
 		Currency:    checkoutRecord.Currency,
@@ -276,15 +275,15 @@ func (s *Service) Get(
 func (s *Service) refreshPaystack(
 	ctx context.Context,
 	checkoutRecord checkout.Checkout,
-) (paymentprovider.Event, bool) {
+) (commercialpayments.ProviderEvent, bool) {
 	provider, ok := s.providers["paystack"]
 	if !ok {
-		return paymentprovider.Event{}, false
+		return commercialpayments.ProviderEvent{}, false
 	}
 
 	payment, err := provider.GetPayment(ctx, checkoutRecord.Reference)
-	if err != nil || (payment.Status != paymentprovider.StatusSucceeded && payment.Status != paymentprovider.StatusFailed) {
-		return paymentprovider.Event{}, false
+	if err != nil || (payment.Status != commercialpayments.StatusSucceeded && payment.Status != commercialpayments.StatusFailed) {
+		return commercialpayments.ProviderEvent{}, false
 	}
 
 	raw, _ := json.Marshal(map[string]string{
@@ -294,11 +293,11 @@ func (s *Service) refreshPaystack(
 	})
 
 	eventType := "charge.failed"
-	if payment.Status == paymentprovider.StatusSucceeded {
+	if payment.Status == commercialpayments.StatusSucceeded {
 		eventType = "charge.success"
 	}
 
-	return paymentprovider.Event{
+	return commercialpayments.ProviderEvent{
 		Provider:        "paystack",
 		ProviderEventID: "lookup:" + checkoutRecord.Reference + ":" + string(payment.Status),
 		Type:            eventType,
@@ -323,13 +322,13 @@ func (s *Service) Continue(
 		return Checkout{}, ErrProviderUnavailable
 	}
 
-	continuation, ok := provider.(paymentprovider.ContinuationProvider)
+	continuation, ok := provider.(commercialpayments.ContinuationProvider)
 	if !ok || details.Checkout.Provider != checkout.ProviderPaystack ||
 		details.Checkout.Status != checkout.StatusProcessing {
 		return Checkout{}, ErrInvalidTopup
 	}
 
-	session, err := continuation.ContinueCheckout(ctx, paymentprovider.ContinueCheckoutRequest{
+	session, err := continuation.ContinueCheckout(ctx, commercialpayments.ContinueCheckoutRequest{
 		Reference: details.Checkout.Reference,
 		Action:    input.Action,
 		Value:     input.Value,
