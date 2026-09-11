@@ -46,12 +46,16 @@ type CreateInput struct {
 	Metadata    json.RawMessage
 }
 
-// Settlement describes the durable effects of processing one provider event.
+// Settlement is the provider-independent payment result consumed by Checkout.
+// It intentionally contains no wallet or subscription semantics.
 type Settlement struct {
 	Applied        bool
+	CheckoutID     uuid.UUID
 	OrganizationID uuid.UUID
-	WalletID       uuid.UUID
 	PaymentID      uuid.UUID
+	Provider       string
+	Status         Status
 	AmountMinor    int64
+	Currency       string
 	SettledAt      *time.Time
 }

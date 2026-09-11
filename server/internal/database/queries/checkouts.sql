@@ -1,15 +1,13 @@
 -- name: CreateCheckout :one
 INSERT INTO checkouts (
     organization_id, wallet_id, price_id, checkout_type,
-    provider, payment_method, reference, amount_minor, currency, expires_at, metadata
+    reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     sqlc.arg(organization_id) AS organization_id,
     sqlc.narg(wallet_id)::UUID AS wallet_id,
     sqlc.narg(price_id)::UUID AS price_id,
     sqlc.arg(checkout_type) AS checkout_type,
-    sqlc.arg(provider) AS provider,
-    sqlc.arg(payment_method) AS payment_method,
     sqlc.arg(reference) AS reference,
     sqlc.arg(amount_minor) AS amount_minor,
     sqlc.arg(currency) AS currency,
@@ -20,6 +18,20 @@ WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 RETURNING *;
+
+-- name: StartCheckoutPayment :one
+UPDATE checkouts AS c
+SET provider = sqlc.arg(provider),
+    payment_method = sqlc.arg(payment_method),
+    status = 'processing',
+    next_action = 'wait',
+    updated_at = NOW()
+WHERE c.organization_id = sqlc.arg(organization_id)
+  AND c.id = sqlc.arg(id)
+  AND c.status = 'pending'
+  AND c.provider IS NULL
+  AND c.payment_method IS NULL
+RETURNING c.*;
 
 -- name: GetCheckout :one
 SELECT c.*

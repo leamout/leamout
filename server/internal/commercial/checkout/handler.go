@@ -1,7 +1,9 @@
 package checkout
 
 import (
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -12,36 +14,48 @@ import (
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
-type Handler struct{ topups *TopupService }
+type Handler struct{ service *Service }
 
-func NewHandler(topups *TopupService) *Handler { return &Handler{topups: topups} }
+func NewHandler(service *Service) *Handler { return &Handler{service: service} }
+
+type CreateRequest struct {
+	Type        Type            `json:"type"`
+	WalletID    *uuid.UUID      `json:"wallet_id,omitempty"`
+	PriceID     *uuid.UUID      `json:"price_id,omitempty"`
+	AmountMinor int64           `json:"amount_minor,omitempty"`
+	Metadata    json.RawMessage `json:"metadata,omitempty"`
+}
+
+type ConfirmRequest struct {
+	PaymentMethod PaymentMethod         `json:"payment_method"`
+	Email         string                `json:"email"`
+	CallbackURL   string                `json:"callback_url"`
+	MobileMoney   *payments.MobileMoney `json:"mobile_money,omitempty"`
+}
 
 type ContinueRequest struct {
 	Action payments.NextAction `json:"action"`
 	Value  string              `json:"value"`
 }
 
-type CreateRequest struct {
-	Type        Type                  `json:"type"`
-	WalletID    uuid.UUID             `json:"wallet_id"`
-	AmountMinor int64                 `json:"amount_minor"`
-	Provider    Provider              `json:"provider"`
-	Email       string                `json:"email"`
-	CallbackURL string                `json:"callback_url"`
-	MobileMoney *payments.MobileMoney `json:"mobile_money,omitempty"`
-}
-
 type CheckoutResponse struct {
-	CheckoutID      uuid.UUID  `json:"checkout_id"`
-	PaymentID       uuid.UUID  `json:"payment_id"`
-	Reference       string     `json:"reference"`
-	Provider        Provider   `json:"provider"`
-	AmountMinor     int64      `json:"amount_minor"`
-	Currency        string     `json:"currency"`
-	Status          Status     `json:"status"`
-	NextAction      NextAction `json:"next_action"`
-	ProviderMessage *string    `json:"provider_message,omitempty"`
-	ClientSecret    string     `json:"client_secret,omitempty"`
+	CheckoutID      uuid.UUID       `json:"checkout_id"`
+	PaymentID       *uuid.UUID      `json:"payment_id,omitempty"`
+	Type            Type            `json:"type"`
+	WalletID        *uuid.UUID      `json:"wallet_id,omitempty"`
+	PriceID         *uuid.UUID      `json:"price_id,omitempty"`
+	Reference       string          `json:"reference"`
+	Provider        Provider        `json:"provider,omitempty"`
+	PaymentMethod   PaymentMethod   `json:"payment_method,omitempty"`
+	AmountMinor     int64           `json:"amount_minor"`
+	Currency        string          `json:"currency"`
+	Status          Status          `json:"status"`
+	NextAction      NextAction      `json:"next_action"`
+	ProviderMessage *string         `json:"provider_message,omitempty"`
+	ClientSecret    string          `json:"client_secret,omitempty"`
+	ExpiresAt       time.Time       `json:"expires_at"`
+	CompletedAt     *time.Time      `json:"completed_at,omitempty"`
+	Metadata        json.RawMessage `json:"metadata,omitempty"`
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
@@ -55,22 +69,18 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	if request.Type != TypeWalletTopup || request.WalletID == uuid.Nil {
-		httputil.Error(w, ErrInvalidCheckout)
-		return
-	}
-	result, err := h.topups.Create(r.Context(), organizationID, request.WalletID, TopupCreateInput{
+	checkoutRecord, err := h.service.Create(r.Context(), organizationID, CreateParams{
+		Type:        request.Type,
+		WalletID:    request.WalletID,
+		PriceID:     request.PriceID,
 		AmountMinor: request.AmountMinor,
-		Provider:    request.Provider,
-		Email:       request.Email,
-		CallbackURL: request.CallbackURL,
-		MobileMoney: request.MobileMoney,
+		Metadata:    request.Metadata,
 	})
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	httputil.Created(w, Response(result))
+	httputil.Created(w, Response(Result{Checkout: checkoutRecord}))
 }
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -79,12 +89,36 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.topups.Get(r.Context(), organizationID, checkoutID)
+	result, err := h.service.Get(r.Context(), organizationID, checkoutID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	httputil.OK(w, Response(TopupResult{Checkout: result.Checkout, Payment: result.Payment}))
+	httputil.OK(w, Response(result))
+}
+
+func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) {
+	organizationID, checkoutID, err := requestIDs(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	request, err := helper.DecodeJSON[ConfirmRequest](r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	result, err := h.service.Confirm(r.Context(), organizationID, checkoutID, ConfirmInput{
+		PaymentMethod: request.PaymentMethod,
+		Email:         request.Email,
+		CallbackURL:   request.CallbackURL,
+		MobileMoney:   request.MobileMoney,
+	})
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, Response(result))
 }
 
 func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +132,10 @@ func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	result, err := h.topups.Continue(r.Context(), organizationID, checkoutID, TopupContinueInput(request))
+	result, err := h.service.Continue(r.Context(), organizationID, checkoutID, ContinueInput{
+		Action: request.Action,
+		Value:  request.Value,
+	})
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -118,6 +155,30 @@ func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	return organizationID, checkoutID, nil
 }
 
-func Response(result TopupResult) CheckoutResponse {
-	return CheckoutResponse{CheckoutID: result.Checkout.ID, PaymentID: result.Payment.ID, Reference: result.Checkout.Reference, Provider: result.Checkout.Provider, AmountMinor: result.Checkout.AmountMinor, Currency: result.Checkout.Currency, Status: result.Checkout.Status, NextAction: result.Checkout.NextAction, ProviderMessage: result.Checkout.ProviderMessage, ClientSecret: result.Session.ClientSecret}
+func Response(result Result) CheckoutResponse {
+	response := CheckoutResponse{
+		CheckoutID:      result.Checkout.ID,
+		Type:            result.Checkout.Type,
+		WalletID:        result.Checkout.WalletID,
+		PriceID:         result.Checkout.PriceID,
+		Reference:       result.Checkout.Reference,
+		Provider:        result.Checkout.Provider,
+		PaymentMethod:   result.Checkout.PaymentMethod,
+		AmountMinor:     result.Checkout.AmountMinor,
+		Currency:        result.Checkout.Currency,
+		Status:          result.Checkout.Status,
+		NextAction:      result.Checkout.NextAction,
+		ProviderMessage: result.Checkout.ProviderMessage,
+		ExpiresAt:       result.Checkout.ExpiresAt,
+		CompletedAt:     result.Checkout.CompletedAt,
+		Metadata:        result.Checkout.Metadata,
+	}
+	if result.Payment != nil {
+		id := result.Payment.ID
+		response.PaymentID = &id
+	}
+	if result.Session != nil {
+		response.ClientSecret = result.Session.ClientSecret
+	}
+	return response
 }

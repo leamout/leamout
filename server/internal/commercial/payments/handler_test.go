@@ -23,11 +23,11 @@ func (s webhookProviderStub) ParseWebhook([]byte, http.Header) (ProviderEvent, e
 }
 
 func TestWebhookAuthenticatesAdapterBeforeCommercialProcessing(t *testing.T) {
-	event := ProviderEvent{Provider: "stripe", ProviderEventID: "evt_1", Type: "checkout.session.completed", Payment: ProviderPayment{Reference: "topup.1", Status: StatusSucceeded}, Raw: []byte(`{"id":"evt_1"}`)}
+	event := ProviderEvent{Provider: "stripe", ProviderEventID: "evt_1", Type: "checkout.session.completed", Payment: ProviderPayment{Reference: "checkout.1", Status: StatusSucceeded}, Raw: []byte(`{"id":"evt_1"}`)}
 	store := &eventStoreStub{}
 	registry := NewProviderRegistry(map[string]Provider{"stripe": webhookProviderStub{event: event}})
 	router := chi.NewRouter()
-	RegisterRoutes(router, NewHandler(NewService(store), registry))
+	RegisterRoutes(router, NewHandler(NewService(store), registry, nil))
 	request := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/payment-webhooks/stripe", bytes.NewBufferString(`{}`))
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)

@@ -1,21 +1,63 @@
 package checkout
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var checkoutReferencePattern = regexp.MustCompile(`^[A-Za-z0-9.=-]+$`)
 
+func validateIntent(input CreateParams) error {
+	switch input.Type {
+	case TypeWalletTopup:
+		if input.WalletID == nil || *input.WalletID == uuid.Nil || input.PriceID != nil || input.AmountMinor <= 0 {
+			return ErrInvalidCheckout
+		}
+	case TypeSubscription:
+		if input.PriceID == nil || *input.PriceID == uuid.Nil || input.WalletID != nil || input.AmountMinor != 0 {
+			return ErrInvalidCheckout
+		}
+	default:
+		return ErrInvalidCheckout
+	}
+	if !validMetadata(input.Metadata) {
+		return ErrInvalidCheckout
+	}
+	return nil
+}
+
 func validateCreate(input CreateInput, now time.Time) error {
 	validTarget := input.Type == TypeSubscription && input.PriceID != nil && input.WalletID == nil ||
 		input.Type == TypeWalletTopup && input.WalletID != nil && input.PriceID == nil
-	validMethod := input.Provider == ProviderStripe && input.PaymentMethod == MethodCard ||
-		input.Provider == ProviderPaystack && input.PaymentMethod == MethodMobileMoney
-	if !validTarget || !validMethod || input.AmountMinor <= 0 ||
+	if !validTarget || input.AmountMinor <= 0 ||
 		len(input.Currency) != 3 || input.Currency != strings.ToUpper(input.Currency) ||
-		!checkoutReferencePattern.MatchString(input.Reference) || !input.ExpiresAt.After(now) {
+		!checkoutReferencePattern.MatchString(input.Reference) || !input.ExpiresAt.After(now) ||
+		!validMetadata(input.Metadata) {
+		return ErrInvalidCheckout
+	}
+	return nil
+}
+
+func validateConfirm(input ConfirmInput) error {
+	if strings.TrimSpace(input.Email) == "" {
+		return ErrInvalidCheckout
+	}
+	switch input.PaymentMethod {
+	case MethodCard:
+		if input.MobileMoney != nil {
+			return ErrInvalidCheckout
+		}
+	case MethodMobileMoney:
+		if input.MobileMoney == nil ||
+			strings.TrimSpace(input.MobileMoney.Phone) == "" ||
+			strings.TrimSpace(input.MobileMoney.Provider) == "" {
+			return ErrInvalidCheckout
+		}
+	default:
 		return ErrInvalidCheckout
 	}
 	return nil
@@ -36,6 +78,25 @@ func validateTransition(transition Transition) error {
 		return ErrInvalidTransition
 	}
 	return nil
+}
+
+func providerForMethod(method PaymentMethod) (Provider, bool) {
+	switch method {
+	case MethodCard:
+		return ProviderStripe, true
+	case MethodMobileMoney:
+		return ProviderPaystack, true
+	default:
+		return "", false
+	}
+}
+
+func validMetadata(raw json.RawMessage) bool {
+	if len(raw) == 0 {
+		return true
+	}
+	var value map[string]any
+	return json.Unmarshal(raw, &value) == nil && value != nil
 }
 
 func isTerminal(status Status) bool {

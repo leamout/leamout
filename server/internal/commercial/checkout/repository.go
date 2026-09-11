@@ -27,8 +27,6 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 		WalletID:       input.WalletID,
 		PriceID:        input.PriceID,
 		CheckoutType:   string(input.Type),
-		Provider:       string(input.Provider),
-		PaymentMethod:  string(input.PaymentMethod),
 		Reference:      input.Reference,
 		AmountMinor:    input.AmountMinor,
 		Currency:       input.Currency,
@@ -39,6 +37,26 @@ func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input
 		return Checkout{}, mapWriteError(err)
 	}
 
+	return checkoutFromRow(row), nil
+}
+
+func (r *Repository) StartPayment(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+	input StartPayment,
+) (Checkout, error) {
+	row, err := r.queries.StartCheckoutPayment(ctx, sqlc.StartCheckoutPaymentParams{
+		Provider:       string(input.Provider),
+		PaymentMethod:  string(input.PaymentMethod),
+		OrganizationID: organizationID,
+		ID:             id,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Checkout{}, ErrInvalidTransition
+		}
+		return Checkout{}, mapWriteError(err)
+	}
 	return checkoutFromRow(row), nil
 }
 
@@ -117,8 +135,8 @@ func checkoutFromRow(row sqlc.Checkout) Checkout {
 		WalletID:        row.WalletID,
 		PriceID:         row.PriceID,
 		Type:            Type(row.CheckoutType),
-		Provider:        Provider(row.Provider),
-		PaymentMethod:   PaymentMethod(row.PaymentMethod),
+		Provider:        Provider(nullableString(row.Provider)),
+		PaymentMethod:   PaymentMethod(nullableString(row.PaymentMethod)),
 		Reference:       row.Reference,
 		AmountMinor:     row.AmountMinor,
 		Currency:        row.Currency,
@@ -131,6 +149,13 @@ func checkoutFromRow(row sqlc.Checkout) Checkout {
 		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
 		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
+}
+
+func nullableString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func mapReadError(err error) error {

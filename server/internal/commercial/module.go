@@ -124,22 +124,30 @@ func New(db *pgxpool.Pool) *Module {
 
 	walletRepository := wallets.NewRepository(db)
 	walletService := wallets.NewService(walletRepository)
+	walletHandler := wallets.NewHandler(walletService)
+
 	checkoutRepository := checkout.NewRepository(db)
-	checkoutService := checkout.NewService(checkoutRepository)
 	paymentRepository := payments.NewRepository(db)
 	paymentService := payments.NewService(paymentRepository)
 	providerRegistry := payments.NewProviderRegistry()
-	topupService := checkout.NewTopupService(
+	checkoutService := checkout.NewService(
+		checkoutRepository,
 		walletService,
-		checkoutService,
+		catalogService,
+		subscriptionsService,
 		paymentRepository,
 		paymentService,
 		providerRegistry,
 	)
-	checkoutHandler := checkout.NewHandler(topupService)
-	walletHandler := wallets.NewHandler(walletService)
+	checkoutHandler := checkout.NewHandler(checkoutService)
+	paymentHandler := payments.NewHandler(paymentService, providerRegistry, checkoutService)
+
 	prepaidModule := PrepaidModule{
-		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
+		Wallets: WalletModule{
+			Repository: walletRepository,
+			Service:    walletService,
+			Handler:    walletHandler,
+		},
 	}
 
 	return &Module{
@@ -149,12 +157,16 @@ func New(db *pgxpool.Pool) *Module {
 			Handler:    catalog.NewHandler(catalogService),
 		},
 		Billing: BillingModule{
-			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService, Handler: checkoutHandler},
+			Checkouts: CheckoutModule{
+				Repository: checkoutRepository,
+				Service:    checkoutService,
+				Handler:    checkoutHandler,
+			},
 			Payments: PaymentsModule{
 				Repository: paymentRepository,
 				Service:    paymentService,
 				Providers:  providerRegistry,
-				Handler:    payments.NewHandler(paymentService, providerRegistry),
+				Handler:    paymentHandler,
 			},
 		},
 		Access: AccessModule{

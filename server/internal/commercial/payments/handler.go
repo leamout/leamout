@@ -1,6 +1,7 @@
 package payments
 
 import (
+	"context"
 	"io"
 	"net/http"
 
@@ -11,13 +12,18 @@ import (
 
 const maxWebhookBytes = 1 << 20
 
-type Handler struct {
-	service   *Service
-	providers *ProviderRegistry
+type settlementCompleter interface {
+	CompletePayment(context.Context, Settlement) error
 }
 
-func NewHandler(service *Service, providers *ProviderRegistry) *Handler {
-	return &Handler{service: service, providers: providers}
+type Handler struct {
+	service    *Service
+	providers  *ProviderRegistry
+	completion settlementCompleter
+}
+
+func NewHandler(service *Service, providers *ProviderRegistry, completion settlementCompleter) *Handler {
+	return &Handler{service: service, providers: providers, completion: completion}
 }
 
 func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
@@ -38,9 +44,21 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, apperror.NewBadRequest("invalid payment webhook"))
 		return
 	}
-	if _, err = h.service.ProcessProviderEvent(r.Context(), event); err != nil {
+
+	settlement, err := h.service.ProcessProviderEvent(r.Context(), event)
+	if err != nil {
 		httputil.Error(w, apperror.NewBadRequest("invalid payment webhook"))
 		return
 	}
+	if h.completion != nil && isCompletableSettlement(settlement.Status) {
+		if err = h.completion.CompletePayment(r.Context(), settlement); err != nil {
+			httputil.Error(w, apperror.NewServiceUnavailable("complete checkout settlement", err))
+			return
+		}
+	}
 	httputil.OK(w, map[string]bool{"received": true})
+}
+
+func isCompletableSettlement(status Status) bool {
+	return status == StatusSucceeded || status == StatusFailed || status == StatusCancelled
 }

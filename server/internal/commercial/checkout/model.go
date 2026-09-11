@@ -2,6 +2,7 @@ package checkout
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,11 @@ var (
 	ErrReferenceConflict = apperror.NewConflict("checkout reference already exists")
 	ErrInvalidTransition = apperror.NewConflict("invalid checkout transition")
 	ErrInvalidCheckout   = apperror.NewBadRequest("invalid checkout")
+	ErrProviderUnavailable = apperror.NewServiceUnavailable(
+		"payment provider is unavailable",
+		errors.New("payment provider is not configured"),
+	)
+	ErrPaymentMismatch = apperror.NewConflict("provider payment does not match checkout")
 )
 
 type Checkout struct {
@@ -63,17 +69,32 @@ type Checkout struct {
 	UpdatedAt       time.Time
 }
 
+// CreateParams is the customer-facing commercial intent. Amount is accepted
+// only for wallet top-ups; subscription amount and currency are resolved from
+// the catalog price.
+type CreateParams struct {
+	WalletID    *uuid.UUID
+	PriceID     *uuid.UUID
+	Type        Type
+	AmountMinor int64
+	Metadata    json.RawMessage
+}
+
+// CreateInput is the server-priced persistence command.
 type CreateInput struct {
-	WalletID      *uuid.UUID
-	PriceID       *uuid.UUID
-	Type          Type
+	WalletID    *uuid.UUID
+	PriceID     *uuid.UUID
+	Type        Type
+	Reference   string
+	AmountMinor int64
+	Currency    string
+	ExpiresAt   time.Time
+	Metadata    json.RawMessage
+}
+
+type StartPayment struct {
 	Provider      Provider
 	PaymentMethod PaymentMethod
-	Reference     string
-	AmountMinor   int64
-	Currency      string
-	ExpiresAt     time.Time
-	Metadata      json.RawMessage
 }
 
 type Transition struct {
