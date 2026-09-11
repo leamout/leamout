@@ -5,16 +5,7 @@ import (
 	"net/http"
 )
 
-type Status string
 type NextAction string
-
-const (
-	StatusPending    Status = "pending"
-	StatusProcessing Status = "processing"
-	StatusSucceeded  Status = "succeeded"
-	StatusFailed     Status = "failed"
-	StatusCancelled  Status = "cancelled"
-)
 
 const (
 	NextActionNone                 NextAction = "none"
@@ -63,7 +54,7 @@ type ContinuationProvider interface {
 	GetCheckout(context.Context, string) (CheckoutSession, error)
 }
 
-type Payment struct {
+type ProviderPayment struct {
 	Provider    string
 	ProviderID  string
 	Reference   string
@@ -72,11 +63,11 @@ type Payment struct {
 	Status      Status
 }
 
-type Event struct {
+type ProviderEvent struct {
 	Provider        string
 	ProviderEventID string
 	Type            string
-	Payment         Payment
+	Payment         ProviderPayment
 	Raw             []byte
 }
 
@@ -85,6 +76,6 @@ type Event struct {
 // Commercial consequences remain the responsibility of the commercial domain.
 type Provider interface {
 	CreateCheckout(context.Context, CheckoutRequest) (CheckoutSession, error)
-	GetPayment(context.Context, string) (Payment, error)
-	ParseWebhook([]byte, http.Header) (Event, error)
+	GetPayment(context.Context, string) (ProviderPayment, error)
+	ParseWebhook([]byte, http.Header) (ProviderEvent, error)
 }

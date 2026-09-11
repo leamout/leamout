@@ -416,6 +416,43 @@ func (q *Queries) ListWalletLedgerEntries(ctx context.Context, arg ListWalletLed
 	return items, nil
 }
 
+const listWallets = `-- name: ListWallets :many
+SELECT w.id, w.organization_id, w.currency, w.status, w.created_at, w.updated_at
+FROM wallets AS w
+JOIN organizations AS o ON o.id = w.organization_id
+WHERE w.organization_id = $1
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+ORDER BY w.created_at ASC, w.id ASC
+`
+
+func (q *Queries) ListWallets(ctx context.Context, organizationID uuid.UUID) ([]Wallet, error) {
+	rows, err := q.db.Query(ctx, listWallets, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Wallet{}
+	for rows.Next() {
+		var i Wallet
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.Currency,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockActiveWallet = `-- name: LockActiveWallet :one
 SELECT w.id, w.organization_id, w.currency, w.status, w.created_at, w.updated_at
 FROM wallets AS w

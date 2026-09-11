@@ -1,178 +1,157 @@
 package wallets
 
 import (
-	"io"
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/checkout"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/pkg/apperror"
-	"github.com/leamout/leamout/pkg/helper"
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
-const maxWebhookBytes = 1 << 20
-
-type TopupHandler struct {
-	service *TopupService
+type walletReader interface {
+	List(context.Context, uuid.UUID) ([]Wallet, error)
+	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
+	Balance(context.Context, uuid.UUID, uuid.UUID) (Balance, error)
+	ListEntries(context.Context, uuid.UUID, uuid.UUID) ([]LedgerEntry, error)
 }
 
-func NewTopupHandler(service *TopupService) *TopupHandler {
-	return &TopupHandler{service: service}
+type Handler struct {
+	wallets walletReader
 }
 
-type createRequest struct {
-	AmountMinor int64                        `json:"amount_minor"`
-	Provider    checkout.Provider            `json:"provider"`
-	Email       string                       `json:"email"`
-	CallbackURL string                       `json:"callback_url"`
-	MobileMoney *paymentprovider.MobileMoney `json:"mobile_money,omitempty"`
+func NewHandler(wallets walletReader) *Handler {
+	return &Handler{wallets: wallets}
 }
 
-type continueRequest struct {
-	Action paymentprovider.NextAction `json:"action"`
-	Value  string                     `json:"value"`
+type walletResponse struct {
+	ID             uuid.UUID        `json:"id"`
+	OrganizationID uuid.UUID        `json:"organization_id"`
+	Currency       string           `json:"currency"`
+	Status         Status           `json:"status"`
+	Balance        *balanceResponse `json:"balance,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
+	UpdatedAt      time.Time        `json:"updated_at"`
 }
 
-type checkoutResponse struct {
-	CheckoutID      uuid.UUID           `json:"checkout_id"`
-	PaymentID       uuid.UUID           `json:"payment_id"`
-	Reference       string              `json:"reference"`
-	Provider        checkout.Provider   `json:"provider"`
-	AmountMinor     int64               `json:"amount_minor"`
-	Currency        string              `json:"currency"`
-	Status          checkout.Status     `json:"status"`
-	NextAction      checkout.NextAction `json:"next_action"`
-	ProviderMessage *string             `json:"provider_message,omitempty"`
-	ClientSecret    string              `json:"client_secret,omitempty"`
+type balanceResponse struct {
+	PostedMinor    int64 `json:"posted_minor"`
+	ReservedMinor  int64 `json:"reserved_minor"`
+	AvailableMinor int64 `json:"available_minor"`
 }
 
-func (h *TopupHandler) Create(w http.ResponseWriter, r *http.Request) {
-	organizationID, walletID, err := requestIDs(r, "wallet_id")
+type ledgerEntryResponse struct {
+	ID             uuid.UUID `json:"id"`
+	WalletID       uuid.UUID `json:"wallet_id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+	Type           EntryType `json:"entry_type"`
+	AmountMinor    int64     `json:"amount_minor"`
+	SourceType     string    `json:"source_type"`
+	SourceID       string    `json:"source_id"`
+	OccurredAt     time.Time `json:"occurred_at"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	organizationID, err := requestContextOrganizationID(r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-
-	request, err := helper.DecodeJSON[createRequest](r)
+	items, err := h.wallets.List(r.Context(), organizationID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-
-	result, err := h.service.Create(
-		r.Context(),
-		organizationID,
-		walletID,
-		TopupCreateInput(request),
-	)
-	if err != nil {
-		httputil.Error(w, err)
-		return
+	responses := make([]walletResponse, 0, len(items))
+	for _, wallet := range items {
+		balance, balanceErr := h.wallets.Balance(r.Context(), organizationID, wallet.ID)
+		if balanceErr != nil {
+			httputil.Error(w, balanceErr)
+			return
+		}
+		responses = append(responses, newWalletResponse(wallet, &balance))
 	}
-
-	httputil.Created(w, responseFromCheckout(result))
+	httputil.OK(w, map[string]any{"wallets": responses})
 }
 
-func (h *TopupHandler) Get(w http.ResponseWriter, r *http.Request) {
-	organizationID, checkoutID, err := requestIDs(r, "checkout_id")
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	organizationID, walletID, err := requestWallet(r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-
-	result, err := h.service.Get(r.Context(), organizationID, checkoutID)
+	wallet, err := h.wallets.Get(r.Context(), organizationID, walletID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-
-	httputil.OK(w, checkoutResponse{
-		CheckoutID:      result.Checkout.ID,
-		PaymentID:       result.Payment.ID,
-		Reference:       result.Checkout.Reference,
-		Provider:        result.Checkout.Provider,
-		AmountMinor:     result.Checkout.AmountMinor,
-		Currency:        result.Checkout.Currency,
-		Status:          result.Checkout.Status,
-		NextAction:      result.Checkout.NextAction,
-		ProviderMessage: result.Checkout.ProviderMessage,
-	})
+	balance, err := h.wallets.Balance(r.Context(), organizationID, walletID)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, newWalletResponse(wallet, &balance))
 }
 
-func (h *TopupHandler) Continue(w http.ResponseWriter, r *http.Request) {
-	organizationID, checkoutID, err := requestIDs(r, "checkout_id")
+func (h *Handler) ListLedger(w http.ResponseWriter, r *http.Request) {
+	organizationID, walletID, err := requestWallet(r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-
-	request, err := helper.DecodeJSON[continueRequest](r)
+	if _, err = h.wallets.Get(r.Context(), organizationID, walletID); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	entries, err := h.wallets.ListEntries(r.Context(), organizationID, walletID)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-
-	result, err := h.service.Continue(
-		r.Context(),
-		organizationID,
-		checkoutID,
-		TopupContinueInput(request),
-	)
-	if err != nil {
-		httputil.Error(w, err)
-		return
+	responses := make([]ledgerEntryResponse, 0, len(entries))
+	for _, entry := range entries {
+		responses = append(responses, ledgerEntryResponse{
+			ID: entry.ID, WalletID: entry.WalletID, OrganizationID: entry.OrganizationID,
+			Type: entry.Type, AmountMinor: entry.AmountMinor, SourceType: entry.SourceType,
+			SourceID: entry.SourceID, OccurredAt: entry.OccurredAt, CreatedAt: entry.CreatedAt,
+		})
 	}
-
-	httputil.OK(w, responseFromCheckout(result))
+	httputil.OK(w, map[string]any{"entries": responses})
 }
 
-func (h *TopupHandler) Webhook(w http.ResponseWriter, r *http.Request) {
-	provider := chi.URLParam(r, "provider")
-	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBytes)
-
-	payload, err := io.ReadAll(r.Body)
-	if err != nil {
-		httputil.Error(w, apperror.NewBadRequest("invalid webhook payload"))
-		return
+func newWalletResponse(wallet Wallet, balance *Balance) walletResponse {
+	response := walletResponse{
+		ID: wallet.ID, OrganizationID: wallet.OrganizationID, Currency: wallet.Currency,
+		Status: wallet.Status, CreatedAt: wallet.CreatedAt, UpdatedAt: wallet.UpdatedAt,
 	}
-
-	if _, err = h.service.Webhook(r.Context(), provider, payload, r.Header); err != nil {
-		httputil.Error(w, apperror.NewBadRequest("invalid payment webhook"))
-		return
+	if balance != nil {
+		response.Balance = &balanceResponse{
+			PostedMinor: balance.PostedMinor, ReservedMinor: balance.ReservedMinor, AvailableMinor: balance.AvailableMinor,
+		}
 	}
-
-	httputil.OK(w, map[string]bool{"received": true})
+	return response
 }
 
-func requestIDs(r *http.Request, resourceParam string) (uuid.UUID, uuid.UUID, error) {
+func requestWallet(r *http.Request) (uuid.UUID, uuid.UUID, error) {
+	organizationID, err := requestContextOrganizationID(r)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, err
+	}
+	walletID, err := uuid.Parse(chi.URLParam(r, "wallet_id"))
+	if err != nil {
+		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid wallet_id")
+	}
+	return organizationID, walletID, nil
+}
+
+func requestContextOrganizationID(r *http.Request) (uuid.UUID, error) {
 	organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
 	if !ok {
-		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("organization context required")
+		return uuid.Nil, apperror.NewBadRequest("organization context required")
 	}
-
-	resourceID, err := uuid.Parse(chi.URLParam(r, resourceParam))
-	if err != nil {
-		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid " + resourceParam)
-	}
-
-	return organizationID, resourceID, nil
-}
-
-func responseFromCheckout(result TopupCheckout) checkoutResponse {
-	return checkoutResponse{
-		CheckoutID:      result.Checkout.ID,
-		PaymentID:       result.Payment.ID,
-		Reference:       result.Checkout.Reference,
-		Provider:        result.Checkout.Provider,
-		AmountMinor:     result.Checkout.AmountMinor,
-		Currency:        result.Checkout.Currency,
-		Status:          result.Checkout.Status,
-		NextAction:      result.Checkout.NextAction,
-		ProviderMessage: result.Checkout.ProviderMessage,
-		ClientSecret:    result.Session.ClientSecret,
-	}
+	return organizationID, nil
 }

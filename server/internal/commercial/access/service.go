@@ -1,4 +1,4 @@
-package state
+package access
 
 import (
 	"context"
@@ -25,35 +25,35 @@ func NewService(subscriptions *subscriptions.Service, entitlements *entitlements
 	}
 }
 
-func (s *Service) Resolve(ctx context.Context, organizationID uuid.UUID) (OrganizationState, error) {
+func (s *Service) Resolve(ctx context.Context, organizationID uuid.UUID) (OrganizationAccess, error) {
 	return s.ResolveAt(ctx, organizationID, s.now())
 }
 
-func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at time.Time) (OrganizationState, error) {
+func (s *Service) ResolveAt(ctx context.Context, organizationID uuid.UUID, at time.Time) (OrganizationAccess, error) {
 	if organizationID == uuid.Nil {
-		return OrganizationState{}, ErrOrganizationIDRequired
+		return OrganizationAccess{}, ErrOrganizationIDRequired
 	}
 
 	current, err := s.subscriptions.Current(ctx, organizationID)
 	if err != nil {
 		if errors.Is(err, subscriptions.ErrSubscriptionNotFound) {
-			return unsubscribedState(organizationID, at), nil
+			return unsubscribedAccess(organizationID, at), nil
 		}
-		return OrganizationState{}, err
+		return OrganizationAccess{}, err
 	}
 
 	resolution, err := s.entitlements.ResolveForOrganizationPlanAt(ctx, organizationID, current.PlanID, at)
 	if err != nil {
-		return OrganizationState{}, err
+		return OrganizationAccess{}, err
 	}
 
-	return organizationState(organizationID, current, resolution, at), nil
+	return organizationAccess(organizationID, current, resolution, at), nil
 }
 
-func organizationState(organizationID uuid.UUID, current subscriptions.Subscription, resolution entitlements.Resolution, at time.Time) OrganizationState {
+func organizationAccess(organizationID uuid.UUID, current subscriptions.Subscription, resolution entitlements.Resolution, at time.Time) OrganizationAccess {
 	subscriptionID := current.ID
 	planID := current.PlanID
-	return OrganizationState{
+	return OrganizationAccess{
 		OrganizationID: organizationID,
 		Standing:       standingFromSubscription(current.Status),
 		SubscriptionID: &subscriptionID,
@@ -65,8 +65,8 @@ func organizationState(organizationID uuid.UUID, current subscriptions.Subscript
 	}
 }
 
-func unsubscribedState(organizationID uuid.UUID, at time.Time) OrganizationState {
-	return OrganizationState{
+func unsubscribedAccess(organizationID uuid.UUID, at time.Time) OrganizationAccess {
+	return OrganizationAccess{
 		OrganizationID: organizationID,
 		Standing:       StandingUnsubscribed,
 		Features:       map[string]bool{},

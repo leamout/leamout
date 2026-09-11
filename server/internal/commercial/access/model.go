@@ -1,4 +1,4 @@
-package state
+package access
 
 import (
 	"time"
@@ -18,8 +18,8 @@ const (
 
 var ErrOrganizationIDRequired = apperror.NewBadRequest("organization id is required")
 
-// OrganizationState is the resolved commercial state consumed by operational modules.
-type OrganizationState struct {
+// OrganizationAccess is the resolved commercial state consumed by operational modules.
+type OrganizationAccess struct {
 	OrganizationID uuid.UUID
 	Standing       Standing
 	SubscriptionID *uuid.UUID
@@ -30,7 +30,7 @@ type OrganizationState struct {
 	NextChangeAt   *time.Time
 }
 
-type organizationStateResponse struct {
+type organizationAccessResponse struct {
 	OrganizationID uuid.UUID        `json:"organization_id"`
 	Standing       Standing         `json:"standing"`
 	SubscriptionID *uuid.UUID       `json:"subscription_id,omitempty"`
@@ -41,15 +41,15 @@ type organizationStateResponse struct {
 	NextChangeAt   *time.Time       `json:"next_change_at,omitempty"`
 }
 
-func newOrganizationStateResponse(state OrganizationState) organizationStateResponse {
-	return organizationStateResponse(state)
+func newOrganizationAccessResponse(state OrganizationAccess) organizationAccessResponse {
+	return organizationAccessResponse(state)
 }
 
-func (s OrganizationState) Enabled(feature string) bool {
+func (s OrganizationAccess) Enabled(feature string) bool {
 	return s.Features[feature]
 }
 
-func (s OrganizationState) Limit(name string) (int64, bool) {
+func (s OrganizationAccess) Limit(name string) (int64, bool) {
 	value, ok := s.Limits[name]
 	return value, ok
 }

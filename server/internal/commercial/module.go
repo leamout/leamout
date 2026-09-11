@@ -3,34 +3,26 @@ package commercial
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/checkout"
+	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
-	"github.com/leamout/leamout/internal/commercial/orders"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	commercialstate "github.com/leamout/leamout/internal/commercial/state"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 // Module is the composition boundary for Leamout's Commercial domain.
 // Runtime and telecom code should depend on this module rather than assembling
 // Commercial subdomains independently.
 type Module struct {
-	Catalog  CatalogModule
-	Purchase PurchaseModule
-	Access   AccessModule
-	Usage    UsageModule
-	Prepaid  PrepaidModule
-	Payments PaymentsModule
-
-	// Compatibility bridge for runtime callers migrating to Prepaid.
-	Money PrepaidModule
-	// Compatibility bridge for runtime callers migrating to Access.State.
-	State StateModule
+	Catalog CatalogModule
+	Billing BillingModule
+	Access  AccessModule
+	Usage   UsageModule
+	Prepaid PrepaidModule
 }
 
 type CatalogModule struct {
@@ -39,16 +31,23 @@ type CatalogModule struct {
 	Handler    *catalog.Handler
 }
 
-type PurchaseModule struct {
-	Checkouts *checkout.Repository
-	Orders    *orders.Repository
+type BillingModule struct {
+	Checkouts CheckoutModule
+	Payments  PaymentsModule
+}
+
+type CheckoutModule struct {
+	Repository *checkout.Repository
+	Service    *checkout.Service
+	Handler    *checkout.Handler
 }
 
 type AccessModule struct {
 	Subscriptions SubscriptionsModule
 	Licenses      LicensesModule
 	Entitlements  EntitlementsModule
-	State         StateModule
+	Service       *commercialaccess.Service
+	Handler       *commercialaccess.Handler
 }
 
 type SubscriptionsModule struct {
@@ -68,24 +67,26 @@ type EntitlementsModule struct {
 	Service    *entitlements.Service
 }
 
-type StateModule struct {
-	Service *commercialstate.Service
-	Handler *commercialstate.Handler
-}
-
 type UsageModule struct {
 	Repository *usage.Repository
 	Service    *usage.Service
 }
 
 type PrepaidModule struct {
-	Wallets      *wallets.Repository
-	TopupService *wallets.TopupService
-	TopupHandler *wallets.TopupHandler
+	Wallets WalletModule
+}
+
+type WalletModule struct {
+	Repository *wallets.Repository
+	Service    *wallets.Service
+	Handler    *wallets.Handler
 }
 
 type PaymentsModule struct {
 	Repository *payments.Repository
+	Service    *payments.Service
+	Providers  *payments.ProviderRegistry
+	Handler    *payments.Handler
 }
 
 // New composes the Commercial domain from its durable submodules. Payment
@@ -107,7 +108,7 @@ func New(db *pgxpool.Pool) *Module {
 		subscriptionsService,
 	)
 
-	commercialStateService := commercialstate.NewService(
+	commercialAccessService := commercialaccess.NewService(
 		subscriptionsService,
 		entitlementsService,
 	)
@@ -115,32 +116,30 @@ func New(db *pgxpool.Pool) *Module {
 	licensingRepository := licensing.NewRepository(db)
 	licensingService := licensing.NewService(
 		licensingRepository,
-		commercialStateService,
+		commercialAccessService,
 	)
 
 	usageRepository := usage.NewRepository(db)
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
+	walletService := wallets.NewService(walletRepository)
 	checkoutRepository := checkout.NewRepository(db)
-	orderRepository := orders.NewRepository(db)
+	checkoutService := checkout.NewService(checkoutRepository)
 	paymentRepository := payments.NewRepository(db)
-	topupService := wallets.NewTopupService(
-		walletRepository,
-		checkoutRepository,
+	paymentService := payments.NewService(paymentRepository)
+	providerRegistry := payments.NewProviderRegistry()
+	topupService := checkout.NewTopupService(
+		walletService,
+		checkoutService,
 		paymentRepository,
-		walletRepository,
-		map[string]paymentprovider.Provider{},
+		paymentService,
+		providerRegistry,
 	)
-	topupHandler := wallets.NewTopupHandler(topupService)
-	stateModule := StateModule{
-		Service: commercialStateService,
-		Handler: commercialstate.NewHandler(commercialStateService),
-	}
+	checkoutHandler := checkout.NewHandler(topupService)
+	walletHandler := wallets.NewHandler(walletService)
 	prepaidModule := PrepaidModule{
-		Wallets:      walletRepository,
-		TopupService: topupService,
-		TopupHandler: topupHandler,
+		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
 	}
 
 	return &Module{
@@ -149,9 +148,14 @@ func New(db *pgxpool.Pool) *Module {
 			Service:    catalogService,
 			Handler:    catalog.NewHandler(catalogService),
 		},
-		Purchase: PurchaseModule{
-			Checkouts: checkoutRepository,
-			Orders:    orderRepository,
+		Billing: BillingModule{
+			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService, Handler: checkoutHandler},
+			Payments: PaymentsModule{
+				Repository: paymentRepository,
+				Service:    paymentService,
+				Providers:  providerRegistry,
+				Handler:    payments.NewHandler(paymentService, providerRegistry),
+			},
 		},
 		Access: AccessModule{
 			Subscriptions: SubscriptionsModule{
@@ -168,17 +172,13 @@ func New(db *pgxpool.Pool) *Module {
 				Repository: entitlementsRepository,
 				Service:    entitlementsService,
 			},
-			State: stateModule,
+			Service: commercialAccessService,
+			Handler: commercialaccess.NewHandler(commercialAccessService),
 		},
 		Usage: UsageModule{
 			Repository: usageRepository,
 			Service:    usageService,
 		},
 		Prepaid: prepaidModule,
-		Payments: PaymentsModule{
-			Repository: paymentRepository,
-		},
-		Money: prepaidModule,
-		State: stateModule,
 	}
 }

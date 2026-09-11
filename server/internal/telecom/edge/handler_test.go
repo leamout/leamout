@@ -12,7 +12,7 @@ import (
 )
 
 func TestHandlerReturnsForbiddenWhenRouteDoesNotAuthorize(t *testing.T) {
-	service := NewService(&fakeStore{resolveErr: pgx.ErrNoRows}, &fakeState{})
+	service := NewService(&fakeStore{resolveErr: pgx.ErrNoRows}, &fakeAccess{})
 	handler := NewHandler(service, "edge-secret")
 	request := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/internal/v1/sip-edge/authorize", strings.NewReader(`{
 		"username":"managed-trunk",

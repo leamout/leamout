@@ -1,4 +1,4 @@
-package state
+package access
 
 import (
 	"encoding/json"
@@ -36,12 +36,12 @@ func TestCommercialStateRouteValidatesOrganizationID(t *testing.T) {
 	}
 }
 
-func TestOrganizationStateResponse(t *testing.T) {
+func TestOrganizationAccessResponse(t *testing.T) {
 	organizationID := uuid.New()
 	subscriptionID := uuid.New()
 	planID := uuid.New()
 	effectiveAt := time.Date(2026, 9, 2, 12, 0, 0, 0, time.UTC)
-	response := newOrganizationStateResponse(OrganizationState{
+	response := newOrganizationAccessResponse(OrganizationAccess{
 		OrganizationID: organizationID,
 		Standing:       StandingActive,
 		SubscriptionID: &subscriptionID,

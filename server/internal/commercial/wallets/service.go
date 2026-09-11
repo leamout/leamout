@@ -2,404 +2,74 @@ package wallets
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"net/http"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/checkout"
-	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 )
 
 type walletStore interface {
+	Create(context.Context, uuid.UUID, string) (Wallet, error)
+	List(context.Context, uuid.UUID) ([]Wallet, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
+	GetByCurrency(context.Context, uuid.UUID, string) (Wallet, error)
+	Balance(context.Context, uuid.UUID, uuid.UUID) (Balance, error)
+	Post(context.Context, uuid.UUID, uuid.UUID, PostEntryInput) (LedgerEntry, error)
+	ListEntries(context.Context, uuid.UUID, uuid.UUID) ([]LedgerEntry, error)
+	Reserve(context.Context, uuid.UUID, uuid.UUID, ReserveInput) (Reservation, error)
+	GetReservation(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
+	Capture(context.Context, uuid.UUID, uuid.UUID, int64, string) (Reservation, error)
+	Release(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
+	Expire(context.Context) ([]Reservation, error)
 }
 
-type checkoutStore interface {
-	Create(context.Context, uuid.UUID, checkout.CreateInput) (checkout.Checkout, error)
-	Get(context.Context, uuid.UUID, uuid.UUID) (checkout.Checkout, error)
-	ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (checkout.Checkout, error)
-	Transition(context.Context, uuid.UUID, uuid.UUID, checkout.Transition) (checkout.Checkout, error)
+// Service owns prepaid wallet rules. Its mutation methods are internal
+// Commercial capabilities and are not registered as generic HTTP APIs.
+type Service struct {
+	repo walletStore
+	now  func() time.Time
 }
 
-type paymentStore interface {
-	Create(context.Context, uuid.UUID, string, commercialpayments.CreateInput) (commercialpayments.Payment, error)
-	GetByCheckout(context.Context, uuid.UUID, uuid.UUID) (commercialpayments.Payment, error)
-	SetProviderID(context.Context, uuid.UUID, uuid.UUID, string, commercialpayments.Status) (commercialpayments.Payment, error)
-	UpdateStatus(context.Context, uuid.UUID, uuid.UUID, commercialpayments.Status, *time.Time) (commercialpayments.Payment, error)
+func NewService(repo walletStore) *Service { return &Service{repo: repo, now: time.Now} }
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Wallet, error) {
+	return s.repo.List(ctx, organizationID)
 }
-
-type settlementStore interface {
-	Reconcile(context.Context, paymentprovider.Event) (TopupSettlement, error)
+func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
+	return s.repo.Create(ctx, organizationID, currency)
 }
-
-type TopupService struct {
-	wallets     walletStore
-	checkouts   checkoutStore
-	payments    paymentStore
-	settlements settlementStore
-	providers   map[string]paymentprovider.Provider
-	now         func() time.Time
+func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (Wallet, error) {
+	return s.repo.Get(ctx, organizationID, id)
 }
-
-func NewTopupService(
-	wallets walletStore,
-	checkouts checkoutStore,
-	payments paymentStore,
-	settlements settlementStore,
-	providers map[string]paymentprovider.Provider,
-) *TopupService {
-	return &TopupService{
-		wallets:     wallets,
-		checkouts:   checkouts,
-		payments:    payments,
-		settlements: settlements,
-		providers:   providers,
-		now:         time.Now,
-	}
+func (s *Service) GetByCurrency(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
+	return s.repo.GetByCurrency(ctx, organizationID, currency)
 }
-
-func (s *TopupService) SetProvider(name string, provider paymentprovider.Provider) {
-	if provider != nil {
-		s.providers[name] = provider
-	}
+func (s *Service) Balance(ctx context.Context, organizationID, id uuid.UUID) (Balance, error) {
+	return s.repo.Balance(ctx, organizationID, id)
 }
-
-func (s *TopupService) Create(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	walletID uuid.UUID,
-	input TopupCreateInput,
-) (TopupCheckout, error) {
-	providerName := string(input.Provider)
-	provider, ok := s.providers[providerName]
-	if !ok {
-		return TopupCheckout{}, ErrProviderUnavailable
+func (s *Service) Post(ctx context.Context, organizationID, id uuid.UUID, input PostEntryInput) (LedgerEntry, error) {
+	if input.Type == EntryCapture {
+		return LedgerEntry{}, ErrReservationRequired
 	}
-
-	wallet, err := s.wallets.Get(ctx, organizationID, walletID)
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-	if wallet.Status != StatusActive || input.AmountMinor <= 0 || strings.TrimSpace(input.Email) == "" {
-		return TopupCheckout{}, ErrInvalidTopup
-	}
-
-	method := checkout.MethodCard
-	if input.Provider == checkout.ProviderPaystack {
-		method = checkout.MethodMobileMoney
-		if wallet.Currency != "GHS" || input.MobileMoney == nil {
-			return TopupCheckout{}, ErrInvalidTopup
-		}
-	} else if input.Provider != checkout.ProviderStripe || input.MobileMoney != nil {
-		return TopupCheckout{}, ErrInvalidTopup
-	}
-
-	now := s.now().UTC()
-	reference := "topup." + uuid.NewString()
-	checkoutRecord, err := s.checkouts.Create(ctx, organizationID, checkout.CreateInput{
-		WalletID:      &walletID,
-		Type:          checkout.TypeWalletTopup,
-		Provider:      input.Provider,
-		PaymentMethod: method,
-		Reference:     reference,
-		AmountMinor:   input.AmountMinor,
-		Currency:      wallet.Currency,
-		ExpiresAt:     now.Add(30 * time.Minute),
-	})
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-
-	payment, err := s.payments.Create(ctx, organizationID, providerName, commercialpayments.CreateInput{
-		CheckoutID:  checkoutRecord.ID,
-		Status:      commercialpayments.StatusPending,
-		AmountMinor: checkoutRecord.AmountMinor,
-		Currency:    checkoutRecord.Currency,
-	})
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-
-	session, err := provider.CreateCheckout(ctx, paymentprovider.CheckoutRequest{
-		Reference:   reference,
-		AmountMinor: checkoutRecord.AmountMinor,
-		Currency:    checkoutRecord.Currency,
-		Email:       strings.TrimSpace(input.Email),
-		CallbackURL: strings.TrimSpace(input.CallbackURL),
-		Metadata: map[string]string{
-			"organization_id": organizationID.String(),
-			"wallet_id":       walletID.String(),
-		},
-		MobileMoney: input.MobileMoney,
-	})
-	if err != nil {
-		s.failPendingCheckout(ctx, organizationID, checkoutRecord, payment)
-		return TopupCheckout{}, err
-	}
-	if session.Provider != providerName || session.Reference != reference ||
-		(input.Provider == checkout.ProviderStripe && session.ProviderID == "") {
-		s.failPendingCheckout(ctx, organizationID, checkoutRecord, payment)
-		return TopupCheckout{}, ErrPaymentMismatch
-	}
-
-	if session.ProviderID == "" {
-		payment, err = s.payments.UpdateStatus(
-			ctx,
-			organizationID,
-			payment.ID,
-			commercialpayments.StatusProcessing,
-			nil,
-		)
-	} else {
-		payment, err = s.payments.SetProviderID(
-			ctx,
-			organizationID,
-			payment.ID,
-			session.ProviderID,
-			commercialpayments.StatusProcessing,
-		)
-	}
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-
-	message := strings.TrimSpace(session.Message)
-	var providerMessage *string
-	if message != "" {
-		providerMessage = &message
-	}
-
-	checkoutRecord, err = s.checkouts.Transition(
-		ctx,
-		organizationID,
-		checkoutRecord.ID,
-		checkout.Transition{
-			Expected:        checkout.StatusPending,
-			Status:          checkout.StatusProcessing,
-			NextAction:      checkout.NextAction(session.NextAction),
-			ProviderMessage: providerMessage,
-		},
-	)
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-
-	return TopupCheckout{
-		Checkout: checkoutRecord,
-		Payment:  payment,
-		Session:  session,
-		Order:    checkoutRecord,
-	}, nil
+	return s.repo.Post(ctx, organizationID, id, input)
 }
-
-func (s *TopupService) failPendingCheckout(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	checkoutRecord checkout.Checkout,
-	payment commercialpayments.Payment,
-) {
-	completedAt := s.now().UTC()
-
-	_, _ = s.payments.UpdateStatus(
-		ctx,
-		organizationID,
-		payment.ID,
-		commercialpayments.StatusFailed,
-		nil,
-	)
-	_, _ = s.checkouts.Transition(
-		ctx,
-		organizationID,
-		checkoutRecord.ID,
-		checkout.Transition{
-			Expected:    checkout.StatusPending,
-			Status:      checkout.StatusFailed,
-			NextAction:  checkout.ActionNone,
-			CompletedAt: &completedAt,
-		},
-	)
+func (s *Service) ListEntries(ctx context.Context, organizationID, id uuid.UUID) ([]LedgerEntry, error) {
+	return s.repo.ListEntries(ctx, organizationID, id)
 }
-
-func (s *TopupService) Get(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	checkoutID uuid.UUID,
-) (TopupDetails, error) {
-	checkoutRecord, err := s.checkouts.Get(ctx, organizationID, checkoutID)
-	if err != nil {
-		return TopupDetails{}, err
+func (s *Service) Reserve(ctx context.Context, organizationID, id uuid.UUID, input ReserveInput) (Reservation, error) {
+	if err := validateReservationInput(input, s.now()); err != nil {
+		return Reservation{}, err
 	}
-
-	payment, err := s.payments.GetByCheckout(ctx, organizationID, checkoutID)
-	if err != nil {
-		return TopupDetails{}, err
-	}
-
-	if checkoutRecord.Provider == checkout.ProviderPaystack && checkoutRecord.Status == checkout.StatusProcessing {
-		claimed, claimErr := s.checkouts.ClaimRefresh(
-			ctx,
-			organizationID,
-			checkoutID,
-			s.now().UTC().Add(-10*time.Second),
-		)
-		if claimErr == nil {
-			if refreshed, ok := s.refreshPaystack(ctx, claimed); ok {
-				if _, err = s.settlements.Reconcile(ctx, refreshed); err != nil {
-					return TopupDetails{}, err
-				}
-
-				checkoutRecord, err = s.checkouts.Get(ctx, organizationID, checkoutID)
-				if err != nil {
-					return TopupDetails{}, err
-				}
-
-				payment, err = s.payments.GetByCheckout(ctx, organizationID, checkoutID)
-				if err != nil {
-					return TopupDetails{}, err
-				}
-			}
-		} else if !errors.Is(claimErr, checkout.ErrCheckoutNotFound) {
-			return TopupDetails{}, claimErr
-		}
-	}
-
-	return TopupDetails{
-		Checkout: checkoutRecord,
-		Payment:  payment,
-		Order:    checkoutRecord,
-	}, nil
+	return s.repo.Reserve(ctx, organizationID, id, input)
 }
-
-func (s *TopupService) refreshPaystack(
-	ctx context.Context,
-	checkoutRecord checkout.Checkout,
-) (paymentprovider.Event, bool) {
-	provider, ok := s.providers["paystack"]
-	if !ok {
-		return paymentprovider.Event{}, false
-	}
-
-	payment, err := provider.GetPayment(ctx, checkoutRecord.Reference)
-	if err != nil || (payment.Status != paymentprovider.StatusSucceeded && payment.Status != paymentprovider.StatusFailed) {
-		return paymentprovider.Event{}, false
-	}
-
-	raw, _ := json.Marshal(map[string]string{
-		"source":    "charge_lookup",
-		"reference": checkoutRecord.Reference,
-		"status":    string(payment.Status),
-	})
-
-	eventType := "charge.failed"
-	if payment.Status == paymentprovider.StatusSucceeded {
-		eventType = "charge.success"
-	}
-
-	return paymentprovider.Event{
-		Provider:        "paystack",
-		ProviderEventID: "lookup:" + checkoutRecord.Reference + ":" + string(payment.Status),
-		Type:            eventType,
-		Payment:         payment,
-		Raw:             raw,
-	}, true
+func (s *Service) GetReservation(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
+	return s.repo.GetReservation(ctx, organizationID, id)
 }
-
-func (s *TopupService) Continue(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	checkoutID uuid.UUID,
-	input TopupContinueInput,
-) (TopupCheckout, error) {
-	details, err := s.Get(ctx, organizationID, checkoutID)
-	if err != nil {
-		return TopupCheckout{}, err
+func (s *Service) Capture(ctx context.Context, organizationID, id uuid.UUID, amount int64, key string) (Reservation, error) {
+	if err := validateCaptureInput(amount); err != nil {
+		return Reservation{}, err
 	}
-
-	provider, ok := s.providers[string(details.Checkout.Provider)]
-	if !ok {
-		return TopupCheckout{}, ErrProviderUnavailable
-	}
-
-	continuation, ok := provider.(paymentprovider.ContinuationProvider)
-	if !ok || details.Checkout.Provider != checkout.ProviderPaystack ||
-		details.Checkout.Status != checkout.StatusProcessing {
-		return TopupCheckout{}, ErrInvalidTopup
-	}
-
-	session, err := continuation.ContinueCheckout(ctx, paymentprovider.ContinueCheckoutRequest{
-		Reference: details.Checkout.Reference,
-		Action:    input.Action,
-		Value:     input.Value,
-	})
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-
-	message := strings.TrimSpace(session.Message)
-	var providerMessage *string
-	if message != "" {
-		providerMessage = &message
-	}
-
-	checkoutRecord, err := s.checkouts.Transition(
-		ctx,
-		organizationID,
-		checkoutID,
-		checkout.Transition{
-			Expected:        checkout.StatusProcessing,
-			Status:          checkout.StatusProcessing,
-			NextAction:      checkout.NextAction(session.NextAction),
-			ProviderMessage: providerMessage,
-		},
-	)
-	if err != nil {
-		return TopupCheckout{}, err
-	}
-
-	return TopupCheckout{
-		Checkout: checkoutRecord,
-		Payment:  details.Payment,
-		Session:  session,
-		Order:    checkoutRecord,
-	}, nil
+	return s.repo.Capture(ctx, organizationID, id, amount, key)
 }
-
-func (s *TopupService) Webhook(
-	ctx context.Context,
-	providerName string,
-	payload []byte,
-	headers http.Header,
-) (TopupSettlement, error) {
-	provider, ok := s.providers[providerName]
-	if !ok {
-		return TopupSettlement{}, ErrProviderUnavailable
-	}
-
-	event, err := provider.ParseWebhook(payload, headers)
-	if err != nil {
-		return TopupSettlement{}, err
-	}
-	if event.Provider != providerName {
-		return TopupSettlement{}, ErrPaymentMismatch
-	}
-	if !isTopupPaymentEvent(event.Provider, event.Type) {
-		return TopupSettlement{}, nil
-	}
-
-	return s.settlements.Reconcile(ctx, event)
+func (s *Service) Release(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
+	return s.repo.Release(ctx, organizationID, id)
 }
-
-func isTopupPaymentEvent(provider, eventType string) bool {
-	switch provider {
-	case "paystack":
-		return eventType == "charge.success" || eventType == "charge.failed"
-	case "stripe":
-		return eventType == "checkout.session.completed" || eventType == "checkout.session.expired"
-	default:
-		return false
-	}
-}
+func (s *Service) Expire(ctx context.Context) ([]Reservation, error) { return s.repo.Expire(ctx) }

@@ -2,13 +2,9 @@ package wallets
 
 import (
 	"encoding/json"
-	"errors"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/checkout"
-	"github.com/leamout/leamout/internal/commercial/payments"
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
@@ -50,9 +46,6 @@ var (
 	ErrDuplicateLedgerEntry    = apperror.NewConflict("wallet ledger entry already exists")
 	ErrReservationRequired     = apperror.NewConflict("wallet capture requires an active reservation")
 	ErrInvalidMoney            = apperror.NewBadRequest("invalid monetary amount or currency")
-	ErrProviderUnavailable     = apperror.NewServiceUnavailable("payment provider is unavailable", errors.New("payment provider is not configured"))
-	ErrInvalidTopup            = apperror.NewBadRequest("invalid wallet top-up")
-	ErrPaymentMismatch         = apperror.NewConflict("provider payment does not match checkout")
 )
 
 type Wallet struct {
@@ -116,43 +109,4 @@ type ReserveInput struct {
 	OperationType string
 	OperationID   string
 	ExpiresAt     time.Time
-}
-
-type TopupCreateInput struct {
-	AmountMinor int64
-	Provider    checkout.Provider
-	Email       string
-	CallbackURL string
-	MobileMoney *paymentprovider.MobileMoney
-}
-
-type TopupContinueInput struct {
-	Action paymentprovider.NextAction
-	Value  string
-}
-
-type TopupCheckout struct {
-	Checkout checkout.Checkout
-	Payment  payments.Payment
-	Session  paymentprovider.CheckoutSession
-
-	// Compatibility mirror for callers migrating from the old checkout/order terminology.
-	Order checkout.Checkout
-}
-
-type TopupDetails struct {
-	Checkout checkout.Checkout
-	Payment  payments.Payment
-
-	// Compatibility mirror for callers migrating from the old checkout/order terminology.
-	Order checkout.Checkout
-}
-
-type TopupSettlement struct {
-	Applied        bool
-	OrganizationID uuid.UUID
-	WalletID       uuid.UUID
-	PaymentID      uuid.UUID
-	AmountMinor    int64
-	SettledAt      *time.Time
 }

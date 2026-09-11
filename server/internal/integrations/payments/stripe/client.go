@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	paymentprovider "github.com/leamout/leamout/internal/integrations/payments"
+	paymentprovider "github.com/leamout/leamout/internal/commercial/payments"
 )
 
 const (
@@ -122,28 +122,28 @@ func (c *Client) CreateCheckout(ctx context.Context, request paymentprovider.Che
 	}, nil
 }
 
-func (c *Client) GetPayment(ctx context.Context, providerID string) (paymentprovider.Payment, error) {
+func (c *Client) GetPayment(ctx context.Context, providerID string) (paymentprovider.ProviderPayment, error) {
 	providerID = strings.TrimSpace(providerID)
 	if providerID == "" {
-		return paymentprovider.Payment{}, fmt.Errorf("stripe: Checkout Session ID is required")
+		return paymentprovider.ProviderPayment{}, fmt.Errorf("stripe: Checkout Session ID is required")
 	}
 	var result checkoutSession
 	if err := c.do(ctx, http.MethodGet, "/checkout/sessions/"+url.PathEscape(providerID), nil, "", &result); err != nil {
-		return paymentprovider.Payment{}, err
+		return paymentprovider.ProviderPayment{}, err
 	}
 	return normalizePayment(result), nil
 }
 
-func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovider.Event, error) {
+func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovider.ProviderEvent, error) {
 	if c.webhookSecret == "" {
-		return paymentprovider.Event{}, fmt.Errorf("stripe: webhook secret is required")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("stripe: webhook secret is required")
 	}
 	timestamp, signatures, err := parseSignatureHeader(headers.Get("Stripe-Signature"))
 	if err != nil {
-		return paymentprovider.Event{}, err
+		return paymentprovider.ProviderEvent{}, err
 	}
 	if delta := c.now().Sub(time.Unix(timestamp, 0)); delta > c.webhookTolerance || delta < -c.webhookTolerance {
-		return paymentprovider.Event{}, fmt.Errorf("stripe: webhook timestamp outside tolerance")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("stripe: webhook timestamp outside tolerance")
 	}
 	signed := append([]byte(strconv.FormatInt(timestamp, 10)+"."), payload...)
 	mac := hmac.New(sha256.New, []byte(c.webhookSecret))
@@ -157,7 +157,7 @@ func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovi
 		}
 	}
 	if !verified {
-		return paymentprovider.Event{}, fmt.Errorf("stripe: invalid webhook signature")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("stripe: invalid webhook signature")
 	}
 	var envelope struct {
 		ID   string `json:"id"`
@@ -167,12 +167,12 @@ func (c *Client) ParseWebhook(payload []byte, headers http.Header) (paymentprovi
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(payload, &envelope); err != nil {
-		return paymentprovider.Event{}, fmt.Errorf("stripe: decode webhook: %w", err)
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("stripe: decode webhook: %w", err)
 	}
 	if envelope.ID == "" || envelope.Type == "" {
-		return paymentprovider.Event{}, fmt.Errorf("stripe: webhook event identity is required")
+		return paymentprovider.ProviderEvent{}, fmt.Errorf("stripe: webhook event identity is required")
 	}
-	return paymentprovider.Event{
+	return paymentprovider.ProviderEvent{
 		Provider: "stripe", ProviderEventID: envelope.ID, Type: envelope.Type,
 		Payment: normalizePayment(envelope.Data.Object), Raw: append([]byte(nil), payload...),
 	}, nil
@@ -206,8 +206,8 @@ func parseSignatureHeader(value string) (int64, [][]byte, error) {
 	return timestamp, signatures, nil
 }
 
-func normalizePayment(item checkoutSession) paymentprovider.Payment {
-	return paymentprovider.Payment{
+func normalizePayment(item checkoutSession) paymentprovider.ProviderPayment {
+	return paymentprovider.ProviderPayment{
 		Provider: "stripe", ProviderID: item.ID, Reference: item.Metadata["leamout_reference"],
 		AmountMinor: item.AmountTotal, Currency: strings.ToUpper(item.Currency), Status: normalizeStatus(item),
 	}

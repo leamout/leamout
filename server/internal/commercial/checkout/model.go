@@ -83,16 +83,3 @@ type Transition struct {
 	ProviderMessage *string
 	CompletedAt     *time.Time
 }
-
-// Deprecated compatibility names for callers that still use the pre-split
-// checkout terminology. New code should use Checkout, TypeSubscription, and
-// TypeWalletTopup.
-type Order = Checkout
-type OrderType = Type
-
-const (
-	OrderSubscription = TypeSubscription
-	OrderWalletTopup  = TypeWalletTopup
-)
-
-var ErrOrderNotFound = ErrCheckoutNotFound
