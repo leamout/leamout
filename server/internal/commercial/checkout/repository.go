@@ -45,9 +45,11 @@ func (r *Repository) StartPayment(
 	organizationID, id uuid.UUID,
 	input StartPayment,
 ) (Checkout, error) {
+	provider := string(input.Provider)
+	paymentMethod := string(input.PaymentMethod)
 	row, err := r.queries.StartCheckoutPayment(ctx, sqlc.StartCheckoutPaymentParams{
-		Provider:       string(input.Provider),
-		PaymentMethod:  string(input.PaymentMethod),
+		Provider:       &provider,
+		PaymentMethod:  &paymentMethod,
 		OrganizationID: organizationID,
 		ID:             id,
 	})
