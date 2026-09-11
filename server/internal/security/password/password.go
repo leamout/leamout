@@ -19,6 +19,11 @@ const (
 	defaultParallelism = uint8(4)
 	defaultSaltLength  = 16
 	defaultKeyLength   = uint32(32)
+	maxMemory          = uint32(256 * 1024)
+	maxIterations      = uint32(10)
+	maxParallelism     = uint8(16)
+	maxSaltLength      = 64
+	maxKeyLength       = uint32(128)
 )
 
 type parameters struct {
@@ -118,10 +123,13 @@ func decode(encoded string) (parameters, []byte, []byte, error) {
 	}
 
 	expected, err := hex.DecodeString(parts[4])
-	if err != nil || len(expected) == 0 {
+	if err != nil || len(expected) == 0 || len(expected) > int(maxKeyLength) {
 		return parameters{}, nil, nil, fmt.Errorf("invalid password hash digest")
 	}
 	params.keyLength = uint32(len(expected))
+	if params.memory > maxMemory || params.iterations > maxIterations || params.parallelism > maxParallelism || len(salt) > maxSaltLength {
+		return parameters{}, nil, nil, fmt.Errorf("password hash parameters exceed verification limits")
+	}
 
 	return params, salt, expected, nil
 }

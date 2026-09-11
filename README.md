@@ -156,6 +156,10 @@ Browser media ── TURN/STUN via Coturn ──► RTPengine
 - **Organization boundaries are database-enforced where practical.** Cross-project telecom references should be rejected by relational constraints, not merely application convention.
 - **Build from stable primitives.** Higher-level CPaaS products should depend on reliable voice, routing, events, usage, and billing foundations.
 
+The threat boundaries and production deployment requirements for Cloud,
+self-hosted, and telecom workloads are documented in the
+[security model](docs/security.md).
+
 ## Roadmap
 
 ```text

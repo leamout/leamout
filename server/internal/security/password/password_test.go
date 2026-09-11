@@ -51,6 +51,11 @@ func TestVerifyRejectsMalformedHashes(t *testing.T) {
 		"argon2id$v=18$m=65536,t=3,p=4$00$00",
 		"argon2id$v=19$m=0,t=3,p=4$00$00",
 		"argon2id$v=19$m=65536,t=3,p=4$zz$00",
+		// Persisted hashes are untrusted input. These limits prevent a malformed
+		// record from forcing excessive CPU or memory allocation during login.
+		"argon2id$v=19$m=4294967295,t=3,p=4$00$00",
+		"argon2id$v=19$m=65536,t=4294967295,p=4$00$00",
+		"argon2id$v=19$m=65536,t=3,p=255$00$00",
 	} {
 		if Verify("password", encoded) {
 			t.Fatalf("Verify() accepted malformed hash %q", encoded)

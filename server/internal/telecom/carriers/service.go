@@ -19,11 +19,15 @@ import (
 
 type Service struct {
 	repo   *Repository
-	cipher interface{ Encrypt(string) (string, error) }
+	cipher interface {
+		EncryptForScope(string, string) (string, error)
+	}
 	prober routing.EndpointProber
 }
 
-func NewService(repo *Repository, cipher interface{ Encrypt(string) (string, error) }) *Service {
+func NewService(repo *Repository, cipher interface {
+	EncryptForScope(string, string) (string, error)
+}) *Service {
 	return &Service{repo: repo, cipher: cipher, prober: routing.NewSIPOptionsProber()}
 }
 
@@ -117,7 +121,7 @@ func (s *Service) SetOutboundAuth(ctx context.Context, org, id uuid.UUID, req Di
 	if err != nil {
 		return Response{}, err
 	}
-	ciphertext, err := s.cipher.Encrypt(secret)
+	ciphertext, err := s.cipher.EncryptForScope(credentialEncryptionScope(org, id, "outbound"), secret)
 	if err != nil {
 		return Response{}, apperror.NewInternal("encrypt outbound carrier credential", err)
 	}
@@ -169,7 +173,7 @@ func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req Inb
 		if err != nil {
 			return Response{}, err
 		}
-		ciphertext, err := s.cipher.Encrypt(secret)
+		ciphertext, err := s.cipher.EncryptForScope(credentialEncryptionScope(org, id, "inbound"), secret)
 		if err != nil {
 			return Response{}, apperror.NewInternal("encrypt inbound carrier credential", err)
 		}
@@ -188,6 +192,10 @@ func (s *Service) SetInboundAuth(ctx context.Context, org, id uuid.UUID, req Inb
 		return Response{}, apperror.NewBadRequest("inbound auth method must be digest or ip")
 	}
 	return s.Get(ctx, org, id)
+}
+
+func credentialEncryptionScope(organizationID, connectionID uuid.UUID, direction string) string {
+	return "organization/" + organizationID.String() + "/carrier/" + connectionID.String() + "/" + direction
 }
 
 func (s *Service) ClearInboundAuth(ctx context.Context, org, id uuid.UUID) error {
