@@ -1,6 +1,6 @@
 # Commercial Security
 
-Commercial data is tenant-sensitive and financially sensitive. Leamout therefore uses defense in depth rather than treating HTTP middleware as the only security boundary.
+Commercial data is tenant-sensitive and financially sensitive. Leamout uses defense in depth rather than treating HTTP middleware as the only security boundary.
 
 ## Defense layers
 
@@ -11,153 +11,125 @@ HTTP middleware
         ↓
 service authorization and business rules
         ↓
-sqlc tenant/resource ownership checks
+SQLC tenant/resource ownership checks
         ↓
 foreign keys, uniqueness and CHECK constraints
 ```
 
-A failure in one layer must not automatically expose or mutate another organization's commercial records.
+A failure in one layer must not expose or mutate another organization's commercial records.
 
-## Active organization requirement
+## Organization ownership
 
 Organization-owned commercial queries should verify that the organization exists, is active, and has not been soft-deleted.
 
-```sql
-FROM organizations AS o
-WHERE o.id = sqlc.arg(organization_id)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-```
+This applies to wallets, wallet reservations, wallet ledger entries, checkouts, payments, licenses, deployments through their license, and usage events.
 
-This applies to organization-scoped subscriptions, licenses, organization entitlements, deployments through their license, usage events, invoices, invoice items, and payments.
+Owned resources should be read and mutated through their tenant relationship rather than only by globally unique resource ID.
 
-## Guarded inserts
-
-Do not trust an `organization_id` argument and insert it directly when the record is tenant-owned. Prefer an `INSERT ... SELECT` guarded by the organization and any required parent resources.
-
-```sql
-INSERT INTO subscriptions (
-    organization_id,
-    plan_id,
-    status
-)
-SELECT
-    o.id AS organization_id,
-    pl.id AS plan_id,
-    'pending' AS status
-FROM organizations AS o
-JOIN plans AS pl ON pl.id = sqlc.arg(plan_id)
-JOIN products AS p ON p.id = pl.product_id
-WHERE o.id = sqlc.arg(organization_id)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-  AND pl.active = true
-  AND p.active = true
-RETURNING *;
-```
-
-If the organization or parent resource is invalid, the statement inserts no row.
-
-## Tenant-scoped reads
-
-Owned resources should be selected through their tenant relationship, not only by globally unique resource ID.
-
-```sql
-SELECT s.*
-FROM subscriptions AS s
-JOIN organizations AS o ON o.id = s.organization_id
-WHERE s.id = sqlc.arg(id)
-  AND s.organization_id = sqlc.arg(organization_id)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-LIMIT 1;
-```
-
-This prevents an otherwise valid resource ID from crossing an organization boundary.
-
-## Tenant-scoped writes
-
-Updates and deletes must enforce the same ownership relationship.
-
-```sql
-UPDATE licenses AS l
-SET status = sqlc.arg(status), updated_at = NOW()
-FROM organizations AS o
-WHERE l.id = sqlc.arg(id)
-  AND l.organization_id = sqlc.arg(organization_id)
-  AND o.id = l.organization_id
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-RETURNING *;
-```
+A UUID is an identifier, not authorization.
 
 ## Cross-resource ownership
 
-When one commercial resource references another, SQL should verify that the relationship is valid for the same organization.
+When one Commercial resource references another, SQL and service logic should ensure the relationship remains within the same organization.
 
 Examples:
 
 ```text
-license.subscription_id
-    subscription must belong to license.organization_id
+checkout.wallet_id
+    wallet must belong to checkout.organization_id
 
 deployment.license_id
     license must belong to the requested organization
 
-usage_event.subscription_id
-    subscription must belong to usage_event.organization_id
+payment.checkout_id
+    checkout must belong to payment.organization_id
 
-invoice.subscription_id
-    subscription must belong to invoice.organization_id
-
-payment.invoice_id
-    invoice must belong to payment.organization_id
+wallet reservation
+    reservation must belong to the requested wallet and organization
 ```
 
-Foreign keys establish existence, but they do not by themselves establish same-tenant ownership when both records independently carry organization identity.
+Foreign keys establish existence. They do not replace tenant ownership checks.
+
+## Monetary authority
+
+PostgreSQL is authoritative for wallet value.
+
+Redis may cache availability or coordinate realtime admission, but it must never create, destroy, capture, release, or otherwise settle money independently of committed PostgreSQL state.
+
+A managed-provider operation must not create upstream exposure before prepaid wallet authorization is committed.
+
+## Reservation concurrency
+
+Wallet admission must serialize against the wallet before deciding whether enough spendable balance exists.
+
+```text
+lock wallet
+    ↓
+read posted balance + active reservations
+    ↓
+verify sufficient spendable balance
+    ↓
+create / increase reservation
+    ↓
+commit
+    ↓
+provider exposure allowed
+```
+
+Concurrent requests must not be able to authorize the same value twice.
+
+## Immutable ledger
+
+Wallet ledger history is append-only.
+
+Never repair money by updating or deleting a posted ledger row. Refunds, chargebacks, and corrections are new compensating entries with their own idempotency identity.
+
+## Payment providers
+
+Stripe and Paystack are external collection providers, not authorization systems for Leamout resources.
+
+Provider events must be authenticated and reconciled against a Leamout checkout before a wallet credit can be posted.
+
+A provider identifier or provider status is never sufficient authorization by itself.
+
+## Provider spending
+
+DIDWW, CommPeak, and other managed telecom providers can create real upstream cost.
+
+Provider fulfillment must sit behind committed Leamout authorization. Provider-reported wholesale amounts remain COGS and must not become customer debit authority.
 
 ## Catalog resources
 
-Some commercial resources are global catalog/configuration records rather than tenant-owned records:
+Catalog products, plans, prices, and meters are global configuration rather than organization-owned records.
 
-```text
-products
-plans
-meters
-usage_rates
-```
+Their mutation belongs to trusted operator/configuration paths. Customer-facing workflows consume active/effective catalog terms but must not be able to create arbitrary pricing records.
 
-They do not use organization guards in the same way. Their mutation must instead be restricted to trusted administrative/service paths, and related active-state checks should prevent inactive catalog records from being used for new commercial state.
+## Usage events
 
-## Provider identifiers
+Usage event idempotency keys prevent duplicate observations under retries and at-least-once delivery.
 
-Provider identifiers can be globally useful for webhook reconciliation. A provider lookup should still return only a record attached to an active, non-deleted organization unless a deliberately privileged reconciliation path requires otherwise.
+Usage remains organization-scoped even when an idempotency key is globally unique. A leaked key must not become a cross-tenant lookup primitive.
 
-Never use an external provider identifier as an authorization credential.
+Recording usage does not authorize provider spending or debit a wallet.
 
-## Idempotency keys
+## Licensing
 
-Usage event idempotency keys prevent duplicate accounting under retries and at-least-once event delivery.
+Self-hosted licenses are organization-owned and independent of Cloud wallet state.
 
-Lookup APIs should remain organization-scoped even when the database uniqueness constraint is global.
+Deployment IDs do not authorize themselves. Deployment operations must resolve the organization → license → deployment ownership chain.
 
-```text
-organization_id + idempotency_key
-        ↓
-normal application lookup
-```
+Private license-signing keys must remain on trusted authority infrastructure. Self-hosted runtimes receive public verification material only.
 
-A leaked idempotency key must not become a cross-tenant read primitive.
-
-## Database constraints are still required
+## Database constraints remain required
 
 Query guards complement, rather than replace:
 
 - foreign keys;
 - unique indexes;
-- state `CHECK` constraints;
+- lifecycle `CHECK` constraints;
 - positive amount/quantity checks;
-- JSON object checks;
-- temporal checks.
+- currency constraints;
+- temporal checks;
+- reservation lifecycle constraints.
 
-Security rule: middleware improves ergonomics and rejects requests early; SQL and database constraints protect the data when upstream assumptions fail.
+Security rule: middleware rejects invalid requests early; SQL and database constraints protect the data when upstream assumptions fail.
