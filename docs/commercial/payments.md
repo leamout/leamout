@@ -2,6 +2,10 @@
 
 Payments reconcile externally collected money into a Leamout wallet top-up. A payment is evidence of collection; it is not itself wallet balance, a license, or telecom authorization.
 
+Everything in Leamout is prepaid pay-as-you-go except Self-Hosted software licenses.
+
+Self-Hosted software license settlement is outside this automated checkout path. Enterprise license payments may be handled through contract, invoice, and bank transfer without creating wallet balance.
+
 ## Collection boundary
 
 ```text
@@ -32,6 +36,8 @@ verified payment success
         ↓
 wallet ledger credit
 ```
+
+A future verified bank-transfer funding path for enterprise usage wallets would still end at the same wallet-credit boundary. The funding rail does not change the prepaid model.
 
 ## Supported provider/method pairs
 
@@ -70,6 +76,22 @@ The payment service records provider collection state. The checkout/wallet workf
 
 Provider webhooks must never mutate wallet balance directly without Leamout reconciliation.
 
+## Enterprise Self-Hosted license settlement
+
+Self-Hosted software licenses are not wallet top-ups and should not be represented as checkout orders.
+
+```text
+enterprise contract
+      ↓
+invoice / bank transfer
+      ↓
+verified settlement
+      ↓
+license lifecycle
+```
+
+That settlement does not create managed-usage credit. A Self-Hosted + Managed customer must separately pre-fund managed usage before Leamout incurs provider obligations.
+
 ## Provider independence
 
 Never implement:
@@ -89,7 +111,7 @@ verified Leamout checkout success
     ↓
 wallet credit
     ↓
-customer later authorizes managed service from wallet
+customer later authorizes chargeable service from wallet
 ```
 
 ## Deferred concerns
@@ -97,8 +119,8 @@ customer later authorizes managed service from wallet
 The current model does not implement:
 
 - customer subscriptions;
-- postpaid credit;
-- invoice collection as the primary payment path;
+- postpaid telecom or platform usage credit;
+- invoice collection for Cloud/usage charges;
 - customer withdrawals;
 - foreign-exchange conversion;
 - tax calculation/remittance;
