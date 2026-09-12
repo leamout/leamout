@@ -113,7 +113,7 @@ type ReserveInput struct {
 }
 
 // IncreaseReservationInput describes the desired total active hold, not a
-// delta. Replaying the same target is therefore idempotent.
+// delta. Replaying the same target is idempotent.
 type IncreaseReservationInput struct {
 	TargetAmountMinor int64
 	ExpiresAt         time.Time
