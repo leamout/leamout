@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -31,7 +32,7 @@ func (r *Repository) List(ctx context.Context) ([]Organization, error) {
 			Name:       row.Name,
 			Members:    row.MemberCount,
 			Wallets:    row.WalletCount,
-			Currencies: row.Currencies,
+			Currencies: fmt.Sprint(row.Currencies),
 			Status:     row.Status,
 			CreatedAt:  row.CreatedAt,
 		})
@@ -70,7 +71,7 @@ func (r *Repository) Get(ctx context.Context, organizationID uuid.UUID) (Detail,
 		Status:       row.Status,
 		Members:      row.MemberCount,
 		Wallets:      row.WalletCount,
-		Currencies:   row.Currencies,
+		Currencies:   fmt.Sprint(row.Currencies),
 		BillingModel: row.BillingModel,
 		CreatedAt:    row.CreatedAt,
 		UpdatedAt:    row.UpdatedAt,
