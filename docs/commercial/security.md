@@ -2,6 +2,8 @@
 
 Commercial data is tenant-sensitive and financially sensitive. Leamout uses defense in depth rather than treating HTTP middleware as the only security boundary.
 
+Everything in Leamout is prepaid pay-as-you-go except Self-Hosted software licenses. Security boundaries must preserve that distinction: enterprise license settlement must not create wallet value, and chargeable Cloud or managed usage must not exceed authorized prepaid value.
+
 ## Defense layers
 
 ```text
@@ -56,6 +58,8 @@ PostgreSQL is authoritative for wallet value.
 
 Redis may cache availability or coordinate realtime admission, but it must never create, destroy, capture, release, or otherwise settle money independently of committed PostgreSQL state.
 
+A chargeable Cloud or managed operation must not consume beyond committed prepaid authorization.
+
 A managed-provider operation must not create upstream exposure before prepaid wallet authorization is committed.
 
 ## Reservation concurrency
@@ -73,7 +77,7 @@ create / increase reservation
     ↓
 commit
     ↓
-provider exposure allowed
+charge/provider exposure allowed
 ```
 
 Concurrent requests must not be able to authorize the same value twice.
@@ -84,13 +88,17 @@ Wallet ledger history is append-only.
 
 Never repair money by updating or deleting a posted ledger row. Refunds, chargebacks, and corrections are new compensating entries with their own idempotency identity.
 
+Enterprise Self-Hosted license payments must never be posted as wallet credits unless they are separately identified and reconciled as actual prepaid wallet funding.
+
 ## Payment providers
 
-Stripe and Paystack are external collection providers, not authorization systems for Leamout resources.
+Stripe and Paystack are external collection providers for prepaid wallet funding, not authorization systems for Leamout resources.
 
 Provider events must be authenticated and reconciled against a Leamout checkout before a wallet credit can be posted.
 
 A provider identifier or provider status is never sufficient authorization by itself.
+
+Self-Hosted software license settlement is a separate enterprise procurement path and must not be inferred from Stripe/Paystack checkout state.
 
 ## Provider spending
 
@@ -98,11 +106,15 @@ DIDWW, CommPeak, and other managed telecom providers can create real upstream co
 
 Provider fulfillment must sit behind committed Leamout authorization. Provider-reported wholesale amounts remain COGS and must not become customer debit authority.
 
+An active Self-Hosted software license does not authorize managed-provider spending. Self-Hosted + Managed still requires prepaid wallet authorization.
+
 ## Catalog resources
 
 Catalog products, plans, prices, and meters are global configuration rather than organization-owned records.
 
 Their mutation belongs to trusted operator/configuration paths. Customer-facing workflows consume active/effective catalog terms but must not be able to create arbitrary pricing records.
+
+Recurring catalog terms do not imply postpaid usage or a subscription lifecycle.
 
 ## Usage events
 
@@ -114,11 +126,13 @@ Recording usage does not authorize provider spending or debit a wallet.
 
 ## Licensing
 
-Self-hosted licenses are organization-owned and independent of Cloud wallet state.
+Self-hosted licenses are organization-owned and independent of prepaid wallet state.
 
 Deployment IDs do not authorize themselves. Deployment operations must resolve the organization → license → deployment ownership chain.
 
 Private license-signing keys must remain on trusted authority infrastructure. Self-hosted runtimes receive public verification material only.
+
+License activation and wallet funding are separate authority paths. Neither may be treated as proof of the other.
 
 ## Database constraints remain required
 
