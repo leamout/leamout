@@ -33,7 +33,9 @@ func validateConfirm(input ConfirmInput) error {
 	}
 	switch input.PaymentMethod {
 	case MethodCard:
-		if input.MobileMoney != nil { return ErrInvalidCheckout }
+		if input.MobileMoney != nil {
+			return ErrInvalidCheckout
+		}
 	case MethodMobileMoney:
 		if input.MobileMoney == nil || strings.TrimSpace(input.MobileMoney.Phone) == "" || strings.TrimSpace(input.MobileMoney.Provider) == "" {
 			return ErrInvalidCheckout
@@ -45,24 +47,37 @@ func validateConfirm(input ConfirmInput) error {
 }
 
 func validateTransition(transition Transition) error {
-	if isTerminal(transition.Expected) { return ErrInvalidTransition }
-	if transition.Status != StatusPending && transition.Status != StatusProcessing && !isTerminal(transition.Status) { return ErrInvalidTransition }
+	if isTerminal(transition.Expected) {
+		return ErrInvalidTransition
+	}
+	if transition.Status != StatusPending && transition.Status != StatusProcessing && !isTerminal(transition.Status) {
+		return ErrInvalidTransition
+	}
 	if isTerminal(transition.Status) {
-		if transition.NextAction != ActionNone || transition.CompletedAt == nil { return ErrInvalidTransition }
-	} else if transition.CompletedAt != nil { return ErrInvalidTransition }
+		if transition.NextAction != ActionNone || transition.CompletedAt == nil {
+			return ErrInvalidTransition
+		}
+	} else if transition.CompletedAt != nil {
+		return ErrInvalidTransition
+	}
 	return nil
 }
 
 func providerForMethod(method PaymentMethod) (Provider, bool) {
 	switch method {
-	case MethodCard: return ProviderStripe, true
-	case MethodMobileMoney: return ProviderPaystack, true
-	default: return "", false
+	case MethodCard:
+		return ProviderStripe, true
+	case MethodMobileMoney:
+		return ProviderPaystack, true
+	default:
+		return "", false
 	}
 }
 
 func validMetadata(raw json.RawMessage) bool {
-	if len(raw) == 0 { return true }
+	if len(raw) == 0 {
+		return true
+	}
 	var value map[string]any
 	return json.Unmarshal(raw, &value) == nil && value != nil
 }
