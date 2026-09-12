@@ -6,9 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leamout/leamout/internal/commercial"
-	"github.com/leamout/leamout/internal/identity/auth"
-	"github.com/leamout/leamout/internal/identity/session"
-	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/identity"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
@@ -22,9 +20,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
-	"github.com/leamout/leamout/internal/tenancy/credentials"
-	"github.com/leamout/leamout/internal/tenancy/members"
-	"github.com/leamout/leamout/internal/tenancy/organization"
+	"github.com/leamout/leamout/internal/tenancy"
 )
 
 func RegisterRoutes(r *chi.Mux, modules Modules) {
@@ -66,17 +62,14 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			organizationAccess,
 			modules.Idempotency.Middleware.Handle,
 		)
-		auth.RegisterRoutes(r, modules.Auth.Handler, modules.Authn.RequireSession)
-		session.RegisterRoutes(r, modules.Session.Handler, modules.Authn.RequireSession)
-		users.RegisterRoutes(r, modules.Users.Handler, modules.Authn.RequireSession)
-		organization.RegisterRoutes(
+		identity.RegisterRoutes(r, modules.Identity, modules.Authn.RequireSession)
+		tenancy.RegisterRoutes(
 			r,
-			modules.Organizations.Handler,
+			modules.Tenancy,
 			modules.Authn.RequireSession,
-			organizationContextAccess("organization"),
+			organizationContextAccess,
+			sessionOrganizationAccess,
 		)
-		members.RegisterRoutes(r, modules.Members.Handler, sessionOrganizationAccess("members"))
-		credentials.RegisterRoutes(r, modules.Credentials.Handler, sessionOrganizationAccess("credentials"))
 		voice.RegisterRoutes(r, modules.Voice.Handler, organizationAccess("voice-applications"))
 		calls.RegisterRoutes(r, modules.Calls.Handler, organizationAccess("calls"))
 		recordings.RegisterRoutes(r, modules.Recordings.Handler, organizationAccess("recordings"))
