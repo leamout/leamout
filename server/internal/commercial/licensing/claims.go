@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,20 +23,22 @@ var (
 // self-hosted deployment artifact. ExpiresAt is the artifact validity boundary
 // and may be shorter than the durable database license expiration.
 type LicenseClaimsV1 struct {
-	LicenseID      uuid.UUID
-	OrganizationID uuid.UUID
-	DeploymentID   string
-	IssuedAt       time.Time
-	ExpiresAt      time.Time
+	LicenseID           uuid.UUID
+	OrganizationID      uuid.UUID
+	DeploymentID        string
+	DeploymentPublicKey string
+	IssuedAt            time.Time
+	ExpiresAt           time.Time
 }
 
 type licenseClaimsWireV1 struct {
-	Version        int    `json:"version"`
-	LicenseID      string `json:"license_id"`
-	OrganizationID string `json:"organization_id"`
-	DeploymentID   string `json:"deployment_id"`
-	IssuedAt       int64  `json:"issued_at"`
-	ExpiresAt      int64  `json:"expires_at"`
+	Version             int    `json:"version"`
+	LicenseID           string `json:"license_id"`
+	OrganizationID      string `json:"organization_id"`
+	DeploymentID        string `json:"deployment_id"`
+	DeploymentPublicKey string `json:"deployment_public_key"`
+	IssuedAt            int64  `json:"issued_at"`
+	ExpiresAt           int64  `json:"expires_at"`
 }
 
 func normalizeClaimsV1(claims LicenseClaimsV1) (LicenseClaimsV1, error) {
@@ -45,10 +48,18 @@ func normalizeClaimsV1(claims LicenseClaimsV1) (LicenseClaimsV1, error) {
 	if err := validateID(claims.OrganizationID, ErrOrganizationIDRequired); err != nil {
 		return LicenseClaimsV1{}, err
 	}
-	deployment, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: claims.DeploymentID})
+	claims.DeploymentID = strings.TrimSpace(claims.DeploymentID)
+	if claims.DeploymentID == "" {
+		return LicenseClaimsV1{}, ErrDeploymentIDRequired
+	}
+	if strings.IndexFunc(claims.DeploymentID, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0 {
+		return LicenseClaimsV1{}, ErrInvalidDeploymentID
+	}
+	publicKey, err := normalizeDeploymentPublicKey(claims.DeploymentPublicKey)
 	if err != nil {
 		return LicenseClaimsV1{}, err
 	}
+	claims.DeploymentPublicKey = publicKey
 	if claims.IssuedAt.IsZero() {
 		return LicenseClaimsV1{}, ErrClaimsIssuedAtRequired
 	}
@@ -56,7 +67,6 @@ func normalizeClaimsV1(claims LicenseClaimsV1) (LicenseClaimsV1, error) {
 		return LicenseClaimsV1{}, ErrClaimsExpiresAtRequired
 	}
 
-	claims.DeploymentID = deployment.DeploymentID
 	claims.IssuedAt = claims.IssuedAt.UTC().Truncate(time.Second)
 	claims.ExpiresAt = claims.ExpiresAt.UTC().Truncate(time.Second)
 	if !claims.ExpiresAt.After(claims.IssuedAt) {
@@ -72,12 +82,13 @@ func marshalClaimsV1(claims LicenseClaimsV1) ([]byte, LicenseClaimsV1, error) {
 	}
 
 	payload, err := json.Marshal(licenseClaimsWireV1{
-		Version:        LicenseClaimsVersionV1,
-		LicenseID:      normalized.LicenseID.String(),
-		OrganizationID: normalized.OrganizationID.String(),
-		DeploymentID:   normalized.DeploymentID,
-		IssuedAt:       normalized.IssuedAt.Unix(),
-		ExpiresAt:      normalized.ExpiresAt.Unix(),
+		Version:             LicenseClaimsVersionV1,
+		LicenseID:           normalized.LicenseID.String(),
+		OrganizationID:      normalized.OrganizationID.String(),
+		DeploymentID:        normalized.DeploymentID,
+		DeploymentPublicKey: normalized.DeploymentPublicKey,
+		IssuedAt:            normalized.IssuedAt.Unix(),
+		ExpiresAt:           normalized.ExpiresAt.Unix(),
 	})
 	if err != nil {
 		return nil, LicenseClaimsV1{}, err
@@ -109,11 +120,12 @@ func unmarshalClaimsV1(payload []byte) (LicenseClaimsV1, error) {
 	}
 
 	claims, err := normalizeClaimsV1(LicenseClaimsV1{
-		LicenseID:      licenseID,
-		OrganizationID: organizationID,
-		DeploymentID:   wire.DeploymentID,
-		IssuedAt:       time.Unix(wire.IssuedAt, 0).UTC(),
-		ExpiresAt:      time.Unix(wire.ExpiresAt, 0).UTC(),
+		LicenseID:           licenseID,
+		OrganizationID:      organizationID,
+		DeploymentID:        wire.DeploymentID,
+		DeploymentPublicKey: wire.DeploymentPublicKey,
+		IssuedAt:            time.Unix(wire.IssuedAt, 0).UTC(),
+		ExpiresAt:           time.Unix(wire.ExpiresAt, 0).UTC(),
 	})
 	if err != nil {
 		return LicenseClaimsV1{}, err
