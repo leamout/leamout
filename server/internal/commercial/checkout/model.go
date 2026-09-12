@@ -16,7 +16,6 @@ type Status string
 type NextAction string
 
 const (
-	TypeSubscription    Type          = "subscription"
 	TypeWalletTopup     Type          = "wallet_topup"
 	ProviderStripe      Provider      = "stripe"
 	ProviderPaystack    Provider      = "paystack"
@@ -41,66 +40,47 @@ var (
 	ErrReferenceConflict   = apperror.NewConflict("checkout reference already exists")
 	ErrInvalidTransition   = apperror.NewConflict("invalid checkout transition")
 	ErrInvalidCheckout     = apperror.NewBadRequest("invalid checkout")
-	ErrProviderUnavailable = apperror.NewServiceUnavailable(
-		"payment provider is unavailable",
-		errors.New("payment provider is not configured"),
-	)
-	ErrPaymentMismatch = apperror.NewConflict("provider payment does not match checkout")
+	ErrProviderUnavailable = apperror.NewServiceUnavailable("payment provider is unavailable", errors.New("payment provider is not configured"))
+	ErrPaymentMismatch     = apperror.NewConflict("provider payment does not match checkout")
 )
 
 type Checkout struct {
-	ID              uuid.UUID
-	OrganizationID  uuid.UUID
-	WalletID        *uuid.UUID
-	PriceID         *uuid.UUID
-	Type            Type
-	Provider        Provider
-	PaymentMethod   PaymentMethod
-	Reference       string
-	AmountMinor     int64
-	Currency        string
-	Status          Status
-	NextAction      NextAction
-	ProviderMessage *string
-	ExpiresAt       time.Time
-	CompletedAt     *time.Time
-	Metadata        json.RawMessage
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
-
-// CreateParams is the customer-facing commercial intent. Amount is accepted
-// only for wallet top-ups; subscription amount and currency are resolved from
-// the catalog price.
-type CreateParams struct {
-	WalletID    *uuid.UUID
-	PriceID     *uuid.UUID
-	Type        Type
-	AmountMinor int64
-	Metadata    json.RawMessage
-}
-
-// CreateInput is the server-priced persistence command.
-type CreateInput struct {
-	WalletID    *uuid.UUID
-	PriceID     *uuid.UUID
-	Type        Type
-	Reference   string
-	AmountMinor int64
-	Currency    string
-	ExpiresAt   time.Time
-	Metadata    json.RawMessage
-}
-
-type StartPayment struct {
-	Provider      Provider
+	ID uuid.UUID
+	OrganizationID uuid.UUID
+	WalletID *uuid.UUID
+	PriceID *uuid.UUID
+	Type Type
+	Provider Provider
 	PaymentMethod PaymentMethod
+	Reference string
+	AmountMinor int64
+	Currency string
+	Status Status
+	NextAction NextAction
+	ProviderMessage *string
+	ExpiresAt time.Time
+	CompletedAt *time.Time
+	Metadata json.RawMessage
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
-type Transition struct {
-	Expected        Status
-	Status          Status
-	NextAction      NextAction
-	ProviderMessage *string
-	CompletedAt     *time.Time
+type CreateParams struct {
+	WalletID *uuid.UUID
+	AmountMinor int64
+	Metadata json.RawMessage
 }
+
+type CreateInput struct {
+	WalletID *uuid.UUID
+	PriceID *uuid.UUID
+	Type Type
+	Reference string
+	AmountMinor int64
+	Currency string
+	ExpiresAt time.Time
+	Metadata json.RawMessage
+}
+
+type StartPayment struct { Provider Provider; PaymentMethod PaymentMethod }
+type Transition struct { Expected Status; Status Status; NextAction NextAction; ProviderMessage *string; CompletedAt *time.Time }

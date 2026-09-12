@@ -19,10 +19,8 @@ type Handler struct{ service *Service }
 func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 type CreateRequest struct {
-	Type        Type            `json:"type"`
-	WalletID    *uuid.UUID      `json:"wallet_id,omitempty"`
-	PriceID     *uuid.UUID      `json:"price_id,omitempty"`
-	AmountMinor int64           `json:"amount_minor,omitempty"`
+	WalletID    *uuid.UUID      `json:"wallet_id"`
+	AmountMinor int64           `json:"amount_minor"`
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
@@ -43,7 +41,6 @@ type CheckoutResponse struct {
 	PaymentID       *uuid.UUID      `json:"payment_id,omitempty"`
 	Type            Type            `json:"type"`
 	WalletID        *uuid.UUID      `json:"wallet_id,omitempty"`
-	PriceID         *uuid.UUID      `json:"price_id,omitempty"`
 	Reference       string          `json:"reference"`
 	Provider        Provider        `json:"provider,omitempty"`
 	PaymentMethod   PaymentMethod   `json:"payment_method,omitempty"`
@@ -70,11 +67,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	checkoutRecord, err := h.service.Create(r.Context(), organizationID, CreateParams{
-		Type:        request.Type,
-		WalletID:    request.WalletID,
-		PriceID:     request.PriceID,
-		AmountMinor: request.AmountMinor,
-		Metadata:    request.Metadata,
+		WalletID: request.WalletID, AmountMinor: request.AmountMinor, Metadata: request.Metadata,
 	})
 	if err != nil {
 		httputil.Error(w, err)
@@ -85,92 +78,49 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	organizationID, checkoutID, err := requestIDs(r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	result, err := h.service.Get(r.Context(), organizationID, checkoutID)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	httputil.OK(w, Response(result))
 }
 
 func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) {
 	organizationID, checkoutID, err := requestIDs(r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	request, err := helper.DecodeJSON[ConfirmRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	result, err := h.service.Confirm(r.Context(), organizationID, checkoutID, ConfirmInput(request))
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	httputil.OK(w, Response(result))
 }
 
 func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
 	organizationID, checkoutID, err := requestIDs(r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	request, err := helper.DecodeJSON[ContinueRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	result, err := h.service.Continue(r.Context(), organizationID, checkoutID, ContinueInput(request))
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
+	if err != nil { httputil.Error(w, err); return }
 	httputil.OK(w, Response(result))
 }
 
 func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
-	if !ok {
-		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("organization context required")
-	}
+	if !ok { return uuid.Nil, uuid.Nil, apperror.NewBadRequest("organization context required") }
 	checkoutID, err := uuid.Parse(chi.URLParam(r, "checkout_id"))
-	if err != nil {
-		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid checkout_id")
-	}
+	if err != nil { return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid checkout_id") }
 	return organizationID, checkoutID, nil
 }
 
 func Response(result Result) CheckoutResponse {
 	response := CheckoutResponse{
-		CheckoutID:      result.Checkout.ID,
-		Type:            result.Checkout.Type,
-		WalletID:        result.Checkout.WalletID,
-		PriceID:         result.Checkout.PriceID,
-		Reference:       result.Checkout.Reference,
-		Provider:        result.Checkout.Provider,
-		PaymentMethod:   result.Checkout.PaymentMethod,
-		AmountMinor:     result.Checkout.AmountMinor,
-		Currency:        result.Checkout.Currency,
-		Status:          result.Checkout.Status,
-		NextAction:      result.Checkout.NextAction,
-		ProviderMessage: result.Checkout.ProviderMessage,
-		ExpiresAt:       result.Checkout.ExpiresAt,
-		CompletedAt:     result.Checkout.CompletedAt,
-		Metadata:        result.Checkout.Metadata,
+		CheckoutID: result.Checkout.ID, Type: result.Checkout.Type, WalletID: result.Checkout.WalletID,
+		Reference: result.Checkout.Reference, Provider: result.Checkout.Provider, PaymentMethod: result.Checkout.PaymentMethod,
+		AmountMinor: result.Checkout.AmountMinor, Currency: result.Checkout.Currency, Status: result.Checkout.Status,
+		NextAction: result.Checkout.NextAction, ProviderMessage: result.Checkout.ProviderMessage,
+		ExpiresAt: result.Checkout.ExpiresAt, CompletedAt: result.Checkout.CompletedAt, Metadata: result.Checkout.Metadata,
 	}
-	if result.Payment != nil {
-		id := result.Payment.ID
-		response.PaymentID = &id
-	}
-	if result.Session != nil {
-		response.ClientSecret = result.Session.ClientSecret
-	}
+	if result.Payment != nil { id := result.Payment.ID; response.PaymentID = &id }
+	if result.Session != nil { response.ClientSecret = result.Session.ClientSecret }
 	return response
 }
