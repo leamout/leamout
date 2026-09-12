@@ -2,21 +2,43 @@
 
 Licensing carries Leamout commercial authority into self-hosted deployments without depending on Cloud PAYG or a customer subscription lifecycle.
 
+Self-Hosted software licensing is the sole exception to Leamout's prepaid pay-as-you-go commercial model.
+
+The enterprise software license is sold separately from Cloud and managed usage, normally through a negotiated agreement, invoice, and bank transfer. Paying for a Self-Hosted license does not create wallet balance or managed-usage credit.
+
 ## Boundary
 
 ```text
-organization
-    ↓
-license
-    ↓
+enterprise agreement
+        ↓
+Self-Hosted license
+        ↓
 deployment(s)
-    ↓
+        ↓
 signed deployment artifact
 ```
 
 `commercial/licensing` owns durable licenses, license lifecycle, activated self-hosted installations, and the signed artifact protocol consumed by self-hosted runtimes.
 
-Licensing does not own Cloud wallet balance, payment collection, managed-carrier authorization, or customer subscriptions.
+Licensing does not own Cloud wallet balance, wallet funding, managed-carrier authorization, customer subscriptions, or postpaid usage settlement.
+
+## Commercial combinations
+
+```text
+Self-Hosted + BYOC
+        ↓
+enterprise Self-Hosted software license
+```
+
+```text
+Self-Hosted + Managed
+        ↓
+enterprise Self-Hosted software license
+        +
+prepaid managed-usage wallet
+```
+
+A Self-Hosted + Managed customer must satisfy both independently. An active license does not authorize Leamout to incur managed-provider obligations without prepaid wallet funds.
 
 ## License model
 
@@ -159,8 +181,24 @@ Commercial transitions should govern new controlled actions. They should not des
 
 Exact grace, refresh, air-gapped, and offline-renewal policy remains above the cryptographic protocol.
 
-## Provider independence
+## Payment and provider independence
+
+Self-Hosted software license settlement is an enterprise procurement concern, not a wallet top-up workflow.
 
 Payment-provider events must never directly sign licenses.
 
-Cloud payment collection and self-hosted licensing are separate commercial paths. PostgreSQL and Leamout licensing state remain authoritative for self-hosted authority.
+Managed-provider authorization must never be inferred from license state.
+
+```text
+enterprise license settlement
+        ↓
+license lifecycle
+
+prepaid wallet funding
+        ↓
+managed usage authorization
+```
+
+These paths remain separate even when the same organization uses both.
+
+PostgreSQL and Leamout licensing state remain authoritative for self-hosted authority.
