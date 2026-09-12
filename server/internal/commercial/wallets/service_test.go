@@ -84,34 +84,6 @@ type walletStub struct {
 	releaseRace bool
 }
 
-func (s *walletStub) Create(context.Context, uuid.UUID, string) (Wallet, error) {
-	return s.wallet, nil
-}
-
-func (s *walletStub) List(context.Context, uuid.UUID) ([]Wallet, error) {
-	return []Wallet{s.wallet}, nil
-}
-
-func (s *walletStub) Balance(context.Context, uuid.UUID, uuid.UUID) (Balance, error) {
-	return Balance{}, nil
-}
-
-func (s *walletStub) Post(context.Context, uuid.UUID, uuid.UUID, PostEntryInput) (LedgerEntry, error) {
-	return LedgerEntry{}, nil
-}
-
-func (s *walletStub) ListEntries(context.Context, uuid.UUID, uuid.UUID) ([]LedgerEntry, error) {
-	return nil, nil
-}
-
-func (s *walletStub) Increase(context.Context, uuid.UUID, uuid.UUID, IncreaseReservationInput) (Reservation, error) {
-	return s.reservation, nil
-}
-
-func (s *walletStub) Expire(context.Context) ([]Reservation, error) {
-	return nil, nil
-}
-
 func (s *walletStub) Get(_ context.Context, _, _ uuid.UUID) (Wallet, error) {
 	return s.wallet, nil
 }
@@ -364,6 +336,19 @@ func managedNumberAuthorizationFixture(t *testing.T) (*Service, *walletStub, uui
 	return service, walletService, organizationID, operationID, reservationID, priceID, amount
 }
 
-func newAuthorizationTestService(c catalogReader, subscriptions subscriptionReader, repo walletRepository) *Service {
-	return &Service{catalog: c, subscriptions: subscriptions, repo: repo, now: time.Now}
+func newAuthorizationTestService(c *catalogStub, subscriptions *subscriptionStub, wallet *walletStub) *Service {
+	return &Service{
+		managed: managedOperations{
+			getPrice:       c.GetPrice,
+			listPrices:     c.ListPrices,
+			current:        subscriptions.Current,
+			getWallet:      wallet.Get,
+			getByCurrency:  wallet.GetByCurrency,
+			reserve:        wallet.Reserve,
+			getReservation: wallet.GetReservation,
+			capture:        wallet.Capture,
+			release:        wallet.Release,
+		},
+		now: time.Now,
+	}
 }

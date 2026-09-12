@@ -17,7 +17,7 @@ func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
 	checkoutID := uuid.New()
 	walletID := uuid.New()
 	paymentID := uuid.New()
-	store := &checkoutStoreStub{checkout: Checkout{
+	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             checkoutID,
 		OrganizationID: organizationID,
 		WalletID:       &walletID,
@@ -31,7 +31,7 @@ func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
 		NextAction:     ActionWait,
 	}}
 	walletsService := &walletServiceStub{}
-	service := NewService(store, walletsService, nil, nil, nil)
+	service := newTestService(repository, walletsService, nil, nil, nil)
 	settledAt := time.Now().UTC()
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
@@ -57,8 +57,8 @@ func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
 		walletsService.postInput.IdempotencyKey != "checkout:"+checkoutID.String() {
 		t.Fatalf("wallet post = %+v", walletsService.postInput)
 	}
-	if store.checkout.Status != StatusSucceeded {
-		t.Fatalf("checkout status = %s, want %s", store.checkout.Status, StatusSucceeded)
+	if repository.checkout.Status != StatusSucceeded {
+		t.Fatalf("checkout status = %s, want %s", repository.checkout.Status, StatusSucceeded)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestCompletePaymentTreatsDuplicateWalletCreditAsRetry(t *testing.T) {
 	organizationID := uuid.New()
 	checkoutID := uuid.New()
 	walletID := uuid.New()
-	store := &checkoutStoreStub{checkout: Checkout{
+	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             checkoutID,
 		OrganizationID: organizationID,
 		WalletID:       &walletID,
@@ -77,7 +77,7 @@ func TestCompletePaymentTreatsDuplicateWalletCreditAsRetry(t *testing.T) {
 		Status:         StatusProcessing,
 	}}
 	walletsService := &walletServiceStub{postErr: wallets.ErrDuplicateLedgerEntry}
-	service := NewService(store, walletsService, nil, nil, nil)
+	service := newTestService(repository, walletsService, nil, nil, nil)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
 		CheckoutID:     checkoutID,
@@ -91,8 +91,8 @@ func TestCompletePaymentTreatsDuplicateWalletCreditAsRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompletePayment() retry error = %v", err)
 	}
-	if store.checkout.Status != StatusSucceeded {
-		t.Fatalf("checkout status = %s, want succeeded", store.checkout.Status)
+	if repository.checkout.Status != StatusSucceeded {
+		t.Fatalf("checkout status = %s, want succeeded", repository.checkout.Status)
 	}
 }
 
@@ -101,7 +101,7 @@ func TestCompletePaymentActivatesSubscription(t *testing.T) {
 	checkoutID := uuid.New()
 	priceID := uuid.New()
 	interval := catalog.BillingIntervalMonth
-	store := &checkoutStoreStub{checkout: Checkout{
+	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             checkoutID,
 		OrganizationID: organizationID,
 		PriceID:        &priceID,
@@ -118,7 +118,7 @@ func TestCompletePaymentActivatesSubscription(t *testing.T) {
 		BillingInterval: &interval,
 	}}
 	subscriptionsService := &subscriptionServiceStub{}
-	service := NewService(store, nil, catalogService, subscriptionsService, nil)
+	service := newTestService(repository, nil, catalogService, subscriptionsService, nil)
 	settledAt := time.Date(2026, 9, 11, 12, 0, 0, 0, time.UTC)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
@@ -146,7 +146,7 @@ func TestCompletePaymentActivatesSubscription(t *testing.T) {
 }
 
 func TestCompletePaymentRejectsMismatchedSettlement(t *testing.T) {
-	store := &checkoutStoreStub{checkout: Checkout{
+	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             uuid.New(),
 		OrganizationID: uuid.New(),
 		Type:           TypeWalletTopup,
@@ -155,11 +155,11 @@ func TestCompletePaymentRejectsMismatchedSettlement(t *testing.T) {
 		Currency:       "USD",
 		Status:         StatusProcessing,
 	}}
-	service := NewService(store, &walletServiceStub{}, nil, nil, nil)
+	service := newTestService(repository, &walletServiceStub{}, nil, nil, nil)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{
-		CheckoutID:     store.checkout.ID,
-		OrganizationID: store.checkout.OrganizationID,
+		CheckoutID:     repository.checkout.ID,
+		OrganizationID: repository.checkout.OrganizationID,
 		PaymentID:      uuid.New(),
 		Provider:       "stripe",
 		Status:         commercialpayments.StatusSucceeded,

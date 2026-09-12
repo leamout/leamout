@@ -1,7 +1,6 @@
 package wallets
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -12,18 +11,11 @@ import (
 	"github.com/leamout/leamout/pkg/httputil"
 )
 
-type walletReader interface {
-	List(context.Context, uuid.UUID) ([]Wallet, error)
-	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
-	Balance(context.Context, uuid.UUID, uuid.UUID) (Balance, error)
-	ListEntries(context.Context, uuid.UUID, uuid.UUID) ([]LedgerEntry, error)
-}
-
 type Handler struct {
-	wallets walletReader
+	wallets *Service
 }
 
-func NewHandler(wallets walletReader) *Handler {
+func NewHandler(wallets *Service) *Handler {
 	return &Handler{wallets: wallets}
 }
 
