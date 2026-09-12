@@ -18,7 +18,6 @@ var (
 type Event struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
-	SubscriptionID *uuid.UUID
 	MeterID        uuid.UUID
 	Quantity       int64
 	SourceType     string
@@ -30,7 +29,6 @@ type Event struct {
 }
 
 type RecordInput struct {
-	SubscriptionID *uuid.UUID
 	MeterID        uuid.UUID
 	Quantity       int64
 	SourceType     string
