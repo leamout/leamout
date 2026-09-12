@@ -2,6 +2,9 @@ package leamout
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -13,7 +16,17 @@ import (
 
 func TestBackupArchiveRoundTrip(t *testing.T) {
 	root := t.TempDir()
-	state := deploymentState{SchemaVersion: 1, DeploymentID: uuid.NewString(), Mode: deploymentMode, CreatedAt: time.Now().UTC()}
+	publicKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := deploymentState{
+		SchemaVersion: 1,
+		DeploymentID:  uuid.NewString(),
+		PublicKey:     base64.RawURLEncoding.EncodeToString(publicKey),
+		Mode:          deploymentMode,
+		CreatedAt:     time.Now().UTC(),
+	}
 	stateBytes, _ := jsonMarshal(state)
 	statePath := filepath.Join(root, "state.json")
 	envPath := filepath.Join(root, "env")

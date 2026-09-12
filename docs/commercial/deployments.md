@@ -19,6 +19,7 @@ Deployments are license-scoped rather than directly organization-scoped in the s
 ```text
 license_id
 deployment_id
+public_key
 name
 status
 activated_at
@@ -28,7 +29,8 @@ created_at
 updated_at
 ```
 
-`deployment_id` is unique within a license.
+Each license has exactly one deployment. `deployment_id` is globally unique, and
+`public_key` is the deployment's Ed25519 public identity key.
 
 ## Lifecycle
 
@@ -46,19 +48,12 @@ activation
 
 The current schema does not reactivate a deactivated row implicitly. Reactivation policy should be explicit in the licensing/deployment service.
 
-## Deployment limit
+## License binding
 
-Each license carries `max_deployments`.
-
-The intended invariant is:
-
-```text
-active deployments for license <= license.max_deployments
-```
-
-A simple `COUNT` followed by `INSERT` is vulnerable to a race when two activations happen concurrently. The service must enforce the limit transactionally, for example by locking the license row before counting and inserting or by using another database serialization strategy.
-
-The SQL query layer provides ownership-aware lookup/count/create primitives; the service owns the transaction boundary.
+A license is bound to one deployment when that deployment is activated. The
+database uniqueness constraints prevent a license from being attached to a
+second deployment and prevent a deployment identity from being reused by a
+different license.
 
 ## Heartbeats
 
@@ -92,4 +87,8 @@ The organization must also be active and not deleted.
 
 ## Identity
 
-Deployment identity should be installation/application generated and stable across normal restarts. Avoid brittle hardware fingerprinting as the primary license identity mechanism.
+Deployment identity is installation generated and stable across normal
+restarts. `leamout init` creates an Ed25519 keypair, stores the public key with
+the deployment identity, and keeps the private key local. Signed license
+artifacts include the public key so copied license material cannot be used by an
+installation without the matching private key.
