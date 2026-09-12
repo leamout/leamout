@@ -27,16 +27,7 @@ type subscriptionReader interface {
 	Current(context.Context, uuid.UUID) (subscriptions.Subscription, error)
 }
 
-type authorizationWalletStore interface {
-	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
-	GetByCurrency(context.Context, uuid.UUID, string) (Wallet, error)
-	Reserve(context.Context, uuid.UUID, uuid.UUID, ReserveInput) (Reservation, error)
-	GetReservation(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
-	Capture(context.Context, uuid.UUID, uuid.UUID, int64, string) (Reservation, error)
-	Release(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
-}
-
-type walletStore interface {
+type walletRepository interface {
 	Create(context.Context, uuid.UUID, string) (Wallet, error)
 	List(context.Context, uuid.UUID) ([]Wallet, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
@@ -55,17 +46,14 @@ type walletStore interface {
 // Service owns prepaid wallet rules. Its mutation methods are internal
 // Commercial capabilities and are not registered as generic HTTP APIs.
 type Service struct {
-	repo          walletStore
-	authWallet    authorizationWalletStore
+	repo          walletRepository
 	catalog       catalogReader
 	subscriptions subscriptionReader
 	now           func() time.Time
 }
 
-func NewService(repo walletStore, catalog catalogReader, subscriptions subscriptionReader) *Service {
-	service := &Service{repo: repo, catalog: catalog, subscriptions: subscriptions, now: time.Now}
-	service.authWallet = service
-	return service
+func NewService(repo walletRepository, catalog catalogReader, subscriptions subscriptionReader) *Service {
+	return &Service{repo: repo, catalog: catalog, subscriptions: subscriptions, now: time.Now}
 }
 func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Wallet, error) {
 	return s.repo.List(ctx, organizationID)
@@ -177,7 +165,7 @@ func (s *Service) ReserveManagedNumberPurchase(
 	amountMinor int64,
 	currency string,
 ) (uuid.UUID, error) {
-	if s == nil || s.authWallet == nil {
+	if s == nil || s.repo == nil {
 		return uuid.Nil, ErrManagedNumberAuthorizationInvalid
 	}
 	if operationID == uuid.Nil || priceID == uuid.Nil || amountMinor <= 0 {
@@ -192,11 +180,11 @@ func (s *Service) ReserveManagedNumberPurchase(
 		return uuid.Nil, ErrManagedNumberQuoteExpired
 	}
 
-	wallet, err := s.authWallet.GetByCurrency(ctx, organizationID, currency)
+	wallet, err := s.repo.GetByCurrency(ctx, organizationID, currency)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	reservation, err := s.authWallet.Reserve(ctx, organizationID, wallet.ID, ReserveInput{
+	reservation, err := s.repo.Reserve(ctx, organizationID, wallet.ID, ReserveInput{
 		AmountMinor:   amountMinor,
 		OperationType: managedNumberOperationType,
 		OperationID:   operationID.String(),
@@ -218,7 +206,7 @@ func (s *Service) VerifyManagedNumberPurchase(
 	amountMinor int64,
 	currency string,
 ) error {
-	if s == nil || s.authWallet == nil {
+	if s == nil || s.repo == nil {
 		return ErrManagedNumberAuthorizationInvalid
 	}
 	_, err := s.authorization(ctx, organizationID, operationID, reservationID, priceID, amountMinor, currency)
@@ -241,7 +229,7 @@ func (s *Service) CaptureManagedNumberPurchase(
 	if reservation.Status == ReservationCaptured {
 		return nil
 	}
-	_, err = s.authWallet.Capture(
+	_, err = s.repo.Capture(
 		ctx,
 		organizationID,
 		reservationID,
@@ -270,13 +258,13 @@ func (s *Service) ReleaseManagedNumberPurchase(
 	ctx context.Context,
 	organizationID, operationID, reservationID uuid.UUID,
 ) error {
-	if s == nil || s.authWallet == nil {
+	if s == nil || s.repo == nil {
 		return ErrManagedNumberAuthorizationInvalid
 	}
 	if organizationID == uuid.Nil || operationID == uuid.Nil || reservationID == uuid.Nil {
 		return ErrManagedNumberAuthorizationInvalid
 	}
-	reservation, err := s.authWallet.GetReservation(ctx, organizationID, reservationID)
+	reservation, err := s.repo.GetReservation(ctx, organizationID, reservationID)
 	if err != nil {
 		return err
 	}
@@ -285,12 +273,12 @@ func (s *Service) ReleaseManagedNumberPurchase(
 	}
 	switch reservation.Status {
 	case ReservationActive:
-		_, err = s.authWallet.Release(ctx, organizationID, reservationID)
+		_, err = s.repo.Release(ctx, organizationID, reservationID)
 		if errors.Is(err, ErrInvalidReservationState) {
 			// A concurrent worker may have released or expired the reservation
 			// after it was read above. Only those non-monetary terminal states are
 			// valid idempotent outcomes; capture must continue to fail closed.
-			reservation, readErr := s.authWallet.GetReservation(ctx, organizationID, reservationID)
+			reservation, readErr := s.repo.GetReservation(ctx, organizationID, reservationID)
 			if readErr == nil &&
 				reservation.OperationType == managedNumberOperationType &&
 				reservation.OperationID == operationID.String() &&
@@ -314,7 +302,7 @@ func (s *Service) authorization(
 	amountMinor int64,
 	currency string,
 ) (Reservation, error) {
-	if s == nil || s.authWallet == nil || s.catalog == nil {
+	if s == nil || s.repo == nil || s.catalog == nil {
 		return Reservation{}, ErrManagedNumberAuthorizationInvalid
 	}
 	if organizationID == uuid.Nil || operationID == uuid.Nil || reservationID == uuid.Nil || priceID == uuid.Nil || amountMinor <= 0 {
@@ -334,7 +322,7 @@ func (s *Service) authorization(
 		return Reservation{}, ErrManagedNumberAuthorizationInvalid
 	}
 
-	reservation, err := s.authWallet.GetReservation(ctx, organizationID, reservationID)
+	reservation, err := s.repo.GetReservation(ctx, organizationID, reservationID)
 	if err != nil {
 		return Reservation{}, err
 	}
@@ -342,7 +330,7 @@ func (s *Service) authorization(
 		return Reservation{}, ErrManagedNumberAuthorizationInvalid
 	}
 
-	wallet, err := s.authWallet.Get(ctx, organizationID, reservation.WalletID)
+	wallet, err := s.repo.Get(ctx, organizationID, reservation.WalletID)
 	if err != nil {
 		return Reservation{}, err
 	}

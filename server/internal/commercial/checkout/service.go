@@ -13,7 +13,10 @@ import (
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
-type store interface {
+// checkoutRepository is the persistence boundary owned by Checkout. Naming the
+// interface after the domain responsibility avoids a generic "store" concept
+// that obscures which module owns these transitions.
+type checkoutRepository interface {
 	Create(context.Context, uuid.UUID, CreateInput) (Checkout, error)
 	StartPayment(context.Context, uuid.UUID, uuid.UUID, StartPayment) (Checkout, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (Checkout, error)
@@ -48,7 +51,7 @@ type paymentService interface {
 }
 
 type Service struct {
-	repo          store
+	repo          checkoutRepository
 	wallets       walletService
 	catalog       catalogService
 	subscriptions subscriptionService
@@ -75,7 +78,7 @@ type Result struct {
 }
 
 func NewService(
-	repo store,
+	repo checkoutRepository,
 	wallets walletService,
 	catalog catalogService,
 	subscriptions subscriptionService,
