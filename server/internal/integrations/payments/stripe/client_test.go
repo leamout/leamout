@@ -22,7 +22,7 @@ func TestCreateCheckoutCreatesCardCheckoutSession(t *testing.T) {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
 		username, _, _ := r.BasicAuth()
-		if username != "sk_test" || r.Header.Get("Idempotency-Key") != "invoice-1" ||
+		if username != "sk_test" || r.Header.Get("Idempotency-Key") != "wallet-topup-1" ||
 			r.Header.Get("Stripe-Version") != DefaultAPIVersion {
 			t.Fatalf("authentication/idempotency headers are incorrect")
 		}
@@ -34,7 +34,7 @@ func TestCreateCheckoutCreatesCardCheckoutSession(t *testing.T) {
 			values.Get("payment_method_types[]") != "card" {
 			t.Fatalf("form = %v", values)
 		}
-		_, _ = w.Write([]byte(`{"id":"cs_1","client_secret":"cs_1_secret","amount_total":2500,"currency":"usd","payment_status":"unpaid","status":"open","metadata":{"leamout_reference":"invoice-1"}}`))
+		_, _ = w.Write([]byte(`{"id":"cs_1","client_secret":"cs_1_secret","amount_total":2500,"currency":"usd","payment_status":"unpaid","status":"open","metadata":{"leamout_reference":"wallet-topup-1"}}`))
 	}))
 	defer server.Close()
 	client, err := NewClient(Config{BaseURL: server.URL + "/v1", SecretKey: "sk_test", HTTPClient: server.Client()})
@@ -42,7 +42,7 @@ func TestCreateCheckoutCreatesCardCheckoutSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	session, err := client.CreateCheckout(context.Background(), paymentprovider.CheckoutRequest{
-		Reference: "invoice-1", AmountMinor: 2500, Currency: "USD", Email: "buyer@example.com",
+		Reference: "wallet-topup-1", AmountMinor: 2500, Currency: "USD", Email: "buyer@example.com",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +54,7 @@ func TestCreateCheckoutCreatesCardCheckoutSession(t *testing.T) {
 
 func TestParseWebhookAuthenticatesStripePayloadAndTimestamp(t *testing.T) {
 	now := time.Unix(1_800_000_000, 0)
-	payload := []byte(`{"id":"evt_1","type":"checkout.session.completed","data":{"object":{"id":"cs_1","amount_total":2500,"currency":"usd","payment_status":"paid","status":"complete","metadata":{"leamout_reference":"invoice-1"}}}}`)
+	payload := []byte(`{"id":"evt_1","type":"checkout.session.completed","data":{"object":{"id":"cs_1","amount_total":2500,"currency":"usd","payment_status":"paid","status":"complete","metadata":{"leamout_reference":"wallet-topup-1"}}}}`)
 	mac := hmac.New(sha256.New, []byte("whsec_test"))
 	_, _ = mac.Write(append([]byte("1800000000."), payload...))
 	header := http.Header{"Stripe-Signature": []string{"t=1800000000,v1=" + hex.EncodeToString(mac.Sum(nil))}}
@@ -63,7 +63,7 @@ func TestParseWebhookAuthenticatesStripePayloadAndTimestamp(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if event.ProviderEventID != "evt_1" || event.Payment.Reference != "invoice-1" || event.Payment.Status != paymentprovider.StatusSucceeded {
+	if event.ProviderEventID != "evt_1" || event.Payment.Reference != "wallet-topup-1" || event.Payment.Status != paymentprovider.StatusSucceeded {
 		t.Fatalf("event = %+v", event)
 	}
 	header.Set("Stripe-Signature", "t=1700000000,v1="+strings.Repeat("0", sha256.Size*2))

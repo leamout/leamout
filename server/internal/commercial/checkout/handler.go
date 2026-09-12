@@ -39,7 +39,6 @@ type ContinueRequest struct {
 type CheckoutResponse struct {
 	CheckoutID      uuid.UUID       `json:"checkout_id"`
 	PaymentID       *uuid.UUID      `json:"payment_id,omitempty"`
-	Type            Type            `json:"type"`
 	WalletID        *uuid.UUID      `json:"wallet_id,omitempty"`
 	Reference       string          `json:"reference"`
 	Provider        Provider        `json:"provider,omitempty"`
@@ -140,7 +139,7 @@ func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 
 func Response(result Result) CheckoutResponse {
 	response := CheckoutResponse{
-		CheckoutID: result.Checkout.ID, Type: result.Checkout.Type, WalletID: result.Checkout.WalletID,
+		CheckoutID: result.Checkout.ID, WalletID: result.Checkout.WalletID,
 		Reference: result.Checkout.Reference, Provider: result.Checkout.Provider, PaymentMethod: result.Checkout.PaymentMethod,
 		AmountMinor: result.Checkout.AmountMinor, Currency: result.Checkout.Currency, Status: result.Checkout.Status,
 		NextAction: result.Checkout.NextAction, ProviderMessage: result.Checkout.ProviderMessage,

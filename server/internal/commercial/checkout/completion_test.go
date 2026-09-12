@@ -19,7 +19,6 @@ func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
 		ID:             checkoutID,
 		OrganizationID: organizationID,
 		WalletID:       &walletID,
-		Type:           TypeWalletTopup,
 		Provider:       ProviderStripe,
 		PaymentMethod:  MethodCard,
 		Reference:      "checkout.wallet",
@@ -68,7 +67,6 @@ func TestCompletePaymentTreatsDuplicateWalletCreditAsRetry(t *testing.T) {
 		ID:             checkoutID,
 		OrganizationID: organizationID,
 		WalletID:       &walletID,
-		Type:           TypeWalletTopup,
 		Provider:       ProviderStripe,
 		AmountMinor:    1000,
 		Currency:       "USD",
@@ -98,7 +96,6 @@ func TestCompletePaymentRejectsMismatchedSettlement(t *testing.T) {
 	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             uuid.New(),
 		OrganizationID: uuid.New(),
-		Type:           TypeWalletTopup,
 		Provider:       ProviderStripe,
 		AmountMinor:    5000,
 		Currency:       "USD",

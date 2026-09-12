@@ -24,9 +24,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (Checkout, error) {
 	row, err := r.queries.CreateCheckout(ctx, sqlc.CreateCheckoutParams{
 		OrganizationID: organizationID,
-		WalletID:       input.WalletID,
-		PriceID:        input.PriceID,
-		CheckoutType:   string(input.Type),
+		WalletID:       *input.WalletID,
 		Reference:      input.Reference,
 		AmountMinor:    input.AmountMinor,
 		Currency:       input.Currency,
@@ -131,12 +129,11 @@ func (r *Repository) Expire(ctx context.Context) ([]Checkout, error) {
 }
 
 func checkoutFromRow(row sqlc.Checkout) Checkout {
+	walletID := row.WalletID
 	return Checkout{
 		ID:              row.ID,
 		OrganizationID:  row.OrganizationID,
-		WalletID:        row.WalletID,
-		PriceID:         row.PriceID,
-		Type:            Type(row.CheckoutType),
+		WalletID:        &walletID,
 		Provider:        Provider(nullableString(row.Provider)),
 		PaymentMethod:   PaymentMethod(nullableString(row.PaymentMethod)),
 		Reference:       row.Reference,
