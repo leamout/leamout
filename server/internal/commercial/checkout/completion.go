@@ -20,7 +20,7 @@ func (s *Service) CompletePayment(ctx context.Context, settlement commercialpaym
 	if err != nil {
 		return err
 	}
-	if checkoutRecord.Type != TypeWalletTopup || checkoutRecord.AmountMinor != settlement.AmountMinor ||
+	if checkoutRecord.AmountMinor != settlement.AmountMinor ||
 		checkoutRecord.Currency != settlement.Currency ||
 		(checkoutRecord.Provider != "" && string(checkoutRecord.Provider) != settlement.Provider) {
 		return ErrPaymentMismatch

@@ -92,7 +92,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, params C
 	}
 	now := s.now().UTC()
 	input := CreateInput{
-		WalletID: params.WalletID, Type: TypeWalletTopup,
+		WalletID:  params.WalletID,
 		Reference: "checkout." + uuid.NewString(), AmountMinor: params.AmountMinor,
 		Currency: wallet.Currency, ExpiresAt: now.Add(30 * time.Minute), Metadata: params.Metadata,
 	}
@@ -149,7 +149,7 @@ func (s *Service) Confirm(ctx context.Context, organizationID, checkoutID uuid.U
 	if err != nil {
 		return Result{}, err
 	}
-	if checkoutRecord.Status != StatusPending || checkoutRecord.Type != TypeWalletTopup {
+	if checkoutRecord.Status != StatusPending {
 		return Result{}, ErrInvalidTransition
 	}
 	providerName, ok := providerForMethod(input.PaymentMethod)
@@ -168,7 +168,7 @@ func (s *Service) Confirm(ctx context.Context, organizationID, checkoutID uuid.U
 	}
 	metadata := map[string]string{
 		"organization_id": organizationID.String(), "checkout_id": checkoutRecord.ID.String(),
-		"checkout_type": string(checkoutRecord.Type), "wallet_id": checkoutRecord.WalletID.String(),
+		"wallet_id": checkoutRecord.WalletID.String(),
 	}
 	started, err := s.payments.start(ctx, organizationID, commercialpayments.StartInput{
 		CheckoutID: checkoutRecord.ID, Provider: string(providerName), Reference: checkoutRecord.Reference,

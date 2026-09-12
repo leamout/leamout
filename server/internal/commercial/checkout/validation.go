@@ -19,7 +19,7 @@ func validateIntent(input CreateParams) error {
 }
 
 func validateCreate(input CreateInput, now time.Time) error {
-	if input.Type != TypeWalletTopup || input.WalletID == nil || input.PriceID != nil || input.AmountMinor <= 0 ||
+	if input.WalletID == nil || *input.WalletID == uuid.Nil || input.AmountMinor <= 0 ||
 		len(input.Currency) != 3 || input.Currency != strings.ToUpper(input.Currency) ||
 		!checkoutReferencePattern.MatchString(input.Reference) || !input.ExpiresAt.After(now) || !validMetadata(input.Metadata) {
 		return ErrInvalidCheckout
