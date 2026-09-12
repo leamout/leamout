@@ -3,8 +3,6 @@ package licensing
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,7 +15,6 @@ import (
 
 const serializableAttempts = 3
 
-// Repository persists licenses and deployments through SQLC within an organization boundary.
 type Repository struct {
 	pool    *pgxpool.Pool
 	queries *sqlc.Queries
@@ -27,25 +24,9 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool, queries: sqlc.New(pool)}
 }
 
-func (r *Repository) Create(
-	ctx context.Context,
-	organizationID, subscriptionID uuid.UUID,
-	maxDeployments int32,
-	signingKeyID *string,
-	issuedAt time.Time,
-	expiresAt *time.Time,
-	snapshot entitlementSnapshot,
-) (License, error) {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return License{}, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	queries := r.queries.WithTx(tx)
-
+func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, maxDeployments int32, signingKeyID *string, issuedAt time.Time, expiresAt *time.Time) (License, error) {
 	status := string(StatusPending)
-	row, err := queries.CreateLicense(ctx, sqlc.CreateLicenseParams{
-		SubscriptionID: &subscriptionID,
+	row, err := r.queries.CreateLicense(ctx, sqlc.CreateLicenseParams{
 		Status:         &status,
 		MaxDeployments: &maxDeployments,
 		SigningKeyID:   signingKeyID,
@@ -56,61 +37,7 @@ func (r *Repository) Create(
 	if err != nil {
 		return License{}, mapLicenseWriteError(err)
 	}
-	if err := createEntitlementSnapshot(ctx, queries, organizationID, row.ID, snapshot); err != nil {
-		return License{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return License{}, err
-	}
 	return licenseFromRow(row), nil
-}
-
-func createEntitlementSnapshot(
-	ctx context.Context,
-	queries *sqlc.Queries,
-	organizationID, licenseID uuid.UUID,
-	snapshot entitlementSnapshot,
-) error {
-	featureKeys := make([]string, 0, len(snapshot.Features))
-	for key := range snapshot.Features {
-		featureKeys = append(featureKeys, key)
-	}
-	sort.Strings(featureKeys)
-	for _, key := range featureKeys {
-		enabled := snapshot.Features[key]
-		if _, err := queries.CreateLicenseEntitlement(ctx, sqlc.CreateLicenseEntitlementParams{
-			EntitlementKey: key,
-			Kind:           "feature",
-			Enabled:        &enabled,
-			StartsAt:       pgconv.NullableTimestamptz(nil),
-			ExpiresAt:      pgconv.NullableTimestamptz(nil),
-			LicenseID:      licenseID,
-			OrganizationID: organizationID,
-		}); err != nil {
-			return fmt.Errorf("snapshot feature entitlement %q: %w", key, err)
-		}
-	}
-
-	limitKeys := make([]string, 0, len(snapshot.Limits))
-	for key := range snapshot.Limits {
-		limitKeys = append(limitKeys, key)
-	}
-	sort.Strings(limitKeys)
-	for _, key := range limitKeys {
-		limit := snapshot.Limits[key]
-		if _, err := queries.CreateLicenseEntitlement(ctx, sqlc.CreateLicenseEntitlementParams{
-			EntitlementKey: key,
-			Kind:           "limit",
-			LimitValue:     &limit,
-			StartsAt:       pgconv.NullableTimestamptz(nil),
-			ExpiresAt:      pgconv.NullableTimestamptz(nil),
-			LicenseID:      licenseID,
-			OrganizationID: organizationID,
-		}); err != nil {
-			return fmt.Errorf("snapshot limit entitlement %q: %w", key, err)
-		}
-	}
-	return nil
 }
 
 func (r *Repository) Get(ctx context.Context, organizationID, id uuid.UUID) (License, error) {
@@ -161,9 +88,7 @@ func (r *Repository) transitionOnce(ctx context.Context, organizationID, id uuid
 	if current.Status == target {
 		return current, false, nil
 	}
-	_, err = queries.UpdateLicenseStatus(ctx, sqlc.UpdateLicenseStatusParams{
-		Status: targetString(target), OrganizationID: organizationID, ID: id,
-	})
+	_, err = queries.UpdateLicenseStatus(ctx, sqlc.UpdateLicenseStatusParams{Status: string(target), OrganizationID: organizationID, ID: id})
 	if err != nil {
 		if isSerializationFailure(err) {
 			return License{}, true, nil
@@ -184,9 +109,7 @@ func (r *Repository) transitionOnce(ctx context.Context, organizationID, id uuid
 }
 
 func (r *Repository) UpdateExpiration(ctx context.Context, organizationID, id uuid.UUID, expiresAt *time.Time) (License, error) {
-	_, err := r.queries.UpdateLicenseExpiration(ctx, sqlc.UpdateLicenseExpirationParams{
-		ExpiresAt: pgconv.NullableTimestamptz(expiresAt), OrganizationID: organizationID, ID: id,
-	})
+	_, err := r.queries.UpdateLicenseExpiration(ctx, sqlc.UpdateLicenseExpirationParams{ExpiresAt: pgconv.NullableTimestamptz(expiresAt), OrganizationID: organizationID, ID: id})
 	if err != nil {
 		return License{}, mapLicenseWriteError(err)
 	}
@@ -211,9 +134,7 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := r.queries.WithTx(tx)
 
-	existing, err := queries.GetDeployment(ctx, sqlc.GetDeploymentParams{
-		LicenseID: licenseID, DeploymentID: input.DeploymentID, OrganizationID: organizationID,
-	})
+	existing, err := queries.GetDeployment(ctx, sqlc.GetDeploymentParams{LicenseID: licenseID, DeploymentID: input.DeploymentID, OrganizationID: organizationID})
 	if err == nil {
 		deployment := deploymentFromRow(organizationID, existing)
 		if deployment.Status == DeploymentStatusDeactivated {
@@ -224,7 +145,6 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return Deployment{}, false, err
 	}
-
 	licenseRow, err := queries.GetLicense(ctx, sqlc.GetLicenseParams{OrganizationID: organizationID, ID: licenseID})
 	if err != nil {
 		return Deployment{}, false, mapLicenseReadError(err)
@@ -233,18 +153,14 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 	if license.Status != StatusActive || (license.ExpiresAt != nil && !license.ExpiresAt.After(at)) {
 		return Deployment{}, false, ErrLicenseUnavailable
 	}
-	count, err := queries.CountActiveDeploymentsByLicense(ctx, sqlc.CountActiveDeploymentsByLicenseParams{
-		LicenseID: licenseID, OrganizationID: organizationID,
-	})
+	count, err := queries.CountActiveDeploymentsByLicense(ctx, sqlc.CountActiveDeploymentsByLicenseParams{LicenseID: licenseID, OrganizationID: organizationID})
 	if err != nil {
 		return Deployment{}, false, err
 	}
 	if count >= int64(license.MaxDeployments) {
 		return Deployment{}, false, ErrDeploymentLimitReached
 	}
-	row, err := queries.CreateDeployment(ctx, sqlc.CreateDeploymentParams{
-		DeploymentID: input.DeploymentID, Name: input.Name, LicenseID: licenseID, OrganizationID: organizationID,
-	})
+	row, err := queries.CreateDeployment(ctx, sqlc.CreateDeploymentParams{DeploymentID: input.DeploymentID, Name: input.Name, LicenseID: licenseID, OrganizationID: organizationID})
 	if err != nil {
 		if isSerializationFailure(err) {
 			return Deployment{}, true, nil
@@ -261,9 +177,7 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 }
 
 func (r *Repository) ListDeployments(ctx context.Context, organizationID, licenseID uuid.UUID) ([]Deployment, error) {
-	rows, err := r.queries.ListDeploymentsByLicense(ctx, sqlc.ListDeploymentsByLicenseParams{
-		LicenseID: licenseID, OrganizationID: organizationID,
-	})
+	rows, err := r.queries.ListDeploymentsByLicense(ctx, sqlc.ListDeploymentsByLicenseParams{LicenseID: licenseID, OrganizationID: organizationID})
 	if err != nil {
 		return nil, err
 	}
@@ -275,9 +189,7 @@ func (r *Repository) ListDeployments(ctx context.Context, organizationID, licens
 }
 
 func (r *Repository) TouchDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string, at time.Time) (Deployment, error) {
-	_, err := r.queries.TouchDeployment(ctx, sqlc.TouchDeploymentParams{
-		LastSeenAt: pgconv.NullableTimestamptz(&at), LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
-	})
+	_, err := r.queries.TouchDeployment(ctx, sqlc.TouchDeploymentParams{LastSeenAt: pgconv.NullableTimestamptz(&at), LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID})
 	if err != nil {
 		return Deployment{}, mapDeploymentWriteError(err)
 	}
@@ -285,9 +197,7 @@ func (r *Repository) TouchDeployment(ctx context.Context, organizationID, licens
 }
 
 func (r *Repository) DeactivateDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
-	_, err := r.queries.DeactivateDeployment(ctx, sqlc.DeactivateDeploymentParams{
-		LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
-	})
+	_, err := r.queries.DeactivateDeployment(ctx, sqlc.DeactivateDeploymentParams{LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID})
 	if err != nil {
 		return Deployment{}, mapDeploymentWriteError(err)
 	}
@@ -295,9 +205,7 @@ func (r *Repository) DeactivateDeployment(ctx context.Context, organizationID, l
 }
 
 func (r *Repository) getDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
-	row, err := r.queries.GetDeployment(ctx, sqlc.GetDeploymentParams{
-		LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID,
-	})
+	row, err := r.queries.GetDeployment(ctx, sqlc.GetDeploymentParams{LicenseID: licenseID, DeploymentID: deploymentID, OrganizationID: organizationID})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Deployment{}, ErrDeploymentNotFound
@@ -309,8 +217,8 @@ func (r *Repository) getDeployment(ctx context.Context, organizationID, licenseI
 
 func licenseFromRow(row sqlc.License) License {
 	return License{
-		ID: row.ID, OrganizationID: row.OrganizationID, SubscriptionID: row.SubscriptionID,
-		Status: Status(row.Status), MaxDeployments: row.MaxDeployments, SigningKeyID: row.SigningKeyID,
+		ID: row.ID, OrganizationID: row.OrganizationID, Status: Status(row.Status),
+		MaxDeployments: row.MaxDeployments, SigningKeyID: row.SigningKeyID,
 		IssuedAt: pgconv.TimestamptzToTime(row.IssuedAt), ExpiresAt: pgconv.TimestamptzToTimePtr(row.ExpiresAt),
 		CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
@@ -325,15 +233,12 @@ func deploymentFromRow(organizationID uuid.UUID, row sqlc.Deployment) Deployment
 	}
 }
 
-func targetString(status Status) string { return string(status) }
-
 func mapLicenseReadError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrLicenseNotFound
 	}
 	return err
 }
-
 func mapLicenseWriteError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrLicenseUnavailable
@@ -344,7 +249,6 @@ func mapLicenseWriteError(err error) error {
 	}
 	return err
 }
-
 func mapDeploymentWriteError(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrDeploymentNotFound
@@ -355,7 +259,6 @@ func mapDeploymentWriteError(err error) error {
 	}
 	return err
 }
-
 func isSerializationFailure(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "40001"

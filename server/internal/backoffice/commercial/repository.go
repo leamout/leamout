@@ -2,6 +2,7 @@ package commercial
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -19,22 +20,12 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 	}
 	return Detail{
 		Account: Account{
-			OrganizationID:     row.OrganizationID,
-			Organization:       row.OrganizationName,
-			Plan:               row.PlanName,
-			SubscriptionStatus: row.SubscriptionStatus,
-			BillingModel:       row.BillingModel,
-			RenewsAt:           row.RenewsAt,
+			OrganizationID: row.OrganizationID,
+			Organization:   row.OrganizationName,
+			BillingModel:   row.BillingModel,
+			WalletCount:    row.WalletCount,
+			Currencies:     fmt.Sprint(row.Currencies),
 		},
-		SubscriptionID:        row.SubscriptionID,
-		PlanID:                row.PlanID,
-		PriceID:               row.PriceID,
-		PricingType:           row.PricingType,
-		Currency:              row.Currency,
-		AmountMinor:           row.AmountMinor,
-		BillingInterval:       row.BillingInterval,
-		StartsAt:              row.StartsAt,
-		EndsAt:                row.EndsAt,
 		OrganizationCreatedAt: row.OrganizationCreatedAt,
 	}, nil
 }
@@ -54,12 +45,11 @@ func (r *Repository) List(ctx context.Context) ([]Account, error) {
 	accounts := make([]Account, 0, len(rows))
 	for _, row := range rows {
 		accounts = append(accounts, Account{
-			OrganizationID:     row.OrganizationID,
-			Organization:       row.OrganizationName,
-			Plan:               row.PlanName,
-			SubscriptionStatus: row.SubscriptionStatus,
-			BillingModel:       row.BillingModel,
-			RenewsAt:           row.RenewsAt,
+			OrganizationID: row.OrganizationID,
+			Organization:   row.OrganizationName,
+			BillingModel:   row.BillingModel,
+			WalletCount:    row.WalletCount,
+			Currencies:     fmt.Sprint(row.Currencies),
 		})
 	}
 	return accounts, nil

@@ -20,7 +20,7 @@ WHERE organization_id = $1
   AND provider = 'paystack'
   AND status = 'processing'
   AND updated_at <= $3
-RETURNING id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 type ClaimCheckoutRefreshParams struct {
@@ -36,8 +36,6 @@ func (q *Queries) ClaimCheckoutRefresh(ctx context.Context, arg ClaimCheckoutRef
 		&i.ID,
 		&i.OrganizationID,
 		&i.WalletID,
-		&i.PriceID,
-		&i.CheckoutType,
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
@@ -65,7 +63,7 @@ SET status = $1,
 WHERE c.organization_id = $5
   AND c.id = $6
   AND c.status = $7
-RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+RETURNING c.id, c.organization_id, c.wallet_id, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 `
 
 type CompareAndSetCheckoutStateParams struct {
@@ -93,8 +91,6 @@ func (q *Queries) CompareAndSetCheckoutState(ctx context.Context, arg CompareAnd
 		&i.ID,
 		&i.OrganizationID,
 		&i.WalletID,
-		&i.PriceID,
-		&i.CheckoutType,
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
@@ -114,31 +110,27 @@ func (q *Queries) CompareAndSetCheckoutState(ctx context.Context, arg CompareAnd
 
 const createCheckout = `-- name: CreateCheckout :one
 INSERT INTO checkouts (
-    organization_id, wallet_id, price_id, checkout_type,
+    organization_id, wallet_id,
     reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     $1 AS organization_id,
     $2::UUID AS wallet_id,
-    $3::UUID AS price_id,
-    $4 AS checkout_type,
-    $5 AS reference,
-    $6 AS amount_minor,
-    $7 AS currency,
-    $8 AS expires_at,
-    COALESCE($9, '{}'::jsonb) AS metadata
+    $3 AS reference,
+    $4 AS amount_minor,
+    $5 AS currency,
+    $6 AS expires_at,
+    COALESCE($7, '{}'::jsonb) AS metadata
 FROM organizations AS o
 WHERE o.id = $1
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 type CreateCheckoutParams struct {
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	WalletID       *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
-	PriceID        *uuid.UUID         `db:"price_id" json:"price_id"`
-	CheckoutType   string             `db:"checkout_type" json:"checkout_type"`
+	WalletID       uuid.UUID          `db:"wallet_id" json:"wallet_id"`
 	Reference      string             `db:"reference" json:"reference"`
 	AmountMinor    int64              `db:"amount_minor" json:"amount_minor"`
 	Currency       string             `db:"currency" json:"currency"`
@@ -150,8 +142,6 @@ func (q *Queries) CreateCheckout(ctx context.Context, arg CreateCheckoutParams) 
 	row := q.db.QueryRow(ctx, createCheckout,
 		arg.OrganizationID,
 		arg.WalletID,
-		arg.PriceID,
-		arg.CheckoutType,
 		arg.Reference,
 		arg.AmountMinor,
 		arg.Currency,
@@ -163,8 +153,6 @@ func (q *Queries) CreateCheckout(ctx context.Context, arg CreateCheckoutParams) 
 		&i.ID,
 		&i.OrganizationID,
 		&i.WalletID,
-		&i.PriceID,
-		&i.CheckoutType,
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
@@ -187,7 +175,7 @@ UPDATE checkouts
 SET status = 'expired', next_action = 'none', completed_at = NOW(), updated_at = NOW()
 WHERE status IN ('pending', 'processing')
   AND expires_at <= NOW()
-RETURNING id, organization_id, wallet_id, price_id, checkout_type, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
+RETURNING id, organization_id, wallet_id, provider, payment_method, reference, amount_minor, currency, status, next_action, provider_message, expires_at, completed_at, metadata, created_at, updated_at
 `
 
 func (q *Queries) ExpireCheckouts(ctx context.Context) ([]Checkout, error) {
@@ -203,8 +191,6 @@ func (q *Queries) ExpireCheckouts(ctx context.Context) ([]Checkout, error) {
 			&i.ID,
 			&i.OrganizationID,
 			&i.WalletID,
-			&i.PriceID,
-			&i.CheckoutType,
 			&i.Provider,
 			&i.PaymentMethod,
 			&i.Reference,
@@ -230,7 +216,7 @@ func (q *Queries) ExpireCheckouts(ctx context.Context) ([]Checkout, error) {
 }
 
 const getCheckout = `-- name: GetCheckout :one
-SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+SELECT c.id, c.organization_id, c.wallet_id, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
 WHERE c.organization_id = $1
@@ -252,8 +238,6 @@ func (q *Queries) GetCheckout(ctx context.Context, arg GetCheckoutParams) (Check
 		&i.ID,
 		&i.OrganizationID,
 		&i.WalletID,
-		&i.PriceID,
-		&i.CheckoutType,
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
@@ -272,7 +256,7 @@ func (q *Queries) GetCheckout(ctx context.Context, arg GetCheckoutParams) (Check
 }
 
 const getCheckoutByReference = `-- name: GetCheckoutByReference :one
-SELECT c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+SELECT c.id, c.organization_id, c.wallet_id, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 FROM checkouts AS c
 JOIN organizations AS o ON o.id = c.organization_id
 WHERE c.reference = $1
@@ -288,8 +272,6 @@ func (q *Queries) GetCheckoutByReference(ctx context.Context, reference string) 
 		&i.ID,
 		&i.OrganizationID,
 		&i.WalletID,
-		&i.PriceID,
-		&i.CheckoutType,
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,
@@ -319,7 +301,7 @@ WHERE c.organization_id = $3
   AND c.status = 'pending'
   AND c.provider IS NULL
   AND c.payment_method IS NULL
-RETURNING c.id, c.organization_id, c.wallet_id, c.price_id, c.checkout_type, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
+RETURNING c.id, c.organization_id, c.wallet_id, c.provider, c.payment_method, c.reference, c.amount_minor, c.currency, c.status, c.next_action, c.provider_message, c.expires_at, c.completed_at, c.metadata, c.created_at, c.updated_at
 `
 
 type StartCheckoutPaymentParams struct {
@@ -341,8 +323,6 @@ func (q *Queries) StartCheckoutPayment(ctx context.Context, arg StartCheckoutPay
 		&i.ID,
 		&i.OrganizationID,
 		&i.WalletID,
-		&i.PriceID,
-		&i.CheckoutType,
 		&i.Provider,
 		&i.PaymentMethod,
 		&i.Reference,

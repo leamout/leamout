@@ -1,80 +1,127 @@
 # Payments and prepaid checkout
 
-Payments reconcile externally collected money with a server-priced Leamout checkout order. A payment is evidence of collection; it is not itself a subscription, entitlement, license, or wallet balance.
+Payments reconcile externally collected money into a Leamout wallet top-up. A payment is evidence of collection; it is not itself wallet balance, a license, or telecom authorization.
+
+Everything in Leamout is prepaid pay-as-you-go except Self-Hosted software licenses.
+
+Self-Hosted software license settlement is outside this automated checkout path. Enterprise license payments may be handled through contract, invoice, and bank transfer without creating wallet balance.
 
 ## Collection boundary
 
 ```text
-card         -> Stripe PaymentIntent + Leamout card checkout
-mobile money -> Paystack Charge API + Leamout MoMo checkout
+card         → Stripe
+mobile money → Paystack
 ```
 
-Leamout creates every checkout reference and owns the amount, currency, target, and commercial consequence. Stripe is restricted to cards. Paystack is restricted to Mobile Money and exposes only the continuation actions needed by that channel.
+Leamout owns every checkout reference, amount, currency, destination wallet, and resulting wallet credit. Payment providers execute collection; they do not own Commercial state.
 
-Challenge values such as an OTP are relayed to the provider over a protected request and are never persisted. Leamout does not collect a Paystack PIN.
+Challenge values such as an OTP are relayed to the provider over a protected request and are never persisted as Commercial state.
 
-## Checkout order
+## Checkout purpose
 
-A checkout order is the durable intent that precedes provider collection. It has exactly one target:
+The current checkout type is:
 
-- `subscription` references a server-owned catalog price and may reference its invoice.
-- `wallet_topup` references the destination currency wallet.
+```text
+wallet_topup
+```
 
-The provider and payment method are fixed pairs:
+Buying a managed number or consuming managed voice is not a Stripe/Paystack checkout. Those operations spend already-funded wallet value.
+
+```text
+Stripe / Paystack
+        ↓
+wallet top-up checkout
+        ↓
+verified payment success
+        ↓
+wallet ledger credit
+```
+
+A future verified bank-transfer funding path for enterprise usage wallets would still end at the same wallet-credit boundary. The funding rail does not change the prepaid model.
+
+## Supported provider/method pairs
 
 | Provider | Method |
 | --- | --- |
 | Stripe | `card` |
 | Paystack | `mobile_money` |
 
-The browser may select a permitted wallet top-up amount, but configured limits and the final amount are enforced by the server. Subscription amounts always come from the selected immutable price and invoice snapshot.
+The server validates permitted amount and currency against the destination wallet before collection proceeds.
 
 ## Verified collection flow
 
 ```text
-server-priced checkout order
-        ↓
+Leamout checkout
+      ↓
 provider payment attempt
-        ↓
-authenticated provider event
-        ↓
+      ↓
+authenticated provider event / verified status
+      ↓
+reconcile provider + reference + amount + currency
+      ↓
 idempotent payment success
-        ↓
-subscription transition OR wallet ledger credit
+      ↓
+wallet ledger credit
 ```
 
-Pending or processing payment state never delivers value. Before applying a success, reconciliation compares provider, reference, amount, and currency to the checkout order.
+Pending or processing payment state never creates spendable value.
 
-Provider events are stored with a unique `(provider, provider_event_id)` identity. Re-delivery can observe the recorded result but cannot repeat a wallet credit or subscription transition.
+Provider events are recorded with stable provider/event identity so retries cannot create duplicate credits.
 
-## Prepaid wallets
+## Wallet credit boundary
 
-Each organization may have one wallet per ISO currency. Currency is never converted implicitly or mixed within a wallet.
+A successful payment and a wallet credit are separate durable facts.
 
-Posted balance is the sum of immutable ledger entries. Spendable balance is:
+The payment service records provider collection state. The checkout/wallet workflow applies the matching top-up idempotently.
+
+Provider webhooks must never mutate wallet balance directly without Leamout reconciliation.
+
+## Enterprise Self-Hosted license settlement
+
+Self-Hosted software licenses are not wallet top-ups and should not be represented as checkout orders.
 
 ```text
-posted ledger balance - active reservations
+enterprise contract
+      ↓
+invoice / bank transfer
+      ↓
+verified settlement
+      ↓
+license lifecycle
 ```
 
-Positive entries are top-ups, refunds, or credit adjustments. Negative entries are captures, chargebacks, or debit adjustments. Ledger rows cannot be updated or deleted; corrections are compensating entries with their own idempotency key.
-
-## Provider spending
-
-Before Leamout incurs an upstream obligation, it atomically locks the wallet, verifies spendable funds, and creates a reservation. This applies to DIDWW number purchases, CommPeak calls, and every future managed carrier operation.
-
-A successful operation captures no more than the reservation. Failure releases it. Realtime Redis state may accelerate admission and incremental call authorization, but PostgreSQL remains authoritative and Redis cannot mint credit.
-
-The wallet repository acquires a PostgreSQL row lock before reading spendable
-balance and inserting a reservation. Capturing a reservation and appending its
-immutable debit share one database transaction, so neither half can commit
-without the other. Expiration records `expired_at`; an automatic timeout is not
-represented as a manual release.
+That settlement does not create managed-usage credit. A Self-Hosted + Managed customer must separately pre-fund managed usage before Leamout incurs provider obligations.
 
 ## Provider independence
 
-Provider webhooks must never directly grant entitlements, issue licenses, or mutate wallet balances. They authenticate and record provider facts; commercial services apply the matching Leamout transition in an idempotent database transaction.
+Never implement:
+
+```text
+provider webhook
+    ↓
+direct telecom fulfillment
+```
+
+Use:
+
+```text
+provider collection
+    ↓
+verified Leamout checkout success
+    ↓
+wallet credit
+    ↓
+customer later authorizes chargeable service from wallet
+```
 
 ## Deferred concerns
 
-The initial pay-before-use model does not implement postpaid credit, customer withdrawals, automatic foreign-exchange conversion, tax calculation, payouts, or Merchant-of-Record infrastructure.
+The current model does not implement:
+
+- customer subscriptions;
+- postpaid telecom or platform usage credit;
+- invoice collection for Cloud/usage charges;
+- customer withdrawals;
+- foreign-exchange conversion;
+- tax calculation/remittance;
+- payouts or Merchant-of-Record infrastructure.

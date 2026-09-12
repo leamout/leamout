@@ -7,7 +7,7 @@ challenge/response traffic and a synthetic wholesale SIP endpoint.
 sh tests/acceptance/managed-sip-edge/run.sh
 ```
 
-It covers unauthenticated and incorrect credentials, caller-ID authorization,
-managed entitlement enforcement, inactive trunk/organization state, successful
+It covers unauthenticated and incorrect credentials, managed caller-ID authorization,
+inactive caller-ID/trunk/organization state, successful
 platform routing, and removal of customer `Proxy-Authorization` before the
 wholesale leg. CPS, concurrency, and credit exhaustion remain follow-up cases.

@@ -16,13 +16,12 @@ import (
 const LicenseClaimsVersionV1 = 1
 
 var (
-	ErrClaimsSubscriptionIDRequired = errors.New("subscription id is required in signed license claims")
-	ErrClaimsIssuedAtRequired       = errors.New("issued_at is required in signed license claims")
-	ErrClaimsExpiresAtRequired      = errors.New("expires_at is required in signed license claims")
-	ErrInvalidClaimKey              = errors.New("license claim key must be non-empty and contain no whitespace")
-	ErrInvalidClaimLimit            = errors.New("license claim limit must be non-negative")
-	ErrDuplicateClaimKey            = errors.New("duplicate license claim key")
-	ErrMalformedClaims              = errors.New("malformed signed license claims")
+	ErrClaimsIssuedAtRequired  = errors.New("issued_at is required in signed license claims")
+	ErrClaimsExpiresAtRequired = errors.New("expires_at is required in signed license claims")
+	ErrInvalidClaimKey         = errors.New("license claim key must be non-empty and contain no whitespace")
+	ErrInvalidClaimLimit       = errors.New("license claim limit must be non-negative")
+	ErrDuplicateClaimKey       = errors.New("duplicate license claim key")
+	ErrMalformedClaims         = errors.New("malformed signed license claims")
 )
 
 // LicenseClaimsV1 is the versioned commercial authorization carried by a
@@ -31,7 +30,6 @@ var (
 type LicenseClaimsV1 struct {
 	LicenseID      uuid.UUID
 	OrganizationID uuid.UUID
-	SubscriptionID uuid.UUID
 	DeploymentID   string
 	IssuedAt       time.Time
 	ExpiresAt      time.Time
@@ -53,7 +51,6 @@ type licenseClaimsWireV1 struct {
 	Version        int              `json:"version"`
 	LicenseID      string           `json:"license_id"`
 	OrganizationID string           `json:"organization_id"`
-	SubscriptionID string           `json:"subscription_id"`
 	DeploymentID   string           `json:"deployment_id"`
 	IssuedAt       int64            `json:"issued_at"`
 	ExpiresAt      int64            `json:"expires_at"`
@@ -67,9 +64,6 @@ func normalizeClaimsV1(claims LicenseClaimsV1) (LicenseClaimsV1, error) {
 	}
 	if err := validateID(claims.OrganizationID, ErrOrganizationIDRequired); err != nil {
 		return LicenseClaimsV1{}, err
-	}
-	if claims.SubscriptionID == uuid.Nil {
-		return LicenseClaimsV1{}, ErrClaimsSubscriptionIDRequired
 	}
 	deployment, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: claims.DeploymentID})
 	if err != nil {
@@ -162,7 +156,6 @@ func marshalClaimsV1(claims LicenseClaimsV1) ([]byte, LicenseClaimsV1, error) {
 		Version:        LicenseClaimsVersionV1,
 		LicenseID:      normalized.LicenseID.String(),
 		OrganizationID: normalized.OrganizationID.String(),
-		SubscriptionID: normalized.SubscriptionID.String(),
 		DeploymentID:   normalized.DeploymentID,
 		IssuedAt:       normalized.IssuedAt.Unix(),
 		ExpiresAt:      normalized.ExpiresAt.Unix(),
@@ -194,10 +187,6 @@ func unmarshalClaimsV1(payload []byte) (LicenseClaimsV1, error) {
 		return LicenseClaimsV1{}, ErrMalformedClaims
 	}
 	organizationID, err := uuid.Parse(wire.OrganizationID)
-	if err != nil {
-		return LicenseClaimsV1{}, ErrMalformedClaims
-	}
-	subscriptionID, err := uuid.Parse(wire.SubscriptionID)
 	if err != nil {
 		return LicenseClaimsV1{}, ErrMalformedClaims
 	}
@@ -234,7 +223,6 @@ func unmarshalClaimsV1(payload []byte) (LicenseClaimsV1, error) {
 	claims, err := normalizeClaimsV1(LicenseClaimsV1{
 		LicenseID:      licenseID,
 		OrganizationID: organizationID,
-		SubscriptionID: subscriptionID,
 		DeploymentID:   wire.DeploymentID,
 		IssuedAt:       time.Unix(wire.IssuedAt, 0).UTC(),
 		ExpiresAt:      time.Unix(wire.ExpiresAt, 0).UTC(),

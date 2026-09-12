@@ -19,10 +19,8 @@ type Handler struct{ service *Service }
 func NewHandler(service *Service) *Handler { return &Handler{service: service} }
 
 type CreateRequest struct {
-	Type        Type            `json:"type"`
-	WalletID    *uuid.UUID      `json:"wallet_id,omitempty"`
-	PriceID     *uuid.UUID      `json:"price_id,omitempty"`
-	AmountMinor int64           `json:"amount_minor,omitempty"`
+	WalletID    *uuid.UUID      `json:"wallet_id"`
+	AmountMinor int64           `json:"amount_minor"`
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
 }
 
@@ -41,9 +39,7 @@ type ContinueRequest struct {
 type CheckoutResponse struct {
 	CheckoutID      uuid.UUID       `json:"checkout_id"`
 	PaymentID       *uuid.UUID      `json:"payment_id,omitempty"`
-	Type            Type            `json:"type"`
 	WalletID        *uuid.UUID      `json:"wallet_id,omitempty"`
-	PriceID         *uuid.UUID      `json:"price_id,omitempty"`
 	Reference       string          `json:"reference"`
 	Provider        Provider        `json:"provider,omitempty"`
 	PaymentMethod   PaymentMethod   `json:"payment_method,omitempty"`
@@ -69,13 +65,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	checkoutRecord, err := h.service.Create(r.Context(), organizationID, CreateParams{
-		Type:        request.Type,
-		WalletID:    request.WalletID,
-		PriceID:     request.PriceID,
-		AmountMinor: request.AmountMinor,
-		Metadata:    request.Metadata,
-	})
+	checkoutRecord, err := h.service.Create(r.Context(), organizationID, CreateParams(request))
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -149,21 +139,11 @@ func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 
 func Response(result Result) CheckoutResponse {
 	response := CheckoutResponse{
-		CheckoutID:      result.Checkout.ID,
-		Type:            result.Checkout.Type,
-		WalletID:        result.Checkout.WalletID,
-		PriceID:         result.Checkout.PriceID,
-		Reference:       result.Checkout.Reference,
-		Provider:        result.Checkout.Provider,
-		PaymentMethod:   result.Checkout.PaymentMethod,
-		AmountMinor:     result.Checkout.AmountMinor,
-		Currency:        result.Checkout.Currency,
-		Status:          result.Checkout.Status,
-		NextAction:      result.Checkout.NextAction,
-		ProviderMessage: result.Checkout.ProviderMessage,
-		ExpiresAt:       result.Checkout.ExpiresAt,
-		CompletedAt:     result.Checkout.CompletedAt,
-		Metadata:        result.Checkout.Metadata,
+		CheckoutID: result.Checkout.ID, WalletID: result.Checkout.WalletID,
+		Reference: result.Checkout.Reference, Provider: result.Checkout.Provider, PaymentMethod: result.Checkout.PaymentMethod,
+		AmountMinor: result.Checkout.AmountMinor, Currency: result.Checkout.Currency, Status: result.Checkout.Status,
+		NextAction: result.Checkout.NextAction, ProviderMessage: result.Checkout.ProviderMessage,
+		ExpiresAt: result.Checkout.ExpiresAt, CompletedAt: result.Checkout.CompletedAt, Metadata: result.Checkout.Metadata,
 	}
 	if result.Payment != nil {
 		id := result.Payment.ID

@@ -4,16 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
-)
-
-const (
-	ManagedVoiceEntitlement = "voice.managed.enabled"
-	ManagedDailySpendLimit  = "voice.managed.daily_spend_micros"
 )
 
 var ErrDenied = errors.New("managed SIP call is not authorized")
@@ -44,25 +37,16 @@ type Route struct {
 
 type store interface {
 	Resolve(context.Context, Request) (Route, error)
-	DailyWholesaleSpend(context.Context, uuid.UUID, time.Time) (int64, error)
 }
 
-type stateResolver interface {
-	Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error)
-}
+type Service struct{ store store }
 
-type Service struct {
-	store store
-	state stateResolver
-	now   func() time.Time
-}
+func NewService(store store) *Service { return &Service{store: store} }
 
-func NewService(store store, state stateResolver) *Service {
-	return &Service{store: store, state: state, now: time.Now}
-}
-
+// Admit validates the tenant-owned managed SIP route. Prepaid authorization is
+// enforced at the provider-obligation boundary by the managed call workflow.
 func (s *Service) Admit(ctx context.Context, req Request) (Decision, error) {
-	if s.store == nil || s.state == nil {
+	if s.store == nil {
 		return Decision{}, fmt.Errorf("managed SIP admission dependencies are unavailable")
 	}
 	route, err := s.store.Resolve(ctx, req)
@@ -72,26 +56,10 @@ func (s *Service) Admit(ctx context.Context, req Request) (Decision, error) {
 		}
 		return Decision{}, fmt.Errorf("resolve managed SIP route: %w", err)
 	}
-	state, err := s.state.Resolve(ctx, route.OrganizationID)
-	if err != nil {
-		return Decision{}, fmt.Errorf("resolve managed SIP commercial state: %w", err)
-	}
-	limit, ok := state.Limit(ManagedDailySpendLimit)
-	if state.Standing != commercialaccess.StandingActive || !state.Enabled(ManagedVoiceEntitlement) || !ok || limit <= 0 {
-		return Decision{}, ErrDenied
-	}
-	now := s.now().UTC()
-	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-	spent, err := s.store.DailyWholesaleSpend(ctx, route.OrganizationID, day)
-	if err != nil {
-		return Decision{}, fmt.Errorf("resolve managed SIP wholesale spend: %w", err)
-	}
-	if spent >= limit {
-		return Decision{}, ErrDenied
-	}
 	return Decision{
-		Allowed:        true,
-		OrganizationID: route.OrganizationID, TrunkID: route.TrunkID,
+		Allowed:             true,
+		OrganizationID:      route.OrganizationID,
+		TrunkID:             route.TrunkID,
 		CarrierConnectionID: route.CarrierConnectionID,
 		RouteURI:            fmt.Sprintf("sip:%s@%s:%d;transport=%s", req.To, route.Host, route.Port, route.Transport),
 	}, nil

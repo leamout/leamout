@@ -5,22 +5,18 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 )
 
 // Service owns self-hosted license lifecycle and deployment activation policy.
 type Service struct {
-	repo  *Repository
-	state *commercialaccess.Service
-	now   func() time.Time
+	repo *Repository
+	now  func() time.Time
 }
 
-func NewService(repo *Repository, state *commercialaccess.Service) *Service {
-	return &Service{repo: repo, state: state, now: time.Now}
+func NewService(repo *Repository) *Service {
+	return &Service{repo: repo, now: time.Now}
 }
 
-// Create creates a pending license from current commercial state. It does not
-// claim to have produced a signed license artifact; activation is a separate step.
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, input CreateInput) (License, error) {
 	if err := validateID(organizationID, ErrOrganizationIDRequired); err != nil {
 		return License{}, err
@@ -29,28 +25,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, input Cr
 	if err != nil {
 		return License{}, err
 	}
-	resolved, err := s.state.ResolveAt(ctx, organizationID, issuedAt)
-	if err != nil {
-		return License{}, err
-	}
-	if resolved.Standing != commercialaccess.StandingActive || resolved.SubscriptionID == nil {
-		return License{}, ErrCommercialStateUnavailable
-	}
-	limit, ok := resolved.Limit(MaxDeploymentsEntitlement)
-	if !ok || limit <= 0 || limit > int64(^uint32(0)>>1) {
-		return License{}, ErrInvalidDeploymentLimit
-	}
-	snapshot := entitlementSnapshot{Features: resolved.Features, Limits: resolved.Limits}
-	return s.repo.Create(
-		ctx,
-		organizationID,
-		*resolved.SubscriptionID,
-		int32(limit),
-		normalized.SigningKeyID,
-		issuedAt,
-		normalized.ExpiresAt,
-		snapshot,
-	)
+	return s.repo.Create(ctx, organizationID, normalized.MaxDeployments, normalized.SigningKeyID, issuedAt, normalized.ExpiresAt)
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (License, error) {

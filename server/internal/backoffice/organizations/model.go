@@ -1,28 +1,26 @@
 package organizations
 
 type Organization struct {
-	ID        string
-	Name      string
-	Plan      string
-	Members   int64
-	Status    string
-	CreatedAt string
+	ID         string
+	Name       string
+	Members    int64
+	Wallets    int64
+	Currencies string
+	Status     string
+	CreatedAt  string
 }
 
 type Detail struct {
-	ID                 string
-	Name               string
-	Status             string
-	Members            int64
-	Plan               string
-	SubscriptionStatus string
-	BillingModel       string
-	PricingType        string
-	RenewsAt           string
-	EndsAt             string
-	CreatedAt          string
-	UpdatedAt          string
-	MembersList        []Member
+	ID           string
+	Name         string
+	Status       string
+	Members      int64
+	Wallets      int64
+	Currencies   string
+	BillingModel string
+	CreatedAt    string
+	UpdatedAt    string
+	MembersList  []Member
 }
 
 type Member struct {

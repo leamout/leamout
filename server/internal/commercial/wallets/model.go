@@ -121,9 +121,6 @@ var (
 		"managed number purchase price is unavailable",
 		nil,
 	)
-	ErrManagedNumberSubscriptionInactive = apperror.NewConflict(
-		"managed number purchase requires an active subscription",
-	)
 	ErrManagedNumberQuoteExpired = apperror.NewConflict(
 		"managed number purchase quote is no longer current",
 	)

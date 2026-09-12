@@ -2,9 +2,7 @@ package server
 
 import (
 	"github.com/leamout/leamout/internal/commercial"
-	"github.com/leamout/leamout/internal/identity/auth"
-	"github.com/leamout/leamout/internal/identity/session"
-	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/identity"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/webhooks"
@@ -23,19 +21,13 @@ import (
 	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/telecom/wholesale"
-	"github.com/leamout/leamout/internal/tenancy/credentials"
-	"github.com/leamout/leamout/internal/tenancy/members"
-	"github.com/leamout/leamout/internal/tenancy/organization"
+	"github.com/leamout/leamout/internal/tenancy"
 )
 
 type Modules struct {
 	Commercial           *commercial.Module
-	Auth                 AuthModule
-	Session              SessionModule
-	Users                UsersModule
-	Organizations        OrganizationModule
-	Members              MembersModule
-	Credentials          CredentialsModule
+	Identity             *identity.Module
+	Tenancy              *tenancy.Module
 	Voice                VoiceModule
 	Calls                CallsModule
 	Recordings           RecordingsModule
@@ -74,42 +66,6 @@ type EdgeModule struct {
 	Repository *edge.Repository
 	Service    *edge.Service
 	Handler    *edge.Handler
-}
-
-type AuthModule struct {
-	Repository *auth.Repository
-	Service    *auth.Service
-	Handler    *auth.Handler
-}
-
-type SessionModule struct {
-	Repository *session.Repository
-	Service    *session.Service
-	Handler    *session.Handler
-}
-
-type UsersModule struct {
-	Repository *users.Repository
-	Service    *users.Service
-	Handler    *users.Handler
-}
-
-type OrganizationModule struct {
-	Repository *organization.Repository
-	Service    *organization.Service
-	Handler    *organization.Handler
-}
-
-type MembersModule struct {
-	Repository *members.Repository
-	Service    *members.Service
-	Handler    *members.Handler
-}
-
-type CredentialsModule struct {
-	Repository *credentials.Repository
-	Service    *credentials.Service
-	Handler    *credentials.Handler
 }
 
 type VoiceModule struct {

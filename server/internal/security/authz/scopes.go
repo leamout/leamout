@@ -15,8 +15,6 @@ const (
 	ScopeLicensingWrite         Scope = "licensing:write"
 	ScopeCommercialStateRead    Scope = "commercial-state:read"
 	ScopeCommercialStateWrite   Scope = "commercial-state:write"
-	ScopeSubscriptionsRead      Scope = "subscriptions:read"
-	ScopeSubscriptionsWrite     Scope = "subscriptions:write"
 	ScopeVoiceApplicationsRead  Scope = "voice-applications:read"
 	ScopeVoiceApplicationsWrite Scope = "voice-applications:write"
 	ScopeCallsRead              Scope = "calls:read"
@@ -51,7 +49,6 @@ func (s Scope) IsValid() bool {
 		ScopeCredentialsRead,
 		ScopeLicensingRead, ScopeLicensingWrite,
 		ScopeCommercialStateRead, ScopeCommercialStateWrite,
-		ScopeSubscriptionsRead, ScopeSubscriptionsWrite,
 		ScopeVoiceApplicationsRead, ScopeVoiceApplicationsWrite,
 		ScopeCallsRead, ScopeCallsWrite,
 		ScopeRecordingsRead, ScopeRecordingsWrite,

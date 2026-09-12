@@ -148,13 +148,11 @@ type CarrierProvider struct {
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Provider-neutral, short-lived commercial purchase sessions. Payment selection is bound at confirmation and successful settlement is fulfilled by Checkout.
+// Provider-neutral, short-lived prepaid wallet-funding sessions. Payment selection is bound at confirmation and successful settlement credits the wallet.
 type Checkout struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
-	WalletID        *uuid.UUID         `db:"wallet_id" json:"wallet_id"`
-	PriceID         *uuid.UUID         `db:"price_id" json:"price_id"`
-	CheckoutType    string             `db:"checkout_type" json:"checkout_type"`
+	WalletID        uuid.UUID          `db:"wallet_id" json:"wallet_id"`
 	Provider        *string            `db:"provider" json:"provider"`
 	PaymentMethod   *string            `db:"payment_method" json:"payment_method"`
 	Reference       string             `db:"reference" json:"reference"`
@@ -210,21 +208,6 @@ type Deployment struct {
 	UpdatedAt     pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-type Entitlement struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	PlanID         *uuid.UUID         `db:"plan_id" json:"plan_id"`
-	OrganizationID *uuid.UUID         `db:"organization_id" json:"organization_id"`
-	LicenseID      *uuid.UUID         `db:"license_id" json:"license_id"`
-	EntitlementKey string             `db:"entitlement_key" json:"entitlement_key"`
-	Kind           string             `db:"kind" json:"kind"`
-	Enabled        *bool              `db:"enabled" json:"enabled"`
-	LimitValue     *int64             `db:"limit_value" json:"limit_value"`
-	StartsAt       pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
-	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 // Durable request replay records scoped to an authenticated principal or organization.
 type Idempotency struct {
 	Scope               string             `db:"scope" json:"scope"`
@@ -247,7 +230,6 @@ type Idempotency struct {
 type License struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status         string             `db:"status" json:"status"`
 	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
@@ -586,20 +568,6 @@ type Subscriber struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-// Leamout-owned recurring software access. Payment providers are settlement adapters and do not own subscription identity or lifecycle.
-type Subscription struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	PlanID         uuid.UUID          `db:"plan_id" json:"plan_id"`
-	PriceID        uuid.UUID          `db:"price_id" json:"price_id"`
-	Status         string             `db:"status" json:"status"`
-	StartsAt       pgtype.Timestamptz `db:"starts_at" json:"starts_at"`
-	RenewsAt       pgtype.Timestamptz `db:"renews_at" json:"renews_at"`
-	EndsAt         pgtype.Timestamptz `db:"ends_at" json:"ends_at"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type Trunk struct {
 	ID                  uuid.UUID          `db:"id" json:"id"`
 	OrganizationID      *uuid.UUID         `db:"organization_id" json:"organization_id"`
@@ -649,7 +617,6 @@ type TrunkEndpoint struct {
 type UsageEvent struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	MeterID        uuid.UUID          `db:"meter_id" json:"meter_id"`
 	Quantity       int64              `db:"quantity" json:"quantity"`
 	SourceType     string             `db:"source_type" json:"source_type"`
