@@ -159,3 +159,29 @@ func TestProviderOperationReleasesOnTerminalProviderFailure(t *testing.T) {
 		t.Fatalf("capture/complete = %d/%d, want 0/0", authority.captures, repo.complete)
 	}
 }
+
+func TestCompletedProviderOrderKeepsCaptureWhenRoutingIdentityFails(t *testing.T) {
+	authorization := ManagedNumberPurchaseAuthorization{
+		ID: uuid.New(), ReservationID: uuid.New(), PriceID: uuid.New(), AmountMinor: 2500, Currency: "USD",
+	}
+	repo := &providerTestRepository{fakeNumberRepository: &fakeNumberRepository{}}
+	authority := &fakeManagedPurchaseAuthority{}
+	provider := &providerStub{
+		order:  ProviderOrder{ID: "order-1", Status: "completed"},
+		found:  true,
+		number: ProviderNumber{ID: "did-1", Number: "+15559999999", RoutingResourceID: "voice-in-1"},
+	}
+	service := NewService(repo)
+	service.SetManagedPurchaseAuthority(authority)
+	service.SetManagedProvider("didww", provider)
+
+	if err := service.ExecuteProviderOperation(context.Background(), testProviderOperation(t, authorization)); err != nil {
+		t.Fatalf("ExecuteProviderOperation() error = %v", err)
+	}
+	if authority.captures != 1 || authority.releases != 0 {
+		t.Fatalf("capture/release = %d/%d, want 1/0", authority.captures, authority.releases)
+	}
+	if repo.failed != 1 || repo.complete != 0 {
+		t.Fatalf("failed/complete = %d/%d, want 1/0", repo.failed, repo.complete)
+	}
+}
