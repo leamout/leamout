@@ -1,6 +1,6 @@
 # Catalog
 
-The catalog defines reusable Leamout commercial products, plans, and prices. It is global commercial configuration: catalog records do not belong to an organization and do not contain subscription, entitlement, usage, rating, invoice, or payment state.
+The Catalog defines Leamout-owned customer-facing commercial terms. It is global configuration: catalog records do not belong to an organization and do not contain wallet, payment, license, deployment, or usage state.
 
 ## Model
 
@@ -9,167 +9,103 @@ product
    ↓
  plan
    ↓
-prices
+price
+
+meter ─────┘  (for metered prices)
 ```
 
-A **product** is a commercial product family. A **plan** is a reusable offer or edition within that product. A **price** is one immutable set of recurring acquisition terms for a plan.
+A **product** is a commercial product family. A **plan** groups reusable offers within that product. A **price** is one immutable set of customer-facing terms. A **meter** identifies a measurable quantity that a metered price can reference.
 
-Examples:
+## Pricing types
+
+Current price types are:
 
 ```text
-product: self-hosted
-  plan: community
-  plan: enterprise
-    price: USD / month
-    price: USD / year
-
-product: managed-voice
-  plan: developer
-  plan: production
+one_time
+recurring
+metered
 ```
 
-The names above are illustrative only; the catalog does not hard-code editions.
+A one-time price uses `amount_minor`.
 
-## Product fields
+A recurring price uses `amount_minor` plus a billing interval such as `month` or `year`.
+
+A metered price uses:
 
 ```text
-id
-code
-name
-description
-active
-created_at
-updated_at
+meter_id
+unit_amount_micros
+unit_size
+dimensions
 ```
 
-## Plan fields
+Recurring prices do not imply a customer subscription lifecycle. They can describe recurring product charges, such as number rental or self-hosted licensing terms, while the current Cloud commercial model remains prepaid PAYG.
+
+## Product and plan identity
+
+Product and plan codes are stable machine identifiers used to resolve offers without coupling callers to database UUIDs.
+
+Catalog records can be retired from new use without rewriting historical customer authorizations or commercial records.
+
+## Customer price versus provider cost
+
+Catalog prices answer what Leamout charges the customer.
+
+They do not represent DIDWW, CommPeak, or other provider wholesale costs.
 
 ```text
-id
-product_id
-code
-name
-description
-active
-created_at
-updated_at
+Catalog price
+    = customer-facing Leamout price
+
+provider wholesale charge
+    = Leamout COGS
 ```
 
-## Price fields
+Provider inventory prices, SKUs, rate sheets, and CDR cost must never become the authoritative customer price merely because the provider fulfilled the operation.
+
+## PAYG use
+
+For a fixed managed purchase, the application resolves the applicable Leamout Catalog offer before wallet authorization.
 
 ```text
-id
-plan_id
-currency
-amount_minor
-billing_interval
-active
-effective_from
-effective_until
-created_at
+customer selects managed service
+        ↓
+resolve Leamout Catalog price
+        ↓
+reserve wallet funds
+        ↓
+create provider obligation
+        ↓
+capture or release
 ```
 
-`amount_minor` is stored in the currency's minor unit. Currency uses a three-letter uppercase code. The first supported recurring intervals are `month` and `year`.
-
-Commercial price terms are immutable after creation:
-
-```text
-plan_id
-currency
-amount_minor
-billing_interval
-effective_from
-```
-
-Changing a plan's price means creating another price record. Existing subscriptions continue to reference the price they acquired. A price can be retired from future acquisition by changing its availability (`active` / `effective_until`) without rewriting historical terms.
-
-Only one open-ended active price for a given `(plan_id, currency, billing_interval)` may exist at a time.
-
-## Codes
-
-Product and plan codes are stable machine identifiers. They must be non-empty and cannot contain whitespace. The database keeps product codes unique and plan codes unique.
+For metered products, the Catalog can represent customer-facing unit terms. The system must still preserve the terms used for an authorization so later Catalog changes do not rewrite an already-authorized operation.
 
 ## Current application boundary
 
-`commercial/catalog` is currently read-only application behavior.
+`commercial/catalog` is read-oriented application behavior. It resolves and lists configured products, plans, prices, and meters used by concrete commercial workflows.
 
-It supports commercial workflows that need to resolve or discover existing products, plans, and prices:
-
-```text
-GetProduct
-GetProductByCode
-ListProducts
-GetPlan
-GetPlanByCode
-ListPlans
-GetPrice
-ListPrices
-```
-
-Active price discovery evaluates the price's effective window at the service's current time and also requires the parent plan and product to be active.
-
-The application module does not currently own product, plan, or price creation/update workflows because Leamout has no concrete operator/admin surface for those mutations yet.
-
-Catalog records are populated outside this application module through bootstrap/seed/configuration mechanisms. If a real operator workflow is introduced later, catalog mutations should be added together with that concrete caller rather than kept speculatively in the domain service.
-
-## Active discovery
-
-Active-plan discovery requires both the plan and its parent product to be active. Active-price discovery additionally requires the price to be active and effective at the evaluation time.
-
-```text
-product/plan/price no longer available
-        ↓
-existing historical references remain valid
-        ↓
-record is excluded from new commercial acquisition
-```
-
-Catalog state changes must not rewrite historical subscriptions, charges, invoices, licenses, or entitlement snapshots.
-
-## Catalog prices are not telecom rates
-
-A catalog price answers what it costs to acquire a plan under recurring commercial terms. It does not price individual telecom consumption.
-
-```text
-catalog price
-= plan acquisition terms
-
-carrier/rating rate
-= economic value of telecom usage
-```
-
-Destination, carrier, connection, billing increment, buy rate, sell rate, and other telecom-specific economics remain the responsibility of the rating side of the commercial domain.
+Catalog mutation should be added only with a concrete trusted operator/configuration workflow.
 
 ## Boundaries
 
-The catalog answers:
+The Catalog answers:
 
 ```text
-What products exist?
-What plans belong to a product?
-What recurring prices can acquire a plan?
-Is this product, plan, or price available?
-What stable code identifies this offer?
+What does Leamout sell?
+What offer/plan identifies it?
+What customer-facing price applies?
+What meter/unit defines a metered price?
+Is this commercial term currently available?
 ```
 
 It does not answer:
 
 ```text
-Which plan/price did an organization acquire?
-What features does the organization receive?
-How much did telecom usage cost?
-Was an invoice paid?
+How much prepaid balance does an organization have?
+Did a provider collect money?
 Is a self-hosted deployment licensed?
+What did DIDWW or CommPeak charge Leamout?
 ```
 
-Those responsibilities belong to subscriptions, entitlements/state, rating/charges/invoicing/payments, and licensing respectively.
-
-## Persistence rules
-
-- PostgreSQL is authoritative for catalog state.
-- Product and plan codes are unique.
-- A plan always references a product.
-- A price always references a plan.
-- Acquired price terms are immutable; new terms require a new price record.
-- Application-level catalog access is read-only until a concrete operator mutation workflow exists.
-- Historical commercial references must remain valid when catalog availability changes outside this module.
+Those belong to Wallets, Payments, Licensing, and wholesale/provider reconciliation respectively.
