@@ -9,11 +9,10 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
 
 func TestPostRequiresReservationForCapture(t *testing.T) {
-	service := NewService(nil, nil, nil)
+	service := NewService(nil, nil)
 	_, err := service.Post(context.Background(), uuid.New(), uuid.New(), PostEntryInput{Type: EntryCapture})
 	if !errors.Is(err, ErrReservationRequired) {
 		t.Fatalf("Post() error = %v, want %v", err, ErrReservationRequired)
@@ -21,7 +20,7 @@ func TestPostRequiresReservationForCapture(t *testing.T) {
 }
 
 func TestReserveRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
-	service := NewService(nil, nil, nil)
+	service := NewService(nil, nil)
 	tests := []ReserveInput{
 		{AmountMinor: 0, ExpiresAt: time.Now().Add(time.Hour)},
 		{AmountMinor: 100, ExpiresAt: time.Now().Add(-time.Hour)},
@@ -35,7 +34,7 @@ func TestReserveRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
 }
 
 func TestIncreaseRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
-	service := NewService(nil, nil, nil)
+	service := NewService(nil, nil)
 	tests := []IncreaseReservationInput{
 		{AmountMinor: 0, ExpiresAt: time.Now().Add(time.Hour)},
 		{AmountMinor: 100, ExpiresAt: time.Now().Add(-time.Hour)},
@@ -49,6 +48,7 @@ func TestIncreaseRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
 }
 
 type catalogStub struct {
+	plan       catalog.Plan
 	pricesByID map[uuid.UUID]catalog.Price
 	prices     []catalog.Price
 }
@@ -61,17 +61,15 @@ func (s *catalogStub) GetPrice(_ context.Context, id uuid.UUID) (catalog.Price, 
 	return price, nil
 }
 
+func (s *catalogStub) GetPlanByCode(_ context.Context, code string) (catalog.Plan, error) {
+	if s.plan.Code != code {
+		return catalog.Plan{}, catalog.ErrPlanNotFound
+	}
+	return s.plan, nil
+}
+
 func (s *catalogStub) ListPrices(context.Context, uuid.UUID, bool) ([]catalog.Price, error) {
 	return append([]catalog.Price(nil), s.prices...), nil
-}
-
-type subscriptionStub struct {
-	subscription subscriptions.Subscription
-	err          error
-}
-
-func (s *subscriptionStub) Current(context.Context, uuid.UUID) (subscriptions.Subscription, error) {
-	return s.subscription, s.err
 }
 
 type walletStub struct {
@@ -136,20 +134,15 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 	now := time.Date(2026, 9, 12, 8, 0, 0, 0, time.UTC)
 	organizationID := uuid.New()
 	planID := uuid.New()
-	recurringPriceID := uuid.New()
 	purchasePriceID := uuid.New()
 	walletID := uuid.New()
 	reservationID := uuid.New()
 	operationID := uuid.New()
 	amount := int64(2500)
-	recurringAmount := int64(10000)
 
 	catalogService := &catalogStub{
+		plan: catalog.Plan{ID: planID, Code: managedNumberPlanCode, Active: true},
 		pricesByID: map[uuid.UUID]catalog.Price{
-			recurringPriceID: {
-				ID: recurringPriceID, PlanID: planID, PricingType: catalog.PricingTypeRecurring,
-				Currency: "USD", AmountMinor: &recurringAmount,
-			},
 			purchasePriceID: {
 				ID: purchasePriceID, PlanID: planID, PricingType: catalog.PricingTypeOneTime,
 				Currency: "USD", AmountMinor: &amount,
@@ -160,15 +153,11 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 			Currency: "USD", AmountMinor: &amount, Active: true, EffectiveFrom: now.Add(-time.Hour),
 		}},
 	}
-	subscriptionService := &subscriptionStub{subscription: subscriptions.Subscription{
-		ID: uuid.New(), OrganizationID: organizationID, PlanID: planID, PriceID: recurringPriceID,
-		Status: subscriptions.StatusActive,
-	}}
 	walletService := &walletStub{
 		wallet:      Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive},
 		reservation: Reservation{ID: reservationID},
 	}
-	service := newAuthorizationTestService(catalogService, subscriptionService, walletService)
+	service := newAuthorizationTestService(catalogService, walletService)
 	service.now = func() time.Time { return now }
 
 	priceID, quotedAmount, currency, err := service.QuoteManagedNumberPurchase(context.Background(), organizationID)
@@ -214,36 +203,30 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 	}
 }
 
-func TestManagedNumberPurchaseQuoteRequiresActiveSubscription(t *testing.T) {
+func TestManagedNumberPurchaseQuoteRequiresActivePAYGOffer(t *testing.T) {
 	service := newAuthorizationTestService(
-		&catalogStub{},
-		&subscriptionStub{subscription: subscriptions.Subscription{Status: subscriptions.StatusPastDue}},
+		&catalogStub{plan: catalog.Plan{Code: managedNumberPlanCode, Active: false}},
 		&walletStub{},
 	)
 	_, _, _, err := service.QuoteManagedNumberPurchase(context.Background(), uuid.New())
-	if !errors.Is(err, ErrManagedNumberSubscriptionInactive) {
-		t.Fatalf("QuoteManagedNumberPurchase() error = %v, want %v", err, ErrManagedNumberSubscriptionInactive)
+	if !errors.Is(err, ErrManagedNumberPriceUnavailable) {
+		t.Fatalf("QuoteManagedNumberPurchase() error = %v, want %v", err, ErrManagedNumberPriceUnavailable)
 	}
 }
 
 func TestManagedNumberPurchaseRejectsStaleQuote(t *testing.T) {
 	organizationID := uuid.New()
 	planID := uuid.New()
-	recurringPriceID := uuid.New()
 	purchasePriceID := uuid.New()
-	recurringAmount := int64(10000)
 	purchaseAmount := int64(2500)
 	catalogService := &catalogStub{
+		plan: catalog.Plan{ID: planID, Code: managedNumberPlanCode, Active: true},
 		pricesByID: map[uuid.UUID]catalog.Price{
-			recurringPriceID: {ID: recurringPriceID, PlanID: planID, PricingType: catalog.PricingTypeRecurring, Currency: "USD", AmountMinor: &recurringAmount},
+			purchasePriceID: {ID: purchasePriceID, PlanID: planID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &purchaseAmount},
 		},
 		prices: []catalog.Price{{ID: purchasePriceID, PlanID: planID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &purchaseAmount}},
 	}
-	service := newAuthorizationTestService(
-		catalogService,
-		&subscriptionStub{subscription: subscriptions.Subscription{PlanID: planID, PriceID: recurringPriceID, Status: subscriptions.StatusActive}},
-		&walletStub{},
-	)
+	service := newAuthorizationTestService(catalogService, &walletStub{})
 
 	_, err := service.ReserveManagedNumberPurchase(
 		context.Background(), organizationID, uuid.New(), purchasePriceID, purchaseAmount+1, "USD",
@@ -264,7 +247,7 @@ func TestReleaseManagedNumberPurchaseIsIdempotent(t *testing.T) {
 			Status: ReservationReleased,
 		},
 	}
-	service := newAuthorizationTestService(&catalogStub{}, &subscriptionStub{}, walletService)
+	service := newAuthorizationTestService(&catalogStub{}, walletService)
 
 	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
 		t.Fatalf("ReleaseManagedNumberPurchase() error = %v", err)
@@ -300,7 +283,7 @@ func TestReleaseManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
 		},
 		releaseRace: true,
 	}
-	service := newAuthorizationTestService(&catalogStub{}, &subscriptionStub{}, walletService)
+	service := newAuthorizationTestService(&catalogStub{}, walletService)
 
 	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
 		t.Fatalf("ReleaseManagedNumberPurchase() concurrent replay error = %v", err)
@@ -330,18 +313,17 @@ func managedNumberAuthorizationFixture(t *testing.T) (*Service, *walletStub, uui
 		&catalogStub{pricesByID: map[uuid.UUID]catalog.Price{
 			priceID: {ID: priceID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &amount},
 		}},
-		&subscriptionStub{},
 		walletService,
 	)
 	return service, walletService, organizationID, operationID, reservationID, priceID, amount
 }
 
-func newAuthorizationTestService(c *catalogStub, subscriptions *subscriptionStub, wallet *walletStub) *Service {
+func newAuthorizationTestService(c *catalogStub, wallet *walletStub) *Service {
 	return &Service{
 		managed: managedOperations{
 			getPrice:       c.GetPrice,
+			getPlanByCode:  c.GetPlanByCode,
 			listPrices:     c.ListPrices,
-			current:        subscriptions.Current,
 			getWallet:      wallet.Get,
 			getByCurrency:  wallet.GetByCurrency,
 			reserve:        wallet.Reserve,
