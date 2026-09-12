@@ -75,13 +75,11 @@ func normalizeCreate(input CreateInput, issuedAt time.Time) (CreateInput, time.T
 }
 
 func normalizeDeployment(input ActivateDeploymentInput) (ActivateDeploymentInput, error) {
-	input.DeploymentID = strings.TrimSpace(input.DeploymentID)
-	if input.DeploymentID == "" {
-		return ActivateDeploymentInput{}, ErrDeploymentIDRequired
+	deploymentID, err := normalizeDeploymentID(input.DeploymentID)
+	if err != nil {
+		return ActivateDeploymentInput{}, err
 	}
-	if strings.IndexFunc(input.DeploymentID, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0 {
-		return ActivateDeploymentInput{}, ErrInvalidDeploymentID
-	}
+	input.DeploymentID = deploymentID
 	publicKey, err := normalizeDeploymentPublicKey(input.PublicKey)
 	if err != nil {
 		return ActivateDeploymentInput{}, err
@@ -95,6 +93,17 @@ func normalizeDeployment(input ActivateDeploymentInput) (ActivateDeploymentInput
 		input.Name = &name
 	}
 	return input, nil
+}
+
+func normalizeDeploymentID(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ErrDeploymentIDRequired
+	}
+	if strings.IndexFunc(value, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0 {
+		return "", ErrInvalidDeploymentID
+	}
+	return value, nil
 }
 
 func normalizeDeploymentPublicKey(value string) (string, error) {
