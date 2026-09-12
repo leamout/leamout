@@ -42,14 +42,13 @@ var (
 	ErrDeploymentMismatch        = errors.New("signed license is bound to another deployment")
 	ErrInvalidStatus             = errors.New("invalid license status")
 	ErrInvalidTransition         = errors.New("invalid license status transition")
-	ErrInvalidDeploymentLimit    = apperror.NewConflict("max deployments must be greater than zero")
 	ErrInvalidExpiration         = apperror.NewBadRequest("license expiration must be after issuance")
 	ErrDeploymentIDRequired      = apperror.NewBadRequest("deployment_id is required")
 	ErrInvalidDeploymentID       = apperror.NewBadRequest("deployment_id must not contain whitespace")
 	ErrInvalidDeploymentName     = apperror.NewBadRequest("deployment name must not be blank")
 	ErrDeploymentNotFound        = apperror.NewNotFound("deployment not found")
 	ErrDeploymentInactive        = apperror.NewConflict("deployment is deactivated")
-	ErrDeploymentLimitReached    = apperror.NewConflict("license deployment limit reached")
+	ErrLicenseAlreadyBound       = apperror.NewConflict("license is already bound to another deployment")
 	ErrActivationConflict        = apperror.NewConflict("deployment activation conflicted with another concurrent change")
 )
 
@@ -57,7 +56,6 @@ type License struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	Status         Status
-	MaxDeployments int32
 	SigningKeyID   *string
 	IssuedAt       time.Time
 	ExpiresAt      *time.Time
@@ -80,11 +78,10 @@ type Deployment struct {
 }
 
 // CreateInput is explicit self-hosted licensing authority. It is independent
-// of Cloud PAYG and carries its own deployment limit.
+// of Cloud PAYG and authorizes one deployment.
 type CreateInput struct {
-	MaxDeployments int32
-	SigningKeyID   *string
-	ExpiresAt      *time.Time
+	SigningKeyID *string
+	ExpiresAt    *time.Time
 }
 
 type ActivateDeploymentInput struct {
@@ -96,7 +93,6 @@ type licenseResponse struct {
 	ID             uuid.UUID  `json:"id"`
 	OrganizationID uuid.UUID  `json:"organization_id"`
 	Status         Status     `json:"status"`
-	MaxDeployments int32      `json:"max_deployments"`
 	IssuedAt       time.Time  `json:"issued_at"`
 	ExpiresAt      *time.Time `json:"expires_at,omitempty"`
 	CreatedAt      time.Time  `json:"created_at"`
@@ -106,8 +102,8 @@ type licenseResponse struct {
 func newLicenseResponse(license License) licenseResponse {
 	return licenseResponse{
 		ID: license.ID, OrganizationID: license.OrganizationID, Status: license.Status,
-		MaxDeployments: license.MaxDeployments, IssuedAt: license.IssuedAt,
-		ExpiresAt: license.ExpiresAt, CreatedAt: license.CreatedAt, UpdatedAt: license.UpdatedAt,
+		IssuedAt: license.IssuedAt, ExpiresAt: license.ExpiresAt,
+		CreatedAt: license.CreatedAt, UpdatedAt: license.UpdatedAt,
 	}
 }
 
