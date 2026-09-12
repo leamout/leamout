@@ -4,7 +4,7 @@ SELECT
     o.name AS organization_name,
     'prepaid'::TEXT AS billing_model,
     COUNT(w.id)::TEXT AS wallet_count,
-    COALESCE(string_agg(w.currency, ', ' ORDER BY w.currency), '—') AS currencies
+    COALESCE(string_agg(w.currency, ', ' ORDER BY w.currency), '—')::TEXT AS currencies
 FROM organizations AS o
 LEFT JOIN wallets AS w
     ON w.organization_id = o.id
@@ -20,7 +20,7 @@ SELECT
     o.name AS organization_name,
     'prepaid'::TEXT AS billing_model,
     COUNT(w.id)::TEXT AS wallet_count,
-    COALESCE(string_agg(w.currency, ', ' ORDER BY w.currency), '—') AS currencies,
+    COALESCE(string_agg(w.currency, ', ' ORDER BY w.currency), '—')::TEXT AS currencies,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS organization_created_at
 FROM organizations AS o
 LEFT JOIN wallets AS w
