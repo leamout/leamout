@@ -1,6 +1,7 @@
 package leamout
 
 import (
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
@@ -25,6 +26,7 @@ const (
 type deploymentState struct {
 	SchemaVersion int       `json:"schema_version"`
 	DeploymentID  string    `json:"deployment_id"`
+	PublicKey     string    `json:"public_key"`
 	Mode          string    `json:"mode"`
 	CreatedAt     time.Time `json:"created_at"`
 }
@@ -54,11 +56,17 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 	}
 
 	statePath := filepath.Join(stateDir, "deployment.json")
+	identityKeyPath := filepath.Join(stateDir, "deployment.key")
 	envPath := filepath.Join(configDir, "leamout.env")
 
 	stateExists, err := pathExists(statePath)
 	if err != nil {
 		writef(stderr, "inspect deployment state: %v\n", err)
+		return 1
+	}
+	identityKeyExists, err := pathExists(identityKeyPath)
+	if err != nil {
+		writef(stderr, "inspect deployment identity key: %v\n", err)
 		return 1
 	}
 	envExists, err := pathExists(envPath)
@@ -67,14 +75,18 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 		return 1
 	}
 
-	if stateExists || envExists {
-		if !stateExists || !envExists {
-			writef(stderr, "incomplete Leamout initialization: %s and %s must either both exist or both be absent\n", statePath, envPath)
+	if stateExists || identityKeyExists || envExists {
+		if !stateExists || !identityKeyExists || !envExists {
+			writef(stderr, "incomplete Leamout initialization: %s, %s, and %s must either all exist or all be absent\n", statePath, identityKeyPath, envPath)
 			return 1
 		}
 		state, err := loadDeploymentState(statePath)
 		if err != nil {
 			writef(stderr, "load deployment identity: %v\n", err)
+			return 1
+		}
+		if _, err := loadDeploymentPrivateKey(identityKeyPath, state.PublicKey); err != nil {
+			writef(stderr, "load deployment identity key: %v\n", err)
 			return 1
 		}
 		if err := validateRuntimeEnv(envPath, state.DeploymentID); err != nil {
@@ -95,9 +107,15 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 		return 0
 	}
 
+	deploymentPublicKey, deploymentPrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		writef(stderr, "generate deployment identity key: %v\n", err)
+		return 1
+	}
 	state := deploymentState{
 		SchemaVersion: deploymentStateSchemaVersion,
 		DeploymentID:  uuid.NewString(),
+		PublicKey:     base64.RawURLEncoding.EncodeToString(deploymentPublicKey),
 		Mode:          deploymentMode,
 		CreatedAt:     time.Now().UTC(),
 	}
@@ -113,9 +131,10 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 		return 1
 	}
 	stateBytes = append(stateBytes, '\n')
+	identityKeyBytes := []byte(base64.RawURLEncoding.EncodeToString(deploymentPrivateKey) + "\n")
 	envBytes := renderRuntimeEnv(state, secrets)
 
-	if err := writeInitializationFiles(statePath, stateBytes, envPath, envBytes); err != nil {
+	if err := writeInitializationFiles(statePath, stateBytes, identityKeyPath, identityKeyBytes, envPath, envBytes); err != nil {
 		writef(stderr, "persist deployment initialization: %v\n", err)
 		return 1
 	}
@@ -125,7 +144,7 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 		filepath.Join(stateDir, "runtime"),
 		version,
 	); err != nil {
-		if rollbackErr := rollbackInitialization(statePath, envPath); rollbackErr != nil {
+		if rollbackErr := rollbackInitialization(statePath, identityKeyPath, envPath); rollbackErr != nil {
 			writef(stderr, "install production runtime: %v; rollback initialization: %v\n", err, rollbackErr)
 		} else {
 			writef(stderr, "install production runtime: %v\n", err)
@@ -134,6 +153,7 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 	}
 
 	writeln(stdout, "✓ Deployment identity created")
+	writeln(stdout, "✓ Deployment identity key generated")
 	writeln(stdout, "✓ Deployment-owned secrets generated")
 	writeln(stdout, "✓ Production configuration written")
 	writeln(stdout, "✓ Production runtime installed and verified")
@@ -224,13 +244,17 @@ func renderRuntimeEnv(state deploymentState, secrets deploymentSecrets) []byte {
 	}, "\n"))
 }
 
-func writeInitializationFiles(statePath string, state []byte, envPath string, env []byte) error {
+func writeInitializationFiles(statePath string, state []byte, identityKeyPath string, identityKey []byte, envPath string, env []byte) error {
 	if err := writeExclusiveFile(statePath, state, 0o600); err != nil {
 		return err
 	}
+	if err := writeExclusiveFile(identityKeyPath, identityKey, 0o600); err != nil {
+		_ = os.Remove(statePath)
+		return err
+	}
 	if err := writeExclusiveFile(envPath, env, 0o600); err != nil {
-		if removeErr := os.Remove(statePath); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
-			return fmt.Errorf("write runtime configuration: %w; rollback deployment state: %w", err, removeErr)
+		if rollbackErr := rollbackInitialization(statePath, identityKeyPath); rollbackErr != nil {
+			return fmt.Errorf("write runtime configuration: %w; rollback deployment identity: %w", err, rollbackErr)
 		}
 		return err
 	}
@@ -277,6 +301,10 @@ func loadDeploymentState(path string) (deploymentState, error) {
 	if _, err := uuid.Parse(state.DeploymentID); err != nil {
 		return deploymentState{}, fmt.Errorf("invalid deployment ID: %w", err)
 	}
+	publicKey, err := base64.RawURLEncoding.DecodeString(state.PublicKey)
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		return deploymentState{}, errors.New("invalid deployment public key")
+	}
 	if state.Mode != deploymentMode {
 		return deploymentState{}, fmt.Errorf("unexpected deployment mode %q", state.Mode)
 	}
@@ -284,6 +312,22 @@ func loadDeploymentState(path string) (deploymentState, error) {
 		return deploymentState{}, errors.New("deployment creation time is missing")
 	}
 	return state, nil
+}
+
+func loadDeploymentPrivateKey(path, expectedPublicKey string) (ed25519.PrivateKey, error) {
+	encoded, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	privateKey, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(string(encoded)))
+	if err != nil || len(privateKey) != ed25519.PrivateKeySize {
+		return nil, errors.New("invalid deployment private key")
+	}
+	publicKey := privateKey[ed25519.SeedSize:]
+	if base64.RawURLEncoding.EncodeToString(publicKey) != expectedPublicKey {
+		return nil, errors.New("deployment private key does not match public identity")
+	}
+	return ed25519.PrivateKey(privateKey), nil
 }
 
 func validateRuntimeEnv(path, deploymentID string) error {
