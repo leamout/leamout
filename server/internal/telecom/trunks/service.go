@@ -267,7 +267,7 @@ func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, i
 	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
-	if req.Name == nil && req.Host == nil && req.Port == nil && req.Transport == nil && req.Direction == nil && req.Priority == nil && req.Weight == nil && req.Enabled == nil {
+	if req.Host == nil && req.Port == nil && req.Transport == nil && req.Direction == nil && req.Priority == nil && req.Weight == nil && req.Enabled == nil {
 		return sqlc.TrunkEndpoint{}, apperror.NewBadRequest("at least one field is required")
 	}
 	if req.Host != nil {
