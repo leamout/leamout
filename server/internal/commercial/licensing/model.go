@@ -26,30 +26,33 @@ const (
 )
 
 var (
-	ErrLicenseNotFound           = apperror.NewNotFound("license not found")
-	ErrLicenseUnavailable        = apperror.NewConflict("license is unavailable")
-	ErrOrganizationIDRequired    = apperror.NewBadRequest("organization id is required")
-	ErrLicenseIDRequired         = apperror.NewBadRequest("license id is required")
-	ErrSigningKeyRequired        = errors.New("signing key id is required before license activation")
-	ErrInvalidSigningKey         = errors.New("signing key id must not contain whitespace")
-	ErrSigningKeyUnavailable     = errors.New("license signing key is unavailable")
-	ErrUnsupportedLicenseVersion = errors.New("unsupported signed license version")
-	ErrUnsupportedAlgorithm      = errors.New("unsupported license signature algorithm")
-	ErrMalformedArtifact         = errors.New("malformed signed license artifact")
-	ErrInvalidSignature          = errors.New("invalid signed license signature")
-	ErrArtifactExpired           = errors.New("signed license artifact has expired")
-	ErrArtifactNotYetValid       = errors.New("signed license artifact is not yet valid")
-	ErrDeploymentMismatch        = errors.New("signed license is bound to another deployment")
-	ErrInvalidStatus             = errors.New("invalid license status")
-	ErrInvalidTransition         = errors.New("invalid license status transition")
-	ErrInvalidExpiration         = apperror.NewBadRequest("license expiration must be after issuance")
-	ErrDeploymentIDRequired      = apperror.NewBadRequest("deployment_id is required")
-	ErrInvalidDeploymentID       = apperror.NewBadRequest("deployment_id must not contain whitespace")
-	ErrInvalidDeploymentName     = apperror.NewBadRequest("deployment name must not be blank")
-	ErrDeploymentNotFound        = apperror.NewNotFound("deployment not found")
-	ErrDeploymentInactive        = apperror.NewConflict("deployment is deactivated")
-	ErrLicenseAlreadyBound       = apperror.NewConflict("license is already bound to another deployment")
-	ErrActivationConflict        = apperror.NewConflict("deployment activation conflicted with another concurrent change")
+	ErrLicenseNotFound              = apperror.NewNotFound("license not found")
+	ErrLicenseUnavailable           = apperror.NewConflict("license is unavailable")
+	ErrOrganizationIDRequired       = apperror.NewBadRequest("organization id is required")
+	ErrLicenseIDRequired            = apperror.NewBadRequest("license id is required")
+	ErrSigningKeyRequired           = errors.New("signing key id is required before license activation")
+	ErrInvalidSigningKey            = errors.New("signing key id must not contain whitespace")
+	ErrSigningKeyUnavailable        = errors.New("license signing key is unavailable")
+	ErrUnsupportedLicenseVersion    = errors.New("unsupported signed license version")
+	ErrUnsupportedAlgorithm         = errors.New("unsupported license signature algorithm")
+	ErrMalformedArtifact            = errors.New("malformed signed license artifact")
+	ErrInvalidSignature             = errors.New("invalid signed license signature")
+	ErrArtifactExpired              = errors.New("signed license artifact has expired")
+	ErrArtifactNotYetValid          = errors.New("signed license artifact is not yet valid")
+	ErrDeploymentMismatch           = errors.New("signed license is bound to another deployment")
+	ErrDeploymentKeyMismatch        = errors.New("signed license is bound to another deployment key")
+	ErrInvalidStatus                = errors.New("invalid license status")
+	ErrInvalidTransition            = errors.New("invalid license status transition")
+	ErrInvalidExpiration            = apperror.NewBadRequest("license expiration must be after issuance")
+	ErrDeploymentIDRequired         = apperror.NewBadRequest("deployment_id is required")
+	ErrInvalidDeploymentID          = apperror.NewBadRequest("deployment_id must not contain whitespace")
+	ErrDeploymentPublicKeyRequired  = apperror.NewBadRequest("public_key is required")
+	ErrInvalidDeploymentPublicKey   = apperror.NewBadRequest("public_key must be a base64url Ed25519 public key")
+	ErrInvalidDeploymentName        = apperror.NewBadRequest("deployment name must not be blank")
+	ErrDeploymentNotFound           = apperror.NewNotFound("deployment not found")
+	ErrDeploymentInactive           = apperror.NewConflict("deployment is deactivated")
+	ErrLicenseAlreadyBound          = apperror.NewConflict("license is already bound to another deployment")
+	ErrActivationConflict           = apperror.NewConflict("deployment activation conflicted with another concurrent change")
 )
 
 type License struct {
@@ -68,6 +71,7 @@ type Deployment struct {
 	OrganizationID uuid.UUID
 	LicenseID      uuid.UUID
 	DeploymentID   string
+	PublicKey      string
 	Name           *string
 	Status         DeploymentStatus
 	ActivatedAt    time.Time
@@ -86,6 +90,7 @@ type CreateInput struct {
 
 type ActivateDeploymentInput struct {
 	DeploymentID string  `json:"deployment_id"`
+	PublicKey    string  `json:"public_key"`
 	Name         *string `json:"name,omitempty"`
 }
 
@@ -111,6 +116,7 @@ type deploymentResponse struct {
 	ID            uuid.UUID        `json:"id"`
 	LicenseID     uuid.UUID        `json:"license_id"`
 	DeploymentID  string           `json:"deployment_id"`
+	PublicKey     string           `json:"public_key"`
 	Name          *string          `json:"name,omitempty"`
 	Status        DeploymentStatus `json:"status"`
 	ActivatedAt   time.Time        `json:"activated_at"`
@@ -123,7 +129,7 @@ type deploymentResponse struct {
 func newDeploymentResponse(deployment Deployment) deploymentResponse {
 	return deploymentResponse{
 		ID: deployment.ID, LicenseID: deployment.LicenseID, DeploymentID: deployment.DeploymentID,
-		Name: deployment.Name, Status: deployment.Status, ActivatedAt: deployment.ActivatedAt,
+		PublicKey: deployment.PublicKey, Name: deployment.Name, Status: deployment.Status, ActivatedAt: deployment.ActivatedAt,
 		LastSeenAt: deployment.LastSeenAt, DeactivatedAt: deployment.DeactivatedAt,
 		CreatedAt: deployment.CreatedAt, UpdatedAt: deployment.UpdatedAt,
 	}
