@@ -1,6 +1,9 @@
 package didww
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type resource[T any] struct {
 	ID            string                  `json:"id"`
@@ -147,7 +150,26 @@ type orderRequestItem struct {
 type orderRequestItemAttributes struct {
 	SKUID              string `json:"sku_id"`
 	AvailableDIDID     string `json:"available_did_id,omitempty"`
-	BillingCyclesCount *int   `json:"billing_cycles_count,omitempty"`
+	BillingCyclesCount *int   `json:"-"`
+}
+
+// MarshalJSON makes non-renewing DID orders the adapter default. A future
+// renewal workflow must opt into a positive cycle count only after obtaining a
+// fresh prepaid authorization.
+func (a orderRequestItemAttributes) MarshalJSON() ([]byte, error) {
+	billingCyclesCount := 0
+	if a.BillingCyclesCount != nil {
+		billingCyclesCount = *a.BillingCyclesCount
+	}
+	return json.Marshal(struct {
+		SKUID              string `json:"sku_id"`
+		AvailableDIDID     string `json:"available_did_id,omitempty"`
+		BillingCyclesCount int    `json:"billing_cycles_count"`
+	}{
+		SKUID:              a.SKUID,
+		AvailableDIDID:     a.AvailableDIDID,
+		BillingCyclesCount: billingCyclesCount,
+	})
 }
 
 type relationshipPatch struct {
