@@ -72,7 +72,7 @@ func NewService(repo *Repository, walletService *wallets.Service, paymentService
 		wallets: walletOperations{get: walletService.Get, post: walletService.Post},
 		payments: paymentOperations{
 			providerAvailable: paymentService.ProviderAvailable,
-			getByCheckout: paymentService.GetByCheckout, start: paymentService.Start,
+			getByCheckout:     paymentService.GetByCheckout, start: paymentService.Start,
 			continuePayment: paymentService.Continue, refresh: paymentService.Refresh,
 		},
 		now: time.Now,
