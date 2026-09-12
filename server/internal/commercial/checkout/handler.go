@@ -78,37 +78,65 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	organizationID, checkoutID, err := requestIDs(r)
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	result, err := h.service.Get(r.Context(), organizationID, checkoutID)
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	httputil.OK(w, Response(result))
 }
 
 func (h *Handler) Confirm(w http.ResponseWriter, r *http.Request) {
 	organizationID, checkoutID, err := requestIDs(r)
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	request, err := helper.DecodeJSON[ConfirmRequest](r)
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	result, err := h.service.Confirm(r.Context(), organizationID, checkoutID, ConfirmInput(request))
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	httputil.OK(w, Response(result))
 }
 
 func (h *Handler) Continue(w http.ResponseWriter, r *http.Request) {
 	organizationID, checkoutID, err := requestIDs(r)
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	request, err := helper.DecodeJSON[ContinueRequest](r)
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	result, err := h.service.Continue(r.Context(), organizationID, checkoutID, ContinueInput(request))
-	if err != nil { httputil.Error(w, err); return }
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
 	httputil.OK(w, Response(result))
 }
 
 func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
-	if !ok { return uuid.Nil, uuid.Nil, apperror.NewBadRequest("organization context required") }
+	if !ok {
+		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("organization context required")
+	}
 	checkoutID, err := uuid.Parse(chi.URLParam(r, "checkout_id"))
-	if err != nil { return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid checkout_id") }
+	if err != nil {
+		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid checkout_id")
+	}
 	return organizationID, checkoutID, nil
 }
 
@@ -120,7 +148,12 @@ func Response(result Result) CheckoutResponse {
 		NextAction: result.Checkout.NextAction, ProviderMessage: result.Checkout.ProviderMessage,
 		ExpiresAt: result.Checkout.ExpiresAt, CompletedAt: result.Checkout.CompletedAt, Metadata: result.Checkout.Metadata,
 	}
-	if result.Payment != nil { id := result.Payment.ID; response.PaymentID = &id }
-	if result.Session != nil { response.ClientSecret = result.Session.ClientSecret }
+	if result.Payment != nil {
+		id := result.Payment.ID
+		response.PaymentID = &id
+	}
+	if result.Session != nil {
+		response.ClientSecret = result.Session.ClientSecret
+	}
 	return response
 }
