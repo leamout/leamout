@@ -324,13 +324,15 @@ func (q *Queries) GetWalletReservation(ctx context.Context, arg GetWalletReserva
 
 const increaseWalletReservation = `-- name: IncreaseWalletReservation :one
 UPDATE wallet_reservations AS wr
-SET amount_minor = amount_minor + $1,
+SET amount_minor = $1,
     expires_at = $2,
     updated_at = NOW()
 WHERE wr.organization_id = $3
   AND wr.id = $4
   AND wr.status = 'active'
   AND wr.expires_at > NOW()
+  AND $1 >= wr.amount_minor
+  AND $2 >= wr.expires_at
 RETURNING wr.id, wr.wallet_id, wr.organization_id, wr.amount_minor, wr.captured_amount_minor, wr.operation_type, wr.operation_id, wr.status, wr.expires_at, wr.captured_at, wr.released_at, wr.expired_at, wr.created_at, wr.updated_at
 `
 
