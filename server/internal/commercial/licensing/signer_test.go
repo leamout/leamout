@@ -32,14 +32,6 @@ func TestSignerRoundTripV1(t *testing.T) {
 		DeploymentID:   "node-01",
 		IssuedAt:       issuedAt,
 		ExpiresAt:      issuedAt.Add(24 * time.Hour),
-		Features: map[string]bool{
-			"recording.enabled": true,
-			"byoc.enabled":      true,
-		},
-		Limits: map[string]int64{
-			"max.concurrent_calls": 500,
-			"max.deployments":      3,
-		},
 	}
 
 	artifact, err := signer.SignV1(claims)
@@ -50,11 +42,8 @@ func TestSignerRoundTripV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyV1() error = %v", err)
 	}
-	if verified.LicenseID != claims.LicenseID || verified.OrganizationID != claims.OrganizationID {
-		t.Fatalf("verified identity = %#v, want %#v", verified, claims)
-	}
-	if !verified.Features["recording.enabled"] || verified.Limits["max.concurrent_calls"] != 500 {
-		t.Fatalf("verified claims = %#v / %#v", verified.Features, verified.Limits)
+	if verified != claims {
+		t.Fatalf("verified claims = %#v, want %#v", verified, claims)
 	}
 }
 
@@ -72,8 +61,6 @@ func TestSignerV1IsDeterministicForNormalizedClaims(t *testing.T) {
 		DeploymentID:   " node-01 ",
 		IssuedAt:       issuedAt,
 		ExpiresAt:      issuedAt.Add(time.Hour),
-		Features:       map[string]bool{"z.feature": true, "a.feature": false},
-		Limits:         map[string]int64{"z.limit": 9, "a.limit": 1},
 	}
 
 	first, err := signer.SignV1(claims)
@@ -170,8 +157,6 @@ func validTestClaims(issuedAt time.Time) LicenseClaimsV1 {
 		DeploymentID:   "node-01",
 		IssuedAt:       issuedAt,
 		ExpiresAt:      issuedAt.Add(2 * time.Hour),
-		Features:       map[string]bool{"recording.enabled": true},
-		Limits:         map[string]int64{"max.deployments": 3},
 	}
 }
 
