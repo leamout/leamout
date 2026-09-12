@@ -113,7 +113,7 @@ SELECT
     o.status,
     COUNT(DISTINCT om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
     COUNT(DISTINCT w.id) FILTER (WHERE w.status <> 'closed')::BIGINT AS wallet_count,
-    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—') AS currencies,
+    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—')::TEXT AS currencies,
     'prepaid'::TEXT AS billing_model,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
     to_char(o.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
@@ -132,15 +132,15 @@ LIMIT 1
 `
 
 type GetBackofficeOrganizationRow struct {
-	ID           string      `db:"id" json:"id"`
-	Name         string      `db:"name" json:"name"`
-	Status       string      `db:"status" json:"status"`
-	MemberCount  int64       `db:"member_count" json:"member_count"`
-	WalletCount  int64       `db:"wallet_count" json:"wallet_count"`
-	Currencies   interface{} `db:"currencies" json:"currencies"`
-	BillingModel string      `db:"billing_model" json:"billing_model"`
-	CreatedAt    string      `db:"created_at" json:"created_at"`
-	UpdatedAt    string      `db:"updated_at" json:"updated_at"`
+	ID           string `db:"id" json:"id"`
+	Name         string `db:"name" json:"name"`
+	Status       string `db:"status" json:"status"`
+	MemberCount  int64  `db:"member_count" json:"member_count"`
+	WalletCount  int64  `db:"wallet_count" json:"wallet_count"`
+	Currencies   string `db:"currencies" json:"currencies"`
+	BillingModel string `db:"billing_model" json:"billing_model"`
+	CreatedAt    string `db:"created_at" json:"created_at"`
+	UpdatedAt    string `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (GetBackofficeOrganizationRow, error) {
@@ -251,7 +251,7 @@ SELECT
     o.status,
     COUNT(DISTINCT om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
     COUNT(DISTINCT w.id) FILTER (WHERE w.status <> 'closed')::BIGINT AS wallet_count,
-    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—') AS currencies,
+    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—')::TEXT AS currencies,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
 FROM organizations AS o
 LEFT JOIN organization_members AS om ON om.organization_id = o.id
@@ -263,13 +263,13 @@ LIMIT 100
 `
 
 type ListBackofficeOrganizationsRow struct {
-	ID          string      `db:"id" json:"id"`
-	Name        string      `db:"name" json:"name"`
-	Status      string      `db:"status" json:"status"`
-	MemberCount int64       `db:"member_count" json:"member_count"`
-	WalletCount int64       `db:"wallet_count" json:"wallet_count"`
-	Currencies  interface{} `db:"currencies" json:"currencies"`
-	CreatedAt   string      `db:"created_at" json:"created_at"`
+	ID          string `db:"id" json:"id"`
+	Name        string `db:"name" json:"name"`
+	Status      string `db:"status" json:"status"`
+	MemberCount int64  `db:"member_count" json:"member_count"`
+	WalletCount int64  `db:"wallet_count" json:"wallet_count"`
+	Currencies  string `db:"currencies" json:"currencies"`
+	CreatedAt   string `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) ListBackofficeOrganizations(ctx context.Context) ([]ListBackofficeOrganizationsRow, error) {
