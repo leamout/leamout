@@ -2,6 +2,8 @@
 
 The Catalog defines Leamout-owned customer-facing commercial terms. It is global configuration: catalog records do not belong to an organization and do not contain wallet, payment, license, deployment, or usage state.
 
+Everything in Leamout is prepaid pay-as-you-go except Self-Hosted software licenses. Catalog pricing must preserve that distinction.
+
 ## Model
 
 ```text
@@ -39,7 +41,9 @@ unit_size
 dimensions
 ```
 
-Recurring prices do not imply a customer subscription lifecycle. They can describe recurring product charges, such as number rental or self-hosted licensing terms, while the current Cloud commercial model remains prepaid PAYG.
+Recurring catalog terms do not create a customer subscription lifecycle and do not permit postpaid usage. A recurring term can describe a product that renews periodically, such as number rental, while each charge remains prepaid.
+
+Self-Hosted software license terms may also be represented in Catalog for offer/pricing configuration, but enterprise license settlement is handled separately from the PAYG wallet path.
 
 ## Product and plan identity
 
@@ -65,7 +69,9 @@ Provider inventory prices, SKUs, rate sheets, and CDR cost must never become the
 
 ## PAYG use
 
-For a fixed managed purchase, the application resolves the applicable Leamout Catalog offer before wallet authorization.
+For any chargeable Cloud or managed operation, the applicable Leamout customer term is resolved before prepaid authorization.
+
+For a fixed managed purchase:
 
 ```text
 customer selects managed service
@@ -79,7 +85,27 @@ create provider obligation
 capture or release
 ```
 
-For metered products, the Catalog can represent customer-facing unit terms. The system must still preserve the terms used for an authorization so later Catalog changes do not rewrite an already-authorized operation.
+For metered products, the Catalog can represent customer-facing unit terms. The system must preserve the terms used for an authorization so later Catalog changes do not rewrite an already-authorized operation.
+
+Cloud + BYOC remains prepaid PAYG for any Leamout platform charge even though the customer's carrier cost is outside Leamout.
+
+## Self-Hosted license exception
+
+Self-Hosted software licensing is the sole non-PAYG commercial path.
+
+Catalog may describe the enterprise offer, but payment and license issuance are not wallet-funded checkout flows.
+
+```text
+Catalog license offer
+        ↓
+enterprise agreement / invoice
+        ↓
+verified settlement
+        ↓
+license lifecycle
+```
+
+Paying for a Self-Hosted license does not create wallet balance or managed-usage credit.
 
 ## Current application boundary
 
