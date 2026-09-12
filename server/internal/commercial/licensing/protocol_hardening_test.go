@@ -25,7 +25,8 @@ func TestVerifyV1AuthenticatesKeyID(t *testing.T) {
 		t.Fatalf("NewKeyring() error = %v", err)
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	artifact, err := signer.SignV1(validTestClaims(issuedAt))
+	claims := validTestClaims(issuedAt)
+	artifact, err := signer.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
@@ -39,7 +40,7 @@ func TestVerifyV1AuthenticatesKeyID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
-	if _, err := keyring.VerifyV1(tampered, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) {
+	if _, err := keyring.VerifyV1(tampered, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrInvalidSignature)
 	}
 }
