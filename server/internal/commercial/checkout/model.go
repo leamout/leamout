@@ -45,42 +45,51 @@ var (
 )
 
 type Checkout struct {
-	ID uuid.UUID
-	OrganizationID uuid.UUID
-	WalletID *uuid.UUID
-	PriceID *uuid.UUID
-	Type Type
-	Provider Provider
-	PaymentMethod PaymentMethod
-	Reference string
-	AmountMinor int64
-	Currency string
-	Status Status
-	NextAction NextAction
+	ID              uuid.UUID
+	OrganizationID  uuid.UUID
+	WalletID        *uuid.UUID
+	PriceID         *uuid.UUID
+	Type            Type
+	Provider        Provider
+	PaymentMethod   PaymentMethod
+	Reference       string
+	AmountMinor     int64
+	Currency        string
+	Status          Status
+	NextAction      NextAction
 	ProviderMessage *string
-	ExpiresAt time.Time
-	CompletedAt *time.Time
-	Metadata json.RawMessage
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ExpiresAt       time.Time
+	CompletedAt     *time.Time
+	Metadata        json.RawMessage
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type CreateParams struct {
-	WalletID *uuid.UUID
+	WalletID    *uuid.UUID
 	AmountMinor int64
-	Metadata json.RawMessage
+	Metadata    json.RawMessage
 }
 
 type CreateInput struct {
-	WalletID *uuid.UUID
-	PriceID *uuid.UUID
-	Type Type
-	Reference string
+	WalletID    *uuid.UUID
+	PriceID     *uuid.UUID
+	Type        Type
+	Reference   string
 	AmountMinor int64
-	Currency string
-	ExpiresAt time.Time
-	Metadata json.RawMessage
+	Currency    string
+	ExpiresAt   time.Time
+	Metadata    json.RawMessage
 }
 
-type StartPayment struct { Provider Provider; PaymentMethod PaymentMethod }
-type Transition struct { Expected Status; Status Status; NextAction NextAction; ProviderMessage *string; CompletedAt *time.Time }
+type StartPayment struct {
+	Provider      Provider
+	PaymentMethod PaymentMethod
+}
+type Transition struct {
+	Expected        Status
+	Status          Status
+	NextAction      NextAction
+	ProviderMessage *string
+	CompletedAt     *time.Time
+}
