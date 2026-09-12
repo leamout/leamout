@@ -40,7 +40,7 @@ func TestSignerRoundTripV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
-	verified, err := keyring.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute))
+	verified, err := keyring.VerifyV1(artifact, "node-01", issuedAt.Add(time.Minute))
 	if err != nil {
 		t.Fatalf("VerifyV1() error = %v", err)
 	}
@@ -98,11 +98,8 @@ func TestVerifyV1RejectsTamperingAndWrongDeployment(t *testing.T) {
 		t.Fatalf("SignV1() error = %v", err)
 	}
 
-	if _, err := keyring.VerifyV1(artifact, "node-02", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrDeploymentMismatch) {
+	if _, err := keyring.VerifyV1(artifact, "node-02", issuedAt.Add(time.Minute)); !errors.Is(err, ErrDeploymentMismatch) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrDeploymentMismatch)
-	}
-	if _, err := keyring.VerifyV1(artifact, "node-01", testDeploymentPublicKey(9), issuedAt.Add(time.Minute)); !errors.Is(err, ErrDeploymentKeyMismatch) {
-		t.Fatalf("VerifyV1() key error = %v, want %v", err, ErrDeploymentKeyMismatch)
 	}
 
 	var envelope SignedLicenseV1
@@ -114,7 +111,7 @@ func TestVerifyV1RejectsTamperingAndWrongDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
-	if _, err := keyring.VerifyV1(tampered, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) && !errors.Is(err, ErrMalformedArtifact) {
+	if _, err := keyring.VerifyV1(tampered, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) && !errors.Is(err, ErrMalformedArtifact) {
 		t.Fatalf("VerifyV1() error = %v, want tamper rejection", err)
 	}
 }
@@ -142,10 +139,10 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewKeyring() error = %v", err)
 	}
-	if _, err := keyring.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(-time.Second)); !errors.Is(err, ErrArtifactNotYetValid) {
+	if _, err := keyring.VerifyV1(artifact, "node-01", issuedAt.Add(-time.Second)); !errors.Is(err, ErrArtifactNotYetValid) {
 		t.Fatalf("VerifyV1(before issuance) error = %v, want %v", err, ErrArtifactNotYetValid)
 	}
-	if _, err := keyring.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(2*time.Hour)); !errors.Is(err, ErrArtifactExpired) {
+	if _, err := keyring.VerifyV1(artifact, "node-01", issuedAt.Add(2*time.Hour)); !errors.Is(err, ErrArtifactExpired) {
 		t.Fatalf("VerifyV1(at expiry) error = %v, want %v", err, ErrArtifactExpired)
 	}
 
@@ -153,7 +150,7 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewKeyring(new only) error = %v", err)
 	}
-	if _, err := newOnly.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrSigningKeyUnavailable) {
+	if _, err := newOnly.VerifyV1(artifact, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrSigningKeyUnavailable) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrSigningKeyUnavailable)
 	}
 }
