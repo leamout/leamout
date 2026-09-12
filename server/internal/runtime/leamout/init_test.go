@@ -10,6 +10,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
@@ -177,6 +180,38 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "Existing deployment identity and secrets preserved") || !strings.Contains(stdout, "Production runtime verified") {
 		t.Fatalf("unexpected repeat init output: %s", stdout)
+	}
+}
+
+func TestEnsureDeploymentIdentityMigratesLegacyState(t *testing.T) {
+	root := t.TempDir()
+	statePath := filepath.Join(root, "deployment.json")
+	legacy := deploymentState{
+		SchemaVersion: deploymentStateSchemaVersion,
+		DeploymentID:  uuid.NewString(),
+		Mode:          deploymentMode,
+		CreatedAt:     time.Now().UTC(),
+	}
+	content, err := json.MarshalIndent(legacy, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, append(content, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := ensureDeploymentIdentity(statePath)
+	if err != nil {
+		t.Fatalf("migrate legacy deployment identity: %v", err)
+	}
+	if state.PublicKey == "" {
+		t.Fatal("migrated deployment public key is empty")
+	}
+	if _, err := loadDeploymentPrivateKey(filepath.Join(root, "deployment.key"), state.PublicKey); err != nil {
+		t.Fatalf("migrated deployment private key: %v", err)
+	}
+	if _, err := loadDeploymentState(statePath); err != nil {
+		t.Fatalf("load migrated deployment state: %v", err)
 	}
 }
 

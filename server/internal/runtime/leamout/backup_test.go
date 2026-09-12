@@ -16,7 +16,7 @@ import (
 
 func TestBackupArchiveRoundTrip(t *testing.T) {
 	root := t.TempDir()
-	publicKey, _, err := ed25519.GenerateKey(rand.Reader)
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,6 +29,7 @@ func TestBackupArchiveRoundTrip(t *testing.T) {
 	}
 	stateBytes, _ := jsonMarshal(state)
 	statePath := filepath.Join(root, "state.json")
+	keyPath := filepath.Join(root, "deployment.key")
 	envPath := filepath.Join(root, "env")
 	if err := os.WriteFile(statePath, stateBytes, 0o600); err != nil {
 		t.Fatal(err)
@@ -36,8 +37,11 @@ func TestBackupArchiveRoundTrip(t *testing.T) {
 	if err := os.WriteFile(envPath, []byte("SECRET=value\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(keyPath, []byte(base64.RawURLEncoding.EncodeToString(privateKey)+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	archive := filepath.Join(root, "backup.tar.gz")
-	if err := createBackupArchive(archive, state, map[string]string{"deployment.json": statePath, "leamout.env": envPath}, []byte("SELECT 1;\n"), time.Now()); err != nil {
+	if err := createBackupArchive(archive, state, map[string]string{"deployment.json": statePath, "deployment.key": keyPath, "leamout.env": envPath}, []byte("SELECT 1;\n"), time.Now()); err != nil {
 		t.Fatal(err)
 	}
 	if info, err := os.Stat(archive); err != nil || info.Mode().Perm() != 0o600 {

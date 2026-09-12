@@ -15,7 +15,7 @@ func runUpdate(ctx context.Context, stdout, stderr io.Writer, args []string, ver
 		writeln(stderr, "development CLI cannot install a production update")
 		return 1
 	}
-	state, err := loadDeploymentState("/var/lib/leamout/deployment.json")
+	state, err := ensureDeploymentIdentity("/var/lib/leamout/deployment.json")
 	if err != nil {
 		writef(stderr, "load deployment identity: %v\n", err)
 		return 1
