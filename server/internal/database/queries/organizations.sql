@@ -79,7 +79,7 @@ SELECT
     o.status,
     COUNT(DISTINCT om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
     COUNT(DISTINCT w.id) FILTER (WHERE w.status <> 'closed')::BIGINT AS wallet_count,
-    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—') AS currencies,
+    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—')::TEXT AS currencies,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
 FROM organizations AS o
 LEFT JOIN organization_members AS om ON om.organization_id = o.id
@@ -96,7 +96,7 @@ SELECT
     o.status,
     COUNT(DISTINCT om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
     COUNT(DISTINCT w.id) FILTER (WHERE w.status <> 'closed')::BIGINT AS wallet_count,
-    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—') AS currencies,
+    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—')::TEXT AS currencies,
     'prepaid'::TEXT AS billing_model,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
     to_char(o.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
