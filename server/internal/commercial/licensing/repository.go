@@ -24,11 +24,10 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool, queries: sqlc.New(pool)}
 }
 
-func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, maxDeployments int32, signingKeyID *string, issuedAt time.Time, expiresAt *time.Time) (License, error) {
+func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, signingKeyID *string, issuedAt time.Time, expiresAt *time.Time) (License, error) {
 	status := string(StatusPending)
 	row, err := r.queries.CreateLicense(ctx, sqlc.CreateLicenseParams{
 		Status:         &status,
-		MaxDeployments: &maxDeployments,
 		SigningKeyID:   signingKeyID,
 		IssuedAt:       pgconv.NullableTimestamptz(&issuedAt),
 		ExpiresAt:      pgconv.NullableTimestamptz(expiresAt),
@@ -153,12 +152,12 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 	if license.Status != StatusActive || (license.ExpiresAt != nil && !license.ExpiresAt.After(at)) {
 		return Deployment{}, false, ErrLicenseUnavailable
 	}
-	count, err := queries.CountActiveDeploymentsByLicense(ctx, sqlc.CountActiveDeploymentsByLicenseParams{LicenseID: licenseID, OrganizationID: organizationID})
+	deployments, err := queries.ListDeploymentsByLicense(ctx, sqlc.ListDeploymentsByLicenseParams{LicenseID: licenseID, OrganizationID: organizationID})
 	if err != nil {
 		return Deployment{}, false, err
 	}
-	if count >= int64(license.MaxDeployments) {
-		return Deployment{}, false, ErrDeploymentLimitReached
+	if len(deployments) != 0 {
+		return Deployment{}, false, ErrLicenseAlreadyBound
 	}
 	row, err := queries.CreateDeployment(ctx, sqlc.CreateDeploymentParams{DeploymentID: input.DeploymentID, Name: input.Name, LicenseID: licenseID, OrganizationID: organizationID})
 	if err != nil {
@@ -217,8 +216,7 @@ func (r *Repository) getDeployment(ctx context.Context, organizationID, licenseI
 
 func licenseFromRow(row sqlc.License) License {
 	return License{
-		ID: row.ID, OrganizationID: row.OrganizationID, Status: Status(row.Status),
-		MaxDeployments: row.MaxDeployments, SigningKeyID: row.SigningKeyID,
+		ID: row.ID, OrganizationID: row.OrganizationID, Status: Status(row.Status), SigningKeyID: row.SigningKeyID,
 		IssuedAt: pgconv.TimestamptzToTime(row.IssuedAt), ExpiresAt: pgconv.TimestamptzToTimePtr(row.ExpiresAt),
 		CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
@@ -254,7 +252,10 @@ func mapDeploymentWriteError(err error) error {
 		return ErrDeploymentNotFound
 	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_deployments_license_deployment" {
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if pgErr.ConstraintName == "uq_deployments_license" {
+			return ErrLicenseAlreadyBound
+		}
 		return ErrActivationConflict
 	}
 	return err
