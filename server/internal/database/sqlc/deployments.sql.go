@@ -12,30 +12,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const countActiveDeploymentsByLicense = `-- name: CountActiveDeploymentsByLicense :one
-SELECT COUNT(*)
-FROM deployments AS d
-JOIN licenses AS l ON l.id = d.license_id
-JOIN organizations AS o ON o.id = l.organization_id
-WHERE d.license_id = $1
-  AND d.status = 'active'
-  AND l.organization_id = $2
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-`
-
-type CountActiveDeploymentsByLicenseParams struct {
-	LicenseID      uuid.UUID `db:"license_id" json:"license_id"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-}
-
-func (q *Queries) CountActiveDeploymentsByLicense(ctx context.Context, arg CountActiveDeploymentsByLicenseParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countActiveDeploymentsByLicense, arg.LicenseID, arg.OrganizationID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createDeployment = `-- name: CreateDeployment :one
 INSERT INTO deployments (
     license_id,
@@ -100,7 +76,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = $3
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.id, organization_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
+RETURNING l.id, organization_id, l.status, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
 `
 
 type DeactivateDeploymentParams struct {
@@ -113,7 +89,6 @@ type DeactivateDeploymentRow struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Status         string             `db:"status" json:"status"`
-	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
 	IssuedAt       pgtype.Timestamptz `db:"issued_at" json:"issued_at"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
@@ -144,7 +119,6 @@ func (q *Queries) DeactivateDeployment(ctx context.Context, arg DeactivateDeploy
 		&i.ID,
 		&i.OrganizationID,
 		&i.Status,
-		&i.MaxDeployments,
 		&i.SigningKeyID,
 		&i.IssuedAt,
 		&i.ExpiresAt,
@@ -269,7 +243,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = $4
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.id, organization_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
+RETURNING l.id, organization_id, l.status, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
 `
 
 type TouchDeploymentParams struct {
@@ -283,7 +257,6 @@ type TouchDeploymentRow struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Status         string             `db:"status" json:"status"`
-	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
 	IssuedAt       pgtype.Timestamptz `db:"issued_at" json:"issued_at"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
@@ -319,7 +292,6 @@ func (q *Queries) TouchDeployment(ctx context.Context, arg TouchDeploymentParams
 		&i.ID,
 		&i.OrganizationID,
 		&i.Status,
-		&i.MaxDeployments,
 		&i.SigningKeyID,
 		&i.IssuedAt,
 		&i.ExpiresAt,
