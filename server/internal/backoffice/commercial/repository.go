@@ -2,6 +2,7 @@ package commercial
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -23,7 +24,7 @@ func (r *Repository) Get(ctx context.Context, id uuid.UUID) (Detail, error) {
 			Organization:   row.OrganizationName,
 			BillingModel:   row.BillingModel,
 			WalletCount:    row.WalletCount,
-			Currencies:     row.Currencies,
+			Currencies:     fmt.Sprint(row.Currencies),
 		},
 		OrganizationCreatedAt: row.OrganizationCreatedAt,
 	}, nil
@@ -48,7 +49,7 @@ func (r *Repository) List(ctx context.Context) ([]Account, error) {
 			Organization:   row.OrganizationName,
 			BillingModel:   row.BillingModel,
 			WalletCount:    row.WalletCount,
-			Currencies:     row.Currencies,
+			Currencies:     fmt.Sprint(row.Currencies),
 		})
 	}
 	return accounts, nil
