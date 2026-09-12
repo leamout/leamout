@@ -42,6 +42,7 @@ var (
 	ErrWalletExists            = apperror.NewConflict("wallet already exists for currency")
 	ErrInsufficientFunds       = apperror.NewConflict("insufficient prepaid funds")
 	ErrInvalidReservationState = apperror.NewConflict("wallet reservation is no longer active")
+	ErrReservationRegression   = apperror.NewConflict("wallet reservation authorization cannot move backward")
 	ErrDuplicateOperation      = apperror.NewConflict("wallet operation already reserved")
 	ErrDuplicateLedgerEntry    = apperror.NewConflict("wallet ledger entry already exists")
 	ErrReservationRequired     = apperror.NewConflict("wallet capture requires an active reservation")
@@ -111,23 +112,9 @@ type ReserveInput struct {
 	ExpiresAt     time.Time
 }
 
+// IncreaseReservationInput describes the desired total active hold, not a
+// delta. Replaying the same target is therefore idempotent.
 type IncreaseReservationInput struct {
-	AmountMinor int64
-	ExpiresAt   time.Time
+	TargetAmountMinor int64
+	ExpiresAt         time.Time
 }
-
-var (
-	ErrManagedNumberPriceUnavailable = apperror.NewServiceUnavailable(
-		"managed number purchase price is unavailable",
-		nil,
-	)
-	ErrManagedNumberSubscriptionInactive = apperror.NewConflict(
-		"managed number purchase requires an active subscription",
-	)
-	ErrManagedNumberQuoteExpired = apperror.NewConflict(
-		"managed number purchase quote is no longer current",
-	)
-	ErrManagedNumberAuthorizationInvalid = apperror.NewConflict(
-		"managed number purchase authorization is invalid",
-	)
-)
