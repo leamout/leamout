@@ -52,6 +52,9 @@ func normalizeCreate(input CreateInput, issuedAt time.Time) (CreateInput, time.T
 	if issuedAt.IsZero() {
 		return CreateInput{}, time.Time{}, ErrInvalidExpiration
 	}
+	if input.MaxDeployments <= 0 {
+		return CreateInput{}, time.Time{}, ErrInvalidDeploymentLimit
+	}
 	if input.SigningKeyID != nil {
 		keyID := strings.TrimSpace(*input.SigningKeyID)
 		if keyID == "" {

@@ -12,31 +12,16 @@ import (
 var checkoutReferencePattern = regexp.MustCompile(`^[A-Za-z0-9.=-]+$`)
 
 func validateIntent(input CreateParams) error {
-	switch input.Type {
-	case TypeWalletTopup:
-		if input.WalletID == nil || *input.WalletID == uuid.Nil || input.PriceID != nil || input.AmountMinor <= 0 {
-			return ErrInvalidCheckout
-		}
-	case TypeSubscription:
-		if input.PriceID == nil || *input.PriceID == uuid.Nil || input.WalletID != nil || input.AmountMinor != 0 {
-			return ErrInvalidCheckout
-		}
-	default:
-		return ErrInvalidCheckout
-	}
-	if !validMetadata(input.Metadata) {
+	if input.WalletID == nil || *input.WalletID == uuid.Nil || input.AmountMinor <= 0 || !validMetadata(input.Metadata) {
 		return ErrInvalidCheckout
 	}
 	return nil
 }
 
 func validateCreate(input CreateInput, now time.Time) error {
-	validTarget := input.Type == TypeSubscription && input.PriceID != nil && input.WalletID == nil ||
-		input.Type == TypeWalletTopup && input.WalletID != nil && input.PriceID == nil
-	if !validTarget || input.AmountMinor <= 0 ||
+	if input.WalletID == nil || *input.WalletID == uuid.Nil || input.AmountMinor <= 0 ||
 		len(input.Currency) != 3 || input.Currency != strings.ToUpper(input.Currency) ||
-		!checkoutReferencePattern.MatchString(input.Reference) || !input.ExpiresAt.After(now) ||
-		!validMetadata(input.Metadata) {
+		!checkoutReferencePattern.MatchString(input.Reference) || !input.ExpiresAt.After(now) || !validMetadata(input.Metadata) {
 		return ErrInvalidCheckout
 	}
 	return nil
@@ -52,9 +37,7 @@ func validateConfirm(input ConfirmInput) error {
 			return ErrInvalidCheckout
 		}
 	case MethodMobileMoney:
-		if input.MobileMoney == nil ||
-			strings.TrimSpace(input.MobileMoney.Phone) == "" ||
-			strings.TrimSpace(input.MobileMoney.Provider) == "" {
+		if input.MobileMoney == nil || strings.TrimSpace(input.MobileMoney.Phone) == "" || strings.TrimSpace(input.MobileMoney.Provider) == "" {
 			return ErrInvalidCheckout
 		}
 	default:

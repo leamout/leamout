@@ -40,15 +40,25 @@ type AvailableSearchRequest struct {
 	Contains    string
 }
 
-// AvailableNumberResponse exposes an opaque, short-lived selection handle.
-type AvailableNumberResponse struct {
-	SelectionID  string `json:"selection_id"`
-	Number       string `json:"number"`
-	CountryCode  string `json:"country_code"`
-	VoiceEnabled bool   `json:"voice_enabled"`
+type MoneyQuote struct {
+	AmountMinor int64  `json:"amount_minor"`
+	Currency    string `json:"currency"`
 }
 
-// ManagedNumberCandidate retains provider purchase inputs behind selection_id.
+// AvailableNumberResponse exposes an opaque, short-lived selection handle and
+// the Leamout-owned customer price. Provider inventory IDs, SKUs, and wholesale
+// economics remain internal.
+type AvailableNumberResponse struct {
+	SelectionID  string     `json:"selection_id"`
+	Number       string     `json:"number"`
+	CountryCode  string     `json:"country_code"`
+	VoiceEnabled bool       `json:"voice_enabled"`
+	Price        MoneyQuote `json:"price"`
+}
+
+// ManagedNumberCandidate retains provider purchase inputs and the server-owned
+// quote behind selection_id. Provider adapters populate only provider fields;
+// Commercial attaches the customer price before the selection is persisted.
 type ManagedNumberCandidate struct {
 	Provider              string
 	ProviderInventoryID   string
@@ -56,16 +66,30 @@ type ManagedNumberCandidate struct {
 	Number                string
 	CountryCode           string
 	ChannelsIncludedCount int
+	PriceID               uuid.UUID
+	PriceAmountMinor      int64
+	PriceCurrency         string
+}
+
+// ManagedNumberPurchaseAuthorization is durable proof that customer funds were
+// reserved before the provider operation became runnable.
+type ManagedNumberPurchaseAuthorization struct {
+	ID            uuid.UUID `json:"id"`
+	ReservationID uuid.UUID `json:"reservation_id"`
+	PriceID       uuid.UUID `json:"price_id"`
+	AmountMinor   int64     `json:"amount_minor"`
+	Currency      string    `json:"currency"`
 }
 
 type ProviderOperationRequest struct {
-	Provider                  string    `json:"provider"`
-	ProviderInventoryID       string    `json:"available_did_id"`
-	ProviderProductID         string    `json:"sku_id"`
-	Number                    string    `json:"number"`
-	CountryCode               string    `json:"country_code"`
-	CarrierConnectionID       uuid.UUID `json:"carrier_connection_id"`
-	ProviderRoutingResourceID string    `json:"provider_routing_resource_id"`
+	Provider                  string                             `json:"provider"`
+	ProviderInventoryID       string                             `json:"available_did_id"`
+	ProviderProductID         string                             `json:"sku_id"`
+	Number                    string                             `json:"number"`
+	CountryCode               string                             `json:"country_code"`
+	CarrierConnectionID       uuid.UUID                          `json:"carrier_connection_id"`
+	ProviderRoutingResourceID string                             `json:"provider_routing_resource_id"`
+	PurchaseAuthorization     ManagedNumberPurchaseAuthorization `json:"purchase_authorization"`
 }
 
 type ProviderOrderRequest struct {

@@ -3,24 +3,20 @@ package checkout
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
-// CompletePayment applies the commercial effect of a settled payment. Payments
-// owns provider state; Checkout owns what a successful payment means.
+// CompletePayment applies the commercial effect of a settled wallet top-up.
 func (s *Service) CompletePayment(ctx context.Context, settlement commercialpayments.Settlement) error {
 	if settlement.CheckoutID == uuid.Nil || settlement.OrganizationID == uuid.Nil ||
 		settlement.PaymentID == uuid.Nil || settlement.AmountMinor <= 0 || settlement.Currency == "" {
 		return ErrPaymentMismatch
 	}
 
-	checkoutRecord, err := s.repo.Get(ctx, settlement.OrganizationID, settlement.CheckoutID)
+	checkoutRecord, err := s.checkouts.get(ctx, settlement.OrganizationID, settlement.CheckoutID)
 	if err != nil {
 		return err
 	}
@@ -47,93 +43,39 @@ func (s *Service) CompletePayment(ctx context.Context, settlement commercialpaym
 	}
 
 	if target == StatusSucceeded {
-		if err = s.fulfillSucceededCheckout(ctx, checkoutRecord, settledAt); err != nil {
+		if checkoutRecord.WalletID == nil {
+			return ErrInvalidCheckout
+		}
+		_, err = s.wallets.post(ctx, checkoutRecord.OrganizationID, *checkoutRecord.WalletID, wallets.PostEntryInput{
+			Type:           wallets.EntryTopup,
+			AmountMinor:    checkoutRecord.AmountMinor,
+			SourceType:     "checkout",
+			SourceID:       checkoutRecord.ID.String(),
+			IdempotencyKey: "checkout:" + checkoutRecord.ID.String(),
+			Metadata:       checkoutRecord.Metadata,
+			OccurredAt:     &settledAt,
+		})
+		if err != nil && !errors.Is(err, wallets.ErrDuplicateLedgerEntry) {
 			return err
 		}
 	}
 
-	_, err = s.repo.Transition(
-		ctx,
-		checkoutRecord.OrganizationID,
-		checkoutRecord.ID,
-		Transition{
-			Expected:    StatusProcessing,
-			Status:      target,
-			NextAction:  ActionNone,
-			CompletedAt: &settledAt,
-		},
-	)
+	_, err = s.checkouts.transition(ctx, checkoutRecord.OrganizationID, checkoutRecord.ID, Transition{
+		Expected:    StatusProcessing,
+		Status:      target,
+		NextAction:  ActionNone,
+		CompletedAt: &settledAt,
+	})
 	if errors.Is(err, ErrInvalidTransition) {
-		current, readErr := s.repo.Get(ctx, checkoutRecord.OrganizationID, checkoutRecord.ID)
-		if readErr == nil && current.Status == target {
+		current, readErr := s.checkouts.get(ctx, checkoutRecord.OrganizationID, checkoutRecord.ID)
+		if readErr != nil {
+			return readErr
+		}
+		if current.Status == target {
 			return nil
 		}
 	}
 	return err
-}
-
-func (s *Service) fulfillSucceededCheckout(
-	ctx context.Context,
-	checkoutRecord Checkout,
-	settledAt time.Time,
-) error {
-	switch checkoutRecord.Type {
-	case TypeWalletTopup:
-		if checkoutRecord.WalletID == nil {
-			return ErrInvalidCheckout
-		}
-		_, err := s.wallets.Post(
-			ctx,
-			checkoutRecord.OrganizationID,
-			*checkoutRecord.WalletID,
-			wallets.PostEntryInput{
-				Type:           wallets.EntryTopup,
-				AmountMinor:    checkoutRecord.AmountMinor,
-				SourceType:     "checkout",
-				SourceID:       checkoutRecord.ID.String(),
-				IdempotencyKey: "checkout:" + checkoutRecord.ID.String(),
-				Metadata:       checkoutRecord.Metadata,
-				OccurredAt:     &settledAt,
-			},
-		)
-		if errors.Is(err, wallets.ErrDuplicateLedgerEntry) {
-			return nil
-		}
-		return err
-
-	case TypeSubscription:
-		if checkoutRecord.PriceID == nil {
-			return ErrInvalidCheckout
-		}
-		price, err := s.catalog.GetPrice(ctx, *checkoutRecord.PriceID)
-		if err != nil {
-			return err
-		}
-		if price.PricingType != catalog.PricingTypeRecurring || price.BillingInterval == nil {
-			return ErrInvalidCheckout
-		}
-		renewsAt := renewalTime(settledAt, *price.BillingInterval)
-		if renewsAt == nil {
-			return ErrInvalidCheckout
-		}
-		status := subscriptions.StatusActive
-		_, err = s.subscriptions.Create(ctx, checkoutRecord.OrganizationID, subscriptions.CreateInput{
-			PriceID:  *checkoutRecord.PriceID,
-			Status:   &status,
-			StartsAt: &settledAt,
-			RenewsAt: renewsAt,
-		})
-		if errors.Is(err, subscriptions.ErrCurrentSubscriptionExists) {
-			current, readErr := s.subscriptions.Current(ctx, checkoutRecord.OrganizationID)
-			if readErr == nil && current.PriceID == *checkoutRecord.PriceID {
-				return nil
-			}
-		}
-		return err
-
-	default:
-		return ErrInvalidCheckout
-	}
 }
 
 func checkoutStatusForPayment(status commercialpayments.Status) (Status, bool) {
@@ -147,17 +89,4 @@ func checkoutStatusForPayment(status commercialpayments.Status) (Status, bool) {
 	default:
 		return "", false
 	}
-}
-
-func renewalTime(start time.Time, interval catalog.BillingInterval) *time.Time {
-	var value time.Time
-	switch interval {
-	case catalog.BillingIntervalMonth:
-		value = start.AddDate(0, 1, 0)
-	case catalog.BillingIntervalYear:
-		value = start.AddDate(1, 0, 0)
-	default:
-		return nil
-	}
-	return &value
 }

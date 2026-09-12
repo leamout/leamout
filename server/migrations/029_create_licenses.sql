@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS licenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    subscription_id UUID,
     status TEXT NOT NULL DEFAULT 'pending',
     max_deployments INTEGER NOT NULL DEFAULT 1,
     signing_key_id TEXT,
@@ -10,10 +9,6 @@ CREATE TABLE IF NOT EXISTS licenses (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_licenses_subscription_organization
-        FOREIGN KEY (subscription_id, organization_id)
-        REFERENCES subscriptions (id, organization_id)
-        ON DELETE SET NULL (subscription_id),
     CONSTRAINT chk_licenses_status CHECK (
         status IN ('pending', 'active', 'suspended', 'expired', 'revoked')
     ),
@@ -28,10 +23,6 @@ CREATE TABLE IF NOT EXISTS licenses (
 
 CREATE INDEX IF NOT EXISTS idx_licenses_organization_status
     ON licenses (organization_id, status, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_licenses_subscription_id
-    ON licenses (subscription_id, created_at DESC)
-    WHERE subscription_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_licenses_expires_at
     ON licenses (expires_at)

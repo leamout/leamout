@@ -24,7 +24,6 @@ func (r *Repository) CreateEvent(
 	input RecordInput,
 ) (Event, error) {
 	row, err := r.queries.CreateUsageEvent(ctx, sqlc.CreateUsageEventParams{
-		SubscriptionID: input.SubscriptionID,
 		Quantity:       input.Quantity,
 		SourceType:     input.SourceType,
 		SourceID:       input.SourceID,
@@ -64,7 +63,6 @@ func eventFromRow(row sqlc.UsageEvent) Event {
 	return Event{
 		ID:             row.ID,
 		OrganizationID: row.OrganizationID,
-		SubscriptionID: row.SubscriptionID,
 		MeterID:        row.MeterID,
 		Quantity:       row.Quantity,
 		SourceType:     row.SourceType,

@@ -1,51 +1,52 @@
 # Licensing
 
-Licensing carries Leamout commercial authorization into self-hosted deployments without exposing private signing capability to the self-hosted runtime.
+Licensing carries Leamout commercial authority into self-hosted deployments without depending on Cloud PAYG or a customer subscription lifecycle.
+
+Self-Hosted software licensing is the sole exception to Leamout's prepaid pay-as-you-go commercial model.
+
+The enterprise software license is sold separately from Cloud and managed usage, normally through a negotiated agreement, invoice, and bank transfer. Paying for a Self-Hosted license does not create wallet balance or managed-usage credit.
 
 ## Boundary
 
 ```text
-catalog
-   ↓
-subscriptions
-   ↓
-entitlements
-   ↓
-state
-   ↓
-licensing
-   ↓
-self-hosted deployment(s)
+enterprise agreement
+        ↓
+Self-Hosted license
+        ↓
+deployment(s)
+        ↓
+signed deployment artifact
 ```
 
-`commercial/licensing` owns durable licenses, license lifecycle, activated self-hosted installations, and the signed artifact protocol consumed by self-hosted runtimes. It consumes resolved commercial state; it does not decide catalog pricing, subscription lifecycle, or entitlement inheritance.
+`commercial/licensing` owns durable licenses, license lifecycle, activated self-hosted installations, and the signed artifact protocol consumed by self-hosted runtimes.
 
-## Current implementation
+Licensing does not own Cloud wallet balance, wallet funding, managed-carrier authorization, customer subscriptions, or postpaid usage settlement.
 
-The licensing package uses UUID-backed domain models and SQLC-backed persistence. License and deployment reads/writes are organization-scoped.
-
-A new license is created from current commercial state:
+## Commercial combinations
 
 ```text
-current active subscription
-        +
-effective organization entitlements
+Self-Hosted + BYOC
         ↓
-max.deployments
-        ↓
-pending license
+enterprise Self-Hosted software license
 ```
 
-`max_deployments` is a durable snapshot of the resolved `max.deployments` entitlement at license creation time. A caller cannot choose a larger deployment limit directly. License creation also copies the complete resolved feature and limit set into license-scoped entitlement rows in the same PostgreSQL transaction as the license row.
+```text
+Self-Hosted + Managed
+        ↓
+enterprise Self-Hosted software license
+        +
+prepaid managed-usage wallet
+```
 
-Creating a row is not cryptographic issuance. A license starts `pending`; it becomes `active` only after trusted licensing-authority code has associated a signing key and is ready to issue deployment-bound artifacts.
+A Self-Hosted + Managed customer must satisfy both independently. An active license does not authorize Leamout to incur managed-provider obligations without prepaid wallet funds.
 
 ## License model
 
+A license contains:
+
 ```text
-id                 UUID
-organization_id    UUID
-subscription_id    UUID
+id
+organization_id
 status
 max_deployments
 signing_key_id
@@ -55,7 +56,13 @@ created_at
 updated_at
 ```
 
-Lifecycle:
+There is no `subscription_id` dependency.
+
+License creation accepts explicit self-hosted licensing authority, including `max_deployments`, optional signing key identity, and optional expiration.
+
+A newly created license starts as `pending`. Activating a license requires a signing key. An already-expired license cannot be activated.
+
+## Lifecycle
 
 ```text
 pending ─────→ active ─────→ suspended ─────→ active
@@ -67,7 +74,7 @@ pending ─────→ active ─────→ suspended ─────�
 expired / revoked = terminal
 ```
 
-Repeated transitions to the current state are idempotent. License transitions use serializable database transactions so concurrent lifecycle changes cannot silently overwrite one another.
+Repeated transitions to the current state are treated idempotently where supported by the service/repository lifecycle rules.
 
 ## Deployment activation
 
@@ -88,59 +95,45 @@ license not expired
 active deployments < max_deployments
 ```
 
-The same active `deployment_id` is idempotent and returns the existing deployment rather than consuming another slot. A deactivated deployment identity is not silently reactivated.
+The same active `deployment_id` is idempotent and does not consume another slot. A deactivated deployment identity is not silently reactivated.
 
-The repository performs the read/count/create sequence in a PostgreSQL `SERIALIZABLE` transaction and retries serialization failures. That protects `max_deployments` from concurrent activation races without embedding raw SQL in the commercial repository.
-
-Deployment lifecycle currently supports:
-
-```text
-activate
-list
-touch / last-seen
-deactivate
-```
+The repository protects deployment limits transactionally so concurrent activations cannot exceed `max_deployments`.
 
 ## Signed license protocol v1
 
-The persistent `License` record is **not** the signed artifact consumed by a self-hosted runtime. Version 1 now defines a concrete Ed25519 protocol.
+The persistent `License` row is not the artifact consumed by a self-hosted runtime.
+
+Version 1 uses Ed25519 signatures over versioned, deployment-bound claims.
 
 ```text
-trusted license claims
-        ↓
-canonical v1 payload
-        ↓
-Ed25519 signer
-        ↓
+license authority
+      ↓
+LicenseClaimsV1
+      ↓
+canonical payload
+      ↓
+Ed25519 signature
+      ↓
 versioned envelope
-        ↓
+      ↓
 self-hosted runtime
-        ↓
-public-key keyring
-        ↓
-local verification
+      ↓
+public-key verification
 ```
 
 ### Deployment binding
 
 A signed artifact is bound to one activated `deployment_id`.
 
-```text
-license L
-  ├── node-01 → artifact for node-01
-  └── node-02 → artifact for node-02
-```
-
-An artifact issued for `node-01` fails verification when presented by `node-02`. This is required because a reusable license-wide token could otherwise be copied to unlimited machines and bypass `max_deployments` while offline.
+An artifact issued for one deployment must fail verification when presented by another deployment. This prevents one artifact from being copied across unlimited installations and bypassing `max_deployments`.
 
 ### Claims v1
 
-`LicenseClaimsV1` carries:
+Current claims carry:
 
 ```text
 license_id
 organization_id
-subscription_id
 deployment_id
 issued_at
 expires_at
@@ -148,9 +141,11 @@ features[]
 limits[]
 ```
 
-Feature and limit keys are normalized and sorted before encoding. A key cannot appear as both a feature and a limit. Times are normalized to UTC whole seconds. That makes the v1 payload deterministic for the same normalized claims.
+There is no `subscription_id` claim.
 
-Features and limits use sorted arrays in the wire format rather than JSON maps. The runtime reconstructs maps after verification.
+Feature and limit claims are part of the signed license protocol. They are not the deleted `commercial/entitlements` service or database table.
+
+Claim keys are normalized and sorted before encoding. A key cannot appear as both a feature and a limit. Limit values must be non-negative. Times are normalized to UTC whole seconds so canonical payloads remain deterministic.
 
 ### Envelope v1
 
@@ -164,99 +159,46 @@ payload   = base64url(canonical claims JSON)
 signature = base64url(Ed25519 signature)
 ```
 
-Signatures authenticate both the selected key identity and payload using domain separation:
+Signatures use domain separation and authenticate both key identity and payload.
 
-```text
-"leamout-license-v1\0" || key_id || "\0" || payload
-```
-
-This prevents `key_id` substitution even if the same public key is temporarily registered under multiple rotation identifiers, and prevents a payload from another protocol from being treated as a Leamout license artifact.
-
-The decoder rejects unknown JSON fields, unsupported versions, unsupported algorithms, malformed base64, malformed claims, invalid signatures, unknown key IDs, wrong deployment IDs, artifacts used before `issued_at`, and artifacts at or after `expires_at`.
+The decoder rejects unsupported versions/algorithms, malformed payloads, unknown key IDs, invalid signatures, deployment mismatches, not-yet-valid artifacts, and expired artifacts.
 
 ## Key rotation
 
-The trusted authority signs with a private Ed25519 key selected by `key_id`. Self-hosted runtimes receive a public-key keyring:
+The trusted authority signs with a private key selected by `key_id`. Self-hosted runtimes receive only the public-key keyring.
 
-```text
-key-old → old public key
-key-new → new public key
-```
-
-During rotation both public keys may remain in the runtime keyring so already-issued artifacts continue to verify until normal expiry. Once no valid artifact depends on `key-old`, that public key can be removed.
-
-Private signing keys must never be shipped to self-hosted deployments.
+During rotation, old and new public keys may overlap so already-issued artifacts remain verifiable until their normal expiry. Private signing keys must never be shipped to self-hosted deployments.
 
 ## Offline validity and revocation
 
-Offline verification has an unavoidable availability/security tradeoff: a self-hosted runtime cannot learn that a server-side license was suspended or revoked while it is disconnected.
+A disconnected self-hosted runtime cannot learn immediately that server-side state changed.
 
-Therefore the signed artifact has its own finite `expires_at` validity boundary. The licensing authority can issue an artifact whose lifetime is shorter than the durable license expiration:
+Signed artifacts therefore carry their own finite `expires_at` validity boundary. Artifact validity may be shorter than the durable license expiration so the runtime periodically refreshes trusted authority without pretending fully offline instant revocation exists.
 
-```text
-durable license expires in 1 year
-        ↓
-signed deployment artifact valid for N hours/days
-        ↓
-periodic trusted refresh
-```
+## Expiry and active telecom sessions
 
-The exact online refresh/grace policy remains a product decision. The cryptographic protocol does not pretend instant revocation exists for fully offline installations.
+Commercial transitions should govern new controlled actions. They should not destroy an already-active telecom session solely because a license artifact expires mid-session.
 
-## Entitlement snapshot rule
+Exact grace, refresh, air-gapped, and offline-renewal policy remains above the cryptographic protocol.
 
-Signed feature/limit claims must come from a trusted, durable license entitlement snapshot. They must not be assembled from arbitrary request payloads.
+## Payment and provider independence
 
-The license creation flow durably snapshots `max.deployments` and persists the complete resolved feature/limit set atomically with the license row. If any snapshot row fails, the license row and every snapshot row are rolled back together. The signer must load these license-scoped entitlements rather than sign mutable organization state opportunistically.
+Self-Hosted software license settlement is an enterprise procurement concern, not a wallet top-up workflow.
 
-The intended issuance flow is:
+Payment-provider events must never directly sign licenses.
+
+Managed-provider authorization must never be inferred from license state.
 
 ```text
-resolved commercial state
+enterprise license settlement
         ↓
-create license + durable entitlement snapshot atomically
+license lifecycle
+
+prepaid wallet funding
         ↓
-activate deployment
-        ↓
-load license snapshot
-        ↓
-build LicenseClaimsV1
-        ↓
-sign with license.signing_key_id
-        ↓
-return deployment-bound artifact
+managed usage authorization
 ```
 
-## Expiry and active calls
+These paths remain separate even when the same organization uses both.
 
-Commercial enforcement must not destroy active telecom sessions. If a signed artifact expires while a call is already active, Leamout should not terminate that call solely because of the commercial transition. Enforcement should affect new controlled actions according to policy.
-
-Grace periods, cached renewals, air-gapped licenses, and offline renewal windows remain future policy above the cryptographic verification layer.
-
-## Provider independence
-
-Never implement:
-
-```text
-payment provider webhook
-        ↓
-direct license signing
-```
-
-Use:
-
-```text
-provider event
-     ↓
-Leamout subscription/payment reconciliation
-     ↓
-commercial state
-     ↓
-licensing authority
-     ↓
-durable license snapshot
-     ↓
-signed deployment artifact
-```
-
-PostgreSQL and Leamout domain state remain authoritative.
+PostgreSQL and Leamout licensing state remain authoritative for self-hosted authority.

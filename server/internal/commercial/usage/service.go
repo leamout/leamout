@@ -72,9 +72,6 @@ func normalizeRecordInput(input RecordInput) (RecordInput, error) {
 		!sourceTypePattern.MatchString(input.SourceType) {
 		return RecordInput{}, ErrInvalidEvent
 	}
-	if input.SubscriptionID != nil && *input.SubscriptionID == uuid.Nil {
-		return RecordInput{}, ErrInvalidEvent
-	}
 
 	if len(input.Dimensions) == 0 {
 		input.Dimensions = json.RawMessage(`{}`)
@@ -91,8 +88,7 @@ func normalizeRecordInput(input RecordInput) (RecordInput, error) {
 func sameEvent(existing Event, input RecordInput) bool {
 	if existing.MeterID != input.MeterID || existing.Quantity != input.Quantity ||
 		existing.SourceType != input.SourceType || existing.SourceID != input.SourceID ||
-		!existing.OccurredAt.Equal(input.OccurredAt) ||
-		!sameUUID(existing.SubscriptionID, input.SubscriptionID) {
+		!existing.OccurredAt.Equal(input.OccurredAt) {
 		return false
 	}
 
@@ -104,11 +100,4 @@ func sameEvent(existing Event, input RecordInput) bool {
 	}
 
 	return reflect.DeepEqual(existingDimensions, inputDimensions)
-}
-
-func sameUUID(left, right *uuid.UUID) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return *left == *right
 }

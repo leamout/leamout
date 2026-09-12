@@ -7,13 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
-type checkoutStoreStub struct {
+type checkoutRepositoryStub struct {
 	checkout     Checkout
 	createdInput CreateInput
 	startedInput StartPayment
@@ -23,7 +21,7 @@ type checkoutStoreStub struct {
 	transitions  int
 }
 
-func (s *checkoutStoreStub) Create(_ context.Context, organizationID uuid.UUID, input CreateInput) (Checkout, error) {
+func (s *checkoutRepositoryStub) Create(_ context.Context, organizationID uuid.UUID, input CreateInput) (Checkout, error) {
 	s.creates++
 	s.createdInput = input
 	result := s.checkout
@@ -32,8 +30,6 @@ func (s *checkoutStoreStub) Create(_ context.Context, organizationID uuid.UUID, 
 	}
 	result.OrganizationID = organizationID
 	result.WalletID = input.WalletID
-	result.PriceID = input.PriceID
-	result.Type = input.Type
 	result.Reference = input.Reference
 	result.AmountMinor = input.AmountMinor
 	result.Currency = input.Currency
@@ -45,7 +41,7 @@ func (s *checkoutStoreStub) Create(_ context.Context, organizationID uuid.UUID, 
 	return result, nil
 }
 
-func (s *checkoutStoreStub) StartPayment(_ context.Context, _, _ uuid.UUID, input StartPayment) (Checkout, error) {
+func (s *checkoutRepositoryStub) StartPayment(_ context.Context, _, _ uuid.UUID, input StartPayment) (Checkout, error) {
 	s.starts++
 	s.startedInput = input
 	s.checkout.Provider = input.Provider
@@ -55,15 +51,15 @@ func (s *checkoutStoreStub) StartPayment(_ context.Context, _, _ uuid.UUID, inpu
 	return s.checkout, nil
 }
 
-func (s *checkoutStoreStub) Get(context.Context, uuid.UUID, uuid.UUID) (Checkout, error) {
+func (s *checkoutRepositoryStub) Get(context.Context, uuid.UUID, uuid.UUID) (Checkout, error) {
 	return s.checkout, nil
 }
 
-func (s *checkoutStoreStub) GetByReference(context.Context, string) (Checkout, error) {
+func (s *checkoutRepositoryStub) GetByReference(context.Context, string) (Checkout, error) {
 	return s.checkout, nil
 }
 
-func (s *checkoutStoreStub) Transition(_ context.Context, _, _ uuid.UUID, input Transition) (Checkout, error) {
+func (s *checkoutRepositoryStub) Transition(_ context.Context, _, _ uuid.UUID, input Transition) (Checkout, error) {
 	s.transitions++
 	s.transition = input
 	s.checkout.Status = input.Status
@@ -73,11 +69,11 @@ func (s *checkoutStoreStub) Transition(_ context.Context, _, _ uuid.UUID, input 
 	return s.checkout, nil
 }
 
-func (s *checkoutStoreStub) ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (Checkout, error) {
+func (s *checkoutRepositoryStub) ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, time.Time) (Checkout, error) {
 	return Checkout{}, ErrCheckoutNotFound
 }
 
-func (s *checkoutStoreStub) Expire(context.Context) ([]Checkout, error) { return nil, nil }
+func (s *checkoutRepositoryStub) Expire(context.Context) ([]Checkout, error) { return nil, nil }
 
 type walletServiceStub struct {
 	wallet    wallets.Wallet
@@ -98,49 +94,6 @@ func (s *walletServiceStub) Post(
 	s.posts++
 	s.postInput = input
 	return wallets.LedgerEntry{}, s.postErr
-}
-
-type catalogServiceStub struct {
-	price   catalog.Price
-	plan    catalog.Plan
-	product catalog.Product
-}
-
-func (s *catalogServiceStub) GetPrice(context.Context, uuid.UUID) (catalog.Price, error) {
-	return s.price, nil
-}
-
-func (s *catalogServiceStub) GetPlan(context.Context, uuid.UUID) (catalog.Plan, error) {
-	return s.plan, nil
-}
-
-func (s *catalogServiceStub) GetProduct(context.Context, uuid.UUID) (catalog.Product, error) {
-	return s.product, nil
-}
-
-type subscriptionServiceStub struct {
-	current    subscriptions.Subscription
-	currentErr error
-	created    subscriptions.CreateInput
-	createErr  error
-	creates    int
-}
-
-func (s *subscriptionServiceStub) Create(
-	_ context.Context,
-	_ uuid.UUID,
-	input subscriptions.CreateInput,
-) (subscriptions.Subscription, error) {
-	s.creates++
-	s.created = input
-	return subscriptions.Subscription{}, s.createErr
-}
-
-func (s *subscriptionServiceStub) Current(context.Context, uuid.UUID) (subscriptions.Subscription, error) {
-	if s.currentErr != nil {
-		return subscriptions.Subscription{}, s.currentErr
-	}
-	return s.current, nil
 }
 
 type paymentServiceStub struct {
@@ -178,30 +131,29 @@ func (s *paymentServiceStub) Refresh(context.Context, string, string) (commercia
 }
 
 func TestServiceRejectsInvalidCheckoutBeforePersistence(t *testing.T) {
-	store := &checkoutStoreStub{}
-	service := NewService(store, nil, nil, nil, nil)
+	repository := &checkoutRepositoryStub{}
+	service := newTestService(repository, nil, nil)
 
 	_, err := service.Create(t.Context(), uuid.New(), CreateParams{})
 	if !errors.Is(err, ErrInvalidCheckout) {
 		t.Fatalf("Create() error = %v, want %v", err, ErrInvalidCheckout)
 	}
-	if store.creates != 0 {
+	if repository.creates != 0 {
 		t.Fatal("invalid checkout reached repository")
 	}
 }
 
 func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
-	store := &checkoutStoreStub{}
+	repository := &checkoutRepositoryStub{}
 	walletID := uuid.New()
 	walletsService := &walletServiceStub{wallet: wallets.Wallet{
 		ID:       walletID,
 		Currency: "GHS",
 		Status:   wallets.StatusActive,
 	}}
-	service := NewService(store, walletsService, nil, nil, nil)
+	service := newTestService(repository, walletsService, nil)
 
 	result, err := service.Create(t.Context(), uuid.New(), CreateParams{
-		Type:        TypeWalletTopup,
 		WalletID:    &walletID,
 		AmountMinor: 5000,
 	})
@@ -216,50 +168,14 @@ func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
 	}
 }
 
-func TestCreateSubscriptionUsesCatalogPrice(t *testing.T) {
-	store := &checkoutStoreStub{}
-	priceID := uuid.New()
-	planID := uuid.New()
-	productID := uuid.New()
-	amount := int64(2500)
-	interval := catalog.BillingIntervalMonth
-	now := time.Now().UTC().Add(-time.Minute)
-	catalogService := &catalogServiceStub{
-		price: catalog.Price{
-			ID:              priceID,
-			PlanID:          planID,
-			PricingType:     catalog.PricingTypeRecurring,
-			Currency:        "USD",
-			AmountMinor:     &amount,
-			BillingInterval: &interval,
-			Active:          true,
-			EffectiveFrom:   now,
-		},
-		plan:    catalog.Plan{ID: planID, ProductID: productID, Active: true},
-		product: catalog.Product{ID: productID, Active: true},
-	}
-	subscriptionsService := &subscriptionServiceStub{currentErr: subscriptions.ErrSubscriptionNotFound}
-	service := NewService(store, nil, catalogService, subscriptionsService, nil)
-
-	result, err := service.Create(t.Context(), uuid.New(), CreateParams{
-		Type:    TypeSubscription,
-		PriceID: &priceID,
-	})
-	if err != nil {
-		t.Fatalf("Create() error = %v", err)
-	}
-	if result.AmountMinor != amount || result.Currency != "USD" {
-		t.Fatalf("checkout terms = %s %d", result.Currency, result.AmountMinor)
-	}
-}
-
 func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 	organizationID := uuid.New()
 	checkoutID := uuid.New()
-	store := &checkoutStoreStub{checkout: Checkout{
+	walletID := uuid.New()
+	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             checkoutID,
 		OrganizationID: organizationID,
-		Type:           TypeWalletTopup,
+		WalletID:       &walletID,
 		Reference:      "checkout.test",
 		AmountMinor:    5000,
 		Currency:       "GHS",
@@ -281,7 +197,7 @@ func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 			},
 		},
 	}
-	service := NewService(store, nil, nil, nil, paymentsService)
+	service := newTestService(repository, nil, paymentsService)
 
 	result, err := service.Confirm(t.Context(), organizationID, checkoutID, ConfirmInput{
 		PaymentMethod: MethodCard,
@@ -290,10 +206,42 @@ func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Confirm() error = %v", err)
 	}
-	if store.startedInput.Provider != ProviderStripe || paymentsService.startInput.Provider != "stripe" {
-		t.Fatalf("provider selection = %q / %q", store.startedInput.Provider, paymentsService.startInput.Provider)
+	if repository.startedInput.Provider != ProviderStripe || paymentsService.startInput.Provider != "stripe" {
+		t.Fatalf("provider selection = %q / %q", repository.startedInput.Provider, paymentsService.startInput.Provider)
 	}
 	if result.Payment == nil || result.Session == nil || result.Payment.ID != paymentID {
 		t.Fatal("confirmed checkout must include payment and provider session")
 	}
+}
+
+func newTestService(
+	repo *checkoutRepositoryStub,
+	wallet *walletServiceStub,
+	payments *paymentServiceStub,
+) *Service {
+	service := &Service{now: time.Now}
+	if repo != nil {
+		service.checkouts = checkoutOperations{
+			create:         repo.Create,
+			startPayment:   repo.StartPayment,
+			get:            repo.Get,
+			getByReference: repo.GetByReference,
+			transition:     repo.Transition,
+			claimRefresh:   repo.ClaimRefresh,
+			expire:         repo.Expire,
+		}
+	}
+	if wallet != nil {
+		service.wallets = walletOperations{get: wallet.Get, post: wallet.Post}
+	}
+	if payments != nil {
+		service.payments = paymentOperations{
+			providerAvailable: payments.ProviderAvailable,
+			getByCheckout:     payments.GetByCheckout,
+			start:             payments.Start,
+			continuePayment:   payments.Continue,
+			refresh:           payments.Refresh,
+		}
+	}
+	return service
 }

@@ -18,7 +18,7 @@ import (
 
 type numberRepository interface {
 	CreateBYOC(context.Context, uuid.UUID, CreateRequest) (sqlc.PhoneNumber, error)
-	CreateManaged(context.Context, uuid.UUID, string) (sqlc.PhoneNumber, error)
+	CreateManaged(context.Context, uuid.UUID, string, ManagedNumberPurchaseAuthorization) (sqlc.PhoneNumber, error)
 	List(context.Context, uuid.UUID) ([]sqlc.PhoneNumber, error)
 	Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
 	GetForRelease(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error)
@@ -40,6 +40,15 @@ type ManagedNumberInventory interface {
 
 type ManagedNumberSelectionStore interface {
 	SaveManagedSelection(context.Context, uuid.UUID, ManagedNumberCandidate) (string, error)
+	LoadManagedSelection(context.Context, uuid.UUID, string) (ManagedNumberCandidate, error)
+}
+
+type ManagedNumberPurchaseAuthority interface {
+	QuoteManagedNumberPurchase(context.Context, uuid.UUID) (uuid.UUID, int64, string, error)
+	ReserveManagedNumberPurchase(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, int64, string) (uuid.UUID, error)
+	VerifyManagedNumberPurchase(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64, string) error
+	CaptureManagedNumberPurchase(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64, string) error
+	ReleaseManagedNumberPurchase(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error
 }
 
 type ManagedNumberProvider interface {
@@ -54,6 +63,7 @@ type Service struct {
 	providerRepo      providerOperationRepository
 	managedInventory  ManagedNumberInventory
 	managedSelections ManagedNumberSelectionStore
+	managedPurchase   ManagedNumberPurchaseAuthority
 	providers         map[string]ManagedNumberProvider
 }
 
@@ -76,6 +86,10 @@ func (s *Service) SetManagedSelectionStore(store ManagedNumberSelectionStore) {
 	s.managedSelections = store
 }
 
+func (s *Service) SetManagedPurchaseAuthority(authority ManagedNumberPurchaseAuthority) {
+	s.managedPurchase = authority
+}
+
 func (s *Service) SetManagedProvider(slug string, provider ManagedNumberProvider) {
 	slug = strings.TrimSpace(slug)
 	if slug == "" || provider == nil {
@@ -91,6 +105,9 @@ func (s *Service) SearchAvailable(ctx context.Context, organizationID uuid.UUID,
 	if s.managedInventory == nil || s.managedSelections == nil {
 		return nil, apperror.NewServiceUnavailable("managed number inventory is not configured", nil)
 	}
+	if s.managedPurchase == nil {
+		return nil, apperror.NewServiceUnavailable("managed number commercial authorization is not configured", nil)
+	}
 	countryCode, err := normalizeCountryCode(req.CountryCode)
 	if err != nil {
 		return nil, err
@@ -100,6 +117,11 @@ func (s *Service) SearchAvailable(ctx context.Context, organizationID uuid.UUID,
 		return nil, err
 	}
 	req.CountryCode, req.Contains = countryCode, contains
+
+	priceID, amountMinor, currency, err := s.managedPurchase.QuoteManagedNumberPurchase(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
 
 	candidates, err := s.managedInventory.SearchAvailable(ctx, req)
 	if err != nil {
@@ -124,11 +146,20 @@ func (s *Service) SearchAvailable(ctx context.Context, organizationID uuid.UUID,
 		if candidate.ChannelsIncludedCount <= 0 {
 			return nil, apperror.NewServiceUnavailable("managed number provider returned a number without included voice capacity", nil)
 		}
+		candidate.PriceID = priceID
+		candidate.PriceAmountMinor = amountMinor
+		candidate.PriceCurrency = currency
 		selectionID, err := s.managedSelections.SaveManagedSelection(ctx, organizationID, candidate)
 		if err != nil {
 			return nil, apperror.NewServiceUnavailable("store managed number selection", err)
 		}
-		result = append(result, AvailableNumberResponse{SelectionID: selectionID, Number: candidate.Number, CountryCode: candidate.CountryCode, VoiceEnabled: true})
+		result = append(result, AvailableNumberResponse{
+			SelectionID:  selectionID,
+			Number:       candidate.Number,
+			CountryCode:  candidate.CountryCode,
+			VoiceEnabled: true,
+			Price:        MoneyQuote{AmountMinor: amountMinor, Currency: currency},
+		})
 	}
 	return result, nil
 }
@@ -166,12 +197,48 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		if strings.TrimSpace(req.Number) != "" || strings.TrimSpace(req.CountryCode) != "" || req.CarrierConnectionID != nil || req.VoiceEnabled != nil || req.SMSEnabled != nil {
 			return sqlc.PhoneNumber{}, apperror.NewBadRequest("managed number creation accepts only type and selection_id")
 		}
+		if s.managedSelections == nil || s.managedPurchase == nil {
+			return sqlc.PhoneNumber{}, apperror.NewServiceUnavailable("managed number purchasing is not configured", nil)
+		}
 		selectionID, err := normalizeSelectionID(req.SelectionID)
 		if err != nil {
 			return sqlc.PhoneNumber{}, err
 		}
-		result, err := s.repo.CreateManaged(ctx, organizationID, selectionID)
+		selection, err := s.managedSelections.LoadManagedSelection(ctx, organizationID, selectionID)
 		if err != nil {
+			if errors.Is(err, ErrSelectionNotFound) {
+				return sqlc.PhoneNumber{}, apperror.NewNotFound(err.Error())
+			}
+			return sqlc.PhoneNumber{}, apperror.NewServiceUnavailable("load managed number selection", err)
+		}
+		if selection.PriceID == uuid.Nil || selection.PriceAmountMinor <= 0 || strings.TrimSpace(selection.PriceCurrency) == "" {
+			return sqlc.PhoneNumber{}, apperror.NewConflict("managed number selection does not contain a valid quote")
+		}
+
+		authorizationID := uuid.New()
+		reservationID, err := s.managedPurchase.ReserveManagedNumberPurchase(
+			ctx,
+			organizationID,
+			authorizationID,
+			selection.PriceID,
+			selection.PriceAmountMinor,
+			selection.PriceCurrency,
+		)
+		if err != nil {
+			return sqlc.PhoneNumber{}, err
+		}
+		authorization := ManagedNumberPurchaseAuthorization{
+			ID:            authorizationID,
+			ReservationID: reservationID,
+			PriceID:       selection.PriceID,
+			AmountMinor:   selection.PriceAmountMinor,
+			Currency:      selection.PriceCurrency,
+		}
+		result, err := s.repo.CreateManaged(ctx, organizationID, selectionID, authorization)
+		if err != nil {
+			if releaseErr := s.managedPurchase.ReleaseManagedNumberPurchase(ctx, organizationID, authorizationID, reservationID); releaseErr != nil {
+				return sqlc.PhoneNumber{}, apperror.NewServiceUnavailable("release managed number purchase authorization", releaseErr)
+			}
 			switch {
 			case errors.Is(err, ErrSelectionNotFound):
 				return sqlc.PhoneNumber{}, apperror.NewNotFound(err.Error())
@@ -279,11 +346,27 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 	}
 	var request ProviderOperationRequest
 	if err := json.Unmarshal(operation.Request, &request); err != nil {
-		return s.failOperation(ctx, operation, fmt.Errorf("decode provider operation request: %w", err))
+		return s.failOperation(ctx, operation, request, fmt.Errorf("decode provider operation request: %w", err))
 	}
 	if err := validateProviderOperationRequest(request); err != nil {
-		return s.failOperation(ctx, operation, err)
+		return s.failOperation(ctx, operation, request, err)
 	}
+	if s.managedPurchase == nil {
+		return s.failOperation(ctx, operation, request, fmt.Errorf("managed number commercial authorization is not configured"))
+	}
+	authorization := request.PurchaseAuthorization
+	if err := s.managedPurchase.VerifyManagedNumberPurchase(
+		ctx,
+		operation.OrganizationID,
+		authorization.ID,
+		authorization.ReservationID,
+		authorization.PriceID,
+		authorization.AmountMinor,
+		authorization.Currency,
+	); err != nil {
+		return s.failOperation(ctx, operation, request, fmt.Errorf("verify managed number purchase authorization: %w", err))
+	}
+
 	provider := s.providers[request.Provider]
 	if provider == nil {
 		err := fmt.Errorf("managed number provider %q is not configured", request.Provider)
@@ -296,7 +379,7 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 	externalReferenceID := operation.ID.String()
 	providerOrder, found, err := provider.FindNumberOrder(ctx, externalReferenceID)
 	if err != nil {
-		return s.handleProviderError(ctx, operation, fmt.Errorf("reconcile provider number order: %w", err))
+		return s.handleProviderError(ctx, operation, request, fmt.Errorf("reconcile provider number order: %w", err))
 	}
 	if !found {
 		providerOrder, err = provider.CreateNumberOrder(ctx, ProviderOrderRequest{
@@ -305,7 +388,7 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 			ExternalReferenceID: externalReferenceID,
 		})
 		if err != nil {
-			return s.handleProviderError(ctx, operation, fmt.Errorf("create provider number order: %w", err))
+			return s.handleProviderError(ctx, operation, request, fmt.Errorf("create provider number order: %w", err))
 		}
 	}
 	providerResponse, err := json.Marshal(providerOrder)
@@ -320,7 +403,7 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 	case "pending":
 		return nil
 	case "canceled", "cancelled", "failed":
-		return s.failOperation(ctx, operation, fmt.Errorf("provider number order ended with status %q", providerOrder.Status))
+		return s.failOperation(ctx, operation, request, fmt.Errorf("provider number order ended with status %q", providerOrder.Status))
 	case "completed":
 		return s.completeProviderOperation(ctx, operation, request, provider, providerResponse)
 	default:
@@ -333,23 +416,36 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 }
 
 func (s *Service) completeProviderOperation(ctx context.Context, operation sqlc.ProviderOperation, request ProviderOperationRequest, provider ManagedNumberProvider, providerResponse []byte) error {
+	authorization := request.PurchaseAuthorization
+	if err := s.managedPurchase.CaptureManagedNumberPurchase(
+		ctx,
+		operation.OrganizationID,
+		authorization.ID,
+		authorization.ReservationID,
+		authorization.PriceID,
+		authorization.AmountMinor,
+		authorization.Currency,
+	); err != nil {
+		return fmt.Errorf("capture completed managed number provider order: %w", err)
+	}
+
 	providerNumber, err := provider.FindManagedNumber(ctx, request.Number)
 	if err != nil {
-		return s.handleProviderError(ctx, operation, fmt.Errorf("resolve purchased provider number: %w", err))
+		return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("resolve purchased provider number: %w", err))
 	}
 	if strings.TrimSpace(providerNumber.ID) == "" {
-		return s.handleProviderError(ctx, operation, fmt.Errorf("provider returned purchased number without resource id"))
+		return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("provider returned purchased number without resource id"))
 	}
 	if strings.TrimSpace(providerNumber.Number) != request.Number {
-		return s.failOperation(ctx, operation, fmt.Errorf("provider returned unexpected purchased number %q", providerNumber.Number))
+		return s.failProviderOperation(ctx, operation, fmt.Errorf("provider returned unexpected purchased number %q", providerNumber.Number))
 	}
 	if strings.TrimSpace(providerNumber.RoutingResourceID) != request.ProviderRoutingResourceID {
 		providerNumber, err = provider.ConfigureNumberRouting(ctx, providerNumber.ID, request.ProviderRoutingResourceID)
 		if err != nil {
-			return s.handleProviderError(ctx, operation, fmt.Errorf("configure provider number routing: %w", err))
+			return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("configure provider number routing: %w", err))
 		}
 		if strings.TrimSpace(providerNumber.RoutingResourceID) != request.ProviderRoutingResourceID {
-			return s.handleProviderError(ctx, operation, fmt.Errorf("provider number routing did not converge to expected resource"))
+			return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("provider number routing did not converge to expected resource"))
 		}
 	}
 	if err := s.providerRepo.CompleteProviderOperation(ctx, operation, request, providerNumber.ID, providerResponse); err != nil {
@@ -358,10 +454,10 @@ func (s *Service) completeProviderOperation(ctx context.Context, operation sqlc.
 	return nil
 }
 
-func (s *Service) handleProviderError(ctx context.Context, operation sqlc.ProviderOperation, err error) error {
+func (s *Service) handleProviderError(ctx context.Context, operation sqlc.ProviderOperation, request ProviderOperationRequest, err error) error {
 	var classified interface{ Retryable() bool }
 	if errors.As(err, &classified) && !classified.Retryable() {
-		return s.failOperation(ctx, operation, err)
+		return s.failOperation(ctx, operation, request, err)
 	}
 	if recordErr := s.providerRepo.RecordProviderOperationFailure(ctx, operation.ID, err); recordErr != nil {
 		return fmt.Errorf("record provider operation failure: %w", recordErr)
@@ -369,7 +465,33 @@ func (s *Service) handleProviderError(ctx context.Context, operation sqlc.Provid
 	return nil
 }
 
-func (s *Service) failOperation(ctx context.Context, operation sqlc.ProviderOperation, err error) error {
+func (s *Service) handleCapturedProviderError(ctx context.Context, operation sqlc.ProviderOperation, err error) error {
+	var classified interface{ Retryable() bool }
+	if errors.As(err, &classified) && !classified.Retryable() {
+		return s.failProviderOperation(ctx, operation, err)
+	}
+	if recordErr := s.providerRepo.RecordProviderOperationFailure(ctx, operation.ID, err); recordErr != nil {
+		return fmt.Errorf("record provider operation failure after capture: %w", recordErr)
+	}
+	return nil
+}
+
+func (s *Service) failOperation(ctx context.Context, operation sqlc.ProviderOperation, request ProviderOperationRequest, err error) error {
+	authorization := request.PurchaseAuthorization
+	if s.managedPurchase != nil && authorization.ID != uuid.Nil && authorization.ReservationID != uuid.Nil {
+		if releaseErr := s.managedPurchase.ReleaseManagedNumberPurchase(
+			ctx,
+			operation.OrganizationID,
+			authorization.ID,
+			authorization.ReservationID,
+		); releaseErr != nil {
+			return fmt.Errorf("release managed number purchase authorization: %w", releaseErr)
+		}
+	}
+	return s.failProviderOperation(ctx, operation, err)
+}
+
+func (s *Service) failProviderOperation(ctx context.Context, operation sqlc.ProviderOperation, err error) error {
 	if failErr := s.providerRepo.FailProviderOperation(ctx, operation, err); failErr != nil {
 		return fmt.Errorf("fail provider operation: %w", failErr)
 	}
@@ -377,10 +499,13 @@ func (s *Service) failOperation(ctx context.Context, operation sqlc.ProviderOper
 }
 
 func validateProviderOperationRequest(request ProviderOperationRequest) error {
+	authorization := request.PurchaseAuthorization
 	if strings.TrimSpace(request.Provider) == "" || strings.TrimSpace(request.ProviderInventoryID) == "" ||
 		strings.TrimSpace(request.ProviderProductID) == "" || strings.TrimSpace(request.Number) == "" ||
 		strings.TrimSpace(request.CountryCode) == "" || request.CarrierConnectionID == uuid.Nil ||
-		strings.TrimSpace(request.ProviderRoutingResourceID) == "" {
+		strings.TrimSpace(request.ProviderRoutingResourceID) == "" || authorization.ID == uuid.Nil ||
+		authorization.ReservationID == uuid.Nil || authorization.PriceID == uuid.Nil || authorization.AmountMinor <= 0 ||
+		strings.TrimSpace(authorization.Currency) == "" {
 		return fmt.Errorf("provider operation request is incomplete")
 	}
 	return nil

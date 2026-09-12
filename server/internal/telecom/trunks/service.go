@@ -12,22 +12,16 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/modules/outbox"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/hasher"
 )
 
-type managedSIPStateResolver interface {
-	Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error)
-}
-
 type Service struct {
-	repo            *Repository
-	db              *pgxpool.Pool
-	outbox          *outbox.Repository
-	commercialState managedSIPStateResolver
+	repo   *Repository
+	db     *pgxpool.Pool
+	outbox *outbox.Repository
 }
 
 func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
@@ -39,30 +33,19 @@ func NewService(repo *Repository, db ...*pgxpool.Pool) *Service {
 	return service
 }
 
-func (s *Service) SetManagedSIPAuthority(state managedSIPStateResolver) error {
-	if state == nil {
-		return errors.New("managed SIP commercial state resolver is required")
-	}
-	s.commercialState = state
-	return nil
-}
-
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (CreateResult, error) {
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return CreateResult{}, err
 	}
-
 	mode, err := normalizeProvisioningMode(req.Type)
 	if err != nil {
 		return CreateResult{}, err
 	}
 	req.Type = mode
-
 	name, err := normalizeName(req.Name)
 	if err != nil {
 		return CreateResult{}, err
 	}
-
 	if req.Direction != nil {
 		value, err := normalizeChoice(*req.Direction, directions, "direction")
 		if err != nil {
@@ -77,14 +60,10 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		}
 		req.Status = &value
 	}
-
 	switch mode {
 	case ProvisioningModeManaged:
 		if req.CarrierConnectionID != nil {
 			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is not accepted for managed trunks")
-		}
-		if err := s.authorizeManagedSIP(ctx, organizationID); err != nil {
-			return CreateResult{}, err
 		}
 		credential, ha1, err := s.newManagedSIPCredential()
 		if err != nil {
@@ -104,7 +83,6 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 			return CreateResult{}, writeError(err, "managed trunk", "managed trunk could not be created")
 		}
 		return CreateResult{Trunk: item, Credential: &credential}, nil
-
 	case ProvisioningModeBYOC:
 		if req.CarrierConnectionID == nil {
 			return CreateResult{}, apperror.NewBadRequest("carrier_connection_id is required for BYOC trunks")
@@ -113,21 +91,13 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 			return CreateResult{}, err
 		}
 		item, err := s.mutateTrunk(ctx, EventTrunkCreated, func(repo *Repository) (sqlc.Trunk, error) {
-			return repo.Create(ctx, sqlc.CreateTrunkParams{
-				OrganizationID:      &organizationID,
-				CarrierConnectionID: *req.CarrierConnectionID,
-				ProvisioningMode:    string(ProvisioningModeBYOC),
-				Name:                name,
-				Direction:           req.Direction,
-				Status:              req.Status,
-			})
+			return repo.Create(ctx, sqlc.CreateTrunkParams{OrganizationID: &organizationID, CarrierConnectionID: *req.CarrierConnectionID, ProvisioningMode: string(ProvisioningModeBYOC), Name: name, Direction: req.Direction, Status: req.Status})
 		})
 		if err != nil {
 			return CreateResult{}, writeError(err, "trunk", "carrier connection not found")
 		}
 		return CreateResult{Trunk: item}, nil
 	}
-
 	return CreateResult{}, apperror.NewBadRequest("type must be byoc or managed")
 }
 
@@ -138,10 +108,6 @@ func (s *Service) RotateCredential(ctx context.Context, organizationID, trunkID 
 	if err := validateID(trunkID, "trunk id"); err != nil {
 		return SIPCredential{}, err
 	}
-	if err := s.authorizeManagedSIP(ctx, organizationID); err != nil {
-		return SIPCredential{}, err
-	}
-
 	item, err := s.Get(ctx, organizationID, trunkID)
 	if err != nil {
 		return SIPCredential{}, err
@@ -152,7 +118,6 @@ func (s *Service) RotateCredential(ctx context.Context, organizationID, trunkID 
 	if item.Status != "active" {
 		return SIPCredential{}, apperror.NewConflict("managed trunk must be active before rotating SIP credentials")
 	}
-
 	credential, ha1, err := s.newManagedSIPCredential()
 	if err != nil {
 		return SIPCredential{}, apperror.NewInternal("generate managed SIP credential", err)
@@ -214,10 +179,7 @@ func (s *Service) Update(ctx context.Context, organizationID uuid.UUID, id uuid.
 		req.Status = &value
 	}
 	item, err := s.mutateTrunk(ctx, EventTrunkUpdated, func(repo *Repository) (sqlc.Trunk, error) {
-		return repo.Update(ctx, sqlc.UpdateTrunkParams{
-			Name: req.Name, Direction: req.Direction, Status: req.Status,
-			ID: id, OrganizationID: &organizationID,
-		})
+		return repo.Update(ctx, sqlc.UpdateTrunkParams{Name: req.Name, Direction: req.Direction, Status: req.Status, ID: id, OrganizationID: &organizationID})
 	})
 	return item, writeError(err, "trunk", "trunk not found")
 }
@@ -236,7 +198,7 @@ func (s *Service) Delete(ctx context.Context, organizationID, id uuid.UUID) erro
 	return writeError(err, "trunk", "trunk not found")
 }
 
-func (s *Service) CreateEndpoint(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID, req EndpointCreateRequest) (sqlc.TrunkEndpoint, error) {
+func (s *Service) CreateEndpoint(ctx context.Context, organizationID, trunkID uuid.UUID, req EndpointCreateRequest) (sqlc.TrunkEndpoint, error) {
 	if _, err := s.requireBYOCTrunk(ctx, organizationID, trunkID); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
@@ -274,16 +236,12 @@ func (s *Service) CreateEndpoint(ctx context.Context, organizationID uuid.UUID, 
 		}
 	}
 	item, err := s.mutateEndpoint(ctx, EventTrunkEndpointCreated, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
-		return repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{
-			OrganizationID: &organizationID, TrunkID: trunkID, Host: host, Port: req.Port,
-			Transport: req.Transport, Direction: req.Direction, Priority: req.Priority,
-			Weight: req.Weight, Enabled: req.Enabled,
-		})
+		return repo.CreateEndpoint(ctx, sqlc.CreateTrunkEndpointParams{OrganizationID: &organizationID, TrunkID: trunkID, Host: host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled})
 	})
 	return item, writeError(err, "trunk endpoint", "trunk not found")
 }
 
-func (s *Service) ListEndpoints(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
+func (s *Service) ListEndpoints(ctx context.Context, organizationID, trunkID uuid.UUID) ([]sqlc.TrunkEndpoint, error) {
 	if _, err := s.requireBYOCTrunk(ctx, organizationID, trunkID); err != nil {
 		return nil, err
 	}
@@ -294,7 +252,7 @@ func (s *Service) ListEndpoints(ctx context.Context, organizationID uuid.UUID, t
 	return items, nil
 }
 
-func (s *Service) GetEndpoint(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
+func (s *Service) GetEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) (sqlc.TrunkEndpoint, error) {
 	if _, err := s.requireBYOCTrunk(ctx, organizationID, trunkID); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
@@ -305,7 +263,7 @@ func (s *Service) GetEndpoint(ctx context.Context, organizationID uuid.UUID, tru
 	return item, readError(err, "trunk endpoint not found")
 }
 
-func (s *Service) UpdateEndpoint(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID, id uuid.UUID, req EndpointUpdateRequest) (sqlc.TrunkEndpoint, error) {
+func (s *Service) UpdateEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID, req EndpointUpdateRequest) (sqlc.TrunkEndpoint, error) {
 	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
 		return sqlc.TrunkEndpoint{}, err
 	}
@@ -349,16 +307,12 @@ func (s *Service) UpdateEndpoint(ctx context.Context, organizationID uuid.UUID, 
 		}
 	}
 	item, err := s.mutateEndpoint(ctx, EventTrunkEndpointUpdated, func(repo *Repository) (sqlc.TrunkEndpoint, error) {
-		return repo.UpdateEndpoint(ctx, sqlc.UpdateTrunkEndpointParams{
-			Host: req.Host, Port: req.Port, Transport: req.Transport, Direction: req.Direction,
-			Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled,
-			ID: id, TrunkID: trunkID, OrganizationID: &organizationID,
-		})
+		return repo.UpdateEndpoint(ctx, sqlc.UpdateTrunkEndpointParams{Host: req.Host, Port: req.Port, Transport: req.Transport, Direction: req.Direction, Priority: req.Priority, Weight: req.Weight, Enabled: req.Enabled, ID: id, TrunkID: trunkID, OrganizationID: &organizationID})
 	})
 	return item, writeError(err, "trunk endpoint", "trunk endpoint not found")
 }
 
-func (s *Service) DeleteEndpoint(ctx context.Context, organizationID uuid.UUID, trunkID uuid.UUID, id uuid.UUID) error {
+func (s *Service) DeleteEndpoint(ctx context.Context, organizationID, trunkID, id uuid.UUID) error {
 	if _, err := s.GetEndpoint(ctx, organizationID, trunkID, id); err != nil {
 		return err
 	}
@@ -379,23 +333,6 @@ func (s *Service) requireBYOCTrunk(ctx context.Context, organizationID, trunkID 
 	return item, nil
 }
 
-func (s *Service) authorizeManagedSIP(ctx context.Context, organizationID uuid.UUID) error {
-	if s.commercialState == nil {
-		return apperror.NewServiceUnavailable("managed SIP trunk provisioning is not available on this control plane", nil)
-	}
-	state, err := s.commercialState.Resolve(ctx, organizationID)
-	if err != nil {
-		return apperror.NewServiceUnavailable("managed SIP commercial state is unavailable", err)
-	}
-	if state.Standing != commercialaccess.StandingActive {
-		return apperror.NewPaymentRequired("managed SIP requires active commercial standing")
-	}
-	if !state.Enabled(ManagedVoiceEntitlement) {
-		return apperror.NewPaymentRequired("managed SIP is not enabled for this organization")
-	}
-	return nil
-}
-
 func (s *Service) newManagedSIPCredential() (SIPCredential, string, error) {
 	usernameEntropy := make([]byte, 12)
 	if _, err := rand.Read(usernameEntropy); err != nil {
@@ -407,10 +344,7 @@ func (s *Service) newManagedSIPCredential() (SIPCredential, string, error) {
 	}
 	username := "lm_sip_" + base64.RawURLEncoding.EncodeToString(usernameEntropy)
 	password := "lm_sip_" + base64.RawURLEncoding.EncodeToString(passwordEntropy)
-	credential := SIPCredential{
-		Host: ManagedSIPHost, Port: ManagedSIPPort, Transport: ManagedSIPTransport,
-		Realm: ManagedSIPRealm, Username: username, Password: password,
-	}
+	credential := SIPCredential{Host: ManagedSIPHost, Port: ManagedSIPPort, Transport: ManagedSIPTransport, Realm: ManagedSIPRealm, Username: username, Password: password}
 	return credential, hasher.ComputeHA1MD5(username, credential.Realm, password), nil
 }
 
@@ -428,14 +362,7 @@ func (s *Service) rotateCredential(ctx context.Context, trunk sqlc.Trunk, creden
 		return writeError(err, "managed SIP credential", "managed SIP credential not found")
 	}
 	occurredAt := time.Now().UTC()
-	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
-		Subject: string(EventTrunkCredentialRotated), AggregateType: "trunk", AggregateID: trunk.ID,
-		Payload: Event{
-			EventType: EventTrunkCredentialRotated, OrganizationID: *trunk.OrganizationID,
-			TrunkID: trunk.ID, Resource: response(trunk), OccurredAt: occurredAt,
-		},
-		Headers: eventHeaders(EventTrunkCredentialRotated, *trunk.OrganizationID),
-	}); err != nil {
+	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{Subject: string(EventTrunkCredentialRotated), AggregateType: "trunk", AggregateID: trunk.ID, Payload: Event{EventType: EventTrunkCredentialRotated, OrganizationID: *trunk.OrganizationID, TrunkID: trunk.ID, Resource: response(trunk), OccurredAt: occurredAt}, Headers: eventHeaders(EventTrunkCredentialRotated, *trunk.OrganizationID)}); err != nil {
 		return apperror.NewInternal("insert managed SIP credential rotation event", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -462,14 +389,7 @@ func (s *Service) mutateTrunk(ctx context.Context, eventType EventType, mutation
 	}
 	organizationID := *item.OrganizationID
 	occurredAt := time.Now().UTC()
-	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
-		Subject: string(eventType), AggregateType: "trunk", AggregateID: item.ID,
-		Payload: Event{
-			EventType: eventType, OrganizationID: organizationID, TrunkID: item.ID,
-			Resource: response(item), OccurredAt: occurredAt,
-		},
-		Headers: eventHeaders(eventType, organizationID),
-	}); err != nil {
+	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{Subject: string(eventType), AggregateType: "trunk", AggregateID: item.ID, Payload: Event{EventType: eventType, OrganizationID: organizationID, TrunkID: item.ID, Resource: response(item), OccurredAt: occurredAt}, Headers: eventHeaders(eventType, organizationID)}); err != nil {
 		return sqlc.Trunk{}, fmt.Errorf("insert trunk outbox event: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -497,14 +417,7 @@ func (s *Service) mutateEndpoint(ctx context.Context, eventType EventType, mutat
 	organizationID := *item.OrganizationID
 	occurredAt := time.Now().UTC()
 	endpointID := item.ID
-	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{
-		Subject: string(eventType), AggregateType: "trunk_endpoint", AggregateID: item.ID,
-		Payload: Event{
-			EventType: eventType, OrganizationID: organizationID, TrunkID: item.TrunkID,
-			EndpointID: &endpointID, Resource: endpointResponse(item), OccurredAt: occurredAt,
-		},
-		Headers: eventHeaders(eventType, organizationID),
-	}); err != nil {
+	if _, err := s.outbox.WithTx(tx).Insert(ctx, outbox.Event{Subject: string(eventType), AggregateType: "trunk_endpoint", AggregateID: item.ID, Payload: Event{EventType: eventType, OrganizationID: organizationID, TrunkID: item.TrunkID, EndpointID: &endpointID, Resource: endpointResponse(item), OccurredAt: occurredAt}, Headers: eventHeaders(eventType, organizationID)}); err != nil {
 		return sqlc.TrunkEndpoint{}, fmt.Errorf("insert trunk endpoint outbox event: %w", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -514,9 +427,7 @@ func (s *Service) mutateEndpoint(ctx context.Context, eventType EventType, mutat
 }
 
 func eventHeaders(eventType EventType, organizationID uuid.UUID) map[string]string {
-	return map[string]string{
-		"event_type": string(eventType), "organization_id": organizationID.String(), "schema_version": "1",
-	}
+	return map[string]string{"event_type": string(eventType), "organization_id": organizationID.String(), "schema_version": "1"}
 }
 
 func readError(err error, message string) error {

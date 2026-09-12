@@ -8,7 +8,8 @@ templ OrganizationTable(organizations []Organization) {
 			<thead>
 				<tr>
 					<th>Organization</th>
-					<th>Plan</th>
+					<th>Wallets</th>
+					<th>Currencies</th>
 					<th>Members</th>
 					<th>Status</th>
 					<th>Created</th>
@@ -18,7 +19,8 @@ templ OrganizationTable(organizations []Organization) {
 				for _, organization := range organizations {
 					<tr>
 						<td><a class="link link-primary font-medium" href={ templ.SafeURL("/organizations/" + organization.ID) }>{ organization.Name }</a></td>
-						<td>{ organization.Plan }</td>
+						<td>{ fmt.Sprint(organization.Wallets) }</td>
+						<td>{ organization.Currencies }</td>
 						<td>{ fmt.Sprint(organization.Members) }</td>
 						<td>{ organization.Status }</td>
 						<td>{ organization.CreatedAt }</td>

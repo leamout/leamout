@@ -110,3 +110,21 @@ type ReserveInput struct {
 	OperationID   string
 	ExpiresAt     time.Time
 }
+
+type IncreaseReservationInput struct {
+	AmountMinor int64
+	ExpiresAt   time.Time
+}
+
+var (
+	ErrManagedNumberPriceUnavailable = apperror.NewServiceUnavailable(
+		"managed number purchase price is unavailable",
+		nil,
+	)
+	ErrManagedNumberQuoteExpired = apperror.NewConflict(
+		"managed number purchase quote is no longer current",
+	)
+	ErrManagedNumberAuthorizationInvalid = apperror.NewConflict(
+		"managed number purchase authorization is invalid",
+	)
+)

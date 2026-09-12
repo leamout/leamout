@@ -2,6 +2,7 @@ package organizations
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/database/sqlc"
@@ -27,12 +28,13 @@ func (r *Repository) List(ctx context.Context) ([]Organization, error) {
 	organizations := make([]Organization, 0, len(rows))
 	for _, row := range rows {
 		organizations = append(organizations, Organization{
-			ID:        row.ID,
-			Name:      row.Name,
-			Plan:      row.PlanName,
-			Members:   row.MemberCount,
-			Status:    row.Status,
-			CreatedAt: row.CreatedAt,
+			ID:         row.ID,
+			Name:       row.Name,
+			Members:    row.MemberCount,
+			Wallets:    row.WalletCount,
+			Currencies: fmt.Sprint(row.Currencies),
+			Status:     row.Status,
+			CreatedAt:  row.CreatedAt,
 		})
 	}
 	return organizations, nil
@@ -64,18 +66,15 @@ func (r *Repository) Get(ctx context.Context, organizationID uuid.UUID) (Detail,
 	}
 
 	return Detail{
-		ID:                 row.ID,
-		Name:               row.Name,
-		Status:             row.Status,
-		Members:            row.MemberCount,
-		Plan:               row.PlanName,
-		SubscriptionStatus: row.SubscriptionStatus,
-		BillingModel:       row.BillingModel,
-		PricingType:        row.PricingType,
-		RenewsAt:           row.RenewsAt,
-		EndsAt:             row.EndsAt,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
-		MembersList:        members,
+		ID:           row.ID,
+		Name:         row.Name,
+		Status:       row.Status,
+		Members:      row.MemberCount,
+		Wallets:      row.WalletCount,
+		Currencies:   fmt.Sprint(row.Currencies),
+		BillingModel: row.BillingModel,
+		CreatedAt:    row.CreatedAt,
+		UpdatedAt:    row.UpdatedAt,
+		MembersList:  members,
 	}, nil
 }

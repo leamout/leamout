@@ -60,25 +60,26 @@ Commercial is organized as:
 Catalog
   products / plans / prices / meters
 
-Billing
+Funding
   checkout / payments
 
-Access
-  subscriptions / licenses / entitlements
+Licensing
+  Self-Hosted software licenses / deployments
 
 Usage
   usage_events
 
-Prepaid
+Wallets
   wallets / wallet ledger / reservations
 ```
 
 Commercial invariants:
 
-- Leamout uses subscription/license plus prepaid collection. Do not introduce postpaid usage credit without an explicit product decision.
-- Checkout owns commercial purchase intent and fulfillment.
+- Everything is prepaid PAYG except Self-Hosted software licenses; there are no customer subscriptions or access/entitlements service.
+- Checkout owns prepaid wallet-funding intent and fulfillment. Self-Hosted license settlement is separate.
 - Payments owns provider-independent money collection, payment state, provider access, and provider-event reconciliation.
-- A Payment must not directly grant subscriptions, licenses, entitlements, or wallet value.
+- Stripe and Paystack payments are wallet-funding rails, not Self-Hosted license purchases.
+- A Payment must not directly grant a license or wallet value.
 - A successful payment Settlement is interpreted by Checkout.
 - Wallet ledger entries are immutable. Corrections, refunds, and chargebacks are compensating entries.
 - Managed-provider obligations require prepaid authorization before Leamout incurs upstream cost.

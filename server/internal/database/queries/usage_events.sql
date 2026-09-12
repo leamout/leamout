@@ -1,7 +1,6 @@
 -- name: CreateUsageEvent :one
 INSERT INTO usage_events (
     organization_id,
-    subscription_id,
     meter_id,
     quantity,
     source_type,
@@ -12,7 +11,6 @@ INSERT INTO usage_events (
 )
 SELECT
     o.id AS organization_id,
-    sqlc.narg(subscription_id)::uuid AS subscription_id,
     m.id AS meter_id,
     sqlc.arg(quantity) AS quantity,
     sqlc.arg(source_type) AS source_type,
@@ -26,15 +24,6 @@ WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
   AND m.active = true
-  AND (
-      sqlc.narg(subscription_id)::uuid IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM subscriptions AS s
-          WHERE s.id = sqlc.narg(subscription_id)::uuid
-            AND s.organization_id = o.id
-      )
-  )
 ON CONFLICT (organization_id, idempotency_key) DO NOTHING
 RETURNING *;
 

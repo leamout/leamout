@@ -24,12 +24,12 @@ func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
 		}
 		payload, _ := io.ReadAll(r.Body)
 		body := string(payload)
-		for _, expected := range []string{`"amount":"2500"`, `"reference":"invoice-1"`, `"mobile_money":{"phone":"0240000000","provider":"mtn"}`} {
+		for _, expected := range []string{`"amount":"2500"`, `"reference":"wallet-topup-1"`, `"mobile_money":{"phone":"0240000000","provider":"mtn"}`} {
 			if !strings.Contains(body, expected) {
 				t.Fatalf("body %s does not contain %s", body, expected)
 			}
 		}
-		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"reference":"invoice-1","status":"pending","message":"Authorize the payment on your phone"}}`))
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"reference":"wallet-topup-1","status":"pending","message":"Authorize the payment on your phone"}}`))
 	}))
 	defer server.Close()
 
@@ -38,14 +38,14 @@ func TestCreateCheckoutCreatesMobileMoneyCharge(t *testing.T) {
 		t.Fatal(err)
 	}
 	session, err := client.CreateCheckout(context.Background(), paymentprovider.CheckoutRequest{
-		Reference: "invoice-1", AmountMinor: 2500, Currency: "GHS", Email: "buyer@example.com",
+		Reference: "wallet-topup-1", AmountMinor: 2500, Currency: "GHS", Email: "buyer@example.com",
 		MobileMoney: &paymentprovider.MobileMoney{Phone: "0240000000", Provider: "mtn"},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if session.Provider != "paystack" || session.ProviderID != "" ||
-		session.NextAction != paymentprovider.NextActionWait || session.Reference != "invoice-1" {
+		session.NextAction != paymentprovider.NextActionWait || session.Reference != "wallet-topup-1" {
 		t.Fatalf("session = %+v", session)
 	}
 }
@@ -56,17 +56,17 @@ func TestContinueCheckoutSubmitsOTP(t *testing.T) {
 			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
 		}
 		payload, _ := io.ReadAll(r.Body)
-		for _, expected := range []string{`"otp":"123456"`, `"reference":"invoice-1"`} {
+		for _, expected := range []string{`"otp":"123456"`, `"reference":"wallet-topup-1"`} {
 			if !strings.Contains(string(payload), expected) {
 				t.Fatalf("body %s does not contain %s", payload, expected)
 			}
 		}
-		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"invoice-1","status":"success","gateway_response":"Approved"}}`))
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"wallet-topup-1","status":"success","gateway_response":"Approved"}}`))
 	}))
 	defer server.Close()
 	client, _ := NewClient(Config{BaseURL: server.URL, SecretKey: "test-secret", HTTPClient: server.Client()})
 	session, err := client.ContinueCheckout(context.Background(), paymentprovider.ContinueCheckoutRequest{
-		Reference: "invoice-1", Action: paymentprovider.NextActionSubmitOTP, Value: "123456",
+		Reference: "wallet-topup-1", Action: paymentprovider.NextActionSubmitOTP, Value: "123456",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -84,11 +84,11 @@ func TestCreateCheckoutMapsMobileMoneyAuthorization(t *testing.T) {
 
 func TestGetCheckoutReturnsProviderContinuation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"invoice-1","status":"pay_offline","display_text":"Approve the payment on your phone"}}`))
+		_, _ = w.Write([]byte(`{"status":true,"message":"Charge attempted","data":{"id":42,"reference":"wallet-topup-1","status":"pay_offline","display_text":"Approve the payment on your phone"}}`))
 	}))
 	defer server.Close()
 	client, _ := NewClient(Config{BaseURL: server.URL, SecretKey: "test-secret", HTTPClient: server.Client()})
-	session, err := client.GetCheckout(context.Background(), "invoice-1")
+	session, err := client.GetCheckout(context.Background(), "wallet-topup-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,14 +99,14 @@ func TestGetCheckoutReturnsProviderContinuation(t *testing.T) {
 
 func TestGetPaymentChecksPaystackCharge(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/charge/invoice-1" {
+		if r.URL.Path != "/charge/wallet-topup-1" {
 			t.Fatalf("path = %s", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`{"status":true,"data":{"id":42,"reference":"invoice-1","amount":2500,"currency":"GHS","status":"success"}}`))
+		_, _ = w.Write([]byte(`{"status":true,"data":{"id":42,"reference":"wallet-topup-1","amount":2500,"currency":"GHS","status":"success"}}`))
 	}))
 	defer server.Close()
 	client, _ := NewClient(Config{BaseURL: server.URL, SecretKey: "test-secret", HTTPClient: server.Client()})
-	payment, err := client.GetPayment(context.Background(), "invoice-1")
+	payment, err := client.GetPayment(context.Background(), "wallet-topup-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestGetPaymentChecksPaystackCharge(t *testing.T) {
 
 func TestCreateCheckoutRequiresMobileMoneyFields(t *testing.T) {
 	client, _ := NewClient(Config{SecretKey: "test-secret"})
-	base := paymentprovider.CheckoutRequest{Reference: "invoice-1", AmountMinor: 2500, Currency: "GHS", Email: "buyer@example.com"}
+	base := paymentprovider.CheckoutRequest{Reference: "wallet-topup-1", AmountMinor: 2500, Currency: "GHS", Email: "buyer@example.com"}
 	if _, err := client.CreateCheckout(context.Background(), base); err == nil || !strings.Contains(err.Error(), "details are required") {
 		t.Fatalf("missing details error = %v", err)
 	}
@@ -128,14 +128,14 @@ func TestCreateCheckoutRequiresMobileMoneyFields(t *testing.T) {
 }
 
 func TestParseWebhookAuthenticatesPaystackPayload(t *testing.T) {
-	payload := []byte(`{"event":"charge.success","data":{"id":42,"reference":"invoice-1","amount":2500,"currency":"GHS","status":"success"}}`)
+	payload := []byte(`{"event":"charge.success","data":{"id":42,"reference":"wallet-topup-1","amount":2500,"currency":"GHS","status":"success"}}`)
 	header := signedHeader(payload)
 	client, _ := NewClient(Config{SecretKey: "test-secret"})
 	event, err := client.ParseWebhook(payload, header)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if event.ProviderEventID != "charge.success:42" || event.Type != "charge.success" || event.Payment.Reference != "invoice-1" || event.Payment.Status != paymentprovider.StatusSucceeded {
+	if event.ProviderEventID != "charge.success:42" || event.Type != "charge.success" || event.Payment.Reference != "wallet-topup-1" || event.Payment.Status != paymentprovider.StatusSucceeded {
 		t.Fatalf("event = %+v", event)
 	}
 	header.Set("x-paystack-signature", strings.Repeat("0", sha512.Size*2))

@@ -6,20 +6,10 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
 	"github.com/leamout/leamout/pkg/hasher"
 )
 
-type fakeManagedSIPState struct {
-	state commercialaccess.OrganizationAccess
-	err   error
-}
-
-func (f fakeManagedSIPState) Resolve(context.Context, uuid.UUID) (commercialaccess.OrganizationAccess, error) {
-	return f.state, f.err
-}
-
-func TestCreateManagedTrunkFailsClosedWithoutAuthority(t *testing.T) {
+func TestCreateManagedTrunkRequiresDatabase(t *testing.T) {
 	service := NewService(nil)
 
 	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{
@@ -27,7 +17,7 @@ func TestCreateManagedTrunkFailsClosedWithoutAuthority(t *testing.T) {
 		Name: "Leamout managed",
 	})
 	if err == nil {
-		t.Fatal("managed trunk creation succeeded without hosted managed SIP authority")
+		t.Fatal("managed trunk creation succeeded without database")
 	}
 }
 
@@ -45,34 +35,8 @@ func TestCreateManagedTrunkRejectsCarrierConnection(t *testing.T) {
 	}
 }
 
-func TestManagedSIPAuthorityRequiresCommercialEntitlement(t *testing.T) {
-	organizationID := uuid.New()
-	service := NewService(nil)
-	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialaccess.OrganizationAccess{
-		OrganizationID: organizationID,
-		Standing:       commercialaccess.StandingActive,
-		Features:       map[string]bool{},
-	}}); err != nil {
-		t.Fatalf("configure managed SIP authority: %v", err)
-	}
-	if err := service.authorizeManagedSIP(context.Background(), organizationID); err == nil {
-		t.Fatal("managed SIP authority accepted an organization without voice.managed.enabled")
-	}
-}
-
 func TestManagedSIPCredentialIsOneWayDigestMaterial(t *testing.T) {
-	organizationID := uuid.New()
 	service := NewService(nil)
-	if err := service.SetManagedSIPAuthority(fakeManagedSIPState{state: commercialaccess.OrganizationAccess{
-		OrganizationID: organizationID,
-		Standing:       commercialaccess.StandingActive,
-		Features:       map[string]bool{ManagedVoiceEntitlement: true},
-	}}); err != nil {
-		t.Fatalf("configure managed SIP authority: %v", err)
-	}
-	if err := service.authorizeManagedSIP(context.Background(), organizationID); err != nil {
-		t.Fatalf("authorize managed SIP: %v", err)
-	}
 
 	credential, ha1, err := service.newManagedSIPCredential()
 	if err != nil {

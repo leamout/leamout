@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/integrations/carriers/commpeak"
 	"github.com/leamout/leamout/internal/integrations/carriers/didww"
@@ -114,6 +115,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 
 	queries := sqlc.New(db)
+	commercialModule := commercial.New(db)
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
 	telecomMetrics := metrics.New(redisClient)
@@ -170,6 +172,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 
 	numbersRepository := numbers.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
+	numbersService.SetManagedPurchaseAuthority(commercialModule.Wallets.Service)
 	if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
 		didwwClient, err := didww.NewClient(didww.Config{BaseURL: cfg.DIDWW.APIBaseURL, APIKey: cfg.DIDWW.APIKey})
 		if err != nil {

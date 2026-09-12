@@ -44,16 +44,16 @@ func TestNormalizeCreate(t *testing.T) {
 	issuedAt := time.Date(2026, 8, 31, 20, 0, 0, 0, time.UTC)
 	expiresAt := issuedAt.Add(24 * time.Hour)
 	key := " key-2026 "
-	got, gotIssuedAt, err := normalizeCreate(CreateInput{SigningKeyID: &key, ExpiresAt: &expiresAt}, issuedAt)
+	got, gotIssuedAt, err := normalizeCreate(CreateInput{MaxDeployments: 1, SigningKeyID: &key, ExpiresAt: &expiresAt}, issuedAt)
 	if err != nil {
 		t.Fatalf("normalizeCreate() error = %v", err)
 	}
-	if gotIssuedAt != issuedAt || got.SigningKeyID == nil || *got.SigningKeyID != "key-2026" {
+	if gotIssuedAt != issuedAt || got.MaxDeployments != 1 || got.SigningKeyID == nil || *got.SigningKeyID != "key-2026" {
 		t.Fatalf("unexpected normalized create: %#v, %v", got, gotIssuedAt)
 	}
 
 	invalidExpiry := issuedAt
-	_, _, err = normalizeCreate(CreateInput{ExpiresAt: &invalidExpiry}, issuedAt)
+	_, _, err = normalizeCreate(CreateInput{MaxDeployments: 1, ExpiresAt: &invalidExpiry}, issuedAt)
 	if !errors.Is(err, ErrInvalidExpiration) {
 		t.Fatalf("normalizeCreate() error = %v, want %v", err, ErrInvalidExpiration)
 	}

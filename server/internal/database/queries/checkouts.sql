@@ -1,13 +1,11 @@
 -- name: CreateCheckout :one
 INSERT INTO checkouts (
-    organization_id, wallet_id, price_id, checkout_type,
+    organization_id, wallet_id,
     reference, amount_minor, currency, expires_at, metadata
 )
 SELECT
     sqlc.arg(organization_id) AS organization_id,
-    sqlc.narg(wallet_id)::UUID AS wallet_id,
-    sqlc.narg(price_id)::UUID AS price_id,
-    sqlc.arg(checkout_type) AS checkout_type,
+    sqlc.arg(wallet_id)::UUID AS wallet_id,
     sqlc.arg(reference) AS reference,
     sqlc.arg(amount_minor) AS amount_minor,
     sqlc.arg(currency) AS currency,

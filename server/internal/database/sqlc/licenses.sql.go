@@ -15,7 +15,6 @@ import (
 const createLicense = `-- name: CreateLicense :one
 INSERT INTO licenses (
     organization_id,
-    subscription_id,
     status,
     max_deployments,
     signing_key_id,
@@ -24,30 +23,19 @@ INSERT INTO licenses (
 )
 SELECT
     o.id AS organization_id,
-    $1::uuid AS subscription_id,
-    COALESCE($2, 'pending') AS status,
-    COALESCE($3, 1) AS max_deployments,
-    $4 AS signing_key_id,
-    COALESCE($5, NOW()) AS issued_at,
-    $6 AS expires_at
+    COALESCE($1, 'pending') AS status,
+    COALESCE($2, 1) AS max_deployments,
+    $3 AS signing_key_id,
+    COALESCE($4, NOW()) AS issued_at,
+    $5 AS expires_at
 FROM organizations AS o
-WHERE o.id = $7
+WHERE o.id = $6
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-  AND (
-      $1::uuid IS NULL
-      OR EXISTS (
-          SELECT 1
-          FROM subscriptions AS s
-          WHERE s.id = $1::uuid
-            AND s.organization_id = o.id
-      )
-  )
-RETURNING id, organization_id, subscription_id, status, max_deployments, signing_key_id, issued_at, expires_at, created_at, updated_at
+RETURNING id, organization_id, status, max_deployments, signing_key_id, issued_at, expires_at, created_at, updated_at
 `
 
 type CreateLicenseParams struct {
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status         *string            `db:"status" json:"status"`
 	MaxDeployments *int32             `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
@@ -58,7 +46,6 @@ type CreateLicenseParams struct {
 
 func (q *Queries) CreateLicense(ctx context.Context, arg CreateLicenseParams) (License, error) {
 	row := q.db.QueryRow(ctx, createLicense,
-		arg.SubscriptionID,
 		arg.Status,
 		arg.MaxDeployments,
 		arg.SigningKeyID,
@@ -70,7 +57,6 @@ func (q *Queries) CreateLicense(ctx context.Context, arg CreateLicenseParams) (L
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.SubscriptionID,
 		&i.Status,
 		&i.MaxDeployments,
 		&i.SigningKeyID,
@@ -83,7 +69,7 @@ func (q *Queries) CreateLicense(ctx context.Context, arg CreateLicenseParams) (L
 }
 
 const getLicense = `-- name: GetLicense :one
-SELECT l.id, l.organization_id, l.subscription_id, l.status, l.max_deployments, l.signing_key_id, l.issued_at, l.expires_at, l.created_at, l.updated_at
+SELECT l.id, l.organization_id, l.status, l.max_deployments, l.signing_key_id, l.issued_at, l.expires_at, l.created_at, l.updated_at
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
 WHERE l.organization_id = $1
@@ -104,7 +90,6 @@ func (q *Queries) GetLicense(ctx context.Context, arg GetLicenseParams) (License
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.SubscriptionID,
 		&i.Status,
 		&i.MaxDeployments,
 		&i.SigningKeyID,
@@ -117,7 +102,7 @@ func (q *Queries) GetLicense(ctx context.Context, arg GetLicenseParams) (License
 }
 
 const listLicensesByOrganization = `-- name: ListLicensesByOrganization :many
-SELECT l.id, l.organization_id, l.subscription_id, l.status, l.max_deployments, l.signing_key_id, l.issued_at, l.expires_at, l.created_at, l.updated_at
+SELECT l.id, l.organization_id, l.status, l.max_deployments, l.signing_key_id, l.issued_at, l.expires_at, l.created_at, l.updated_at
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
 WHERE l.organization_id = $1
@@ -138,57 +123,6 @@ func (q *Queries) ListLicensesByOrganization(ctx context.Context, organizationID
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrganizationID,
-			&i.SubscriptionID,
-			&i.Status,
-			&i.MaxDeployments,
-			&i.SigningKeyID,
-			&i.IssuedAt,
-			&i.ExpiresAt,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listLicensesBySubscription = `-- name: ListLicensesBySubscription :many
-SELECT l.id, l.organization_id, l.subscription_id, l.status, l.max_deployments, l.signing_key_id, l.issued_at, l.expires_at, l.created_at, l.updated_at
-FROM licenses AS l
-JOIN subscriptions AS s
-  ON s.id = l.subscription_id
- AND s.organization_id = l.organization_id
-JOIN organizations AS o ON o.id = l.organization_id
-WHERE l.organization_id = $1
-  AND l.subscription_id = $2
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-ORDER BY l.created_at DESC
-`
-
-type ListLicensesBySubscriptionParams struct {
-	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID `db:"subscription_id" json:"subscription_id"`
-}
-
-func (q *Queries) ListLicensesBySubscription(ctx context.Context, arg ListLicensesBySubscriptionParams) ([]License, error) {
-	rows, err := q.db.Query(ctx, listLicensesBySubscription, arg.OrganizationID, arg.SubscriptionID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []License{}
-	for rows.Next() {
-		var i License
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrganizationID,
-			&i.SubscriptionID,
 			&i.Status,
 			&i.MaxDeployments,
 			&i.SigningKeyID,
@@ -218,7 +152,7 @@ WHERE l.organization_id = $2
   AND o.id = l.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, l.id, organization_id, subscription_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, l.id, organization_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at
 `
 
 type UpdateLicenseExpirationParams struct {
@@ -236,7 +170,6 @@ type UpdateLicenseExpirationRow struct {
 	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 	ID_2           uuid.UUID          `db:"id_2" json:"id_2"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status_2       string             `db:"status_2" json:"status_2"`
 	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
@@ -258,7 +191,6 @@ func (q *Queries) UpdateLicenseExpiration(ctx context.Context, arg UpdateLicense
 		&i.DeletedAt,
 		&i.ID_2,
 		&i.OrganizationID,
-		&i.SubscriptionID,
 		&i.Status_2,
 		&i.MaxDeployments,
 		&i.SigningKeyID,
@@ -281,7 +213,7 @@ WHERE l.organization_id = $2
   AND o.id = l.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, l.id, organization_id, subscription_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at
+RETURNING o.id, name, o.status, o.created_at, o.updated_at, deleted_at, l.id, organization_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at
 `
 
 type UpdateLicenseStatusParams struct {
@@ -299,7 +231,6 @@ type UpdateLicenseStatusRow struct {
 	DeletedAt      pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
 	ID_2           uuid.UUID          `db:"id_2" json:"id_2"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status_2       string             `db:"status_2" json:"status_2"`
 	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
@@ -321,7 +252,6 @@ func (q *Queries) UpdateLicenseStatus(ctx context.Context, arg UpdateLicenseStat
 		&i.DeletedAt,
 		&i.ID_2,
 		&i.OrganizationID,
-		&i.SubscriptionID,
 		&i.Status_2,
 		&i.MaxDeployments,
 		&i.SigningKeyID,
