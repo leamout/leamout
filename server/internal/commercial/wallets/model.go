@@ -110,3 +110,8 @@ type ReserveInput struct {
 	OperationID   string
 	ExpiresAt     time.Time
 }
+
+type IncreaseReservationInput struct {
+	AmountMinor int64
+	ExpiresAt   time.Time
+}

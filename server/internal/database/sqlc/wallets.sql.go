@@ -322,6 +322,52 @@ func (q *Queries) GetWalletReservation(ctx context.Context, arg GetWalletReserva
 	return i, err
 }
 
+const increaseWalletReservation = `-- name: IncreaseWalletReservation :one
+UPDATE wallet_reservations AS wr
+SET amount_minor = amount_minor + $1,
+    expires_at = $2,
+    updated_at = NOW()
+WHERE wr.organization_id = $3
+  AND wr.id = $4
+  AND wr.status = 'active'
+  AND wr.expires_at > NOW()
+RETURNING wr.id, wr.wallet_id, wr.organization_id, wr.amount_minor, wr.captured_amount_minor, wr.operation_type, wr.operation_id, wr.status, wr.expires_at, wr.captured_at, wr.released_at, wr.expired_at, wr.created_at, wr.updated_at
+`
+
+type IncreaseWalletReservationParams struct {
+	IncrementMinor int64              `db:"increment_minor" json:"increment_minor"`
+	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	ID             uuid.UUID          `db:"id" json:"id"`
+}
+
+func (q *Queries) IncreaseWalletReservation(ctx context.Context, arg IncreaseWalletReservationParams) (WalletReservation, error) {
+	row := q.db.QueryRow(ctx, increaseWalletReservation,
+		arg.IncrementMinor,
+		arg.ExpiresAt,
+		arg.OrganizationID,
+		arg.ID,
+	)
+	var i WalletReservation
+	err := row.Scan(
+		&i.ID,
+		&i.WalletID,
+		&i.OrganizationID,
+		&i.AmountMinor,
+		&i.CapturedAmountMinor,
+		&i.OperationType,
+		&i.OperationID,
+		&i.Status,
+		&i.ExpiresAt,
+		&i.CapturedAt,
+		&i.ReleasedAt,
+		&i.ExpiredAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const insertWalletReservation = `-- name: InsertWalletReservation :one
 INSERT INTO wallet_reservations (
     wallet_id, organization_id, amount_minor, operation_type, operation_id, expires_at

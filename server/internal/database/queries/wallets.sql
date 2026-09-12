@@ -124,6 +124,17 @@ WHERE wr.organization_id = sqlc.arg(organization_id)
   AND sqlc.arg(captured_amount_minor) <= wr.amount_minor
 RETURNING wr.*;
 
+-- name: IncreaseWalletReservation :one
+UPDATE wallet_reservations AS wr
+SET amount_minor = amount_minor + sqlc.arg(increment_minor),
+    expires_at = sqlc.arg(expires_at),
+    updated_at = NOW()
+WHERE wr.organization_id = sqlc.arg(organization_id)
+  AND wr.id = sqlc.arg(id)
+  AND wr.status = 'active'
+  AND wr.expires_at > NOW()
+RETURNING wr.*;
+
 -- name: ReleaseWalletReservation :one
 UPDATE wallet_reservations
 SET status = 'released', released_at = NOW(), updated_at = NOW()

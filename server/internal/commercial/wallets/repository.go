@@ -193,6 +193,43 @@ func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, 
 	return reservationFromRow(row), nil
 }
 
+// Increase serializes on the wallet and extends an active hold only when the
+// additional amount remains fully prepaid.
+func (r *Repository) Increase(ctx context.Context, organizationID, id uuid.UUID, input IncreaseReservationInput) (Reservation, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return Reservation{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	q := r.queries.WithTx(tx)
+	reservation, err := q.GetWalletReservation(ctx, sqlc.GetWalletReservationParams{OrganizationID: organizationID, ID: id})
+	if err != nil {
+		return Reservation{}, mapReservationReadError(err)
+	}
+	if _, err = q.LockActiveWallet(ctx, sqlc.LockActiveWalletParams{ID: reservation.WalletID, OrganizationID: organizationID}); err != nil {
+		return Reservation{}, mapWalletReadError(err)
+	}
+	balance, err := q.GetWalletBalance(ctx, sqlc.GetWalletBalanceParams{OrganizationID: organizationID, WalletID: reservation.WalletID})
+	if err != nil {
+		return Reservation{}, mapWalletReadError(err)
+	}
+	if balance.AvailableMinor < input.AmountMinor {
+		return Reservation{}, ErrInsufficientFunds
+	}
+	row, err := q.IncreaseWalletReservation(ctx, sqlc.IncreaseWalletReservationParams{
+		IncrementMinor: input.AmountMinor, ExpiresAt: pgconv.NullableTimestamptz(&input.ExpiresAt),
+		OrganizationID: organizationID, ID: id,
+	})
+	if err != nil {
+		return Reservation{}, mapReservationTransitionError(err)
+	}
+	if err = tx.Commit(ctx); err != nil {
+		return Reservation{}, err
+	}
+	return reservationFromRow(row), nil
+}
+
 func (r *Repository) Release(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
 	row, err := r.queries.ReleaseWalletReservation(ctx, sqlc.ReleaseWalletReservationParams{
 		OrganizationID: organizationID,

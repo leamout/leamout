@@ -18,6 +18,7 @@ type walletStore interface {
 	Reserve(context.Context, uuid.UUID, uuid.UUID, ReserveInput) (Reservation, error)
 	GetReservation(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
 	Capture(context.Context, uuid.UUID, uuid.UUID, int64, string) (Reservation, error)
+	Increase(context.Context, uuid.UUID, uuid.UUID, IncreaseReservationInput) (Reservation, error)
 	Release(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
 	Expire(context.Context) ([]Reservation, error)
 }
@@ -68,6 +69,12 @@ func (s *Service) Capture(ctx context.Context, organizationID, id uuid.UUID, amo
 		return Reservation{}, err
 	}
 	return s.repo.Capture(ctx, organizationID, id, amount, key)
+}
+func (s *Service) Increase(ctx context.Context, organizationID, id uuid.UUID, input IncreaseReservationInput) (Reservation, error) {
+	if input.AmountMinor <= 0 || !input.ExpiresAt.After(s.now()) {
+		return Reservation{}, ErrInvalidMoney
+	}
+	return s.repo.Increase(ctx, organizationID, id, input)
 }
 func (s *Service) Release(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
 	return s.repo.Release(ctx, organizationID, id)
