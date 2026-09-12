@@ -29,7 +29,6 @@ func TestLicenseInstallVerifiesDeploymentBindingAndPersistsArtifact(t *testing.T
 	artifact, err := signer.SignV1(licensing.LicenseClaimsV1{
 		LicenseID: uuid.New(), OrganizationID: uuid.New(),
 		DeploymentID: deploymentID, IssuedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
-		Features: map[string]bool{"voice.enabled": true}, Limits: map[string]int64{"voice.concurrent_calls": 10},
 	})
 	if err != nil {
 		t.Fatal(err)
