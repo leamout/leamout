@@ -1,7 +1,6 @@
 CREATE TABLE IF NOT EXISTS usage_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
-    subscription_id UUID,
     meter_id UUID NOT NULL REFERENCES meters(id),
     quantity BIGINT NOT NULL,
     source_type TEXT NOT NULL,
@@ -11,10 +10,6 @@ CREATE TABLE IF NOT EXISTS usage_events (
     occurred_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT fk_usage_events_subscription_organization
-        FOREIGN KEY (subscription_id, organization_id)
-        REFERENCES subscriptions (id, organization_id)
-        ON DELETE SET NULL (subscription_id),
     CONSTRAINT uq_usage_events_organization_idempotency
         UNIQUE (organization_id, idempotency_key),
     CONSTRAINT chk_usage_events_quantity CHECK (quantity > 0),
@@ -35,10 +30,6 @@ COMMENT ON TABLE usage_events IS
 
 CREATE INDEX IF NOT EXISTS idx_usage_events_organization_meter_occurred
     ON usage_events (organization_id, meter_id, occurred_at);
-
-CREATE INDEX IF NOT EXISTS idx_usage_events_subscription_meter_occurred
-    ON usage_events (subscription_id, meter_id, occurred_at)
-    WHERE subscription_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_usage_events_source
     ON usage_events (source_type, source_id);
