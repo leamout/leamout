@@ -40,7 +40,7 @@ func TestVerifyV1AuthenticatesKeyID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
-	if _, err := keyring.VerifyV1(tampered, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) {
+	if _, err := keyring.VerifyV1(tampered, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrInvalidSignature)
 	}
 }
