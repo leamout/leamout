@@ -10,7 +10,6 @@ import (
 
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 type catalogStub struct {
@@ -40,27 +39,27 @@ func (s *subscriptionStub) Current(context.Context, uuid.UUID) (subscriptions.Su
 }
 
 type walletStub struct {
-	wallet      wallets.Wallet
-	reservation wallets.Reservation
-	reserveIn   wallets.ReserveInput
+	wallet      Wallet
+	reservation Reservation
+	reserveIn   ReserveInput
 	captures    int
 	releases    int
 	captureRace bool
 	releaseRace bool
 }
 
-func (s *walletStub) Get(_ context.Context, _, _ uuid.UUID) (wallets.Wallet, error) {
+func (s *walletStub) Get(_ context.Context, _, _ uuid.UUID) (Wallet, error) {
 	return s.wallet, nil
 }
 
-func (s *walletStub) GetByCurrency(_ context.Context, _ uuid.UUID, currency string) (wallets.Wallet, error) {
+func (s *walletStub) GetByCurrency(_ context.Context, _ uuid.UUID, currency string) (Wallet, error) {
 	if s.wallet.Currency != currency {
-		return wallets.Wallet{}, wallets.ErrWalletNotFound
+		return Wallet{}, ErrWalletNotFound
 	}
 	return s.wallet, nil
 }
 
-func (s *walletStub) Reserve(_ context.Context, organizationID, walletID uuid.UUID, input wallets.ReserveInput) (wallets.Reservation, error) {
+func (s *walletStub) Reserve(_ context.Context, organizationID, walletID uuid.UUID, input ReserveInput) (Reservation, error) {
 	s.reserveIn = input
 	s.reservation.OrganizationID = organizationID
 	s.reservation.WalletID = walletID
@@ -68,31 +67,31 @@ func (s *walletStub) Reserve(_ context.Context, organizationID, walletID uuid.UU
 	s.reservation.OperationType = input.OperationType
 	s.reservation.OperationID = input.OperationID
 	s.reservation.ExpiresAt = input.ExpiresAt
-	s.reservation.Status = wallets.ReservationActive
+	s.reservation.Status = ReservationActive
 	return s.reservation, nil
 }
 
-func (s *walletStub) GetReservation(context.Context, uuid.UUID, uuid.UUID) (wallets.Reservation, error) {
+func (s *walletStub) GetReservation(context.Context, uuid.UUID, uuid.UUID) (Reservation, error) {
 	return s.reservation, nil
 }
 
-func (s *walletStub) Capture(_ context.Context, _ uuid.UUID, _ uuid.UUID, amount int64, _ string) (wallets.Reservation, error) {
+func (s *walletStub) Capture(_ context.Context, _ uuid.UUID, _ uuid.UUID, amount int64, _ string) (Reservation, error) {
 	s.captures++
-	s.reservation.Status = wallets.ReservationCaptured
+	s.reservation.Status = ReservationCaptured
 	s.reservation.CapturedAmountMinor = &amount
 	if s.captureRace {
 		s.captureRace = false
-		return wallets.Reservation{}, wallets.ErrInvalidReservationState
+		return Reservation{}, ErrInvalidReservationState
 	}
 	return s.reservation, nil
 }
 
-func (s *walletStub) Release(context.Context, uuid.UUID, uuid.UUID) (wallets.Reservation, error) {
+func (s *walletStub) Release(context.Context, uuid.UUID, uuid.UUID) (Reservation, error) {
 	s.releases++
-	s.reservation.Status = wallets.ReservationReleased
+	s.reservation.Status = ReservationReleased
 	if s.releaseRace {
 		s.releaseRace = false
-		return wallets.Reservation{}, wallets.ErrInvalidReservationState
+		return Reservation{}, ErrInvalidReservationState
 	}
 	return s.reservation, nil
 }
@@ -130,10 +129,10 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 		Status: subscriptions.StatusActive,
 	}}
 	walletService := &walletStub{
-		wallet:      wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive},
-		reservation: wallets.Reservation{ID: reservationID},
+		wallet:      Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive},
+		reservation: Reservation{ID: reservationID},
 	}
-	service := NewService(catalogService, subscriptionService, walletService)
+	service := NewAuthorizationService(catalogService, subscriptionService, walletService)
 	service.now = func() time.Time { return now }
 
 	priceID, quotedAmount, currency, err := service.QuoteManagedNumberPurchase(context.Background(), organizationID)
@@ -180,7 +179,7 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 }
 
 func TestManagedNumberPurchaseQuoteRequiresActiveSubscription(t *testing.T) {
-	service := NewService(
+	service := NewAuthorizationService(
 		&catalogStub{},
 		&subscriptionStub{subscription: subscriptions.Subscription{Status: subscriptions.StatusPastDue}},
 		&walletStub{},
@@ -204,7 +203,7 @@ func TestManagedNumberPurchaseRejectsStaleQuote(t *testing.T) {
 		},
 		prices: []catalog.Price{{ID: purchasePriceID, PlanID: planID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &purchaseAmount}},
 	}
-	service := NewService(
+	service := NewAuthorizationService(
 		catalogService,
 		&subscriptionStub{subscription: subscriptions.Subscription{PlanID: planID, PriceID: recurringPriceID, Status: subscriptions.StatusActive}},
 		&walletStub{},
@@ -223,13 +222,13 @@ func TestReleaseManagedNumberPurchaseIsIdempotent(t *testing.T) {
 	operationID := uuid.New()
 	reservationID := uuid.New()
 	walletService := &walletStub{
-		reservation: wallets.Reservation{
+		reservation: Reservation{
 			ID: reservationID, OrganizationID: organizationID,
 			OperationType: managedNumberOperationType, OperationID: operationID.String(),
-			Status: wallets.ReservationReleased,
+			Status: ReservationReleased,
 		},
 	}
-	service := NewService(&catalogStub{}, &subscriptionStub{}, walletService)
+	service := NewAuthorizationService(&catalogStub{}, &subscriptionStub{}, walletService)
 
 	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
 		t.Fatalf("ReleaseManagedNumberPurchase() error = %v", err)
@@ -258,14 +257,14 @@ func TestReleaseManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
 	operationID := uuid.New()
 	reservationID := uuid.New()
 	walletService := &walletStub{
-		reservation: wallets.Reservation{
+		reservation: Reservation{
 			ID: reservationID, OrganizationID: organizationID,
 			OperationType: managedNumberOperationType, OperationID: operationID.String(),
-			Status: wallets.ReservationActive,
+			Status: ReservationActive,
 		},
 		releaseRace: true,
 	}
-	service := NewService(&catalogStub{}, &subscriptionStub{}, walletService)
+	service := NewAuthorizationService(&catalogStub{}, &subscriptionStub{}, walletService)
 
 	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
 		t.Fatalf("ReleaseManagedNumberPurchase() concurrent replay error = %v", err)
@@ -275,7 +274,7 @@ func TestReleaseManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
 	}
 }
 
-func managedNumberAuthorizationFixture(t *testing.T) (*Service, *walletStub, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64) {
+func managedNumberAuthorizationFixture(t *testing.T) (*AuthorizationService, *walletStub, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64) {
 	t.Helper()
 	organizationID := uuid.New()
 	operationID := uuid.New()
@@ -284,14 +283,14 @@ func managedNumberAuthorizationFixture(t *testing.T) (*Service, *walletStub, uui
 	walletID := uuid.New()
 	amount := int64(2500)
 	walletService := &walletStub{
-		wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive},
-		reservation: wallets.Reservation{
+		wallet: Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive},
+		reservation: Reservation{
 			ID: reservationID, WalletID: walletID, OrganizationID: organizationID,
 			AmountMinor: amount, OperationType: managedNumberOperationType, OperationID: operationID.String(),
-			Status: wallets.ReservationActive, ExpiresAt: time.Now().Add(time.Hour),
+			Status: ReservationActive, ExpiresAt: time.Now().Add(time.Hour),
 		},
 	}
-	service := NewService(
+	service := NewAuthorizationService(
 		&catalogStub{pricesByID: map[uuid.UUID]catalog.Price{
 			priceID: {ID: priceID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &amount},
 		}},

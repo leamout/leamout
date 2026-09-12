@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
+	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 type store interface {
@@ -24,8 +24,8 @@ type store interface {
 }
 
 type walletService interface {
-	Get(context.Context, uuid.UUID, uuid.UUID) (wallets.Wallet, error)
-	Post(context.Context, uuid.UUID, uuid.UUID, wallets.PostEntryInput) (wallets.LedgerEntry, error)
+	Get(context.Context, uuid.UUID, uuid.UUID) (prepaid.Wallet, error)
+	Post(context.Context, uuid.UUID, uuid.UUID, prepaid.PostEntryInput) (prepaid.LedgerEntry, error)
 }
 
 type catalogService interface {
@@ -112,7 +112,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, params C
 		if err != nil {
 			return Checkout{}, err
 		}
-		if wallet.Status != wallets.StatusActive {
+		if wallet.Status != prepaid.StatusActive {
 			return Checkout{}, ErrInvalidCheckout
 		}
 		input.AmountMinor = params.AmountMinor

@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
+	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
-	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
@@ -51,7 +51,7 @@ func TestCompletePaymentCreditsWalletAndCompletesCheckout(t *testing.T) {
 	if walletsService.posts != 1 {
 		t.Fatalf("wallet posts = %d, want 1", walletsService.posts)
 	}
-	if walletsService.postInput.Type != wallets.EntryTopup ||
+	if walletsService.postInput.Type != prepaid.EntryTopup ||
 		walletsService.postInput.SourceType != "checkout" ||
 		walletsService.postInput.SourceID != checkoutID.String() ||
 		walletsService.postInput.IdempotencyKey != "checkout:"+checkoutID.String() {
@@ -76,7 +76,7 @@ func TestCompletePaymentTreatsDuplicateWalletCreditAsRetry(t *testing.T) {
 		Currency:       "USD",
 		Status:         StatusProcessing,
 	}}
-	walletsService := &walletServiceStub{postErr: wallets.ErrDuplicateLedgerEntry}
+	walletsService := &walletServiceStub{postErr: prepaid.ErrDuplicateLedgerEntry}
 	service := NewService(store, walletsService, nil, nil, nil)
 
 	err := service.CompletePayment(t.Context(), commercialpayments.Settlement{

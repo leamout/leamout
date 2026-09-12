@@ -12,7 +12,6 @@ import (
 	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
-	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 // Module is the composition boundary for Leamout's Commercial domain.
@@ -74,14 +73,10 @@ type UsageModule struct {
 }
 
 type PrepaidModule struct {
-	Service *prepaid.Service
-	Wallets WalletModule
-}
-
-type WalletModule struct {
-	Repository *wallets.Repository
-	Service    *wallets.Service
-	Handler    *wallets.Handler
+	Authorizations *prepaid.AuthorizationService
+	Repository     *prepaid.Repository
+	Service        *prepaid.Service
+	Handler        *prepaid.Handler
 }
 
 type PaymentsModule struct {
@@ -124,10 +119,10 @@ func New(db *pgxpool.Pool) *Module {
 	usageRepository := usage.NewRepository(db)
 	usageService := usage.NewService(usageRepository)
 
-	walletRepository := wallets.NewRepository(db)
-	walletService := wallets.NewService(walletRepository)
-	walletHandler := wallets.NewHandler(walletService)
-	prepaidService := prepaid.NewService(catalogService, subscriptionsService, walletService)
+	walletRepository := prepaid.NewRepository(db)
+	walletService := prepaid.NewService(walletRepository)
+	walletHandler := prepaid.NewHandler(walletService)
+	authorizationService := prepaid.NewAuthorizationService(catalogService, subscriptionsService, walletService)
 
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
@@ -144,12 +139,10 @@ func New(db *pgxpool.Pool) *Module {
 	paymentHandler := payments.NewHandler(paymentService, checkoutService)
 
 	prepaidModule := PrepaidModule{
-		Service: prepaidService,
-		Wallets: WalletModule{
-			Repository: walletRepository,
-			Service:    walletService,
-			Handler:    walletHandler,
-		},
+		Authorizations: authorizationService,
+		Repository:     walletRepository,
+		Service:        walletService,
+		Handler:        walletHandler,
 	}
 
 	return &Module{

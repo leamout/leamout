@@ -1,4 +1,4 @@
-package wallets
+package prepaid
 
 import (
 	"context"

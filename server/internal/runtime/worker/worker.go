@@ -172,7 +172,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 
 	numbersRepository := numbers.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
-	numbersService.SetManagedPurchaseAuthority(commercialModule.Prepaid.Service)
+	numbersService.SetManagedPurchaseAuthority(commercialModule.Prepaid.Authorizations)
 	if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
 		didwwClient, err := didww.NewClient(didww.Config{BaseURL: cfg.DIDWW.APIBaseURL, APIKey: cfg.DIDWW.APIKey})
 		if err != nil {

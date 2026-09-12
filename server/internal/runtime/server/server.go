@@ -226,7 +226,7 @@ func NewModules(
 
 	numbersRepository := numbers.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
-	numbersService.SetManagedPurchaseAuthority(commercialModule.Prepaid.Service)
+	numbersService.SetManagedPurchaseAuthority(commercialModule.Prepaid.Authorizations)
 
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
