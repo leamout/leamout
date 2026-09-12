@@ -20,7 +20,7 @@ func (s *Service) CompletePayment(ctx context.Context, settlement commercialpaym
 		return ErrPaymentMismatch
 	}
 
-	checkoutRecord, err := s.repo.Get(ctx, settlement.OrganizationID, settlement.CheckoutID)
+	checkoutRecord, err := s.checkouts.get(ctx, settlement.OrganizationID, settlement.CheckoutID)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (s *Service) CompletePayment(ctx context.Context, settlement commercialpaym
 		}
 	}
 
-	_, err = s.repo.Transition(
+	_, err = s.checkouts.transition(
 		ctx,
 		checkoutRecord.OrganizationID,
 		checkoutRecord.ID,
@@ -64,7 +64,7 @@ func (s *Service) CompletePayment(ctx context.Context, settlement commercialpaym
 		},
 	)
 	if errors.Is(err, ErrInvalidTransition) {
-		current, readErr := s.repo.Get(ctx, checkoutRecord.OrganizationID, checkoutRecord.ID)
+		current, readErr := s.checkouts.get(ctx, checkoutRecord.OrganizationID, checkoutRecord.ID)
 		if readErr == nil && current.Status == target {
 			return nil
 		}
@@ -82,7 +82,7 @@ func (s *Service) fulfillSucceededCheckout(
 		if checkoutRecord.WalletID == nil {
 			return ErrInvalidCheckout
 		}
-		_, err := s.wallets.Post(
+		_, err := s.wallets.post(
 			ctx,
 			checkoutRecord.OrganizationID,
 			*checkoutRecord.WalletID,
@@ -105,7 +105,7 @@ func (s *Service) fulfillSucceededCheckout(
 		if checkoutRecord.PriceID == nil {
 			return ErrInvalidCheckout
 		}
-		price, err := s.catalog.GetPrice(ctx, *checkoutRecord.PriceID)
+		price, err := s.catalog.getPrice(ctx, *checkoutRecord.PriceID)
 		if err != nil {
 			return err
 		}
@@ -117,14 +117,14 @@ func (s *Service) fulfillSucceededCheckout(
 			return ErrInvalidCheckout
 		}
 		status := subscriptions.StatusActive
-		_, err = s.subscriptions.Create(ctx, checkoutRecord.OrganizationID, subscriptions.CreateInput{
+		_, err = s.subscriptions.create(ctx, checkoutRecord.OrganizationID, subscriptions.CreateInput{
 			PriceID:  *checkoutRecord.PriceID,
 			Status:   &status,
 			StartsAt: &settledAt,
 			RenewsAt: renewsAt,
 		})
 		if errors.Is(err, subscriptions.ErrCurrentSubscriptionExists) {
-			current, readErr := s.subscriptions.Current(ctx, checkoutRecord.OrganizationID)
+			current, readErr := s.subscriptions.current(ctx, checkoutRecord.OrganizationID)
 			if readErr == nil && current.PriceID == *checkoutRecord.PriceID {
 				return nil
 			}

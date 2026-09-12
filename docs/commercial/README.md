@@ -194,7 +194,7 @@ See [security.md](security.md) for the database defense model.
 - [Rating](rating.md) — customer-facing telecom usage pricing through usage rates.
 - [Invoicing](invoicing.md) — period statements and historical monetary snapshots.
 - [Payments](payments.md) — checkout intent and provider-independent payment reconciliation.
-- **Wallets** — currency-scoped prepaid value, immutable ledger movements, and provider-operation reservations.
+- [Wallets](wallets.md) — currency-scoped prepaid value, immutable ledger movements, and provider-operation reservations.
 
 ## Current boundaries
 

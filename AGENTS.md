@@ -69,7 +69,7 @@ Access
 Usage
   usage_events
 
-Prepaid
+Wallets
   wallets / wallet ledger / reservations
 ```
 

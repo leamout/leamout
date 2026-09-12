@@ -9,7 +9,6 @@ import (
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
 	"github.com/leamout/leamout/internal/commercial/wallets"
@@ -23,7 +22,7 @@ type Module struct {
 	Billing BillingModule
 	Access  AccessModule
 	Usage   UsageModule
-	Prepaid PrepaidModule
+	Wallets WalletModule
 }
 
 type CatalogModule struct {
@@ -73,11 +72,6 @@ type UsageModule struct {
 	Service    *usage.Service
 }
 
-type PrepaidModule struct {
-	Service *prepaid.Service
-	Wallets WalletModule
-}
-
 type WalletModule struct {
 	Repository *wallets.Repository
 	Service    *wallets.Service
@@ -125,9 +119,8 @@ func New(db *pgxpool.Pool) *Module {
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
-	walletService := wallets.NewService(walletRepository)
+	walletService := wallets.NewService(walletRepository, catalogService, subscriptionsService)
 	walletHandler := wallets.NewHandler(walletService)
-	prepaidService := prepaid.NewService(catalogService, subscriptionsService, walletService)
 
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
@@ -143,13 +136,10 @@ func New(db *pgxpool.Pool) *Module {
 	checkoutHandler := checkout.NewHandler(checkoutService)
 	paymentHandler := payments.NewHandler(paymentService, checkoutService)
 
-	prepaidModule := PrepaidModule{
-		Service: prepaidService,
-		Wallets: WalletModule{
-			Repository: walletRepository,
-			Service:    walletService,
-			Handler:    walletHandler,
-		},
+	walletModule := WalletModule{
+		Repository: walletRepository,
+		Service:    walletService,
+		Handler:    walletHandler,
 	}
 
 	return &Module{
@@ -193,6 +183,6 @@ func New(db *pgxpool.Pool) *Module {
 			Repository: usageRepository,
 			Service:    usageService,
 		},
-		Prepaid: prepaidModule,
+		Wallets: walletModule,
 	}
 }

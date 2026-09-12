@@ -1,4 +1,4 @@
-# Prepaid Commercial Model
+# Wallets
 
 Leamout commercial state is organized around pay-before-use settlement. PostgreSQL is the monetary source of truth. Redis may cache availability or coordinate realtime authorization, but it never creates, destroys, or settles value.
 
@@ -135,6 +135,45 @@ DIDWW order
 Capture happens when the provider order completes because that is the point at which Leamout has incurred the upstream obligation. A later routing or persistence problem does not silently release captured value. Such a correction must be represented by an explicit compensating ledger entry if commercial policy requires a refund.
 
 The purchase authorization and provider operation are independently retry-safe: a captured reservation may be verified again, capture is idempotent for the same amount, and release is idempotent while value has not been captured.
+
+### Managed outbound voice
+
+Managed outbound calls use rolling prepaid authorization. CommPeak rates and
+CDRs remain wholesale COGS; they never determine the customer debit.
+
+```text
+managed outbound request
+        ↓
+resolve an effective Leamout metered price for the destination
+        ↓
+persist immutable rate terms and a durable call authorization
+        ↓
+reserve the initial authorized horizon in the matching-currency wallet
+        ↓
+admit the call to the managed carrier
+        ↓
+increase the same reservation as the authorized horizon advances
+        ↓
+stop extending and terminate before media exceeds the hard horizon
+        ↓
+rate final answered duration from the snapshotted Leamout terms
+        ↓
+capture the final customer amount and release unused authorization
+```
+
+Each reservation increase locks the wallet before checking additional
+spendable value. The update changes only the active hold; it does not create a
+ledger debit. If the additional amount is unavailable, the authorization
+horizon must not advance. Redis may schedule an early refresh, but carrier
+admission and every horizon increase require committed PostgreSQL state.
+
+The durable authorization must snapshot the price ID, currency, unit amount,
+unit size, billing increment, reservation ID, and authorized-through time.
+Retries use one call authorization identity. Final capture is derived from
+answered duration and the snapshot—not from a CommPeak CDR—and cannot exceed
+the amount reserved. A zero-duration or pre-answer failure releases the hold.
+CommPeak reconciliation continues independently into wholesale charges for
+margin and provider-account auditing.
 
 ## Deferred concepts
 
