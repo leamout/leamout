@@ -16,23 +16,26 @@ const createDeployment = `-- name: CreateDeployment :one
 INSERT INTO deployments (
     license_id,
     deployment_id,
+    public_key,
     name
 )
 SELECT
     l.id AS license_id,
     $1 AS deployment_id,
-    $2 AS name
+    $2 AS public_key,
+    $3 AS name
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
-WHERE l.id = $3
-  AND l.organization_id = $4
+WHERE l.id = $4
+  AND l.organization_id = $5
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING id, license_id, deployment_id, name, status, activated_at, last_seen_at, deactivated_at, created_at, updated_at
+RETURNING id, license_id, deployment_id, public_key, name, status, activated_at, last_seen_at, deactivated_at, created_at, updated_at
 `
 
 type CreateDeploymentParams struct {
 	DeploymentID   string    `db:"deployment_id" json:"deployment_id"`
+	PublicKey      string    `db:"public_key" json:"public_key"`
 	Name           *string   `db:"name" json:"name"`
 	LicenseID      uuid.UUID `db:"license_id" json:"license_id"`
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
@@ -41,6 +44,7 @@ type CreateDeploymentParams struct {
 func (q *Queries) CreateDeployment(ctx context.Context, arg CreateDeploymentParams) (Deployment, error) {
 	row := q.db.QueryRow(ctx, createDeployment,
 		arg.DeploymentID,
+		arg.PublicKey,
 		arg.Name,
 		arg.LicenseID,
 		arg.OrganizationID,
@@ -50,6 +54,7 @@ func (q *Queries) CreateDeployment(ctx context.Context, arg CreateDeploymentPara
 		&i.ID,
 		&i.LicenseID,
 		&i.DeploymentID,
+		&i.PublicKey,
 		&i.Name,
 		&i.Status,
 		&i.ActivatedAt,
@@ -76,7 +81,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = $3
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.id, organization_id, l.status, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
+RETURNING l.id, organization_id, l.status, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, public_key, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
 `
 
 type DeactivateDeploymentParams struct {
@@ -103,6 +108,7 @@ type DeactivateDeploymentRow struct {
 	ID_3           uuid.UUID          `db:"id_3" json:"id_3"`
 	LicenseID      uuid.UUID          `db:"license_id" json:"license_id"`
 	DeploymentID   string             `db:"deployment_id" json:"deployment_id"`
+	PublicKey      string             `db:"public_key" json:"public_key"`
 	Name_2         *string            `db:"name_2" json:"name_2"`
 	Status_3       string             `db:"status_3" json:"status_3"`
 	ActivatedAt    pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
@@ -133,6 +139,7 @@ func (q *Queries) DeactivateDeployment(ctx context.Context, arg DeactivateDeploy
 		&i.ID_3,
 		&i.LicenseID,
 		&i.DeploymentID,
+		&i.PublicKey,
 		&i.Name_2,
 		&i.Status_3,
 		&i.ActivatedAt,
@@ -145,7 +152,7 @@ func (q *Queries) DeactivateDeployment(ctx context.Context, arg DeactivateDeploy
 }
 
 const getDeployment = `-- name: GetDeployment :one
-SELECT d.id, d.license_id, d.deployment_id, d.name, d.status, d.activated_at, d.last_seen_at, d.deactivated_at, d.created_at, d.updated_at
+SELECT d.id, d.license_id, d.deployment_id, d.public_key, d.name, d.status, d.activated_at, d.last_seen_at, d.deactivated_at, d.created_at, d.updated_at
 FROM deployments AS d
 JOIN licenses AS l ON l.id = d.license_id
 JOIN organizations AS o ON o.id = l.organization_id
@@ -170,6 +177,7 @@ func (q *Queries) GetDeployment(ctx context.Context, arg GetDeploymentParams) (D
 		&i.ID,
 		&i.LicenseID,
 		&i.DeploymentID,
+		&i.PublicKey,
 		&i.Name,
 		&i.Status,
 		&i.ActivatedAt,
@@ -182,7 +190,7 @@ func (q *Queries) GetDeployment(ctx context.Context, arg GetDeploymentParams) (D
 }
 
 const listDeploymentsByLicense = `-- name: ListDeploymentsByLicense :many
-SELECT d.id, d.license_id, d.deployment_id, d.name, d.status, d.activated_at, d.last_seen_at, d.deactivated_at, d.created_at, d.updated_at
+SELECT d.id, d.license_id, d.deployment_id, d.public_key, d.name, d.status, d.activated_at, d.last_seen_at, d.deactivated_at, d.created_at, d.updated_at
 FROM deployments AS d
 JOIN licenses AS l ON l.id = d.license_id
 JOIN organizations AS o ON o.id = l.organization_id
@@ -211,6 +219,7 @@ func (q *Queries) ListDeploymentsByLicense(ctx context.Context, arg ListDeployme
 			&i.ID,
 			&i.LicenseID,
 			&i.DeploymentID,
+			&i.PublicKey,
 			&i.Name,
 			&i.Status,
 			&i.ActivatedAt,
@@ -243,7 +252,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = $4
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.id, organization_id, l.status, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
+RETURNING l.id, organization_id, l.status, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, public_key, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
 `
 
 type TouchDeploymentParams struct {
@@ -271,6 +280,7 @@ type TouchDeploymentRow struct {
 	ID_3           uuid.UUID          `db:"id_3" json:"id_3"`
 	LicenseID      uuid.UUID          `db:"license_id" json:"license_id"`
 	DeploymentID   string             `db:"deployment_id" json:"deployment_id"`
+	PublicKey      string             `db:"public_key" json:"public_key"`
 	Name_2         *string            `db:"name_2" json:"name_2"`
 	Status_3       string             `db:"status_3" json:"status_3"`
 	ActivatedAt    pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
@@ -306,6 +316,7 @@ func (q *Queries) TouchDeployment(ctx context.Context, arg TouchDeploymentParams
 		&i.ID_3,
 		&i.LicenseID,
 		&i.DeploymentID,
+		&i.PublicKey,
 		&i.Name_2,
 		&i.Status_3,
 		&i.ActivatedAt,
