@@ -25,7 +25,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, input Cr
 	if err != nil {
 		return License{}, err
 	}
-	return s.repo.Create(ctx, organizationID, normalized.MaxDeployments, normalized.SigningKeyID, issuedAt, normalized.ExpiresAt)
+	return s.repo.Create(ctx, organizationID, normalized.SigningKeyID, issuedAt, normalized.ExpiresAt)
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (License, error) {
