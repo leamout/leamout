@@ -29,7 +29,6 @@ func TestSignerRoundTripV1(t *testing.T) {
 	claims := LicenseClaimsV1{
 		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
 		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		SubscriptionID: uuid.MustParse("33333333-3333-3333-3333-333333333333"),
 		DeploymentID:   "node-01",
 		IssuedAt:       issuedAt,
 		ExpiresAt:      issuedAt.Add(24 * time.Hour),
@@ -51,11 +50,11 @@ func TestSignerRoundTripV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyV1() error = %v", err)
 	}
-	if verified.LicenseID != claims.LicenseID || verified.OrganizationID != claims.OrganizationID || verified.SubscriptionID != claims.SubscriptionID {
+	if verified.LicenseID != claims.LicenseID || verified.OrganizationID != claims.OrganizationID {
 		t.Fatalf("verified identity = %#v, want %#v", verified, claims)
 	}
 	if !verified.Features["recording.enabled"] || verified.Limits["max.concurrent_calls"] != 500 {
-		t.Fatalf("verified entitlements = %#v / %#v", verified.Features, verified.Limits)
+		t.Fatalf("verified claims = %#v / %#v", verified.Features, verified.Limits)
 	}
 }
 
@@ -70,7 +69,6 @@ func TestSignerV1IsDeterministicForNormalizedClaims(t *testing.T) {
 	claims := LicenseClaimsV1{
 		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
 		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		SubscriptionID: uuid.MustParse("33333333-3333-3333-3333-333333333333"),
 		DeploymentID:   " node-01 ",
 		IssuedAt:       issuedAt,
 		ExpiresAt:      issuedAt.Add(time.Hour),
@@ -169,7 +167,6 @@ func validTestClaims(issuedAt time.Time) LicenseClaimsV1 {
 	return LicenseClaimsV1{
 		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
 		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		SubscriptionID: uuid.MustParse("33333333-3333-3333-3333-333333333333"),
 		DeploymentID:   "node-01",
 		IssuedAt:       issuedAt,
 		ExpiresAt:      issuedAt.Add(2 * time.Hour),
