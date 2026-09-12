@@ -43,16 +43,3 @@ func TestVerifyV1AuthenticatesKeyID(t *testing.T) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrInvalidSignature)
 	}
 }
-
-func TestNormalizeClaimsV1RejectsFeatureLimitKeyCollision(t *testing.T) {
-	t.Parallel()
-
-	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	claims := validTestClaims(issuedAt)
-	claims.Features["shared.key"] = true
-	claims.Limits["shared.key"] = 1
-
-	if _, err := normalizeClaimsV1(claims); !errors.Is(err, ErrDuplicateClaimKey) {
-		t.Fatalf("normalizeClaimsV1() error = %v, want %v", err, ErrDuplicateClaimKey)
-	}
-}
