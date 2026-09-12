@@ -139,6 +139,9 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 		if deployment.Status == DeploymentStatusDeactivated {
 			return Deployment{}, false, ErrDeploymentInactive
 		}
+		if deployment.PublicKey != input.PublicKey {
+			return Deployment{}, false, ErrDeploymentKeyMismatch
+		}
 		return deployment, false, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -159,7 +162,10 @@ func (r *Repository) activateDeploymentOnce(ctx context.Context, organizationID,
 	if len(deployments) != 0 {
 		return Deployment{}, false, ErrLicenseAlreadyBound
 	}
-	row, err := queries.CreateDeployment(ctx, sqlc.CreateDeploymentParams{DeploymentID: input.DeploymentID, Name: input.Name, LicenseID: licenseID, OrganizationID: organizationID})
+	row, err := queries.CreateDeployment(ctx, sqlc.CreateDeploymentParams{
+		DeploymentID: input.DeploymentID, PublicKey: input.PublicKey, Name: input.Name,
+		LicenseID: licenseID, OrganizationID: organizationID,
+	})
 	if err != nil {
 		if isSerializationFailure(err) {
 			return Deployment{}, true, nil
@@ -225,7 +231,7 @@ func licenseFromRow(row sqlc.License) License {
 func deploymentFromRow(organizationID uuid.UUID, row sqlc.Deployment) Deployment {
 	return Deployment{
 		ID: row.ID, OrganizationID: organizationID, LicenseID: row.LicenseID, DeploymentID: row.DeploymentID,
-		Name: row.Name, Status: DeploymentStatus(row.Status), ActivatedAt: pgconv.TimestamptzToTime(row.ActivatedAt),
+		PublicKey: row.PublicKey, Name: row.Name, Status: DeploymentStatus(row.Status), ActivatedAt: pgconv.TimestamptzToTime(row.ActivatedAt),
 		LastSeenAt: pgconv.TimestamptzToTimePtr(row.LastSeenAt), DeactivatedAt: pgconv.TimestamptzToTimePtr(row.DeactivatedAt),
 		CreatedAt: pgconv.TimestamptzToTime(row.CreatedAt), UpdatedAt: pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
