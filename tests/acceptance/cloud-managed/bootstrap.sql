@@ -23,7 +23,7 @@ INSERT INTO products (id, code, name, active) VALUES (
 INSERT INTO plans (id, product_id, code, name, active) VALUES (
     '00000000-0000-0000-0000-000000006202',
     '00000000-0000-0000-0000-000000006201',
-    'cloud-managed-acceptance',
+    'managed-numbers',
     'Cloud Managed Acceptance',
     true
 );
@@ -38,15 +38,6 @@ INSERT INTO prices (
     '00000000-0000-0000-0000-000000006204',
     '00000000-0000-0000-0000-000000006202',
     'one_time', 'USD', 2500, NULL, true, now() - interval '1 day'
-);
-INSERT INTO subscriptions (
-    id, organization_id, plan_id, price_id, status, starts_at
-) VALUES (
-    '00000000-0000-0000-0000-000000006205',
-    '00000000-0000-0000-0000-000000006001',
-    '00000000-0000-0000-0000-000000006202',
-    '00000000-0000-0000-0000-000000006203',
-    'active', now() - interval '1 day'
 );
 INSERT INTO wallets (id, organization_id, currency, status) VALUES (
     '00000000-0000-0000-0000-000000006206',

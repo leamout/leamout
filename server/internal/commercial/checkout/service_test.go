@@ -30,8 +30,6 @@ func (s *checkoutRepositoryStub) Create(_ context.Context, organizationID uuid.U
 	}
 	result.OrganizationID = organizationID
 	result.WalletID = input.WalletID
-	result.PriceID = input.PriceID
-	result.Type = input.Type
 	result.Reference = input.Reference
 	result.AmountMinor = input.AmountMinor
 	result.Currency = input.Currency
@@ -162,9 +160,6 @@ func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if result.Type != TypeWalletTopup {
-		t.Fatalf("checkout type = %s, want %s", result.Type, TypeWalletTopup)
-	}
 	if result.Currency != "GHS" || result.AmountMinor != 5000 {
 		t.Fatalf("checkout terms = %s %d", result.Currency, result.AmountMinor)
 	}
@@ -181,7 +176,6 @@ func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 		ID:             checkoutID,
 		OrganizationID: organizationID,
 		WalletID:       &walletID,
-		Type:           TypeWalletTopup,
 		Reference:      "checkout.test",
 		AmountMinor:    5000,
 		Currency:       "GHS",

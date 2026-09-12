@@ -9,14 +9,12 @@ import (
 	"github.com/leamout/leamout/pkg/apperror"
 )
 
-type Type string
 type Provider string
 type PaymentMethod string
 type Status string
 type NextAction string
 
 const (
-	TypeWalletTopup     Type          = "wallet_topup"
 	ProviderStripe      Provider      = "stripe"
 	ProviderPaystack    Provider      = "paystack"
 	MethodCard          PaymentMethod = "card"
@@ -48,8 +46,6 @@ type Checkout struct {
 	ID              uuid.UUID
 	OrganizationID  uuid.UUID
 	WalletID        *uuid.UUID
-	PriceID         *uuid.UUID
-	Type            Type
 	Provider        Provider
 	PaymentMethod   PaymentMethod
 	Reference       string
@@ -73,8 +69,6 @@ type CreateParams struct {
 
 type CreateInput struct {
 	WalletID    *uuid.UUID
-	PriceID     *uuid.UUID
-	Type        Type
 	Reference   string
 	AmountMinor int64
 	Currency    string

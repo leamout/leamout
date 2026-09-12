@@ -91,17 +91,17 @@ def denied_while(statement):
         if status < 400: raise Failure(f"call accepted with {status}")
         assert_no_wholesale(before)
     finally:
-        sql(f"UPDATE organizations SET status='active' WHERE id='{ORG}'; UPDATE trunks SET status='active' WHERE id='{TRUNK}'; UPDATE entitlements SET enabled=true WHERE entitlement_key='voice.managed.enabled' AND plan_id IS NOT NULL")
+        sql(f"UPDATE organizations SET status='active' WHERE id='{ORG}'; UPDATE trunks SET status='active' WHERE id='{TRUNK}'; UPDATE phone_numbers SET status='active' WHERE organization_id='{ORG}' AND number='{CALLER}'")
 
 def main():
     tests = [
         ("valid trunk without auth is challenged", no_auth),
         ("wrong password is rejected before wholesale", wrong_password),
         ("unauthorized caller ID is forbidden", unauthorized_caller),
-        ("valid credential, caller ID, and entitlement is authorized", authorized),
+        ("valid credential and managed caller ID are authorized", authorized),
         ("inactive trunk fails closed", lambda: denied_while(f"UPDATE trunks SET status='disabled' WHERE id='{TRUNK}'")),
         ("inactive organization fails closed", lambda: denied_while(f"UPDATE organizations SET status='disabled' WHERE id='{ORG}'")),
-        ("disabled managed entitlement is denied", lambda: denied_while("UPDATE entitlements SET enabled=false WHERE entitlement_key='voice.managed.enabled' AND plan_id IS NOT NULL")),
+        ("inactive managed caller ID is denied", lambda: denied_while(f"UPDATE phone_numbers SET status='disabled' WHERE organization_id='{ORG}' AND number='{CALLER}'")),
         ("Proxy-Authorization is stripped from wholesale", authorized),
     ]
     passed = [case(name, fn) for name, fn in tests]
