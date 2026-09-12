@@ -2,7 +2,6 @@
 INSERT INTO licenses (
     organization_id,
     status,
-    max_deployments,
     signing_key_id,
     issued_at,
     expires_at
@@ -10,7 +9,6 @@ INSERT INTO licenses (
 SELECT
     o.id AS organization_id,
     COALESCE(sqlc.narg(status), 'pending') AS status,
-    COALESCE(sqlc.narg(max_deployments), 1) AS max_deployments,
     sqlc.narg(signing_key_id) AS signing_key_id,
     COALESCE(sqlc.narg(issued_at), NOW()) AS issued_at,
     sqlc.narg(expires_at) AS expires_at
