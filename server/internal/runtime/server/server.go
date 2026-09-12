@@ -11,9 +11,7 @@ import (
 	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/commercial/payments"
 	"github.com/leamout/leamout/internal/database/sqlc"
-	"github.com/leamout/leamout/internal/identity/auth"
-	"github.com/leamout/leamout/internal/identity/session"
-	"github.com/leamout/leamout/internal/identity/users"
+	"github.com/leamout/leamout/internal/identity"
 	"github.com/leamout/leamout/internal/integrations/carriers/didww"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/internal/integrations/payments/paystack"
@@ -42,9 +40,7 @@ import (
 	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/telecom/wholesale"
-	"github.com/leamout/leamout/internal/tenancy/credentials"
-	"github.com/leamout/leamout/internal/tenancy/members"
-	"github.com/leamout/leamout/internal/tenancy/organization"
+	"github.com/leamout/leamout/internal/tenancy"
 )
 
 type Server struct {
@@ -137,18 +133,8 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 func NewModules(db *pgxpool.Pool, callsController calls.Controller, conferenceController conferences.Controller, credentialCipher *encryption.Cipher, turnService *realtime.Service, redisClient *redisintegration.Client) (Modules, error) {
 	queries := sqlc.New(db)
 	commercialModule := commercial.New(db)
-	sessionRepository := session.NewRepository(queries)
-	sessionService := session.NewService(sessionRepository)
-	authRepository := auth.NewRepository(queries)
-	authService := auth.NewService(authRepository)
-	usersRepository := users.NewRepository(queries)
-	usersService := users.NewService(usersRepository)
-	organizationRepository := organization.NewRepository(queries)
-	organizationService := organization.NewService(organizationRepository)
-	membersRepository := members.NewRepository(queries)
-	membersService := members.NewService(membersRepository)
-	credentialsRepository := credentials.NewRepository(queries)
-	credentialsService := credentials.NewService(credentialsRepository)
+	identityModule := identity.New(queries)
+	tenancyModule := tenancy.New(queries)
 	voiceRepository := voice.NewRepository(queries)
 	voiceService := voice.NewService(voiceRepository)
 	routingRepository := routing.NewRepository(queries)
@@ -190,7 +176,7 @@ func NewModules(db *pgxpool.Pool, callsController calls.Controller, conferenceCo
 	auditService := audit.NewService(auditRepository)
 	idempotencyRepository := idempotency.NewRepository(queries)
 	idempotencyService := idempotency.NewService(idempotencyRepository, idempotency.DefaultConfig())
-	resolver := authn.NewResolver(sessionService, credentialsService)
+	resolver := authn.NewResolver(identityModule.Session.Service, tenancyModule.Credentials.Service)
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)
 	organizationMiddleware := middleware.NewOrganizationMiddleware(queries)
 	rateLimitStore, err := redisClient.NewRateLimitStore()
@@ -204,12 +190,8 @@ func NewModules(db *pgxpool.Pool, callsController calls.Controller, conferenceCo
 
 	return Modules{
 		Commercial:           commercialModule,
-		Auth:                 AuthModule{Repository: authRepository, Service: authService, Handler: auth.NewHandler(authService, sessionService)},
-		Session:              SessionModule{Repository: sessionRepository, Service: sessionService, Handler: session.NewHandler(sessionService)},
-		Users:                UsersModule{Repository: usersRepository, Service: usersService, Handler: users.NewHandler(usersService)},
-		Organizations:        OrganizationModule{Repository: organizationRepository, Service: organizationService, Handler: organization.NewHandler(organizationService)},
-		Members:              MembersModule{Repository: membersRepository, Service: membersService, Handler: members.NewHandler(membersService)},
-		Credentials:          CredentialsModule{Repository: credentialsRepository, Service: credentialsService, Handler: credentials.NewHandler(credentialsService)},
+		Identity:             identityModule,
+		Tenancy:              tenancyModule,
 		Voice:                VoiceModule{Repository: voiceRepository, Service: voiceService, Handler: voice.NewHandler(voiceService)},
 		Calls:                CallsModule{Repository: callsRepository, Service: callsService, Handler: calls.NewHandler(callsService)},
 		Recordings:           RecordingsModule{Repository: recordingsRepository, Service: recordingsService, Handler: recordings.NewHandler(recordingsService)},
