@@ -83,3 +83,4 @@ $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
 $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
     -p "$FREESWITCH_ESL_PASSWORD" -x "sofia global siptrace on" >/dev/null
 python3 tests/acceptance/cloud-managed/acceptance.py
+python3 tests/acceptance/cloud-managed/prepaid_assertions.py
