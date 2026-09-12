@@ -45,6 +45,8 @@ type walletStub struct {
 	reserveIn   wallets.ReserveInput
 	captures    int
 	releases    int
+	captureRace bool
+	releaseRace bool
 }
 
 func (s *walletStub) Get(_ context.Context, _, _ uuid.UUID) (wallets.Wallet, error) {
@@ -78,12 +80,20 @@ func (s *walletStub) Capture(_ context.Context, _ uuid.UUID, _ uuid.UUID, amount
 	s.captures++
 	s.reservation.Status = wallets.ReservationCaptured
 	s.reservation.CapturedAmountMinor = &amount
+	if s.captureRace {
+		s.captureRace = false
+		return wallets.Reservation{}, wallets.ErrInvalidReservationState
+	}
 	return s.reservation, nil
 }
 
 func (s *walletStub) Release(context.Context, uuid.UUID, uuid.UUID) (wallets.Reservation, error) {
 	s.releases++
 	s.reservation.Status = wallets.ReservationReleased
+	if s.releaseRace {
+		s.releaseRace = false
+		return wallets.Reservation{}, wallets.ErrInvalidReservationState
+	}
 	return s.reservation, nil
 }
 
@@ -227,4 +237,66 @@ func TestReleaseManagedNumberPurchaseIsIdempotent(t *testing.T) {
 	if walletService.releases != 0 {
 		t.Fatalf("release count = %d, want 0", walletService.releases)
 	}
+}
+
+func TestCaptureManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
+	service, walletService, organizationID, operationID, reservationID, priceID, amount := managedNumberAuthorizationFixture(t)
+	walletService.captureRace = true
+
+	if err := service.CaptureManagedNumberPurchase(
+		context.Background(), organizationID, operationID, reservationID, priceID, amount, "USD",
+	); err != nil {
+		t.Fatalf("CaptureManagedNumberPurchase() concurrent replay error = %v", err)
+	}
+	if walletService.captures != 1 {
+		t.Fatalf("capture count = %d, want 1", walletService.captures)
+	}
+}
+
+func TestReleaseManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
+	organizationID := uuid.New()
+	operationID := uuid.New()
+	reservationID := uuid.New()
+	walletService := &walletStub{
+		reservation: wallets.Reservation{
+			ID: reservationID, OrganizationID: organizationID,
+			OperationType: managedNumberOperationType, OperationID: operationID.String(),
+			Status: wallets.ReservationActive,
+		},
+		releaseRace: true,
+	}
+	service := NewService(&catalogStub{}, &subscriptionStub{}, walletService)
+
+	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
+		t.Fatalf("ReleaseManagedNumberPurchase() concurrent replay error = %v", err)
+	}
+	if walletService.releases != 1 {
+		t.Fatalf("release count = %d, want 1", walletService.releases)
+	}
+}
+
+func managedNumberAuthorizationFixture(t *testing.T) (*Service, *walletStub, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64) {
+	t.Helper()
+	organizationID := uuid.New()
+	operationID := uuid.New()
+	reservationID := uuid.New()
+	priceID := uuid.New()
+	walletID := uuid.New()
+	amount := int64(2500)
+	walletService := &walletStub{
+		wallet: wallets.Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: wallets.StatusActive},
+		reservation: wallets.Reservation{
+			ID: reservationID, WalletID: walletID, OrganizationID: organizationID,
+			AmountMinor: amount, OperationType: managedNumberOperationType, OperationID: operationID.String(),
+			Status: wallets.ReservationActive, ExpiresAt: time.Now().Add(time.Hour),
+		},
+	}
+	service := NewService(
+		&catalogStub{pricesByID: map[uuid.UUID]catalog.Price{
+			priceID: {ID: priceID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &amount},
+		}},
+		&subscriptionStub{},
+		walletService,
+	)
+	return service, walletService, organizationID, operationID, reservationID, priceID, amount
 }

@@ -2,6 +2,7 @@ package prepaid
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -181,6 +182,18 @@ func (s *Service) CaptureManagedNumberPurchase(
 		amountMinor,
 		"managed-number-purchase:"+operationID.String(),
 	)
+	if errors.Is(err, wallets.ErrInvalidReservationState) {
+		// Another worker may have captured the reservation after the read in
+		// authorization. Re-read the durable state so concurrent reconciliation
+		// remains idempotent without treating a different terminal state as
+		// success.
+		reservation, verifyErr := s.authorization(
+			ctx, organizationID, operationID, reservationID, priceID, amountMinor, currency,
+		)
+		if verifyErr == nil && reservation.Status == wallets.ReservationCaptured {
+			return nil
+		}
+	}
 	return err
 }
 
@@ -204,6 +217,18 @@ func (s *Service) ReleaseManagedNumberPurchase(
 	switch reservation.Status {
 	case wallets.ReservationActive:
 		_, err = s.wallets.Release(ctx, organizationID, reservationID)
+		if errors.Is(err, wallets.ErrInvalidReservationState) {
+			// A concurrent worker may have released or expired the reservation
+			// after it was read above. Only those non-monetary terminal states are
+			// valid idempotent outcomes; capture must continue to fail closed.
+			reservation, readErr := s.wallets.GetReservation(ctx, organizationID, reservationID)
+			if readErr == nil &&
+				reservation.OperationType == managedNumberOperationType &&
+				reservation.OperationID == operationID.String() &&
+				(reservation.Status == wallets.ReservationReleased || reservation.Status == wallets.ReservationExpired) {
+				return nil
+			}
+		}
 		return err
 	case wallets.ReservationReleased, wallets.ReservationExpired:
 		return nil
