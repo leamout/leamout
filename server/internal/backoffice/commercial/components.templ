@@ -4,7 +4,7 @@ import "github.com/leamout/leamout/internal/backoffice/components"
 
 templ AccountTable(accounts []Account) {
 	@components.TableWithLinks(
-		[]string{"Organization", "Plan", "Subscription", "Billing Model", "Renews"},
+		[]string{"Organization", "Billing Model", "Wallets", "Currencies"},
 		accountRows(accounts),
 		accountLinks(accounts),
 	)
@@ -27,10 +27,9 @@ func accountRows(accounts []Account) [][]string {
 	for _, account := range accounts {
 		rows = append(rows, []string{
 			account.Organization,
-			account.Plan,
-			account.SubscriptionStatus,
 			account.BillingModel,
-			account.RenewsAt,
+			account.WalletCount,
+			account.Currencies,
 		})
 	}
 	return rows
