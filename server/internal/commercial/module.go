@@ -1,6 +1,9 @@
 package commercial
 
 import (
+	"context"
+
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
@@ -72,9 +75,33 @@ type UsageModule struct {
 	Service    *usage.Service
 }
 
+// WalletService is the Commercial composition facade. Monetary behavior is
+// provided by wallets.Service; managed-provider policy is delegated to the
+// dedicated authorization service so Wallets itself remains product-agnostic.
+type WalletService struct {
+	*wallets.Service
+	authorization *authorization.Service
+}
+
+func (s *WalletService) QuoteManagedNumberPurchase(ctx context.Context, organizationID uuid.UUID) (uuid.UUID, int64, string, error) {
+	return s.authorization.QuoteManagedNumberPurchase(ctx, organizationID)
+}
+func (s *WalletService) ReserveManagedNumberPurchase(ctx context.Context, organizationID, operationID, priceID uuid.UUID, amountMinor int64, currency string) (uuid.UUID, error) {
+	return s.authorization.ReserveManagedNumberPurchase(ctx, organizationID, operationID, priceID, amountMinor, currency)
+}
+func (s *WalletService) VerifyManagedNumberPurchase(ctx context.Context, organizationID, operationID, reservationID, priceID uuid.UUID, amountMinor int64, currency string) error {
+	return s.authorization.VerifyManagedNumberPurchase(ctx, organizationID, operationID, reservationID, priceID, amountMinor, currency)
+}
+func (s *WalletService) CaptureManagedNumberPurchase(ctx context.Context, organizationID, operationID, reservationID, priceID uuid.UUID, amountMinor int64, currency string) error {
+	return s.authorization.CaptureManagedNumberPurchase(ctx, organizationID, operationID, reservationID, priceID, amountMinor, currency)
+}
+func (s *WalletService) ReleaseManagedNumberPurchase(ctx context.Context, organizationID, operationID, reservationID uuid.UUID) error {
+	return s.authorization.ReleaseManagedNumberPurchase(ctx, organizationID, operationID, reservationID)
+}
+
 type WalletModule struct {
 	Repository *wallets.Repository
-	Service    *wallets.Service
+	Service    *WalletService
 	Handler    *wallets.Handler
 }
 
@@ -108,21 +135,17 @@ func New(db *pgxpool.Pool) *Module {
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
-	walletService := wallets.NewService(walletRepository)
-	walletHandler := wallets.NewHandler(walletService)
+	walletValueService := wallets.NewService(walletRepository)
+	walletHandler := wallets.NewHandler(walletValueService)
 
-	authorizationService := authorization.NewService(
-		commercialAccessService,
-		catalogService,
-		subscriptionsService,
-		walletService,
-	)
+	authorizationService := authorization.NewService(commercialAccessService, catalogService, subscriptionsService, walletValueService)
+	walletService := &WalletService{Service: walletValueService, authorization: authorizationService}
 
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
 	providerRegistry := payments.NewProviderRegistry()
 	paymentService := payments.NewService(paymentRepository, providerRegistry)
-	checkoutService := checkout.NewService(checkoutRepository, walletService, catalogService, subscriptionsService, paymentService)
+	checkoutService := checkout.NewService(checkoutRepository, walletValueService, catalogService, subscriptionsService, paymentService)
 	checkoutHandler := checkout.NewHandler(checkoutService)
 	paymentHandler := payments.NewHandler(paymentService, checkoutService)
 
