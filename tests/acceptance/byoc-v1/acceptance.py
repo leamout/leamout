@@ -199,6 +199,7 @@ def reject_digest_inbound(secret):
 
 def inbound_digest_authentication():
     opensips_before = compose("ps", "-q", "opensips")
+    if not opensips_before: raise Failure("OpenSIPS container id is unavailable before inbound credential rotation")
     item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-first-secret"})
     if item.get("inbound_auth_method") != "digest" or not item.get("has_inbound_credentials"): raise Failure("inbound digest credentials were not marked active")
     if "secret" in json.dumps(item).lower(): raise Failure("inbound credential leaked through the carrier API")
