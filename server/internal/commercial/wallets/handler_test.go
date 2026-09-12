@@ -1,4 +1,4 @@
-package prepaid
+package wallets
 
 import (
 	"encoding/json"

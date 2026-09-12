@@ -1,4 +1,4 @@
-# Prepaid Commercial Model
+# Wallets
 
 Leamout commercial state is organized around pay-before-use settlement. PostgreSQL is the monetary source of truth. Redis may cache availability or coordinate realtime authorization, but it never creates, destroys, or settles value.
 

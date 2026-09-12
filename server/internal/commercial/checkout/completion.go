@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 // CompletePayment applies the commercial effect of a settled payment. Payments
@@ -86,8 +86,8 @@ func (s *Service) fulfillSucceededCheckout(
 			ctx,
 			checkoutRecord.OrganizationID,
 			*checkoutRecord.WalletID,
-			prepaid.PostEntryInput{
-				Type:           prepaid.EntryTopup,
+			wallets.PostEntryInput{
+				Type:           wallets.EntryTopup,
 				AmountMinor:    checkoutRecord.AmountMinor,
 				SourceType:     "checkout",
 				SourceID:       checkoutRecord.ID.String(),
@@ -96,7 +96,7 @@ func (s *Service) fulfillSucceededCheckout(
 				OccurredAt:     &settledAt,
 			},
 		)
-		if errors.Is(err, prepaid.ErrDuplicateLedgerEntry) {
+		if errors.Is(err, wallets.ErrDuplicateLedgerEntry) {
 			return nil
 		}
 		return err

@@ -9,9 +9,9 @@ import (
 	"github.com/leamout/leamout/internal/commercial/entitlements"
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/usage"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 // Module is the composition boundary for Leamout's Commercial domain.
@@ -22,7 +22,7 @@ type Module struct {
 	Billing BillingModule
 	Access  AccessModule
 	Usage   UsageModule
-	Prepaid PrepaidModule
+	Wallets WalletModule
 }
 
 type CatalogModule struct {
@@ -72,11 +72,10 @@ type UsageModule struct {
 	Service    *usage.Service
 }
 
-type PrepaidModule struct {
-	Authorizations *prepaid.AuthorizationService
-	Repository     *prepaid.Repository
-	Service        *prepaid.Service
-	Handler        *prepaid.Handler
+type WalletModule struct {
+	Repository *wallets.Repository
+	Service    *wallets.Service
+	Handler    *wallets.Handler
 }
 
 type PaymentsModule struct {
@@ -119,10 +118,9 @@ func New(db *pgxpool.Pool) *Module {
 	usageRepository := usage.NewRepository(db)
 	usageService := usage.NewService(usageRepository)
 
-	walletRepository := prepaid.NewRepository(db)
-	walletService := prepaid.NewService(walletRepository)
-	walletHandler := prepaid.NewHandler(walletService)
-	authorizationService := prepaid.NewAuthorizationService(catalogService, subscriptionsService, walletService)
+	walletRepository := wallets.NewRepository(db)
+	walletService := wallets.NewService(walletRepository, catalogService, subscriptionsService)
+	walletHandler := wallets.NewHandler(walletService)
 
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
@@ -138,11 +136,10 @@ func New(db *pgxpool.Pool) *Module {
 	checkoutHandler := checkout.NewHandler(checkoutService)
 	paymentHandler := payments.NewHandler(paymentService, checkoutService)
 
-	prepaidModule := PrepaidModule{
-		Authorizations: authorizationService,
-		Repository:     walletRepository,
-		Service:        walletService,
-		Handler:        walletHandler,
+	walletModule := WalletModule{
+		Repository: walletRepository,
+		Service:    walletService,
+		Handler:    walletHandler,
 	}
 
 	return &Module{
@@ -186,6 +183,6 @@ func New(db *pgxpool.Pool) *Module {
 			Repository: usageRepository,
 			Service:    usageService,
 		},
-		Prepaid: prepaidModule,
+		Wallets: walletModule,
 	}
 }

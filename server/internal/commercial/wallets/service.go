@@ -1,4 +1,4 @@
-package prepaid
+package wallets
 
 import (
 	"context"
@@ -36,33 +36,94 @@ type authorizationWalletStore interface {
 	Release(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
 }
 
-// AuthorizationService owns prepaid authorization for managed-provider obligations that have
-// a fixed, server-owned customer price. Provider adapters never choose the
-// customer charge and never mutate wallet value directly.
-type AuthorizationService struct {
+type walletStore interface {
+	Create(context.Context, uuid.UUID, string) (Wallet, error)
+	List(context.Context, uuid.UUID) ([]Wallet, error)
+	Get(context.Context, uuid.UUID, uuid.UUID) (Wallet, error)
+	GetByCurrency(context.Context, uuid.UUID, string) (Wallet, error)
+	Balance(context.Context, uuid.UUID, uuid.UUID) (Balance, error)
+	Post(context.Context, uuid.UUID, uuid.UUID, PostEntryInput) (LedgerEntry, error)
+	ListEntries(context.Context, uuid.UUID, uuid.UUID) ([]LedgerEntry, error)
+	Reserve(context.Context, uuid.UUID, uuid.UUID, ReserveInput) (Reservation, error)
+	GetReservation(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
+	Capture(context.Context, uuid.UUID, uuid.UUID, int64, string) (Reservation, error)
+	Increase(context.Context, uuid.UUID, uuid.UUID, IncreaseReservationInput) (Reservation, error)
+	Release(context.Context, uuid.UUID, uuid.UUID) (Reservation, error)
+	Expire(context.Context) ([]Reservation, error)
+}
+
+// Service owns prepaid wallet rules. Its mutation methods are internal
+// Commercial capabilities and are not registered as generic HTTP APIs.
+type Service struct {
+	repo          walletStore
+	authWallet    authorizationWalletStore
 	catalog       catalogReader
 	subscriptions subscriptionReader
-	wallets       authorizationWalletStore
 	now           func() time.Time
 }
 
-func NewAuthorizationService(catalogService catalogReader, subscriptionService subscriptionReader, walletService authorizationWalletStore) *AuthorizationService {
-	return &AuthorizationService{
-		catalog:       catalogService,
-		subscriptions: subscriptionService,
-		wallets:       walletService,
-		now:           time.Now,
-	}
+func NewService(repo walletStore, catalog catalogReader, subscriptions subscriptionReader) *Service {
+	service := &Service{repo: repo, catalog: catalog, subscriptions: subscriptions, now: time.Now}
+	service.authWallet = service
+	return service
 }
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]Wallet, error) {
+	return s.repo.List(ctx, organizationID)
+}
+func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
+	return s.repo.Create(ctx, organizationID, currency)
+}
+func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (Wallet, error) {
+	return s.repo.Get(ctx, organizationID, id)
+}
+func (s *Service) GetByCurrency(ctx context.Context, organizationID uuid.UUID, currency string) (Wallet, error) {
+	return s.repo.GetByCurrency(ctx, organizationID, currency)
+}
+func (s *Service) Balance(ctx context.Context, organizationID, id uuid.UUID) (Balance, error) {
+	return s.repo.Balance(ctx, organizationID, id)
+}
+func (s *Service) Post(ctx context.Context, organizationID, id uuid.UUID, input PostEntryInput) (LedgerEntry, error) {
+	if input.Type == EntryCapture {
+		return LedgerEntry{}, ErrReservationRequired
+	}
+	return s.repo.Post(ctx, organizationID, id, input)
+}
+func (s *Service) ListEntries(ctx context.Context, organizationID, id uuid.UUID) ([]LedgerEntry, error) {
+	return s.repo.ListEntries(ctx, organizationID, id)
+}
+func (s *Service) Reserve(ctx context.Context, organizationID, id uuid.UUID, input ReserveInput) (Reservation, error) {
+	if err := validateReservationInput(input, s.now()); err != nil {
+		return Reservation{}, err
+	}
+	return s.repo.Reserve(ctx, organizationID, id, input)
+}
+func (s *Service) GetReservation(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
+	return s.repo.GetReservation(ctx, organizationID, id)
+}
+func (s *Service) Capture(ctx context.Context, organizationID, id uuid.UUID, amount int64, key string) (Reservation, error) {
+	if err := validateCaptureInput(amount); err != nil {
+		return Reservation{}, err
+	}
+	return s.repo.Capture(ctx, organizationID, id, amount, key)
+}
+func (s *Service) Increase(ctx context.Context, organizationID, id uuid.UUID, input IncreaseReservationInput) (Reservation, error) {
+	if input.AmountMinor <= 0 || !input.ExpiresAt.After(s.now()) {
+		return Reservation{}, ErrInvalidMoney
+	}
+	return s.repo.Increase(ctx, organizationID, id, input)
+}
+func (s *Service) Release(ctx context.Context, organizationID, id uuid.UUID) (Reservation, error) {
+	return s.repo.Release(ctx, organizationID, id)
+}
+func (s *Service) Expire(ctx context.Context) ([]Reservation, error) { return s.repo.Expire(ctx) }
 
-// QuoteManagedNumberPurchase resolves the one-time managed-number price from
-// the organization's current plan. The price currency follows the acquired
-// recurring subscription currency so customer money is never mixed across
-// currencies. The first managed-number product policy intentionally has one
-// flat one-time price per plan/currency; upstream DID cost remains separate.
-func (s *AuthorizationService) QuoteManagedNumberPurchase(ctx context.Context, organizationID uuid.UUID) (uuid.UUID, int64, string, error) {
+// Managed-number methods authorize provider spending against this wallet.
+func (s *Service) QuoteManagedNumberPurchase(ctx context.Context, organizationID uuid.UUID) (uuid.UUID, int64, string, error) {
 	if organizationID == uuid.Nil {
 		return uuid.Nil, 0, "", ErrManagedNumberAuthorizationInvalid
+	}
+	if s == nil || s.catalog == nil || s.subscriptions == nil {
+		return uuid.Nil, 0, "", ErrManagedNumberPriceUnavailable
 	}
 
 	subscription, err := s.subscriptions.Current(ctx, organizationID)
@@ -110,12 +171,15 @@ func (s *AuthorizationService) QuoteManagedNumberPurchase(ctx context.Context, o
 // ReserveManagedNumberPurchase revalidates a previously quoted server-owned
 // price, then reserves prepaid funds before Telecom may create the upstream
 // provider obligation.
-func (s *AuthorizationService) ReserveManagedNumberPurchase(
+func (s *Service) ReserveManagedNumberPurchase(
 	ctx context.Context,
 	organizationID, operationID, priceID uuid.UUID,
 	amountMinor int64,
 	currency string,
 ) (uuid.UUID, error) {
+	if s == nil || s.authWallet == nil {
+		return uuid.Nil, ErrManagedNumberAuthorizationInvalid
+	}
 	if operationID == uuid.Nil || priceID == uuid.Nil || amountMinor <= 0 {
 		return uuid.Nil, ErrManagedNumberAuthorizationInvalid
 	}
@@ -128,11 +192,11 @@ func (s *AuthorizationService) ReserveManagedNumberPurchase(
 		return uuid.Nil, ErrManagedNumberQuoteExpired
 	}
 
-	wallet, err := s.wallets.GetByCurrency(ctx, organizationID, currency)
+	wallet, err := s.authWallet.GetByCurrency(ctx, organizationID, currency)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	reservation, err := s.wallets.Reserve(ctx, organizationID, wallet.ID, ReserveInput{
+	reservation, err := s.authWallet.Reserve(ctx, organizationID, wallet.ID, ReserveInput{
 		AmountMinor:   amountMinor,
 		OperationType: managedNumberOperationType,
 		OperationID:   operationID.String(),
@@ -148,12 +212,15 @@ func (s *AuthorizationService) ReserveManagedNumberPurchase(
 // authorizes the exact managed-number purchase terms before a provider call.
 // Captured reservations are accepted so reconciliation can finish safely after
 // a capture succeeded but Telecom persistence had to retry.
-func (s *AuthorizationService) VerifyManagedNumberPurchase(
+func (s *Service) VerifyManagedNumberPurchase(
 	ctx context.Context,
 	organizationID, operationID, reservationID, priceID uuid.UUID,
 	amountMinor int64,
 	currency string,
 ) error {
+	if s == nil || s.authWallet == nil {
+		return ErrManagedNumberAuthorizationInvalid
+	}
 	_, err := s.authorization(ctx, organizationID, operationID, reservationID, priceID, amountMinor, currency)
 	return err
 }
@@ -161,7 +228,7 @@ func (s *AuthorizationService) VerifyManagedNumberPurchase(
 // CaptureManagedNumberPurchase captures exactly the fixed amount that was
 // reserved. The operation is idempotent when a previous capture already
 // completed with the same amount.
-func (s *AuthorizationService) CaptureManagedNumberPurchase(
+func (s *Service) CaptureManagedNumberPurchase(
 	ctx context.Context,
 	organizationID, operationID, reservationID, priceID uuid.UUID,
 	amountMinor int64,
@@ -174,7 +241,7 @@ func (s *AuthorizationService) CaptureManagedNumberPurchase(
 	if reservation.Status == ReservationCaptured {
 		return nil
 	}
-	_, err = s.wallets.Capture(
+	_, err = s.authWallet.Capture(
 		ctx,
 		organizationID,
 		reservationID,
@@ -199,14 +266,17 @@ func (s *AuthorizationService) CaptureManagedNumberPurchase(
 // ReleaseManagedNumberPurchase is idempotent for released/expired reservations.
 // Captured value cannot be released; any correction must be a compensating
 // ledger entry rather than rewriting monetary history.
-func (s *AuthorizationService) ReleaseManagedNumberPurchase(
+func (s *Service) ReleaseManagedNumberPurchase(
 	ctx context.Context,
 	organizationID, operationID, reservationID uuid.UUID,
 ) error {
+	if s == nil || s.authWallet == nil {
+		return ErrManagedNumberAuthorizationInvalid
+	}
 	if organizationID == uuid.Nil || operationID == uuid.Nil || reservationID == uuid.Nil {
 		return ErrManagedNumberAuthorizationInvalid
 	}
-	reservation, err := s.wallets.GetReservation(ctx, organizationID, reservationID)
+	reservation, err := s.authWallet.GetReservation(ctx, organizationID, reservationID)
 	if err != nil {
 		return err
 	}
@@ -215,12 +285,12 @@ func (s *AuthorizationService) ReleaseManagedNumberPurchase(
 	}
 	switch reservation.Status {
 	case ReservationActive:
-		_, err = s.wallets.Release(ctx, organizationID, reservationID)
+		_, err = s.authWallet.Release(ctx, organizationID, reservationID)
 		if errors.Is(err, ErrInvalidReservationState) {
 			// A concurrent worker may have released or expired the reservation
 			// after it was read above. Only those non-monetary terminal states are
 			// valid idempotent outcomes; capture must continue to fail closed.
-			reservation, readErr := s.wallets.GetReservation(ctx, organizationID, reservationID)
+			reservation, readErr := s.authWallet.GetReservation(ctx, organizationID, reservationID)
 			if readErr == nil &&
 				reservation.OperationType == managedNumberOperationType &&
 				reservation.OperationID == operationID.String() &&
@@ -238,12 +308,15 @@ func (s *AuthorizationService) ReleaseManagedNumberPurchase(
 	}
 }
 
-func (s *AuthorizationService) authorization(
+func (s *Service) authorization(
 	ctx context.Context,
 	organizationID, operationID, reservationID, priceID uuid.UUID,
 	amountMinor int64,
 	currency string,
 ) (Reservation, error) {
+	if s == nil || s.authWallet == nil || s.catalog == nil {
+		return Reservation{}, ErrManagedNumberAuthorizationInvalid
+	}
 	if organizationID == uuid.Nil || operationID == uuid.Nil || reservationID == uuid.Nil || priceID == uuid.Nil || amountMinor <= 0 {
 		return Reservation{}, ErrManagedNumberAuthorizationInvalid
 	}
@@ -261,7 +334,7 @@ func (s *AuthorizationService) authorization(
 		return Reservation{}, ErrManagedNumberAuthorizationInvalid
 	}
 
-	reservation, err := s.wallets.GetReservation(ctx, organizationID, reservationID)
+	reservation, err := s.authWallet.GetReservation(ctx, organizationID, reservationID)
 	if err != nil {
 		return Reservation{}, err
 	}
@@ -269,7 +342,7 @@ func (s *AuthorizationService) authorization(
 		return Reservation{}, ErrManagedNumberAuthorizationInvalid
 	}
 
-	wallet, err := s.wallets.Get(ctx, organizationID, reservation.WalletID)
+	wallet, err := s.authWallet.Get(ctx, organizationID, reservation.WalletID)
 	if err != nil {
 		return Reservation{}, err
 	}

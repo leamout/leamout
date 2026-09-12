@@ -121,14 +121,9 @@ wallet_reservations
 
 Managed telecom wholesale cost is a separate concern: provider CDRs reconcile into `wholesale_charges`; they are not usage pricing rules.
 
-The schema establishes financial invariants. The `commercial/prepaid` package
-owns wallets, immutable ledger entries, reservations, and managed-operation
-authorization policy as one cohesive pay-before-use boundary. Wallet mechanics
-remain isolated in `wallet_*.go` files, while provider-neutral authorization
-policy is named explicitly; there is no second, competing prepaid package. The
-`commercial/prepaid` and `commercial/checkout` repositories implement the four
-durable prepaid records: wallets, immutable ledger entries, funds reservations,
-and checkout orders.
+The schema establishes financial invariants. The `commercial/wallets` and
+`commercial/checkout` repositories implement the four durable prepaid records:
+wallets, immutable ledger entries, funds reservations, and checkout orders.
 Reservation admission serializes on the wallet row, and capture closes the
 reservation and posts its ledger debit in one transaction. Public checkout
 routes and provider-side effects remain separate vertical slices.
@@ -199,7 +194,7 @@ See [security.md](security.md) for the database defense model.
 - [Rating](rating.md) — customer-facing telecom usage pricing through usage rates.
 - [Invoicing](invoicing.md) — period statements and historical monetary snapshots.
 - [Payments](payments.md) — checkout intent and provider-independent payment reconciliation.
-- **Wallets** — currency-scoped prepaid value, immutable ledger movements, and provider-operation reservations.
+- [Wallets](wallets.md) — currency-scoped prepaid value, immutable ledger movements, and provider-operation reservations.
 
 ## Current boundaries
 

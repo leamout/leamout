@@ -9,8 +9,8 @@ import (
 	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/licensing"
 	"github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 // RegisterRoutes exposes Commercial HTTP routes. Authentication, organization
@@ -40,7 +40,7 @@ func RegisterRoutes(
 		organizationAccess("subscriptions"),
 		idempotency,
 	)
-	prepaid.RegisterRoutes(router, module.Prepaid.Handler, organizationAccess("billing"))
+	wallets.RegisterRoutes(router, module.Wallets.Handler, organizationAccess("billing"))
 	checkout.RegisterRoutes(router, module.Billing.Checkouts.Handler, organizationAccess("billing"), idempotency)
 	payments.RegisterRoutes(router, module.Billing.Payments.Handler)
 }

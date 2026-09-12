@@ -1,4 +1,4 @@
-package prepaid
+package wallets
 
 import (
 	"context"
@@ -11,6 +11,42 @@ import (
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
 )
+
+func TestPostRequiresReservationForCapture(t *testing.T) {
+	service := NewService(nil, nil, nil)
+	_, err := service.Post(context.Background(), uuid.New(), uuid.New(), PostEntryInput{Type: EntryCapture})
+	if !errors.Is(err, ErrReservationRequired) {
+		t.Fatalf("Post() error = %v, want %v", err, ErrReservationRequired)
+	}
+}
+
+func TestReserveRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
+	service := NewService(nil, nil, nil)
+	tests := []ReserveInput{
+		{AmountMinor: 0, ExpiresAt: time.Now().Add(time.Hour)},
+		{AmountMinor: 100, ExpiresAt: time.Now().Add(-time.Hour)},
+	}
+	for _, input := range tests {
+		_, err := service.Reserve(context.Background(), uuid.New(), uuid.New(), input)
+		if !errors.Is(err, ErrInvalidMoney) {
+			t.Fatalf("Reserve() error = %v, want %v", err, ErrInvalidMoney)
+		}
+	}
+}
+
+func TestIncreaseRejectsInvalidMoneyBeforeDatabaseAccess(t *testing.T) {
+	service := NewService(nil, nil, nil)
+	tests := []IncreaseReservationInput{
+		{AmountMinor: 0, ExpiresAt: time.Now().Add(time.Hour)},
+		{AmountMinor: 100, ExpiresAt: time.Now().Add(-time.Hour)},
+	}
+	for _, input := range tests {
+		_, err := service.Increase(context.Background(), uuid.New(), uuid.New(), input)
+		if !errors.Is(err, ErrInvalidMoney) {
+			t.Fatalf("Increase() error = %v, want %v", err, ErrInvalidMoney)
+		}
+	}
+}
 
 type catalogStub struct {
 	pricesByID map[uuid.UUID]catalog.Price
@@ -132,7 +168,7 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 		wallet:      Wallet{ID: walletID, OrganizationID: organizationID, Currency: "USD", Status: StatusActive},
 		reservation: Reservation{ID: reservationID},
 	}
-	service := NewAuthorizationService(catalogService, subscriptionService, walletService)
+	service := newAuthorizationTestService(catalogService, subscriptionService, walletService)
 	service.now = func() time.Time { return now }
 
 	priceID, quotedAmount, currency, err := service.QuoteManagedNumberPurchase(context.Background(), organizationID)
@@ -179,7 +215,7 @@ func TestManagedNumberPurchaseQuoteReserveAndCapture(t *testing.T) {
 }
 
 func TestManagedNumberPurchaseQuoteRequiresActiveSubscription(t *testing.T) {
-	service := NewAuthorizationService(
+	service := newAuthorizationTestService(
 		&catalogStub{},
 		&subscriptionStub{subscription: subscriptions.Subscription{Status: subscriptions.StatusPastDue}},
 		&walletStub{},
@@ -203,7 +239,7 @@ func TestManagedNumberPurchaseRejectsStaleQuote(t *testing.T) {
 		},
 		prices: []catalog.Price{{ID: purchasePriceID, PlanID: planID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &purchaseAmount}},
 	}
-	service := NewAuthorizationService(
+	service := newAuthorizationTestService(
 		catalogService,
 		&subscriptionStub{subscription: subscriptions.Subscription{PlanID: planID, PriceID: recurringPriceID, Status: subscriptions.StatusActive}},
 		&walletStub{},
@@ -228,7 +264,7 @@ func TestReleaseManagedNumberPurchaseIsIdempotent(t *testing.T) {
 			Status: ReservationReleased,
 		},
 	}
-	service := NewAuthorizationService(&catalogStub{}, &subscriptionStub{}, walletService)
+	service := newAuthorizationTestService(&catalogStub{}, &subscriptionStub{}, walletService)
 
 	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
 		t.Fatalf("ReleaseManagedNumberPurchase() error = %v", err)
@@ -264,7 +300,7 @@ func TestReleaseManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
 		},
 		releaseRace: true,
 	}
-	service := NewAuthorizationService(&catalogStub{}, &subscriptionStub{}, walletService)
+	service := newAuthorizationTestService(&catalogStub{}, &subscriptionStub{}, walletService)
 
 	if err := service.ReleaseManagedNumberPurchase(context.Background(), organizationID, operationID, reservationID); err != nil {
 		t.Fatalf("ReleaseManagedNumberPurchase() concurrent replay error = %v", err)
@@ -274,7 +310,7 @@ func TestReleaseManagedNumberPurchaseIsIdempotentAcrossWorkers(t *testing.T) {
 	}
 }
 
-func managedNumberAuthorizationFixture(t *testing.T) (*AuthorizationService, *walletStub, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64) {
+func managedNumberAuthorizationFixture(t *testing.T) (*Service, *walletStub, uuid.UUID, uuid.UUID, uuid.UUID, uuid.UUID, int64) {
 	t.Helper()
 	organizationID := uuid.New()
 	operationID := uuid.New()
@@ -290,7 +326,7 @@ func managedNumberAuthorizationFixture(t *testing.T) (*AuthorizationService, *wa
 			Status: ReservationActive, ExpiresAt: time.Now().Add(time.Hour),
 		},
 	}
-	service := NewAuthorizationService(
+	service := newAuthorizationTestService(
 		&catalogStub{pricesByID: map[uuid.UUID]catalog.Price{
 			priceID: {ID: priceID, PricingType: catalog.PricingTypeOneTime, Currency: "USD", AmountMinor: &amount},
 		}},
@@ -298,4 +334,8 @@ func managedNumberAuthorizationFixture(t *testing.T) (*AuthorizationService, *wa
 		walletService,
 	)
 	return service, walletService, organizationID, operationID, reservationID, priceID, amount
+}
+
+func newAuthorizationTestService(c catalogReader, subscriptions subscriptionReader, store authorizationWalletStore) *Service {
+	return &Service{catalog: c, subscriptions: subscriptions, authWallet: store, now: time.Now}
 }

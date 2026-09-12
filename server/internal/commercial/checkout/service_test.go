@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/prepaid"
 	"github.com/leamout/leamout/internal/commercial/subscriptions"
+	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
 type checkoutStoreStub struct {
@@ -80,24 +80,24 @@ func (s *checkoutStoreStub) ClaimRefresh(context.Context, uuid.UUID, uuid.UUID, 
 func (s *checkoutStoreStub) Expire(context.Context) ([]Checkout, error) { return nil, nil }
 
 type walletServiceStub struct {
-	wallet    prepaid.Wallet
-	postInput prepaid.PostEntryInput
+	wallet    wallets.Wallet
+	postInput wallets.PostEntryInput
 	postErr   error
 	posts     int
 }
 
-func (s *walletServiceStub) Get(context.Context, uuid.UUID, uuid.UUID) (prepaid.Wallet, error) {
+func (s *walletServiceStub) Get(context.Context, uuid.UUID, uuid.UUID) (wallets.Wallet, error) {
 	return s.wallet, nil
 }
 
 func (s *walletServiceStub) Post(
 	_ context.Context,
 	_, _ uuid.UUID,
-	input prepaid.PostEntryInput,
-) (prepaid.LedgerEntry, error) {
+	input wallets.PostEntryInput,
+) (wallets.LedgerEntry, error) {
 	s.posts++
 	s.postInput = input
-	return prepaid.LedgerEntry{}, s.postErr
+	return wallets.LedgerEntry{}, s.postErr
 }
 
 type catalogServiceStub struct {
@@ -193,10 +193,10 @@ func TestServiceRejectsInvalidCheckoutBeforePersistence(t *testing.T) {
 func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
 	store := &checkoutStoreStub{}
 	walletID := uuid.New()
-	walletsService := &walletServiceStub{wallet: prepaid.Wallet{
+	walletsService := &walletServiceStub{wallet: wallets.Wallet{
 		ID:       walletID,
 		Currency: "GHS",
-		Status:   prepaid.StatusActive,
+		Status:   wallets.StatusActive,
 	}}
 	service := NewService(store, walletsService, nil, nil, nil)
 

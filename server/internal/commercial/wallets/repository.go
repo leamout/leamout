@@ -1,4 +1,4 @@
-package prepaid
+package wallets
 
 import (
 	"context"
@@ -194,7 +194,7 @@ func (r *Repository) Capture(ctx context.Context, organizationID, id uuid.UUID, 
 }
 
 // Increase serializes on the wallet and extends an active hold only when the
-// additional amount remains fully prepaid.
+// additional amount remains fully wallets.
 func (r *Repository) Increase(ctx context.Context, organizationID, id uuid.UUID, input IncreaseReservationInput) (Reservation, error) {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
