@@ -43,6 +43,10 @@ func (r *Repository) SaveManagedSelection(ctx context.Context, organizationID uu
 	return selectionID, nil
 }
 
+func (r *Repository) LoadManagedSelection(ctx context.Context, organizationID uuid.UUID, selectionID string) (ManagedNumberCandidate, error) {
+	return r.loadSelection(ctx, organizationID, selectionID)
+}
+
 func (r *Repository) CreateBYOC(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
 	return r.queries.CreateBYOCPhoneNumber(ctx, sqlc.CreateBYOCPhoneNumberParams{
 		OrganizationID:      organizationID,
@@ -54,7 +58,12 @@ func (r *Repository) CreateBYOC(ctx context.Context, organizationID uuid.UUID, r
 	})
 }
 
-func (r *Repository) CreateManaged(ctx context.Context, organizationID uuid.UUID, selectionID string) (sqlc.PhoneNumber, error) {
+func (r *Repository) CreateManaged(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	selectionID string,
+	authorization ManagedNumberPurchaseAuthorization,
+) (sqlc.PhoneNumber, error) {
 	selection, err := r.loadSelection(ctx, organizationID, selectionID)
 	if err != nil {
 		return sqlc.PhoneNumber{}, err
@@ -99,6 +108,7 @@ func (r *Repository) CreateManaged(ctx context.Context, organizationID uuid.UUID
 		CountryCode:               selection.CountryCode,
 		CarrierConnectionID:       carrierConnectionID,
 		ProviderRoutingResourceID: providerRoutingResourceID,
+		PurchaseAuthorization:     authorization,
 	})
 	if err != nil {
 		return sqlc.PhoneNumber{}, fmt.Errorf("encode provider operation request: %w", err)
