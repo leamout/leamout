@@ -14,7 +14,7 @@ templ PageContent(organizations []Organization) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Tenancy</p>
 		<h1 class="mt-2 text-3xl font-bold">Organizations</h1>
-		<p class="mt-2 text-base-content/70">Inspect customer organizations, current plans, membership, and lifecycle state.</p>
+		<p class="mt-2 text-base-content/70">Inspect customer organizations, prepaid wallet coverage, membership, and lifecycle state.</p>
 	</div>
 	if len(organizations) == 0 {
 		<div class="alert"><span>No organizations found.</span></div>
@@ -48,9 +48,9 @@ templ DetailContent(organization Detail) {
 			<div class="stat-desc">Active memberships</div>
 		</div>
 		<div class="stat">
-			<div class="stat-title">Plan</div>
-			<div class="stat-value text-3xl">{ organization.Plan }</div>
-			<div class="stat-desc">Subscription: { organization.SubscriptionStatus }</div>
+			<div class="stat-title">Wallets</div>
+			<div class="stat-value text-3xl">{ fmt.Sprint(organization.Wallets) }</div>
+			<div class="stat-desc">{ organization.Currencies }</div>
 		</div>
 		<div class="stat">
 			<div class="stat-title">Billing model</div>
@@ -71,14 +71,11 @@ templ DetailContent(organization Detail) {
 		</section>
 
 		<section class="rounded-box border border-base-300 bg-base-100 p-6">
-			<h2 class="text-lg font-semibold">Commercial state</h2>
+			<h2 class="text-lg font-semibold">PAYG account</h2>
 			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
-				@DetailField("Plan", organization.Plan)
-				@DetailField("Subscription status", organization.SubscriptionStatus)
 				@DetailField("Billing model", organization.BillingModel)
-				@DetailField("Pricing type", organization.PricingType)
-				@DetailField("Renews", organization.RenewsAt)
-				@DetailField("Ends", organization.EndsAt)
+				@DetailField("Wallets", fmt.Sprint(organization.Wallets))
+				@DetailField("Currencies", organization.Currencies)
 			</dl>
 		</section>
 	</div>
