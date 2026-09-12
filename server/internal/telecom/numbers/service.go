@@ -416,25 +416,6 @@ func (s *Service) ExecuteProviderOperation(ctx context.Context, operation sqlc.P
 }
 
 func (s *Service) completeProviderOperation(ctx context.Context, operation sqlc.ProviderOperation, request ProviderOperationRequest, provider ManagedNumberProvider, providerResponse []byte) error {
-	providerNumber, err := provider.FindManagedNumber(ctx, request.Number)
-	if err != nil {
-		return s.handleProviderError(ctx, operation, request, fmt.Errorf("resolve purchased provider number: %w", err))
-	}
-	if strings.TrimSpace(providerNumber.ID) == "" {
-		return s.handleProviderError(ctx, operation, request, fmt.Errorf("provider returned purchased number without resource id"))
-	}
-	if strings.TrimSpace(providerNumber.Number) != request.Number {
-		return s.failOperation(ctx, operation, request, fmt.Errorf("provider returned unexpected purchased number %q", providerNumber.Number))
-	}
-	if strings.TrimSpace(providerNumber.RoutingResourceID) != request.ProviderRoutingResourceID {
-		providerNumber, err = provider.ConfigureNumberRouting(ctx, providerNumber.ID, request.ProviderRoutingResourceID)
-		if err != nil {
-			return s.handleProviderError(ctx, operation, request, fmt.Errorf("configure provider number routing: %w", err))
-		}
-		if strings.TrimSpace(providerNumber.RoutingResourceID) != request.ProviderRoutingResourceID {
-			return s.handleProviderError(ctx, operation, request, fmt.Errorf("provider number routing did not converge to expected resource"))
-		}
-	}
 	authorization := request.PurchaseAuthorization
 	if err := s.managedPurchase.CaptureManagedNumberPurchase(
 		ctx,
@@ -445,7 +426,27 @@ func (s *Service) completeProviderOperation(ctx context.Context, operation sqlc.
 		authorization.AmountMinor,
 		authorization.Currency,
 	); err != nil {
-		return fmt.Errorf("capture managed number purchase: %w", err)
+		return fmt.Errorf("capture completed managed number provider order: %w", err)
+	}
+
+	providerNumber, err := provider.FindManagedNumber(ctx, request.Number)
+	if err != nil {
+		return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("resolve purchased provider number: %w", err))
+	}
+	if strings.TrimSpace(providerNumber.ID) == "" {
+		return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("provider returned purchased number without resource id"))
+	}
+	if strings.TrimSpace(providerNumber.Number) != request.Number {
+		return s.failProviderOperation(ctx, operation, fmt.Errorf("provider returned unexpected purchased number %q", providerNumber.Number))
+	}
+	if strings.TrimSpace(providerNumber.RoutingResourceID) != request.ProviderRoutingResourceID {
+		providerNumber, err = provider.ConfigureNumberRouting(ctx, providerNumber.ID, request.ProviderRoutingResourceID)
+		if err != nil {
+			return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("configure provider number routing: %w", err))
+		}
+		if strings.TrimSpace(providerNumber.RoutingResourceID) != request.ProviderRoutingResourceID {
+			return s.handleCapturedProviderError(ctx, operation, fmt.Errorf("provider number routing did not converge to expected resource"))
+		}
 	}
 	if err := s.providerRepo.CompleteProviderOperation(ctx, operation, request, providerNumber.ID, providerResponse); err != nil {
 		return fmt.Errorf("complete managed number provider operation: %w", err)
@@ -464,6 +465,17 @@ func (s *Service) handleProviderError(ctx context.Context, operation sqlc.Provid
 	return nil
 }
 
+func (s *Service) handleCapturedProviderError(ctx context.Context, operation sqlc.ProviderOperation, err error) error {
+	var classified interface{ Retryable() bool }
+	if errors.As(err, &classified) && !classified.Retryable() {
+		return s.failProviderOperation(ctx, operation, err)
+	}
+	if recordErr := s.providerRepo.RecordProviderOperationFailure(ctx, operation.ID, err); recordErr != nil {
+		return fmt.Errorf("record provider operation failure after capture: %w", recordErr)
+	}
+	return nil
+}
+
 func (s *Service) failOperation(ctx context.Context, operation sqlc.ProviderOperation, request ProviderOperationRequest, err error) error {
 	authorization := request.PurchaseAuthorization
 	if s.managedPurchase != nil && authorization.ID != uuid.Nil && authorization.ReservationID != uuid.Nil {
@@ -476,6 +488,10 @@ func (s *Service) failOperation(ctx context.Context, operation sqlc.ProviderOper
 			return fmt.Errorf("release managed number purchase authorization: %w", releaseErr)
 		}
 	}
+	return s.failProviderOperation(ctx, operation, err)
+}
+
+func (s *Service) failProviderOperation(ctx context.Context, operation sqlc.ProviderOperation, err error) error {
 	if failErr := s.providerRepo.FailProviderOperation(ctx, operation, err); failErr != nil {
 		return fmt.Errorf("fail provider operation: %w", failErr)
 	}
