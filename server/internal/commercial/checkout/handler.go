@@ -66,9 +66,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	checkoutRecord, err := h.service.Create(r.Context(), organizationID, CreateParams{
-		WalletID: request.WalletID, AmountMinor: request.AmountMinor, Metadata: request.Metadata,
-	})
+	checkoutRecord, err := h.service.Create(r.Context(), organizationID, CreateParams(request))
 	if err != nil {
 		httputil.Error(w, err)
 		return
