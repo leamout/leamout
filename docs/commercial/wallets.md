@@ -1,6 +1,8 @@
 # Wallets
 
-Wallets are Leamout's prepaid monetary boundary. PostgreSQL is the source of truth for wallet value; Redis may coordinate realtime admission but never creates or settles money.
+Wallets are Leamout's prepaid monetary boundary for all Cloud and managed communications charges. PostgreSQL is the source of truth for wallet value; Redis may coordinate realtime admission but never creates or settles money.
+
+Self-Hosted software licenses are the sole commercial exception to the wallet-funded PAYG model. They are enterprise software agreements and are settled separately.
 
 ## Core records
 
@@ -12,7 +14,7 @@ wallet_reservations
 
 Each wallet belongs to one organization and one currency.
 
-A wallet does not represent a subscription, plan assignment, provider account, or telecom product.
+A wallet does not represent a subscription, enterprise license, provider account, or telecom product.
 
 ## Posted and spendable balance
 
@@ -36,6 +38,7 @@ Examples of credits:
 
 ```text
 wallet top-up
+verified bank-transfer funding
 refund
 credit adjustment
 ```
@@ -44,32 +47,37 @@ Examples of debits:
 
 ```text
 captured managed-service charge
+captured Cloud/platform charge
 chargeback
 debit adjustment
 ```
 
 A correction is a new compensating entry. Existing posted ledger rows are not rewritten.
 
+Enterprise Self-Hosted license settlement must not be posted as wallet credit merely because the customer paid Leamout by bank transfer.
+
 ## Reservation flow
 
 ```text
-managed operation requested
+chargeable operation requested
         ↓
 lock wallet
         ↓
 verify spendable balance
         ↓
-create reservation
+create reservation when required
         ↓
 commit
         ↓
-provider exposure allowed
+charge/provider exposure allowed
         ↓
 operation succeeds → capture
 operation fails before obligation → release
 ```
 
-Provider exposure must never happen before the reservation commit that authorizes it.
+For managed-provider operations, provider exposure must never happen before committed prepaid authorization.
+
+For other Cloud/platform consumption, the service must likewise prevent chargeable use from exceeding authorized prepaid value.
 
 ## Concurrency
 
@@ -83,7 +91,7 @@ For long-running managed operations such as voice, additional authorization must
 
 Wallets store and move money. They do not define customer prices.
 
-Customer-facing price comes from Catalog or from a concrete service-specific pricing decision made before reservation.
+Customer-facing price comes from Catalog or from a concrete service-specific pricing decision made before authorization.
 
 Provider wholesale cost remains separate:
 
@@ -140,20 +148,34 @@ The final customer charge must use Leamout-authorized customer terms, not a prov
 
 ## BYOC
 
-BYOC carrier usage does not consume Leamout managed-carrier wallet value merely because traffic is controlled by Leamout.
+BYOC means the customer owns the carrier relationship. That carrier's charges do not consume a Leamout managed-carrier wallet merely because traffic is controlled by Leamout.
 
-Commercial observation and provider-cost authorization are separate concerns.
+This does not create a postpaid Leamout model. Any chargeable Leamout Cloud/platform consumption still uses prepaid PAYG.
+
+For Self-Hosted + BYOC, the enterprise Self-Hosted software license is the relevant Leamout commercial obligation unless the customer also uses a Leamout managed service.
+
+## Self-Hosted + Managed
+
+A Self-Hosted + Managed customer has two separate commercial relationships:
+
+```text
+enterprise Self-Hosted software license
+        +
+prepaid managed-usage wallet
+```
+
+The license does not grant managed-usage credit. Managed usage must be funded and authorized from the wallet before provider exposure.
 
 ## Non-goals
 
 Wallets do not own:
 
-- subscriptions;
-- entitlements/access policy;
+- customer subscriptions;
+- enterprise Self-Hosted contract negotiation;
 - customer pricing definitions;
 - telecom fulfillment;
 - provider wholesale costing;
 - postpaid credit;
 - customer withdrawals;
 - FX conversion;
-- invoice-centric settlement.
+- invoice-centric usage settlement.
