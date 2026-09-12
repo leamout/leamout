@@ -2,11 +2,13 @@
 INSERT INTO deployments (
     license_id,
     deployment_id,
+    public_key,
     name
 )
 SELECT
     l.id AS license_id,
     sqlc.arg(deployment_id) AS deployment_id,
+    sqlc.arg(public_key) AS public_key,
     sqlc.narg(name) AS name
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
