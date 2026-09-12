@@ -2,6 +2,7 @@ package licensing
 
 import (
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -27,18 +28,19 @@ func TestSignerRoundTripV1(t *testing.T) {
 
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
 	claims := LicenseClaimsV1{
-		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		DeploymentID:   "node-01",
-		IssuedAt:       issuedAt,
-		ExpiresAt:      issuedAt.Add(24 * time.Hour),
+		LicenseID:           uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		OrganizationID:      uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		DeploymentID:        "node-01",
+		DeploymentPublicKey: testDeploymentPublicKey(1),
+		IssuedAt:            issuedAt,
+		ExpiresAt:           issuedAt.Add(24 * time.Hour),
 	}
 
 	artifact, err := signer.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
-	verified, err := keyring.VerifyV1(artifact, "node-01", issuedAt.Add(time.Minute))
+	verified, err := keyring.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute))
 	if err != nil {
 		t.Fatalf("VerifyV1() error = %v", err)
 	}
@@ -56,11 +58,12 @@ func TestSignerV1IsDeterministicForNormalizedClaims(t *testing.T) {
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 999, time.UTC)
 	claims := LicenseClaimsV1{
-		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		DeploymentID:   " node-01 ",
-		IssuedAt:       issuedAt,
-		ExpiresAt:      issuedAt.Add(time.Hour),
+		LicenseID:           uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		OrganizationID:      uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		DeploymentID:        " node-01 ",
+		DeploymentPublicKey: testDeploymentPublicKey(2),
+		IssuedAt:            issuedAt,
+		ExpiresAt:           issuedAt.Add(time.Hour),
 	}
 
 	first, err := signer.SignV1(claims)
@@ -89,13 +92,17 @@ func TestVerifyV1RejectsTamperingAndWrongDeployment(t *testing.T) {
 		t.Fatalf("NewKeyring() error = %v", err)
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	artifact, err := signer.SignV1(validTestClaims(issuedAt))
+	claims := validTestClaims(issuedAt)
+	artifact, err := signer.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
 
-	if _, err := keyring.VerifyV1(artifact, "node-02", issuedAt.Add(time.Minute)); !errors.Is(err, ErrDeploymentMismatch) {
+	if _, err := keyring.VerifyV1(artifact, "node-02", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrDeploymentMismatch) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrDeploymentMismatch)
+	}
+	if _, err := keyring.VerifyV1(artifact, "node-01", testDeploymentPublicKey(9), issuedAt.Add(time.Minute)); !errors.Is(err, ErrDeploymentKeyMismatch) {
+		t.Fatalf("VerifyV1() key error = %v, want %v", err, ErrDeploymentKeyMismatch)
 	}
 
 	var envelope SignedLicenseV1
@@ -107,7 +114,7 @@ func TestVerifyV1RejectsTamperingAndWrongDeployment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("json.Marshal() error = %v", err)
 	}
-	if _, err := keyring.VerifyV1(tampered, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) && !errors.Is(err, ErrMalformedArtifact) {
+	if _, err := keyring.VerifyV1(tampered, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) && !errors.Is(err, ErrMalformedArtifact) {
 		t.Fatalf("VerifyV1() error = %v, want tamper rejection", err)
 	}
 }
@@ -122,7 +129,8 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 		t.Fatalf("NewSigner(old) error = %v", err)
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	artifact, err := oldSigner.SignV1(validTestClaims(issuedAt))
+	claims := validTestClaims(issuedAt)
+	artifact, err := oldSigner.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
@@ -134,10 +142,10 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewKeyring() error = %v", err)
 	}
-	if _, err := keyring.VerifyV1(artifact, "node-01", issuedAt.Add(-time.Second)); !errors.Is(err, ErrArtifactNotYetValid) {
+	if _, err := keyring.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(-time.Second)); !errors.Is(err, ErrArtifactNotYetValid) {
 		t.Fatalf("VerifyV1(before issuance) error = %v, want %v", err, ErrArtifactNotYetValid)
 	}
-	if _, err := keyring.VerifyV1(artifact, "node-01", issuedAt.Add(2*time.Hour)); !errors.Is(err, ErrArtifactExpired) {
+	if _, err := keyring.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(2*time.Hour)); !errors.Is(err, ErrArtifactExpired) {
 		t.Fatalf("VerifyV1(at expiry) error = %v, want %v", err, ErrArtifactExpired)
 	}
 
@@ -145,19 +153,28 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewKeyring(new only) error = %v", err)
 	}
-	if _, err := newOnly.VerifyV1(artifact, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrSigningKeyUnavailable) {
+	if _, err := newOnly.VerifyV1(artifact, "node-01", claims.DeploymentPublicKey, issuedAt.Add(time.Minute)); !errors.Is(err, ErrSigningKeyUnavailable) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrSigningKeyUnavailable)
 	}
 }
 
 func validTestClaims(issuedAt time.Time) LicenseClaimsV1 {
 	return LicenseClaimsV1{
-		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		DeploymentID:   "node-01",
-		IssuedAt:       issuedAt,
-		ExpiresAt:      issuedAt.Add(2 * time.Hour),
+		LicenseID:           uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		OrganizationID:      uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		DeploymentID:        "node-01",
+		DeploymentPublicKey: testDeploymentPublicKey(3),
+		IssuedAt:            issuedAt,
+		ExpiresAt:           issuedAt.Add(2 * time.Hour),
 	}
+}
+
+func testDeploymentPublicKey(marker byte) string {
+	key := make([]byte, ed25519.PublicKeySize)
+	for index := range key {
+		key[index] = marker + byte(index)
+	}
+	return base64.RawURLEncoding.EncodeToString(key)
 }
 
 func testPrivateKey(marker byte) ed25519.PrivateKey {
