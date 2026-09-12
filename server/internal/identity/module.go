@@ -18,13 +18,11 @@ type AuthModule struct {
 	Service    *auth.Service
 	Handler    *auth.Handler
 }
-
 type SessionModule struct {
 	Repository *session.Repository
 	Service    *session.Service
 	Handler    *session.Handler
 }
-
 type UsersModule struct {
 	Repository *users.Repository
 	Service    *users.Service
@@ -38,22 +36,9 @@ func New(queries *sqlc.Queries) *Module {
 	authService := auth.NewService(authRepository)
 	usersRepository := users.NewRepository(queries)
 	usersService := users.NewService(usersRepository)
-
 	return &Module{
-		Auth: AuthModule{
-			Repository: authRepository,
-			Service:    authService,
-			Handler:    auth.NewHandler(authService, sessionService),
-		},
-		Session: SessionModule{
-			Repository: sessionRepository,
-			Service:    sessionService,
-			Handler:    session.NewHandler(sessionService),
-		},
-		Users: UsersModule{
-			Repository: usersRepository,
-			Service:    usersService,
-			Handler:    users.NewHandler(usersService),
-		},
+		Auth:    AuthModule{Repository: authRepository, Service: authService, Handler: auth.NewHandler(authService, sessionService)},
+		Session: SessionModule{Repository: sessionRepository, Service: sessionService, Handler: session.NewHandler(sessionService)},
+		Users:   UsersModule{Repository: usersRepository, Service: usersService, Handler: users.NewHandler(usersService)},
 	}
 }
