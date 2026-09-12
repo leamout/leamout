@@ -2,7 +2,7 @@
 
 This suite validates carrier onboarding and SIP routing independently from programmable media controls.
 
-It verifies the production-seeded generic provider, organization-scoped carrier connections, encrypted/redacted credential management, live source-IP authorization changes, trunk and endpoint provisioning, DID ownership, real inbound and outbound SIP calls, route attribution, disable behavior, and restart persistence.
+It verifies the production-seeded generic provider, organization-scoped carrier connections, encrypted/redacted credential management, live inbound and outbound digest credential rotation, live source-IP authorization changes, trunk and endpoint provisioning, DID ownership, real inbound and outbound SIP calls, route attribution, disable behavior, and restart persistence.
 
 Run from the repository root:
 

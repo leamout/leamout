@@ -7,6 +7,7 @@ TOKEN_B = os.getenv("BYOC_V1_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnop
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "byoc-v1-esl-secret")
 SUITE_DIR = os.getenv("BYOC_V1_SUITE_DIR", os.path.dirname(os.path.abspath(__file__)))
 DID, CALLER = "+15551234567", "+15557654321"
+INBOUND_USER, INBOUND_REALM = "carrier-ingress", "leamout.example"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/byoc-v1/compose.yaml"]
 S, RESULTS = {}, []
 
@@ -73,6 +74,14 @@ def assert_digest_runtime(secret_name, expected_ha1):
     if runtime != expected: raise Failure(f"realm-bound runtime HA1 mismatch: {runtime!r}")
     opensips_password = psql(f"SELECT password FROM opensips_outbound_carrier_credentials WHERE carrier_connection_id='{connection_id}'")
     if opensips_password != "0x" + expected_ha1: raise Failure("OpenSIPS outbound HA1 view was not updated")
+
+def assert_inbound_digest_runtime(secret_name, expected_ha1):
+    connection_id = S["connection"]["id"]
+    stored = psql(f"SELECT inbound_secret_ciphertext FROM carrier_connections WHERE id='{connection_id}'")
+    if not stored or secret_name in stored: raise Failure("inbound credential was not encrypted")
+    runtime = psql(f"SELECT username||':'||realm||':'||ha1_md5 FROM carrier_digest_credentials WHERE carrier_connection_id='{connection_id}' AND direction='inbound'")
+    expected = f"{INBOUND_USER}:{INBOUND_REALM}:{expected_ha1}"
+    if runtime != expected: raise Failure(f"inbound realm-bound runtime HA1 mismatch: {runtime!r}")
 
 def connection_and_auth():
     item = api("POST", "/v1/carrier-connections/", {"provider_id": S["provider"]["id"], "name": "BYOC synthetic carrier", "inbound_enabled": True}, (201,))
@@ -152,6 +161,61 @@ def rejected_before_allowlist():
     if "+OK" in output: raise Failure("untrusted carrier source was accepted")
     return "unknown carrier source is rejected"
 
+def digest_inbound(secret, label):
+    carrier_uuid = str(uuid.uuid4())
+    before = {x["id"] for x in api("GET", "/v1/calls/?limit=100")["calls"]}
+    try:
+        output = fs(
+            "bgapi originate "
+            f"{{origination_uuid={carrier_uuid},origination_caller_id_number={CALLER},"
+            f"sip_auth_username={INBOUND_USER},sip_auth_password={secret},originate_timeout=10}}"
+            f"sofia/internal/{DID}@opensips:5060 &park()"
+        )
+        if "+OK Job-UUID:" not in output: raise Failure("digest carrier originate was not queued: " + output)
+        call = wait("digest-authenticated inbound call", lambda: next((x for x in api("GET", "/v1/calls/?limit=100")["calls"] if x["id"] not in before and x["direction"] == "inbound"), None), 15)
+        if call.get("carrier_connection_id") != S["connection"]["id"]: raise Failure("inbound call lost carrier connection attribution")
+        if call.get("application_id") != S["app"]["id"]: raise Failure("inbound call lost voice application attribution")
+        S[f"inbound_{label}"] = call
+        return call
+    finally:
+        fs(f"uuid_kill {carrier_uuid}")
+
+def reject_digest_inbound(secret):
+    carrier_uuid = str(uuid.uuid4())
+    before = {x["id"] for x in api("GET", "/v1/calls/?limit=100")["calls"]}
+    try:
+        output = fs(
+            "bgapi originate "
+            f"{{origination_uuid={carrier_uuid},origination_caller_id_number={CALLER},"
+            f"sip_auth_username={INBOUND_USER},sip_auth_password={secret},originate_timeout=4}}"
+            f"sofia/internal/{DID}@opensips:5060 &park()"
+        )
+        if "+OK Job-UUID:" not in output: raise Failure("rejected digest carrier originate was not queued: " + output)
+        time.sleep(5)
+        created = [x for x in api("GET", "/v1/calls/?limit=100")["calls"] if x["id"] not in before and x["direction"] == "inbound"]
+        if created: raise Failure("retired inbound credential created a call")
+    finally:
+        fs(f"uuid_kill {carrier_uuid}")
+
+def inbound_digest_authentication():
+    opensips_before = compose("ps", "-q", "opensips")
+    item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-first-secret"})
+    if item.get("inbound_auth_method") != "digest" or not item.get("has_inbound_credentials"): raise Failure("inbound digest credentials were not marked active")
+    if "secret" in json.dumps(item).lower(): raise Failure("inbound credential leaked through the carrier API")
+    assert_inbound_digest_runtime("inbound-first-secret", "1be56698868f63eab7fdcac07b27456d")
+    first = digest_inbound("inbound-first-secret", "first-secret")
+
+    item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-rotated-secret"})
+    if not item.get("has_inbound_credentials"): raise Failure("rotated inbound credentials were not marked active")
+    assert_inbound_digest_runtime("inbound-rotated-secret", "a06afa76373bdf3c947036292b21e083")
+    reject_digest_inbound("inbound-first-secret")
+    rotated = digest_inbound("inbound-rotated-secret", "rotated-secret")
+    if compose("ps", "-q", "opensips") != opensips_before: raise Failure("OpenSIPS restarted during inbound credential rotation")
+
+    api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"ip"})
+    if psql(f"SELECT count(*) FROM carrier_digest_credentials WHERE carrier_connection_id='{S['connection']['id']}' AND direction='inbound'") != "0": raise Failure("inbound digest runtime material survived the switch to IP auth")
+    return f"authenticated calls {first['id']} and {rotated['id']} across live credential rotation"
+
 def add_source_and_inbound():
     source = api("POST", f"/v1/carrier-connections/{S['connection']['id']}/source-ips", {"cidr":"172.30.0.50/32"}, (201,))
     carrier_uuid = str(uuid.uuid4())
@@ -196,6 +260,7 @@ def main():
         ("Authenticate outbound with first secret", first_authenticated_outbound),
         ("Rotate digest auth without OpenSIPS restart", rotate_and_authenticated_outbound),
         ("Reject unknown source", rejected_before_allowlist),
+        ("Authenticate and rotate inbound digest", inbound_digest_authentication),
         ("Apply source IP live", add_source_and_inbound),
         ("Disable carrier routing", disable_rejects_routes),
         ("Recover configuration", restart_persistence),
