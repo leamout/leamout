@@ -7,9 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/internal/commercial/catalog"
 	commercialpayments "github.com/leamout/leamout/internal/commercial/payments"
-	"github.com/leamout/leamout/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/internal/commercial/wallets"
 )
 
@@ -100,49 +98,6 @@ func (s *walletServiceStub) Post(
 	return wallets.LedgerEntry{}, s.postErr
 }
 
-type catalogServiceStub struct {
-	price   catalog.Price
-	plan    catalog.Plan
-	product catalog.Product
-}
-
-func (s *catalogServiceStub) GetPrice(context.Context, uuid.UUID) (catalog.Price, error) {
-	return s.price, nil
-}
-
-func (s *catalogServiceStub) GetPlan(context.Context, uuid.UUID) (catalog.Plan, error) {
-	return s.plan, nil
-}
-
-func (s *catalogServiceStub) GetProduct(context.Context, uuid.UUID) (catalog.Product, error) {
-	return s.product, nil
-}
-
-type subscriptionServiceStub struct {
-	current    subscriptions.Subscription
-	currentErr error
-	created    subscriptions.CreateInput
-	createErr  error
-	creates    int
-}
-
-func (s *subscriptionServiceStub) Create(
-	_ context.Context,
-	_ uuid.UUID,
-	input subscriptions.CreateInput,
-) (subscriptions.Subscription, error) {
-	s.creates++
-	s.created = input
-	return subscriptions.Subscription{}, s.createErr
-}
-
-func (s *subscriptionServiceStub) Current(context.Context, uuid.UUID) (subscriptions.Subscription, error) {
-	if s.currentErr != nil {
-		return subscriptions.Subscription{}, s.currentErr
-	}
-	return s.current, nil
-}
-
 type paymentServiceStub struct {
 	available  bool
 	payment    commercialpayments.Payment
@@ -179,7 +134,7 @@ func (s *paymentServiceStub) Refresh(context.Context, string, string) (commercia
 
 func TestServiceRejectsInvalidCheckoutBeforePersistence(t *testing.T) {
 	repository := &checkoutRepositoryStub{}
-	service := newTestService(repository, nil, nil, nil, nil)
+	service := newTestService(repository, nil, nil)
 
 	_, err := service.Create(t.Context(), uuid.New(), CreateParams{})
 	if !errors.Is(err, ErrInvalidCheckout) {
@@ -198,15 +153,17 @@ func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
 		Currency: "GHS",
 		Status:   wallets.StatusActive,
 	}}
-	service := newTestService(repository, walletsService, nil, nil, nil)
+	service := newTestService(repository, walletsService, nil)
 
 	result, err := service.Create(t.Context(), uuid.New(), CreateParams{
-		Type:        TypeWalletTopup,
 		WalletID:    &walletID,
 		AmountMinor: 5000,
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
+	}
+	if result.Type != TypeWalletTopup {
+		t.Fatalf("checkout type = %s, want %s", result.Type, TypeWalletTopup)
 	}
 	if result.Currency != "GHS" || result.AmountMinor != 5000 {
 		t.Fatalf("checkout terms = %s %d", result.Currency, result.AmountMinor)
@@ -216,49 +173,14 @@ func TestCreateWalletTopupUsesWalletCurrency(t *testing.T) {
 	}
 }
 
-func TestCreateSubscriptionUsesCatalogPrice(t *testing.T) {
-	repository := &checkoutRepositoryStub{}
-	priceID := uuid.New()
-	planID := uuid.New()
-	productID := uuid.New()
-	amount := int64(2500)
-	interval := catalog.BillingIntervalMonth
-	now := time.Now().UTC().Add(-time.Minute)
-	catalogService := &catalogServiceStub{
-		price: catalog.Price{
-			ID:              priceID,
-			PlanID:          planID,
-			PricingType:     catalog.PricingTypeRecurring,
-			Currency:        "USD",
-			AmountMinor:     &amount,
-			BillingInterval: &interval,
-			Active:          true,
-			EffectiveFrom:   now,
-		},
-		plan:    catalog.Plan{ID: planID, ProductID: productID, Active: true},
-		product: catalog.Product{ID: productID, Active: true},
-	}
-	subscriptionsService := &subscriptionServiceStub{currentErr: subscriptions.ErrSubscriptionNotFound}
-	service := newTestService(repository, nil, catalogService, subscriptionsService, nil)
-
-	result, err := service.Create(t.Context(), uuid.New(), CreateParams{
-		Type:    TypeSubscription,
-		PriceID: &priceID,
-	})
-	if err != nil {
-		t.Fatalf("Create() error = %v", err)
-	}
-	if result.AmountMinor != amount || result.Currency != "USD" {
-		t.Fatalf("checkout terms = %s %d", result.Currency, result.AmountMinor)
-	}
-}
-
 func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 	organizationID := uuid.New()
 	checkoutID := uuid.New()
+	walletID := uuid.New()
 	repository := &checkoutRepositoryStub{checkout: Checkout{
 		ID:             checkoutID,
 		OrganizationID: organizationID,
+		WalletID:       &walletID,
 		Type:           TypeWalletTopup,
 		Reference:      "checkout.test",
 		AmountMinor:    5000,
@@ -281,7 +203,7 @@ func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 			},
 		},
 	}
-	service := newTestService(repository, nil, nil, nil, paymentsService)
+	service := newTestService(repository, nil, paymentsService)
 
 	result, err := service.Confirm(t.Context(), organizationID, checkoutID, ConfirmInput{
 		PaymentMethod: MethodCard,
@@ -301,8 +223,6 @@ func TestConfirmDelegatesCollectionToPayments(t *testing.T) {
 func newTestService(
 	repo *checkoutRepositoryStub,
 	wallet *walletServiceStub,
-	catalog *catalogServiceStub,
-	subscriptions *subscriptionServiceStub,
 	payments *paymentServiceStub,
 ) *Service {
 	service := &Service{now: time.Now}
@@ -319,16 +239,6 @@ func newTestService(
 	}
 	if wallet != nil {
 		service.wallets = walletOperations{get: wallet.Get, post: wallet.Post}
-	}
-	if catalog != nil {
-		service.catalog = catalogOperations{
-			getPrice:   catalog.GetPrice,
-			getPlan:    catalog.GetPlan,
-			getProduct: catalog.GetProduct,
-		}
-	}
-	if subscriptions != nil {
-		service.subscriptions = subscriptionOperations{create: subscriptions.Create, current: subscriptions.Current}
 	}
 	if payments != nil {
 		service.payments = paymentOperations{
