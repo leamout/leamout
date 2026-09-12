@@ -1,6 +1,8 @@
 package licensing
 
 import (
+	"crypto/ed25519"
+	"encoding/base64"
 	"strings"
 	"time"
 
@@ -80,6 +82,11 @@ func normalizeDeployment(input ActivateDeploymentInput) (ActivateDeploymentInput
 	if strings.IndexFunc(input.DeploymentID, func(r rune) bool { return r == ' ' || r == '\t' || r == '\n' || r == '\r' }) >= 0 {
 		return ActivateDeploymentInput{}, ErrInvalidDeploymentID
 	}
+	publicKey, err := normalizeDeploymentPublicKey(input.PublicKey)
+	if err != nil {
+		return ActivateDeploymentInput{}, err
+	}
+	input.PublicKey = publicKey
 	if input.Name != nil {
 		name := strings.TrimSpace(*input.Name)
 		if name == "" {
@@ -88,4 +95,16 @@ func normalizeDeployment(input ActivateDeploymentInput) (ActivateDeploymentInput
 		input.Name = &name
 	}
 	return input, nil
+}
+
+func normalizeDeploymentPublicKey(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", ErrDeploymentPublicKeyRequired
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil || len(decoded) != ed25519.PublicKeySize {
+		return "", ErrInvalidDeploymentPublicKey
+	}
+	return base64.RawURLEncoding.EncodeToString(decoded), nil
 }
