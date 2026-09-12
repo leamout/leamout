@@ -88,7 +88,7 @@ func NewKeyring(keys map[string]ed25519.PublicKey) (*Keyring, error) {
 	return result, nil
 }
 
-func (k *Keyring) VerifyV1(artifact []byte, expectedDeploymentID string, at time.Time) (LicenseClaimsV1, error) {
+func (k *Keyring) VerifyV1(artifact []byte, expectedDeploymentID, expectedDeploymentPublicKey string, at time.Time) (LicenseClaimsV1, error) {
 	envelope, payload, signature, err := decodeArtifactV1(artifact)
 	if err != nil {
 		return LicenseClaimsV1{}, err
@@ -105,12 +105,22 @@ func (k *Keyring) VerifyV1(artifact []byte, expectedDeploymentID string, at time
 		return LicenseClaimsV1{}, err
 	}
 
-	expected, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: expectedDeploymentID})
+	expectedDeploymentID = strings.TrimSpace(expectedDeploymentID)
+	if expectedDeploymentID == "" {
+		return LicenseClaimsV1{}, ErrDeploymentIDRequired
+	}
+	if strings.IndexFunc(expectedDeploymentID, unicode.IsSpace) >= 0 {
+		return LicenseClaimsV1{}, ErrInvalidDeploymentID
+	}
+	if claims.DeploymentID != expectedDeploymentID {
+		return LicenseClaimsV1{}, ErrDeploymentMismatch
+	}
+	expectedDeploymentPublicKey, err = normalizeDeploymentPublicKey(expectedDeploymentPublicKey)
 	if err != nil {
 		return LicenseClaimsV1{}, err
 	}
-	if claims.DeploymentID != expected.DeploymentID {
-		return LicenseClaimsV1{}, ErrDeploymentMismatch
+	if claims.DeploymentPublicKey != expectedDeploymentPublicKey {
+		return LicenseClaimsV1{}, ErrDeploymentKeyMismatch
 	}
 	at = at.UTC()
 	if at.Before(claims.IssuedAt) {
