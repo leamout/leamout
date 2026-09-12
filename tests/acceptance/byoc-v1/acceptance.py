@@ -7,7 +7,9 @@ TOKEN_B = os.getenv("BYOC_V1_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnop
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "byoc-v1-esl-secret")
 SUITE_DIR = os.getenv("BYOC_V1_SUITE_DIR", os.path.dirname(os.path.abspath(__file__)))
 DID, CALLER = "+15551234567", "+15557654321"
-INBOUND_USER, INBOUND_REALM = "carrier-ingress", "leamout.example"
+# OpenSIPS derives the initial proxy-auth challenge realm from this suite's
+# Request-URI host, so the provisioned HA1 must use the same realm.
+INBOUND_USER, INBOUND_REALM = "carrier-ingress", "opensips"
 COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/byoc-v1/compose.yaml"]
 S, RESULTS = {}, []
 
@@ -200,22 +202,23 @@ def reject_digest_inbound(secret):
 def inbound_digest_authentication():
     opensips_before = compose("ps", "-q", "opensips")
     if not opensips_before: raise Failure("OpenSIPS container id is unavailable before inbound credential rotation")
-    item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-first-secret"})
-    if item.get("inbound_auth_method") != "digest" or not item.get("has_inbound_credentials"): raise Failure("inbound digest credentials were not marked active")
-    if "secret" in json.dumps(item).lower(): raise Failure("inbound credential leaked through the carrier API")
-    assert_inbound_digest_runtime("inbound-first-secret", "1be56698868f63eab7fdcac07b27456d")
-    first = digest_inbound("inbound-first-secret", "first-secret")
+    try:
+        item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-first-secret"})
+        if item.get("inbound_auth_method") != "digest" or not item.get("has_inbound_credentials"): raise Failure("inbound digest credentials were not marked active")
+        if "secret" in json.dumps(item).lower(): raise Failure("inbound credential leaked through the carrier API")
+        assert_inbound_digest_runtime("inbound-first-secret", "52acfa1f07012328a7abe98652bcc991")
+        first = digest_inbound("inbound-first-secret", "first-secret")
 
-    item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-rotated-secret"})
-    if not item.get("has_inbound_credentials"): raise Failure("rotated inbound credentials were not marked active")
-    assert_inbound_digest_runtime("inbound-rotated-secret", "a06afa76373bdf3c947036292b21e083")
-    reject_digest_inbound("inbound-first-secret")
-    rotated = digest_inbound("inbound-rotated-secret", "rotated-secret")
-    if compose("ps", "-q", "opensips") != opensips_before: raise Failure("OpenSIPS restarted during inbound credential rotation")
-
-    api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"ip"})
-    if psql(f"SELECT count(*) FROM carrier_digest_credentials WHERE carrier_connection_id='{S['connection']['id']}' AND direction='inbound'") != "0": raise Failure("inbound digest runtime material survived the switch to IP auth")
-    return f"authenticated calls {first['id']} and {rotated['id']} across live credential rotation"
+        item = api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"digest", "username":INBOUND_USER, "realm":INBOUND_REALM, "secret":"inbound-rotated-secret"})
+        if not item.get("has_inbound_credentials"): raise Failure("rotated inbound credentials were not marked active")
+        assert_inbound_digest_runtime("inbound-rotated-secret", "cb32cbf42135dab46695c19977612e9a")
+        reject_digest_inbound("inbound-first-secret")
+        rotated = digest_inbound("inbound-rotated-secret", "rotated-secret")
+        if compose("ps", "-q", "opensips") != opensips_before: raise Failure("OpenSIPS restarted during inbound credential rotation")
+        return f"authenticated calls {first['id']} and {rotated['id']} across live credential rotation"
+    finally:
+        api("PUT", f"/v1/carrier-connections/{S['connection']['id']}/inbound-auth", {"method":"ip"})
+        if psql(f"SELECT count(*) FROM carrier_digest_credentials WHERE carrier_connection_id='{S['connection']['id']}' AND direction='inbound'") != "0": raise Failure("inbound digest runtime material survived the switch to IP auth")
 
 def add_source_and_inbound():
     source = api("POST", f"/v1/carrier-connections/{S['connection']['id']}/source-ips", {"cidr":"172.30.0.50/32"}, (201,))
