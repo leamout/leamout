@@ -13,7 +13,7 @@ prices
 meters
 ```
 
-`products` describe what Leamout sells. `plans` package product access. `prices` contain recurring and metered customer-facing prices. `meters` define measurable consumption units.
+`products` describe what Leamout sells. `plans` package product access. `prices` contain one-time, recurring, and metered customer-facing prices. `meters` define measurable consumption units.
 
 ### Access
 
@@ -41,17 +41,17 @@ wallet_ledger_entries
 wallet_reservations
 ```
 
-Wallet ledger entries are immutable posted credits and debits. Reservations temporarily hold spendable balance before the final charge is known. Available balance is posted balance minus active reservations.
+Wallet ledger entries are immutable posted credits and debits. Reservations temporarily hold spendable balance before the final charge is known or before an asynchronous managed-provider operation becomes irrevocable. Available balance is posted balance minus active reservations.
 
 ### Payments
 
 ```text
-checkout_orders
+checkouts
 payments
 payment_provider_events
 ```
 
-Checkout orders represent customer payment intent. Payments represent reconciled money movement. Provider events are retained for webhook idempotency, verification, and reconciliation.
+Checkouts represent customer purchase intent. Payments represent reconciled money movement. Provider events are retained for webhook idempotency, verification, and reconciliation.
 
 ## Four-quadrant billing rule
 
@@ -74,7 +74,7 @@ Examples:
 Enterprise software        USD 50,000 / year
 Cloud voice processing     USD 0.002 / minute
 Managed Ghana voice        USD 0.017 / minute
-Managed phone number       USD 2.00 / month
+Managed number purchase    USD 2.00 one-time
 ```
 
 Provider wholesale cost remains separate from customer-facing prices. Upstream carrier cost is COGS and must never be stored as a customer `price`.
@@ -99,7 +99,42 @@ final price resolution
 ledger debit + reservation release/capture
 ```
 
-A managed-provider obligation must not be created unless sufficient prepaid funds have been authorized. Fixed charges may post an atomic debit directly; variable-cost operations should reserve funds first.
+A managed-provider obligation must not be created unless sufficient prepaid funds have been authorized. Fixed charges may post an atomic debit directly; asynchronous fixed-cost provider operations may reserve the fixed customer price first so retries and provider reconciliation remain durable.
+
+### Managed number purchase
+
+Managed DID purchasing uses a server-owned Leamout price. DIDWW inventory IDs, SKUs, order amounts, and other provider economics never determine the customer wallet charge.
+
+```text
+managed number search
+        ↓
+resolve active subscription plan
+        ↓
+resolve Leamout one-time price in the subscription currency
+        ↓
+return opaque selection + customer quote
+        ↓
+customer creates managed number
+        ↓
+revalidate quote
+        ↓
+atomically reserve wallet funds
+        ↓
+persist provider operation with durable purchase authorization
+        ↓
+worker verifies reservation
+        ↓
+DIDWW order
+        ├── pending → keep reservation
+        ├── cancelled/failed → release reservation
+        └── completed → capture reservation
+                              ↓
+                       reconcile DID routing
+```
+
+Capture happens when the provider order completes because that is the point at which Leamout has incurred the upstream obligation. A later routing or persistence problem does not silently release captured value. Such a correction must be represented by an explicit compensating ledger entry if commercial policy requires a refund.
+
+The purchase authorization and provider operation are independently retry-safe: a captured reservation may be verified again, capture is idempotent for the same amount, and release is idempotent while value has not been captured.
 
 ## Deferred concepts
 
