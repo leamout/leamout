@@ -27,7 +27,6 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 func (r *Repository) Create(ctx context.Context, organizationID uuid.UUID, maxDeployments int32, signingKeyID *string, issuedAt time.Time, expiresAt *time.Time) (License, error) {
 	status := string(StatusPending)
 	row, err := r.queries.CreateLicense(ctx, sqlc.CreateLicenseParams{
-		SubscriptionID: nil,
 		Status:         &status,
 		MaxDeployments: &maxDeployments,
 		SigningKeyID:   signingKeyID,
@@ -235,19 +234,29 @@ func deploymentFromRow(organizationID uuid.UUID, row sqlc.Deployment) Deployment
 }
 
 func mapLicenseReadError(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) { return ErrLicenseNotFound }
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrLicenseNotFound
+	}
 	return err
 }
 func mapLicenseWriteError(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) { return ErrLicenseUnavailable }
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrLicenseUnavailable
+	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23514" { return ErrInvalidExpiration }
+	if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+		return ErrInvalidExpiration
+	}
 	return err
 }
 func mapDeploymentWriteError(err error) error {
-	if errors.Is(err, pgx.ErrNoRows) { return ErrDeploymentNotFound }
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrDeploymentNotFound
+	}
 	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_deployments_license_deployment" { return ErrActivationConflict }
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_deployments_license_deployment" {
+		return ErrActivationConflict
+	}
 	return err
 }
 func isSerializationFailure(err error) bool {
