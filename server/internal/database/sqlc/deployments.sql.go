@@ -100,7 +100,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = $3
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.id, organization_id, subscription_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
+RETURNING l.id, organization_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
 `
 
 type DeactivateDeploymentParams struct {
@@ -112,7 +112,6 @@ type DeactivateDeploymentParams struct {
 type DeactivateDeploymentRow struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status         string             `db:"status" json:"status"`
 	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
@@ -144,7 +143,6 @@ func (q *Queries) DeactivateDeployment(ctx context.Context, arg DeactivateDeploy
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.SubscriptionID,
 		&i.Status,
 		&i.MaxDeployments,
 		&i.SigningKeyID,
@@ -271,7 +269,7 @@ WHERE d.license_id = l.id
   AND l.organization_id = $4
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-RETURNING l.id, organization_id, subscription_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
+RETURNING l.id, organization_id, l.status, max_deployments, signing_key_id, issued_at, expires_at, l.created_at, l.updated_at, o.id, o.name, o.status, o.created_at, o.updated_at, deleted_at, d.id, license_id, deployment_id, d.name, d.status, activated_at, last_seen_at, deactivated_at, d.created_at, d.updated_at
 `
 
 type TouchDeploymentParams struct {
@@ -284,7 +282,6 @@ type TouchDeploymentParams struct {
 type TouchDeploymentRow struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	SubscriptionID *uuid.UUID         `db:"subscription_id" json:"subscription_id"`
 	Status         string             `db:"status" json:"status"`
 	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
@@ -321,7 +318,6 @@ func (q *Queries) TouchDeployment(ctx context.Context, arg TouchDeploymentParams
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
-		&i.SubscriptionID,
 		&i.Status,
 		&i.MaxDeployments,
 		&i.SigningKeyID,

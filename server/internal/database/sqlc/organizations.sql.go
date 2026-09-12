@@ -111,33 +111,15 @@ SELECT
     o.id::TEXT AS id,
     o.name,
     o.status,
-    COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
-    COALESCE(subscription.plan_name, '—') AS plan_name,
-    COALESCE(subscription.status, 'none') AS subscription_status,
+    COUNT(DISTINCT om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
+    COUNT(DISTINCT w.id) FILTER (WHERE w.status <> 'closed')::BIGINT AS wallet_count,
+    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—') AS currencies,
     'prepaid'::TEXT AS billing_model,
-    COALESCE(subscription.pricing_type, '—') AS pricing_type,
-    COALESCE(to_char(subscription.renews_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS renews_at,
-    COALESCE(to_char(subscription.ends_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'), '—')::TEXT AS ends_at,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at,
     to_char(o.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS updated_at
 FROM organizations AS o
 LEFT JOIN organization_members AS om ON om.organization_id = o.id
-LEFT JOIN LATERAL (
-    SELECT
-        p.name AS plan_name,
-        s.status,
-        pr.pricing_type,
-        s.renews_at,
-        s.ends_at
-    FROM subscriptions AS s
-    JOIN plans AS p ON p.id = s.plan_id
-    JOIN prices AS pr ON pr.id = s.price_id
-    WHERE s.organization_id = o.id
-    ORDER BY
-        CASE WHEN s.status IN ('active', 'past_due') THEN 0 ELSE 1 END,
-        s.created_at DESC
-    LIMIT 1
-) AS subscription ON TRUE
+LEFT JOIN wallets AS w ON w.organization_id = o.id
 WHERE o.id = $1
   AND o.deleted_at IS NULL
 GROUP BY
@@ -145,28 +127,20 @@ GROUP BY
     o.name,
     o.status,
     o.created_at,
-    o.updated_at,
-    subscription.plan_name,
-    subscription.status,
-    subscription.pricing_type,
-    subscription.renews_at,
-    subscription.ends_at
+    o.updated_at
 LIMIT 1
 `
 
 type GetBackofficeOrganizationRow struct {
-	ID                 string `db:"id" json:"id"`
-	Name               string `db:"name" json:"name"`
-	Status             string `db:"status" json:"status"`
-	MemberCount        int64  `db:"member_count" json:"member_count"`
-	PlanName           string `db:"plan_name" json:"plan_name"`
-	SubscriptionStatus string `db:"subscription_status" json:"subscription_status"`
-	BillingModel       string `db:"billing_model" json:"billing_model"`
-	PricingType        string `db:"pricing_type" json:"pricing_type"`
-	RenewsAt           string `db:"renews_at" json:"renews_at"`
-	EndsAt             string `db:"ends_at" json:"ends_at"`
-	CreatedAt          string `db:"created_at" json:"created_at"`
-	UpdatedAt          string `db:"updated_at" json:"updated_at"`
+	ID           string      `db:"id" json:"id"`
+	Name         string      `db:"name" json:"name"`
+	Status       string      `db:"status" json:"status"`
+	MemberCount  int64       `db:"member_count" json:"member_count"`
+	WalletCount  int64       `db:"wallet_count" json:"wallet_count"`
+	Currencies   interface{} `db:"currencies" json:"currencies"`
+	BillingModel string      `db:"billing_model" json:"billing_model"`
+	CreatedAt    string      `db:"created_at" json:"created_at"`
+	UpdatedAt    string      `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (GetBackofficeOrganizationRow, error) {
@@ -177,12 +151,9 @@ func (q *Queries) GetBackofficeOrganization(ctx context.Context, id uuid.UUID) (
 		&i.Name,
 		&i.Status,
 		&i.MemberCount,
-		&i.PlanName,
-		&i.SubscriptionStatus,
+		&i.WalletCount,
+		&i.Currencies,
 		&i.BillingModel,
-		&i.PricingType,
-		&i.RenewsAt,
-		&i.EndsAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -278,28 +249,27 @@ SELECT
     o.id::TEXT AS id,
     o.name,
     o.status,
-    COUNT(om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
-    COALESCE(p.name, '—') AS plan_name,
+    COUNT(DISTINCT om.user_id) FILTER (WHERE om.status = 'active')::BIGINT AS member_count,
+    COUNT(DISTINCT w.id) FILTER (WHERE w.status <> 'closed')::BIGINT AS wallet_count,
+    COALESCE(string_agg(DISTINCT w.currency, ', ' ORDER BY w.currency) FILTER (WHERE w.status <> 'closed'), '—') AS currencies,
     to_char(o.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
 FROM organizations AS o
 LEFT JOIN organization_members AS om ON om.organization_id = o.id
-LEFT JOIN subscriptions AS s
-    ON s.organization_id = o.id
-   AND s.status IN ('active', 'past_due')
-LEFT JOIN plans AS p ON p.id = s.plan_id
+LEFT JOIN wallets AS w ON w.organization_id = o.id
 WHERE o.deleted_at IS NULL
-GROUP BY o.id, o.name, o.status, p.name, o.created_at
+GROUP BY o.id, o.name, o.status, o.created_at
 ORDER BY o.created_at DESC
 LIMIT 100
 `
 
 type ListBackofficeOrganizationsRow struct {
-	ID          string `db:"id" json:"id"`
-	Name        string `db:"name" json:"name"`
-	Status      string `db:"status" json:"status"`
-	MemberCount int64  `db:"member_count" json:"member_count"`
-	PlanName    string `db:"plan_name" json:"plan_name"`
-	CreatedAt   string `db:"created_at" json:"created_at"`
+	ID          string      `db:"id" json:"id"`
+	Name        string      `db:"name" json:"name"`
+	Status      string      `db:"status" json:"status"`
+	MemberCount int64       `db:"member_count" json:"member_count"`
+	WalletCount int64       `db:"wallet_count" json:"wallet_count"`
+	Currencies  interface{} `db:"currencies" json:"currencies"`
+	CreatedAt   string      `db:"created_at" json:"created_at"`
 }
 
 func (q *Queries) ListBackofficeOrganizations(ctx context.Context) ([]ListBackofficeOrganizationsRow, error) {
@@ -316,7 +286,8 @@ func (q *Queries) ListBackofficeOrganizations(ctx context.Context) ([]ListBackof
 			&i.Name,
 			&i.Status,
 			&i.MemberCount,
-			&i.PlanName,
+			&i.WalletCount,
+			&i.Currencies,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
