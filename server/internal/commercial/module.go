@@ -4,6 +4,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	commercialaccess "github.com/leamout/leamout/internal/commercial/access"
+	"github.com/leamout/leamout/internal/commercial/authorization"
 	"github.com/leamout/leamout/internal/commercial/catalog"
 	checkout "github.com/leamout/leamout/internal/commercial/checkout"
 	"github.com/leamout/leamout/internal/commercial/entitlements"
@@ -15,14 +16,13 @@ import (
 )
 
 // Module is the composition boundary for Leamout's Commercial domain.
-// Runtime and telecom code should depend on this module rather than assembling
-// Commercial subdomains independently.
 type Module struct {
-	Catalog CatalogModule
-	Billing BillingModule
-	Access  AccessModule
-	Usage   UsageModule
-	Wallets WalletModule
+	Catalog       CatalogModule
+	Billing       BillingModule
+	Access        AccessModule
+	Usage         UsageModule
+	Wallets       WalletModule
+	Authorization AuthorizationModule
 }
 
 type CatalogModule struct {
@@ -78,6 +78,10 @@ type WalletModule struct {
 	Handler    *wallets.Handler
 }
 
+type AuthorizationModule struct {
+	Service *authorization.Service
+}
+
 type PaymentsModule struct {
 	Repository *payments.Repository
 	Service    *payments.Service
@@ -85,104 +89,58 @@ type PaymentsModule struct {
 	Handler    *payments.Handler
 }
 
-// New composes the Commercial domain from its durable submodules. Payment
-// providers are registered after construction so provider adapters remain
-// outside Commercial state and are configured by the runtime.
 func New(db *pgxpool.Pool) *Module {
 	catalogRepository := catalog.NewRepository(db)
 	catalogService := catalog.NewService(catalogRepository)
 
 	subscriptionsRepository := subscriptions.NewRepository(db)
-	subscriptionsService := subscriptions.NewService(
-		subscriptionsRepository,
-		catalogService,
-	)
+	subscriptionsService := subscriptions.NewService(subscriptionsRepository, catalogService)
 
 	entitlementsRepository := entitlements.NewRepository(db)
-	entitlementsService := entitlements.NewService(
-		entitlementsRepository,
-		subscriptionsService,
-	)
+	entitlementsService := entitlements.NewService(entitlementsRepository, subscriptionsService)
 
-	commercialAccessService := commercialaccess.NewService(
-		subscriptionsService,
-		entitlementsService,
-	)
+	commercialAccessService := commercialaccess.NewService(subscriptionsService, entitlementsService)
 
 	licensingRepository := licensing.NewRepository(db)
-	licensingService := licensing.NewService(
-		licensingRepository,
-		commercialAccessService,
-	)
+	licensingService := licensing.NewService(licensingRepository, commercialAccessService)
 
 	usageRepository := usage.NewRepository(db)
 	usageService := usage.NewService(usageRepository)
 
 	walletRepository := wallets.NewRepository(db)
-	walletService := wallets.NewService(walletRepository, catalogService, subscriptionsService)
+	walletService := wallets.NewService(walletRepository)
 	walletHandler := wallets.NewHandler(walletService)
+
+	authorizationService := authorization.NewService(
+		commercialAccessService,
+		catalogService,
+		subscriptionsService,
+		walletService,
+	)
 
 	checkoutRepository := checkout.NewRepository(db)
 	paymentRepository := payments.NewRepository(db)
 	providerRegistry := payments.NewProviderRegistry()
 	paymentService := payments.NewService(paymentRepository, providerRegistry)
-	checkoutService := checkout.NewService(
-		checkoutRepository,
-		walletService,
-		catalogService,
-		subscriptionsService,
-		paymentService,
-	)
+	checkoutService := checkout.NewService(checkoutRepository, walletService, catalogService, subscriptionsService, paymentService)
 	checkoutHandler := checkout.NewHandler(checkoutService)
 	paymentHandler := payments.NewHandler(paymentService, checkoutService)
 
-	walletModule := WalletModule{
-		Repository: walletRepository,
-		Service:    walletService,
-		Handler:    walletHandler,
-	}
-
 	return &Module{
-		Catalog: CatalogModule{
-			Repository: catalogRepository,
-			Service:    catalogService,
-			Handler:    catalog.NewHandler(catalogService),
-		},
+		Catalog: CatalogModule{Repository: catalogRepository, Service: catalogService, Handler: catalog.NewHandler(catalogService)},
 		Billing: BillingModule{
-			Checkouts: CheckoutModule{
-				Repository: checkoutRepository,
-				Service:    checkoutService,
-				Handler:    checkoutHandler,
-			},
-			Payments: PaymentsModule{
-				Repository: paymentRepository,
-				Service:    paymentService,
-				Providers:  providerRegistry,
-				Handler:    paymentHandler,
-			},
+			Checkouts: CheckoutModule{Repository: checkoutRepository, Service: checkoutService, Handler: checkoutHandler},
+			Payments: PaymentsModule{Repository: paymentRepository, Service: paymentService, Providers: providerRegistry, Handler: paymentHandler},
 		},
 		Access: AccessModule{
-			Subscriptions: SubscriptionsModule{
-				Repository: subscriptionsRepository,
-				Service:    subscriptionsService,
-				Handler:    subscriptions.NewHandler(subscriptionsService),
-			},
-			Licenses: LicensesModule{
-				Repository: licensingRepository,
-				Service:    licensingService,
-				Handler:    licensing.NewHandler(licensingService),
-			},
-			Entitlements: EntitlementsModule{
-				Repository: entitlementsRepository,
-				Service:    entitlementsService,
-			},
+			Subscriptions: SubscriptionsModule{Repository: subscriptionsRepository, Service: subscriptionsService, Handler: subscriptions.NewHandler(subscriptionsService)},
+			Licenses: LicensesModule{Repository: licensingRepository, Service: licensingService, Handler: licensing.NewHandler(licensingService)},
+			Entitlements: EntitlementsModule{Repository: entitlementsRepository, Service: entitlementsService},
 			Service: commercialAccessService,
 			Handler: commercialaccess.NewHandler(commercialAccessService),
 		},
-		Usage: UsageModule{
-			Repository: usageRepository,
-			Service:    usageService,
-		},
-		Wallets: walletModule,
+		Usage: UsageModule{Repository: usageRepository, Service: usageService},
+		Wallets: WalletModule{Repository: walletRepository, Service: walletService, Handler: walletHandler},
+		Authorization: AuthorizationModule{Service: authorizationService},
 	}
 }
