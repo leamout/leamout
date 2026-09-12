@@ -48,6 +48,12 @@ INSERT INTO subscriptions (
     '00000000-0000-0000-0000-000000006203',
     'active', now() - interval '1 day'
 );
+INSERT INTO entitlements (plan_id, entitlement_key, kind, enabled) VALUES (
+    '00000000-0000-0000-0000-000000006202',
+    'voice.managed.enabled',
+    'feature',
+    true
+);
 INSERT INTO wallets (id, organization_id, currency, status) VALUES (
     '00000000-0000-0000-0000-000000006206',
     '00000000-0000-0000-0000-000000006001',
