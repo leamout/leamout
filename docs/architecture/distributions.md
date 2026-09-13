@@ -70,7 +70,7 @@ The invariant is:
 
 ## Runtime ownership
 
-`cmd` and `internal/runtime` mirror each other. A runtime package is the executable-specific composition behind one command.
+`cmd` and `internal/runtime` mirror each other. A runtime package owns the implementation and composition behind one executable.
 
 ```text
 cmd/cloud                 → internal/runtime/cloud
@@ -81,22 +81,19 @@ cmd/backoffice            → internal/runtime/backoffice
 cmd/leamout               → internal/runtime/leamout
 ```
 
-Generic `runtime/server` and `runtime/worker` packages are not used. Shared API and worker implementation lives under `internal/app`, outside the executable runtime namespace.
+There is no generic `internal/app`, `runtime/server`, or `runtime/worker` layer.
 
-```text
-internal/app/server
-internal/app/worker
-```
+Shared behavior belongs in the existing reusable domain and platform packages such as `identity`, `tenancy`, `telecom`, `commercial`, `integrations`, and `platform`.
 
-Runtime packages choose the appropriate shared application composition without making shared telecom, identity, tenancy, or platform packages depend on Cloud or Self-Hosted policy.
+Runtime packages may contain executable-specific wiring, routes, health checks, and worker orchestration. That composition glue may differ between Cloud and Self-Hosted while the actual product capabilities remain shared.
 
 ## Dependency rule
 
-Dependencies flow from runtime composition into shared application and domain packages, never the reverse.
+Dependencies flow from runtime composition into shared domains and platform packages, never the reverse.
 
 ```text
 runtime/cloud ───────────────┐
-runtime/selfhosted ──────────┼──→ internal/app + shared domains
+runtime/selfhosted ──────────┼──→ shared domains + platform
 runtime/cloudworker ─────────┤
 runtime/selfhostedworker ────┘
 ```
@@ -123,9 +120,6 @@ server/
 │   ├── backoffice/
 │   └── leamout/
 └── internal/
-    ├── app/
-    │   ├── server/
-    │   └── worker/
     ├── commercial/
     ├── identity/
     ├── integrations/
@@ -146,8 +140,6 @@ deploy/
 └── self-hosted/
 ```
 
-This layout separates executable composition from shared application and domain implementation. Files should move only when the move establishes a real ownership or release boundary.
-
 ## Release rule
 
 Monorepo does not mean one release artifact.
@@ -159,7 +151,7 @@ Self-Hosted release artifacts must contain only what is required to operate Leam
 ## Refactor order
 
 1. Keep command and runtime packages aligned one-to-one.
-2. Keep shared API/worker implementation outside `runtime`.
+2. Keep shared behavior in domain and platform packages, not in a generic application layer.
 3. Stop constructing the full Commercial module for every runtime.
 4. Ensure Self-Hosted BYOC works without wallet, checkout, or payment-provider dependencies.
 5. Attach wallet authorization only to managed-provider paths.
