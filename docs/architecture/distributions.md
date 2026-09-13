@@ -68,44 +68,37 @@ The invariant is:
 
 > PAYG protects Leamout-owned provider exposure. It is not a prerequisite for Self-Hosted BYOC platform operation.
 
-## Composition roots
+## Runtime ownership
 
-Cloud and Self-Hosted must have explicit runtime composition roots.
-
-Shared packages provide capabilities. Composition roots decide which capabilities are constructed, configured, routed, and shipped.
-
-Conceptually:
+`cmd` and `internal/runtime` mirror each other. A runtime package is the executable-specific composition behind one command.
 
 ```text
-shared domains
-    │
-    ├── Cloud composition
-    │     ├── catalog
-    │     ├── wallets
-    │     ├── checkout
-    │     ├── payments
-    │     ├── usage
-    │     ├── BYOC
-    │     └── managed providers
-    │
-    └── Self-Hosted composition
-          ├── licensed runtime
-          ├── BYOC
-          └── managed-provider extension when configured
+cmd/cloud                 → internal/runtime/cloud
+cmd/cloud-worker          → internal/runtime/cloudworker
+cmd/selfhosted            → internal/runtime/selfhosted
+cmd/selfhosted-worker     → internal/runtime/selfhostedworker
+cmd/backoffice            → internal/runtime/backoffice
+cmd/leamout               → internal/runtime/leamout
 ```
 
-Self-Hosted-only operational capabilities include the `leamout` operator CLI, deployment identity, offline license verification, backup/restore, host doctor, runtime installation, and update lifecycle.
+Generic `runtime/server` and `runtime/worker` packages are not used. Shared API and worker implementation lives under `internal/app`, outside the executable runtime namespace.
 
-Cloud-only operational capabilities include Leamout-operated deployment and fleet concerns. Those must not become dependencies of shared product domains.
+```text
+internal/app/server
+internal/app/worker
+```
+
+Runtime packages choose the appropriate shared application composition without making shared telecom, identity, tenancy, or platform packages depend on Cloud or Self-Hosted policy.
 
 ## Dependency rule
 
-Dependencies flow from distribution composition into shared domains, never the reverse.
+Dependencies flow from runtime composition into shared application and domain packages, never the reverse.
 
 ```text
-Cloud ────────┐
-              ├──→ shared product domains
-Self-Hosted ──┘
+runtime/cloud ───────────────┐
+runtime/selfhosted ──────────┼──→ internal/app + shared domains
+runtime/cloudworker ─────────┤
+runtime/selfhostedworker ────┘
 ```
 
 Do not introduce dependencies such as:
@@ -120,33 +113,40 @@ Self-Hosted BYOC → wallet
 
 ## Repository target
 
-The repository should evolve toward this shape without duplicating domains:
-
 ```text
 server/
 ├── cmd/
 │   ├── cloud/
+│   ├── cloud-worker/
 │   ├── selfhosted/
-│   ├── worker/
+│   ├── selfhosted-worker/
 │   ├── backoffice/
 │   └── leamout/
 └── internal/
+    ├── app/
+    │   ├── server/
+    │   └── worker/
     ├── commercial/
     ├── identity/
+    ├── integrations/
+    ├── platform/
+    │   └── middleware/
     ├── tenancy/
     ├── telecom/
-    ├── integrations/
     └── runtime/
         ├── cloud/
+        ├── cloudworker/
         ├── selfhosted/
-        └── shared server/worker runtime code
+        ├── selfhostedworker/
+        ├── backoffice/
+        └── leamout/
 
 deploy/
 ├── cloud/
 └── self-hosted/
 ```
 
-This is a target composition boundary, not a requirement to move files solely for appearance. Existing paths should move only when the move establishes a real ownership or release boundary.
+This layout separates executable composition from shared application and domain implementation. Files should move only when the move establishes a real ownership or release boundary.
 
 ## Release rule
 
@@ -158,9 +158,10 @@ Self-Hosted release artifacts must contain only what is required to operate Leam
 
 ## Refactor order
 
-1. Separate Cloud and Self-Hosted server/worker composition.
-2. Stop constructing the full Commercial module for every runtime.
-3. Ensure Self-Hosted BYOC works without wallet, checkout, or payment-provider dependencies.
-4. Attach wallet authorization only to managed-provider paths.
-5. Split Cloud and Self-Hosted executable/release composition where needed.
-6. Keep acceptance coverage proving Cloud, Self-Hosted BYOC, and Self-Hosted Managed independently.
+1. Keep command and runtime packages aligned one-to-one.
+2. Keep shared API/worker implementation outside `runtime`.
+3. Stop constructing the full Commercial module for every runtime.
+4. Ensure Self-Hosted BYOC works without wallet, checkout, or payment-provider dependencies.
+5. Attach wallet authorization only to managed-provider paths.
+6. Split Cloud and Self-Hosted release composition where needed.
+7. Keep acceptance coverage proving Cloud, Self-Hosted BYOC, and Self-Hosted Managed independently.
