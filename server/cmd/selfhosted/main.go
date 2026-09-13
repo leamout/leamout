@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv, err := selfhostedruntime.New(ctx, cfg)
+	srv, err := selfhostedruntime.NewSelfHosted(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
