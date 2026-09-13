@@ -3,7 +3,7 @@
 ENV_FILE ?= .env
 COMPOSE_FILE ?= deploy/self-hosted/compose.yaml
 COMPOSE := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
-CERT_DIR ?= deploy/certs
+CERT_DIR ?= deploy/self-hosted/certs
 DEPLOY_ENV := ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) CERT_DIR=$(CERT_DIR)
 
 .PHONY: help

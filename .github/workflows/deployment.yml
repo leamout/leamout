@@ -3,7 +3,7 @@ name: Deployment
 on:
   pull_request:
     paths:
-      - "deploy/compose.yaml"
+      - "deploy/self-hosted/compose.yaml"
       - "server/scripts/deploy/**"
       - "server/scripts/certs/**"
       - ".env.example"
@@ -13,7 +13,7 @@ on:
     branches:
       - main
     paths:
-      - "deploy/compose.yaml"
+      - "deploy/self-hosted/compose.yaml"
       - "server/scripts/deploy/**"
       - "server/scripts/certs/**"
       - ".env.example"
@@ -31,7 +31,7 @@ concurrency:
 env:
   CARRIER_CREDENTIAL_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
   ENV_FILE: .env.example
-  COMPOSE_FILE: deploy/compose.yaml
+  COMPOSE_FILE: deploy/self-hosted/compose.yaml
   COMPOSE_OVERRIDE_FILE: /tmp/compose.ci.yaml
 
 jobs:

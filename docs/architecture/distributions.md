@@ -151,6 +151,11 @@ deploy/
 └── self-hosted/
 ```
 
+Each deployment directory is self-contained. There is no generic root Compose file or shared
+OpenSIPS, FreeSWITCH, NATS, Coturn, or RTPengine configuration under `deploy/`, and neither
+distribution reaches into the other distribution's tree. Shared product behavior belongs in
+the server domain and platform packages rather than shared deployment assets.
+
 ## Release rule
 
 Monorepo does not mean one release artifact.

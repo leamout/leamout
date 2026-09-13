@@ -48,13 +48,13 @@ go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
 npm ci --prefix ./internal/backoffice --no-audit --no-fund
 npm run --prefix ./internal/backoffice build
 cd ..
-docker compose --env-file .env -f deploy/compose.yaml up -d --build backoffice
+docker compose --env-file .env -f deploy/cloud/compose.yaml up -d --build backoffice
 ```
 
 Promote an existing local account using its email address:
 
 ```bash
-docker compose --env-file .env -f deploy/compose.yaml exec postgres \
+docker compose --env-file .env -f deploy/cloud/compose.yaml exec postgres \
   psql -U leamout -d leamout -c \
   "UPDATE users SET is_platform_admin = TRUE, updated_at = NOW() WHERE lower(email) = lower('admin@example.test') RETURNING id, email, is_platform_admin;"
 ```

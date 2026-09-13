@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 timeout_seconds=${LEAMOUT_DRAIN_TIMEOUT_SECONDS:-300}
 poll_seconds=${LEAMOUT_DRAIN_POLL_SECONDS:-2}
 
@@ -50,7 +50,7 @@ while :; do
   elapsed=$((now - started_at))
   if [ "$elapsed" -ge "$timeout_seconds" ]; then
     echo "Drain deadline reached with active calls remaining." >&2
-    echo "The node remains drained. Run deploy/resume.sh to restore admission, or retry drain after calls finish." >&2
+    echo "The node remains drained. Run deploy/cloud/scripts/resume.sh to restore admission, or retry drain after calls finish." >&2
     exit 1
   fi
 

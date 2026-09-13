@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-CERT_DIR="${CERT_DIR:-deploy/certs}"
+CERT_DIR="${CERT_DIR:-deploy/self-hosted/certs}"
 CARRIER_CA_FILE="${CARRIER_CA_FILE:-}"
 carrier_ca="$CERT_DIR/carrier-ca.pem"
 

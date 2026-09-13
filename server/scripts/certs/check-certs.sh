@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-CERT_DIR="${CERT_DIR:-deploy/certs}"
+CERT_DIR="${CERT_DIR:-deploy/self-hosted/certs}"
 
 fullchain="$CERT_DIR/fullchain.pem"
 private_key="$CERT_DIR/privkey.pem"

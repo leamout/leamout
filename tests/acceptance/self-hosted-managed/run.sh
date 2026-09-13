@@ -13,7 +13,7 @@ export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export TURN_REALM="${TURN_REALM:-self-hosted-managed.local}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
-COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/self-hosted-managed/compose.yaml"
+COMPOSE="docker compose -f deploy/cloud/compose.yaml -f tests/acceptance/self-hosted-managed/compose.yaml"
 
 freeswitch_sip_ready() {
     $COMPOSE exec -T freeswitch sh -c '

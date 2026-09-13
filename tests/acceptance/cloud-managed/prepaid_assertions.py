@@ -6,7 +6,7 @@ import urllib.request
 
 API = os.getenv("CLOUD_MANAGED_API_BASE", "http://127.0.0.1:8080")
 TOKEN = os.getenv("CLOUD_MANAGED_TOKEN", "lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx")
-COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
+COMPOSE = ["docker", "compose", "-f", "deploy/cloud/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
 
 
 class Failure(RuntimeError):

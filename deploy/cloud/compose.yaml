@@ -77,7 +77,7 @@ services:
     restart: unless-stopped
     command: ["-c", "/etc/nats/nats-server.conf"]
     volumes:
-      - ../nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - ./nats/nats-server.conf:/etc/nats/nats-server.conf:ro
       - nats_data:/data
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
@@ -165,7 +165,7 @@ services:
   opensips:
     image: leamout/opensips:4.0.1
     build:
-      context: ../opensips
+      context: ./opensips
       dockerfile: Dockerfile
       args:
         OPENSIPS_VERSION: 4.0.1
@@ -180,9 +180,9 @@ services:
       - "5061:5061/tcp"
       - "5062:5062/tcp"
     volumes:
-      - ../certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
-      - ../certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
-      - ../certs/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+      - ./certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ./certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ./certs/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -207,9 +207,9 @@ services:
       - --cert=/etc/coturn/tls/fullchain.pem
       - --pkey=/etc/coturn/tls/privkey.pem
     volumes:
-      - ../coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-      - ../certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
-      - ../certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - ./certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
     ports:
       - "3478:3478/udp"
       - "3478:3478/tcp"
@@ -221,7 +221,7 @@ services:
   freeswitch:
     image: leamout/freeswitch:1.0.0
     build:
-      context: ../freeswitch
+      context: ./freeswitch
       dockerfile: Dockerfile
     restart: unless-stopped
     stop_grace_period: 60s
@@ -245,7 +245,7 @@ services:
   rtpengine:
     image: leamout/rtpengine:dev
     build:
-      context: ../rtpengine
+      context: ./rtpengine
       dockerfile: Dockerfile
       args:
         RTPENGINE_REF: mr26.2.1
