@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv, err := cloudruntime.New(ctx, cfg)
+	srv, err := cloudruntime.NewCloud(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
