@@ -52,13 +52,9 @@ func runLicenseAt(stdout, stderr io.Writer, args []string, statePath, licenseDir
 		writeln(stderr, "--artifact and --keyring are required")
 		return 2
 	}
-	state, err := loadDeploymentState(statePath)
+	state, err := ensureDeploymentIdentity(statePath)
 	if err != nil {
 		writef(stderr, "load deployment identity: %v\n", err)
-		return 1
-	}
-	if _, err := loadDeploymentPrivateKey(filepath.Join(filepath.Dir(statePath), "deployment.key"), state.PublicKey); err != nil {
-		writef(stderr, "load deployment identity key: %v\n", err)
 		return 1
 	}
 	artifact, err := os.ReadFile(artifactPath)

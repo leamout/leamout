@@ -76,17 +76,13 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 	}
 
 	if stateExists || identityKeyExists || envExists {
-		if !stateExists || !identityKeyExists || !envExists {
-			writef(stderr, "incomplete Leamout initialization: %s, %s, and %s must either all exist or all be absent\n", statePath, identityKeyPath, envPath)
+		if !stateExists || !envExists {
+			writef(stderr, "incomplete Leamout initialization: %s and %s must both exist for an initialized deployment\n", statePath, envPath)
 			return 1
 		}
-		state, err := loadDeploymentState(statePath)
+		state, err := ensureDeploymentIdentity(statePath)
 		if err != nil {
 			writef(stderr, "load deployment identity: %v\n", err)
-			return 1
-		}
-		if _, err := loadDeploymentPrivateKey(identityKeyPath, state.PublicKey); err != nil {
-			writef(stderr, "load deployment identity key: %v\n", err)
 			return 1
 		}
 		if err := validateRuntimeEnv(envPath, state.DeploymentID); err != nil {
@@ -314,6 +310,54 @@ func loadDeploymentState(path string) (deploymentState, error) {
 	return state, nil
 }
 
+func ensureDeploymentIdentity(path string) (deploymentState, error) {
+	state, err := loadDeploymentState(path)
+	if err == nil {
+		if _, err := loadDeploymentPrivateKey(filepath.Join(filepath.Dir(path), "deployment.key"), state.PublicKey); err != nil {
+			return deploymentState{}, err
+		}
+		return state, nil
+	}
+
+	content, readErr := os.ReadFile(path)
+	if readErr != nil {
+		return deploymentState{}, readErr
+	}
+	if decodeErr := json.Unmarshal(content, &state); decodeErr != nil || state.PublicKey != "" {
+		return deploymentState{}, err
+	}
+	if state.SchemaVersion != deploymentStateSchemaVersion {
+		return deploymentState{}, err
+	}
+	if _, parseErr := uuid.Parse(state.DeploymentID); parseErr != nil || state.Mode != deploymentMode || state.CreatedAt.IsZero() {
+		return deploymentState{}, err
+	}
+
+	keyPath := filepath.Join(filepath.Dir(path), "deployment.key")
+	privateKey, keyErr := loadDeploymentPrivateKey(keyPath, "")
+	if errors.Is(keyErr, os.ErrNotExist) {
+		_, privateKey, keyErr = ed25519.GenerateKey(rand.Reader)
+		if keyErr == nil {
+			keyErr = writeExclusiveFile(keyPath, []byte(base64.RawURLEncoding.EncodeToString(privateKey)+"\n"), 0o600)
+			if errors.Is(keyErr, os.ErrExist) {
+				privateKey, keyErr = loadDeploymentPrivateKey(keyPath, "")
+			}
+		}
+	}
+	if keyErr != nil {
+		return deploymentState{}, fmt.Errorf("migrate deployment identity key: %w", keyErr)
+	}
+	state.PublicKey = base64.RawURLEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey))
+	stateBytes, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return deploymentState{}, err
+	}
+	if err := writeAtomicFile(path, append(stateBytes, '\n'), 0o600); err != nil {
+		return deploymentState{}, fmt.Errorf("migrate deployment identity: %w", err)
+	}
+	return state, nil
+}
+
 func loadDeploymentPrivateKey(path, expectedPublicKey string) (ed25519.PrivateKey, error) {
 	encoded, err := os.ReadFile(path)
 	if err != nil {
@@ -324,7 +368,7 @@ func loadDeploymentPrivateKey(path, expectedPublicKey string) (ed25519.PrivateKe
 		return nil, errors.New("invalid deployment private key")
 	}
 	publicKey := privateKey[ed25519.SeedSize:]
-	if base64.RawURLEncoding.EncodeToString(publicKey) != expectedPublicKey {
+	if expectedPublicKey != "" && base64.RawURLEncoding.EncodeToString(publicKey) != expectedPublicKey {
 		return nil, errors.New("deployment private key does not match public identity")
 	}
 	return ed25519.PrivateKey(privateKey), nil

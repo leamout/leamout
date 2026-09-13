@@ -69,7 +69,7 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	state, err := loadDeploymentState("/var/lib/leamout/deployment.json")
+	state, err := ensureDeploymentIdentity("/var/lib/leamout/deployment.json")
 	if err != nil {
 		writef(stderr, "deployment identity: %v\n", err)
 		return 1

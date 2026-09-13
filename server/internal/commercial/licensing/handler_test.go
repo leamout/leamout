@@ -62,7 +62,7 @@ func TestLicenseResponsesHideSigningMetadata(t *testing.T) {
 	values := []any{
 		newLicenseResponse(License{
 			ID: uuid.New(), OrganizationID: uuid.New(), Status: StatusPending,
-			MaxDeployments: 2, SigningKeyID: &keyID, IssuedAt: now,
+			SigningKeyID: &keyID, IssuedAt: now,
 		}),
 		newDeploymentResponse(Deployment{
 			ID: uuid.New(), LicenseID: uuid.New(), DeploymentID: "node-01",

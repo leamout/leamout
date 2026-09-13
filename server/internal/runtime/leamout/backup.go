@@ -29,7 +29,7 @@ func runBackup(ctx context.Context, stdout, stderr io.Writer, args []string) int
 		writeln(stderr, "usage: leamout backup [--output <path>]")
 		return 2
 	}
-	state, err := loadDeploymentState("/var/lib/leamout/deployment.json")
+	state, err := ensureDeploymentIdentity("/var/lib/leamout/deployment.json")
 	if err != nil {
 		writef(stderr, "load deployment identity: %v\n", err)
 		return 1
@@ -45,6 +45,7 @@ func runBackup(ctx context.Context, stdout, stderr io.Writer, args []string) int
 	}
 	files := map[string]string{
 		"deployment.json": "/var/lib/leamout/deployment.json",
+		"deployment.key":  "/var/lib/leamout/deployment.key",
 		"leamout.env":     "/etc/leamout/leamout.env",
 	}
 	for _, name := range []string{"license.json", "keyring.json"} {
@@ -77,7 +78,7 @@ func runRestore(ctx context.Context, stdout, stderr io.Writer, args []string) in
 		writef(stderr, "validate backup: %v\n", err)
 		return 1
 	}
-	if state, err := loadDeploymentState("/var/lib/leamout/deployment.json"); err == nil && state.DeploymentID != manifest.DeploymentID {
+	if state, err := ensureDeploymentIdentity("/var/lib/leamout/deployment.json"); err == nil && state.DeploymentID != manifest.DeploymentID {
 		writeln(stderr, "backup belongs to another deployment; refusing restore")
 		return 1
 	}
@@ -178,7 +179,7 @@ func extractBackupArchive(path, destination string) (backupManifest, error) {
 		return backupManifest{}, err
 	}
 	defer func() { _ = gz.Close() }()
-	allowed := map[string]bool{"manifest.json": true, "database.sql": true, "deployment.json": true, "leamout.env": true, "license/license.json": true, "license/keyring.json": true}
+	allowed := map[string]bool{"manifest.json": true, "database.sql": true, "deployment.json": true, "deployment.key": true, "leamout.env": true, "license/license.json": true, "license/keyring.json": true}
 	tr := tar.NewReader(gz)
 	seen := map[string]bool{}
 	for {
@@ -229,7 +230,7 @@ func extractBackupArchive(path, destination string) (backupManifest, error) {
 	if manifest.SchemaVersion != 1 || manifest.DeploymentID == "" {
 		return backupManifest{}, errors.New("unsupported or incomplete backup manifest")
 	}
-	state, err := loadDeploymentState(filepath.Join(destination, "deployment.json"))
+	state, err := ensureDeploymentIdentity(filepath.Join(destination, "deployment.json"))
 	if err != nil {
 		return backupManifest{}, err
 	}
@@ -242,6 +243,7 @@ func extractBackupArchive(path, destination string) (backupManifest, error) {
 func restoreConfiguration(source string) error {
 	for src, dst := range map[string]string{
 		filepath.Join(source, "deployment.json"): "/var/lib/leamout/deployment.json",
+		filepath.Join(source, "deployment.key"):  "/var/lib/leamout/deployment.key",
 		filepath.Join(source, "leamout.env"):     "/etc/leamout/leamout.env",
 	} {
 		content, err := os.ReadFile(src)
