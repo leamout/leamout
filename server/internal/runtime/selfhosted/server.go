@@ -11,26 +11,17 @@ import (
 	"github.com/leamout/leamout/internal/identity"
 	"github.com/leamout/leamout/internal/integrations/freeswitch"
 	redisintegration "github.com/leamout/leamout/internal/integrations/redis"
-	"github.com/leamout/leamout/internal/modules/audit"
-	"github.com/leamout/leamout/internal/modules/idempotency"
-	"github.com/leamout/leamout/internal/modules/webhooks"
+	sharedmodules "github.com/leamout/leamout/internal/modules"
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/platform/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/security/encryption"
+	"github.com/leamout/leamout/internal/telecom"
 	"github.com/leamout/leamout/internal/telecom/calls"
-	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
-	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
-	"github.com/leamout/leamout/internal/telecom/recordings"
-	"github.com/leamout/leamout/internal/telecom/routing"
-	"github.com/leamout/leamout/internal/telecom/sip_domains"
-	"github.com/leamout/leamout/internal/telecom/subscribers"
-	"github.com/leamout/leamout/internal/telecom/trunks"
-	"github.com/leamout/leamout/internal/telecom/voice"
 	"github.com/leamout/leamout/internal/tenancy"
 )
 
@@ -148,44 +139,19 @@ func NewModules(
 	queries := sqlc.New(db)
 	identityModule := identity.New(queries)
 	tenancyModule := tenancy.New(queries)
-
-	voiceRepository := voice.NewRepository(queries)
-	voiceService := voice.NewService(voiceRepository)
-
-	routingRepository := routing.NewRepository(queries)
-	routeResolver := routing.NewResolver(routingRepository)
-	telecomMetrics := metrics.New(redisClient)
-	routeResolver.SetMetrics(telecomMetrics)
-	routingService := routing.NewService(routeResolver)
-
-	callsRepository := calls.NewRepository(db)
-	callAdmission, err := calls.NewAdmissionController(redisClient, callsRepository)
+	sharedModule := sharedmodules.New(db, queries)
+	telecomModule, err := telecom.New(telecom.Dependencies{
+		DB:                   db,
+		Queries:              queries,
+		Redis:                redisClient,
+		CallsController:      callsController,
+		ConferenceController: conferenceController,
+		CredentialCipher:     credentialCipher,
+		RealtimeService:      turnService,
+	})
 	if err != nil {
 		return Modules{}, err
 	}
-	callsService := calls.NewService(callsRepository, callsController, routingService, callAdmission)
-	callsService.SetMetrics(telecomMetrics)
-
-	recordingsRepository := recordings.NewRepository(db)
-	recordingsService := recordings.NewService(recordingsRepository, nil)
-	conferencesRepository := conferences.NewRepository(db)
-	conferencesService := conferences.NewService(conferencesRepository, conferenceController)
-	subscribersRepository := subscribers.NewRepository(queries)
-	subscribersService := subscribers.NewService(subscribersRepository)
-	numbersRepository := numbers.NewRepository(db, redisClient)
-	numbersService := numbers.NewService(numbersRepository)
-	sipDomainsRepository := sip_domains.NewRepository(queries)
-	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
-	carriersRepository := carriers.NewRepository(db)
-	carriersService := carriers.NewService(carriersRepository, credentialCipher)
-	trunksRepository := trunks.NewRepository(queries)
-	trunksService := trunks.NewService(trunksRepository, db)
-	webhooksRepository := webhooks.NewRepository(queries)
-	webhooksService := webhooks.NewService(webhooksRepository)
-	auditRepository := audit.NewRepository(db)
-	auditService := audit.NewService(auditRepository)
-	idempotencyRepository := idempotency.NewRepository(queries)
-	idempotencyService := idempotency.NewService(idempotencyRepository, idempotency.DefaultConfig())
 
 	resolver := authn.NewResolver(identityModule.Session.Service, tenancyModule.Credentials.Service)
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)
@@ -202,21 +168,9 @@ func NewModules(
 	return Modules{
 		Identity:             identityModule,
 		Tenancy:              tenancyModule,
-		Voice:                VoiceModule{Repository: voiceRepository, Service: voiceService, Handler: voice.NewHandler(voiceService)},
-		Calls:                CallsModule{Repository: callsRepository, Service: callsService, Handler: calls.NewHandler(callsService)},
-		Recordings:           RecordingsModule{Repository: recordingsRepository, Service: recordingsService, Handler: recordings.NewHandler(recordingsService)},
-		Subscribers:          SubscribersModule{Repository: subscribersRepository, Service: subscribersService, Handler: subscribers.NewHandler(subscribersService)},
-		Numbers:              NumbersModule{Repository: numbersRepository, Service: numbersService, Handler: numbers.NewHandler(numbersService)},
-		SIPDomains:           SIPDomainsModule{Repository: sipDomainsRepository, Service: sipDomainsService, Handler: sip_domains.NewHandler(sipDomainsService)},
-		Carriers:             CarriersModule{Repository: carriersRepository, Service: carriersService, Handler: carriers.NewHandler(carriersService)},
-		Trunks:               TrunksModule{Repository: trunksRepository, Service: trunksService, Handler: trunks.NewHandler(trunksService)},
-		Webhooks:             WebhooksModule{Repository: webhooksRepository, Service: webhooksService, Handler: webhooks.NewHandler(webhooksService)},
-		Audit:                AuditModule{Repository: auditRepository, Service: auditService, Handler: audit.NewHandler(auditService)},
-		Idempotency:          IdempotencyModule{Repository: idempotencyRepository, Service: idempotencyService, Middleware: middleware.NewIdempotencyMiddleware(idempotencyService)},
+		Shared:               sharedModule,
+		Telecom:              telecomModule,
 		RateLimit:            rateLimitMiddleware,
-		Conferences:          ConferencesModule{Repository: conferencesRepository, Service: conferencesService, Handler: conferences.NewHandler(conferencesService)},
-		Realtime:             RealtimeModule{Service: turnService, Handler: realtime.NewHandler(turnService)},
-		Routing:              routingService,
 		Authn:                authMiddleware,
 		OrganizationsContext: organizationMiddleware,
 	}, nil
