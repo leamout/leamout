@@ -103,7 +103,7 @@ func runRestore(ctx context.Context, stdout, stderr io.Writer, args []string) in
 	if code := exitCode(cmd.Run(), stderr); code != 0 {
 		return code
 	}
-	if code := runInstalledCompose(ctx, stdout, stderr, "up", "-d"); code != 0 {
+	if code := runLicensedInstalledCompose(ctx, stdout, stderr, "up", "-d"); code != 0 {
 		return code
 	}
 	writeln(stdout, "✓ Backup restored")

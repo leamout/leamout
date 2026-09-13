@@ -93,6 +93,26 @@ func runLicenseAt(stdout, stderr io.Writer, args []string, statePath, licenseDir
 	return 0
 }
 
+func validateInstalledLicense(statePath, licenseDir string, now time.Time) (licensing.LicenseClaimsV1, error) {
+	state, err := ensureDeploymentIdentity(statePath)
+	if err != nil {
+		return licensing.LicenseClaimsV1{}, fmt.Errorf("load deployment identity: %w", err)
+	}
+	artifact, err := os.ReadFile(filepath.Join(licenseDir, "license.json"))
+	if err != nil {
+		return licensing.LicenseClaimsV1{}, fmt.Errorf("read installed license artifact: %w", err)
+	}
+	keyringBytes, err := os.ReadFile(filepath.Join(licenseDir, "keyring.json"))
+	if err != nil {
+		return licensing.LicenseClaimsV1{}, fmt.Errorf("read installed license keyring: %w", err)
+	}
+	claims, err := verifyOfflineLicense(artifact, keyringBytes, state.DeploymentID, state.PublicKey, now)
+	if err != nil {
+		return licensing.LicenseClaimsV1{}, fmt.Errorf("verify installed license: %w", err)
+	}
+	return claims, nil
+}
+
 func verifyOfflineLicense(artifact, keyringBytes []byte, deploymentID, deploymentPublicKey string, now time.Time) (licensing.LicenseClaimsV1, error) {
 	var file licenseKeyringFile
 	if err := json.Unmarshal(keyringBytes, &file); err != nil {

@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 type BuildInfo struct {
@@ -33,7 +34,7 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 	case "init":
 		return runInit(stdout, stderr, build.Version)
 	case "up":
-		return runInstalledCompose(ctx, stdout, stderr, "up", "-d")
+		return runLicensedInstalledCompose(ctx, stdout, stderr, "up", "-d")
 	case "down":
 		return runInstalledCompose(ctx, stdout, stderr, "down")
 	case "status":
@@ -82,6 +83,10 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 		writef(stderr, "production runtime: %v\n", err)
 		return 1
 	}
+	if _, err := validateInstalledLicense("/var/lib/leamout/deployment.json", "/etc/leamout/license", time.Now().UTC()); err != nil {
+		writef(stderr, "self-hosted license: %v\n", err)
+		return 1
+	}
 
 	cmd := exec.CommandContext(ctx, "docker", "compose", "--env-file", "/etc/leamout/leamout.env", "-f", "/var/lib/leamout/runtime/compose.yaml", "config", "--quiet")
 	cmd.Stdout = stdout
@@ -92,10 +97,19 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 
 	writeln(stdout, "✓ Supported host")
 	writeln(stdout, "✓ Deployment identity and secrets valid")
+	writeln(stdout, "✓ Self-Hosted license valid")
 	writeln(stdout, "✓ Production runtime installed")
 	writeln(stdout, "✓ Runtime configuration valid")
 	writeln(stdout, "Leamout doctor passed.")
 	return 0
+}
+
+func runLicensedInstalledCompose(ctx context.Context, stdout, stderr io.Writer, args ...string) int {
+	if _, err := validateInstalledLicense("/var/lib/leamout/deployment.json", "/etc/leamout/license", time.Now().UTC()); err != nil {
+		writef(stderr, "self-hosted license: %v\nInstall a valid license before starting Leamout.\n", err)
+		return 1
+	}
+	return runInstalledCompose(ctx, stdout, stderr, args...)
 }
 
 func runInstalledCompose(ctx context.Context, stdout, stderr io.Writer, args ...string) int {

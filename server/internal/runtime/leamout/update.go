@@ -31,7 +31,7 @@ func runUpdate(ctx context.Context, stdout, stderr io.Writer, args []string, ver
 	if code := runInstalledCompose(ctx, stdout, stderr, "pull"); code != 0 {
 		return code
 	}
-	if code := runInstalledCompose(ctx, stdout, stderr, "up", "-d", "--remove-orphans"); code != 0 {
+	if code := runLicensedInstalledCompose(ctx, stdout, stderr, "up", "-d", "--remove-orphans"); code != 0 {
 		return code
 	}
 	writeln(stdout, "✓ Runtime update installed")
