@@ -28,12 +28,12 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/server \
-        ./cmd/server; \
+        ./cmd/cloud; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/worker \
-        ./cmd/worker; \
+        ./cmd/cloud-worker; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
