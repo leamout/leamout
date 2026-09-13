@@ -1,12 +1,11 @@
-package selfhosted
+package server
 
 import (
 	"context"
 
-	appserver "github.com/leamout/leamout/internal/app/server"
 	"github.com/leamout/leamout/internal/platform/config"
 )
 
-func New(ctx context.Context, cfg config.Config) (*appserver.Server, error) {
-	return appserver.NewSelfHosted(ctx, cfg)
+func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	return NewSelfHosted(ctx, cfg)
 }
