@@ -49,24 +49,40 @@ type Worker struct {
 	idempotencyCleanup      *idempotency.CleanupJob
 	health                  *healthState
 	logger                  *logging.Logger
+	componentNames          []string
 }
 
 const workerHealthAddress = ":8081"
 
-var componentNames = []string{
+var sharedComponentNames = []string{
 	"freeswitch-events",
 	"call-reconciliation",
 	"carrier-endpoint-health",
 	"recording-reconciliation",
-	"provider-operations",
-	"commpeak-cdr-polling",
 	"outbox-publisher",
 	"webhook-consumer",
 	"webhook-delivery",
 	"idempotency-cleanup",
 }
 
+var managedComponentNames = []string{
+	"provider-operations",
+	"commpeak-cdr-polling",
+}
+
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
+	return NewCloud(ctx, cfg)
+}
+
+func NewCloud(ctx context.Context, cfg config.Config) (*Worker, error) {
+	return newWorker(ctx, cfg, true)
+}
+
+func NewSelfHosted(ctx context.Context, cfg config.Config) (*Worker, error) {
+	return newWorker(ctx, cfg, false)
+}
+
+func newWorker(ctx context.Context, cfg config.Config, managedProviders bool) (*Worker, error) {
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("connect worker database: %w", err)
@@ -115,7 +131,6 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	}
 
 	queries := sqlc.New(db)
-	commercialModule := commercial.New(db)
 	routingRepository := routing.NewRepository(queries)
 	routeResolver := routing.NewResolver(routingRepository)
 	telecomMetrics := metrics.New(redisClient)
@@ -170,59 +185,64 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize recording reconciliation job: %w", err)
 	}
 
-	numbersRepository := numbers.NewRepository(db, redisClient)
-	numbersService := numbers.NewService(numbersRepository)
-	numbersService.SetManagedPurchaseAuthority(commercialModule.Wallets.Service)
-	if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
-		didwwClient, err := didww.NewClient(didww.Config{BaseURL: cfg.DIDWW.APIBaseURL, APIKey: cfg.DIDWW.APIKey})
+	var providerOperations *numbers.ProviderOperationJob
+	var commpeakCDRPolling *wholesale.CDRPollJob
+	if managedProviders {
+		commercialModule := commercial.NewCloud(db)
+		numbersRepository := numbers.NewRepository(db, redisClient)
+		numbersService := numbers.NewService(numbersRepository)
+		numbersService.SetManagedPurchaseAuthority(commercialModule.Wallets.Service)
+		if strings.TrimSpace(cfg.DIDWW.APIKey) != "" {
+			didwwClient, err := didww.NewClient(didww.Config{BaseURL: cfg.DIDWW.APIBaseURL, APIKey: cfg.DIDWW.APIKey})
+			if err != nil {
+				_ = redisClient.Close()
+				_ = freeSwitch.Close()
+				_ = natsClient.Close()
+				db.Close()
+				return nil, fmt.Errorf("initialize DIDWW provider executor: %w", err)
+			}
+			numbersService.SetManagedProvider("didww", didwwClient)
+		}
+		providerOperations, err = numbers.NewProviderOperationJob(
+			numbersRepository,
+			numbersService,
+			numbers.DefaultProviderOperationJobConfig(),
+		)
 		if err != nil {
 			_ = redisClient.Close()
 			_ = freeSwitch.Close()
 			_ = natsClient.Close()
 			db.Close()
-			return nil, fmt.Errorf("initialize DIDWW provider executor: %w", err)
+			return nil, fmt.Errorf("initialize provider operation job: %w", err)
 		}
-		numbersService.SetManagedProvider("didww", didwwClient)
-	}
-	providerOperations, err := numbers.NewProviderOperationJob(
-		numbersRepository,
-		numbersService,
-		numbers.DefaultProviderOperationJobConfig(),
-	)
-	if err != nil {
-		_ = redisClient.Close()
-		_ = freeSwitch.Close()
-		_ = natsClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize provider operation job: %w", err)
-	}
 
-	var commpeakSource wholesale.CDRPageSource
-	if strings.TrimSpace(cfg.CommPeak.Authorization) != "" {
-		commpeakClient, err := commpeak.NewClient(commpeak.Config{
-			BaseURL:       cfg.CommPeak.APIBaseURL,
-			Authorization: cfg.CommPeak.Authorization,
-		})
+		var commpeakSource wholesale.CDRPageSource
+		if strings.TrimSpace(cfg.CommPeak.Authorization) != "" {
+			commpeakClient, err := commpeak.NewClient(commpeak.Config{
+				BaseURL:       cfg.CommPeak.APIBaseURL,
+				Authorization: cfg.CommPeak.Authorization,
+			})
+			if err != nil {
+				_ = redisClient.Close()
+				_ = freeSwitch.Close()
+				_ = natsClient.Close()
+				db.Close()
+				return nil, fmt.Errorf("initialize CommPeak CDR client: %w", err)
+			}
+			commpeakSource = commpeakClient
+		}
+		commpeakCDRPolling, err = wholesale.NewCDRPollJob(
+			wholesale.NewRepository(db),
+			commpeakSource,
+			wholesale.DefaultCDRPollJobConfig("commpeak"),
+		)
 		if err != nil {
 			_ = redisClient.Close()
 			_ = freeSwitch.Close()
 			_ = natsClient.Close()
 			db.Close()
-			return nil, fmt.Errorf("initialize CommPeak CDR client: %w", err)
+			return nil, fmt.Errorf("initialize CommPeak CDR polling job: %w", err)
 		}
-		commpeakSource = commpeakClient
-	}
-	commpeakCDRPolling, err := wholesale.NewCDRPollJob(
-		wholesale.NewRepository(db),
-		commpeakSource,
-		wholesale.DefaultCDRPollJobConfig("commpeak"),
-	)
-	if err != nil {
-		_ = redisClient.Close()
-		_ = freeSwitch.Close()
-		_ = natsClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize CommPeak CDR polling job: %w", err)
 	}
 
 	outboxRepository := outbox.NewRepository(queries)
@@ -256,6 +276,11 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		return nil, fmt.Errorf("initialize idempotency cleanup job: %w", err)
 	}
 
+	componentNames := append([]string{}, sharedComponentNames...)
+	if managedProviders {
+		componentNames = append(componentNames, managedComponentNames...)
+	}
+
 	return &Worker{
 		db:                      db,
 		freeSwitch:              freeSwitch,
@@ -274,6 +299,7 @@ func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 		idempotencyCleanup:      idempotencyCleanup,
 		health:                  newHealthState(componentNames...),
 		logger:                  logging.New(),
+		componentNames:          componentNames,
 	}, nil
 }
 
@@ -323,7 +349,7 @@ func (w *Worker) Run(ctx context.Context) error {
 		_ = healthServer.Shutdown(shutdownCtx)
 	}()
 
-	errCh := make(chan error, len(componentNames)+1)
+	errCh := make(chan error, len(w.componentNames)+1)
 	go func() {
 		w.logger.Info(ctx, "worker health server started", "address", workerHealthAddress)
 		if err := healthServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -333,8 +359,12 @@ func (w *Worker) Run(ctx context.Context) error {
 	go w.runComponent(ctx, errCh, "call-reconciliation", w.callReconciliation.Run)
 	go w.runComponent(ctx, errCh, "carrier-endpoint-health", w.endpointHealth.Run)
 	go w.runComponent(ctx, errCh, "recording-reconciliation", w.recordingReconciliation.Run)
-	go w.runComponent(ctx, errCh, "provider-operations", w.providerOperations.Run)
-	go w.runComponent(ctx, errCh, "commpeak-cdr-polling", w.commpeakCDRPolling.Run)
+	if w.providerOperations != nil {
+		go w.runComponent(ctx, errCh, "provider-operations", w.providerOperations.Run)
+	}
+	if w.commpeakCDRPolling != nil {
+		go w.runComponent(ctx, errCh, "commpeak-cdr-polling", w.commpeakCDRPolling.Run)
+	}
 	go w.runComponent(ctx, errCh, "outbox-publisher", w.outbox.Run)
 	go w.runComponent(ctx, errCh, "webhook-consumer", w.webhookConsumer.Run)
 	go w.runComponent(ctx, errCh, "webhook-delivery", w.webhookDelivery.Run)
