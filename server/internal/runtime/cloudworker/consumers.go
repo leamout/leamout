@@ -1,8 +1,12 @@
 package worker
 
 import (
+	"github.com/google/uuid"
+
+	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/metrics"
 	"github.com/leamout/leamout/internal/telecom/calls"
+	"github.com/leamout/leamout/internal/telecom/recordings"
 	"github.com/leamout/leamout/internal/telecom/routing"
 )
 
@@ -49,4 +53,45 @@ func newCallJobs(deps *dependencies) (*callJobs, error) {
 		reconciliation: reconciliation,
 		endpointHealth: endpointHealth,
 	}, nil
+}
+
+type recordingJobs struct {
+	consumer       *recordings.Consumer
+	reconciliation *recordings.ReconciliationJob
+}
+
+func newRecordingJobs(deps *dependencies) (*recordingJobs, error) {
+	repository := recordings.NewRepository(deps.db)
+	service := recordings.NewService(repository, nil)
+	reconciliation, err := recordings.NewReconciliationJob(
+		repository,
+		recordings.DefaultReconciliationJobConfig(),
+	)
+	if err != nil {
+		return nil, wrapWorkerError("initialize recording reconciliation job", err)
+	}
+	return &recordingJobs{
+		consumer:       recordings.NewConsumer(service),
+		reconciliation: reconciliation,
+	}, nil
+}
+
+type webhookJobs struct {
+	consumer *webhooks.Consumer
+	delivery *webhooks.DeliveryJob
+}
+
+func newWebhookJobs(deps *dependencies) (*webhookJobs, error) {
+	repository := webhooks.NewRepository(deps.queries)
+	service := webhooks.NewService(repository, deps.db)
+	consumer := webhooks.NewConsumer(deps.nats, service)
+	delivery, err := webhooks.NewDeliveryJob(
+		repository,
+		webhooks.NewHTTPSender(),
+		webhooks.DefaultDeliveryJobConfig("worker-"+uuid.NewString()),
+	)
+	if err != nil {
+		return nil, wrapWorkerError("initialize webhook delivery job", err)
+	}
+	return &webhookJobs{consumer: consumer, delivery: delivery}, nil
 }

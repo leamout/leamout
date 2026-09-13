@@ -87,6 +87,17 @@ Shared behavior belongs in the existing reusable domain and platform packages su
 
 Runtime packages may contain executable-specific wiring, routes, health checks, and worker orchestration. That composition glue may differ between Cloud and Self-Hosted while the actual product capabilities remain shared.
 
+Worker runtime composition uses the same four-file contract in both distributions:
+
+```text
+consumers.go  asynchronous inputs and consumer construction
+health.go     liveness, readiness, and component health state
+modules.go    runtime dependency and background-module composition
+worker.go     worker lifecycle, component registry, and shutdown
+```
+
+Do not split individual jobs into one-file wrappers inside a runtime package. Job behavior remains in the domain package that owns it; runtime worker files only compose and run those jobs.
+
 ## Dependency rule
 
 Dependencies flow from runtime composition into shared domains and platform packages, never the reverse.
