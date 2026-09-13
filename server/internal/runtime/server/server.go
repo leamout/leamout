@@ -135,9 +135,11 @@ func newServer(ctx context.Context, cfg config.Config, newModules moduleFactory)
 			return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
 		}
 	}
-	modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, cfg.ManagedSIP.AdmissionSecret)
-	modules.Wholesale.Handler = wholesale.NewHandler(modules.Wholesale.Service, cfg.ManagedSIP.AdmissionSecret)
-	modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(modules.ProviderDiagnostics.Service, cfg.OperatorAPISecret)
+	if modules.Commercial != nil {
+		modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, cfg.ManagedSIP.AdmissionSecret)
+		modules.Wholesale.Handler = wholesale.NewHandler(modules.Wholesale.Service, cfg.ManagedSIP.AdmissionSecret)
+		modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(modules.ProviderDiagnostics.Service, cfg.OperatorAPISecret)
+	}
 	router := chi.NewRouter()
 	router.Use(middleware.Recovery, middleware.Tracing(), middleware.Request(), middleware.Logging(logger), middleware.Metrics(metricsRegistry), middleware.Secure, middleware.CORS(cfg.CORSOrigins, cfg.IsDevelopment()))
 	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
