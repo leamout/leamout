@@ -125,8 +125,8 @@ func TestValidateInstalledLicenseRequiresCurrentInstalledArtifact(t *testing.T) 
 		t.Fatal(err)
 	}
 	files := map[string][]byte{
-		statePath:                         state,
-		filepath.Join(root, "deployment.key"): []byte(base64.RawURLEncoding.EncodeToString(deploymentPrivateKey) + "\n"),
+		statePath:                                 state,
+		filepath.Join(root, "deployment.key"):     []byte(base64.RawURLEncoding.EncodeToString(deploymentPrivateKey) + "\n"),
 		filepath.Join(licenseDir, "license.json"): artifact,
 		filepath.Join(licenseDir, "keyring.json"): keyring,
 	}
