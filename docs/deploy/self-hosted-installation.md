@@ -39,7 +39,7 @@ console.leamout.com/sign-up
         ↓
 create organization
         ↓
-choose a self-hosted plan / subscription
+choose a Self-Hosted software license
         ↓
 create a self-hosted deployment
         ↓
@@ -69,7 +69,7 @@ Leamout Cloud and the self-hosted runtime own different classes of state.
 `console.leamout.com` and its backing services are authoritative for commercial and fleet-management state such as:
 
 - organizations and users;
-- plans and subscriptions;
+- license products and agreements;
 - invoices and payments;
 - commercial licenses;
 - entitlements;

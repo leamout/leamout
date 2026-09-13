@@ -11,7 +11,7 @@ deploy/certs/
 └── carrier-ca.pem
 ```
 
-These files are mounted into the OpenSIPS container by `deploy/compose.yaml`.
+These files are mounted into the OpenSIPS container by the selected `deploy/cloud/compose.yaml` or `deploy/self-hosted/compose.yaml`.
 
 Do not commit certificate private keys or production certificate material to the repository. `deploy/certs/*.pem` is ignored by Git.
 
@@ -210,7 +210,7 @@ After changing carrier trust material:
 
 ```bash
 make check-certs
-docker compose --env-file .env -f deploy/compose.yaml restart opensips
+docker compose --env-file .env -f deploy/self-hosted/compose.yaml restart opensips
 ```
 
 ## Manual renewal

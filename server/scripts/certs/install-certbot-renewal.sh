@@ -5,7 +5,7 @@ TLS_DOMAIN="${TLS_DOMAIN:-}"
 REPO_DIR="${REPO_DIR:-$(pwd)}"
 CERT_DIR="${CERT_DIR:-$REPO_DIR/deploy/certs}"
 ENV_FILE="${ENV_FILE:-$REPO_DIR/.env}"
-COMPOSE_FILE="${COMPOSE_FILE:-$REPO_DIR/deploy/compose.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-$REPO_DIR/deploy/self-hosted/compose.yaml}"
 CERTBOT_HOOK_DIR="${CERTBOT_HOOK_DIR:-/etc/letsencrypt/renewal-hooks/deploy}"
 HOOK_PATH="$CERTBOT_HOOK_DIR/leamout-opensips"
 

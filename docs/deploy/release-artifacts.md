@@ -244,7 +244,7 @@ redis:8-alpine
 
 Even a semantic-version tag such as `leamout/server:1.0.0` is not sufficient for the release manifest because a tag can be moved. Tags remain useful for humans and development, but the production manifest records the resolved digest.
 
-The repository's `deploy/compose.yaml` remains a development/CI stack. It may contain build directives and human-readable tags, including the hosted web applications needed for repository-level full-stack development. It is **not** a production release lockfile. Phase 2 must render or otherwise consume a self-hosted production deployment from a validated release manifest rather than treating repository Compose services as the customer runtime definition.
+The repository's `deploy/cloud/compose.yaml` and `deploy/self-hosted/compose.yaml` are separate development/CI compositions; `deploy/compose.yaml` is a compatibility include for the Cloud stack. It may contain build directives and human-readable tags, including the hosted web applications needed for repository-level full-stack development. It is **not** a production release lockfile. Phase 2 must render or otherwise consume a self-hosted production deployment from a validated release manifest rather than treating repository Compose services as the customer runtime definition.
 
 ## Database migration boundary
 

@@ -19,7 +19,7 @@ The repository must share product behavior while keeping deployment and commerci
              │                                   │
        prepaid PAYG                      enterprise license
              │                                   │
-      BYOC + Managed                  BYOC + optional Managed
+      BYOC + Managed                       BYOC core
 ```
 
 Cloud and Self-Hosted are not forks and must not duplicate telecom, identity, tenancy, or shared platform code.
@@ -48,7 +48,7 @@ Cloud is prepaid PAYG.
 
 Self-Hosted BYOC is governed by the enterprise software license and must not require wallet balance for customer-owned carrier usage.
 
-Self-Hosted Managed combines the enterprise software license with prepaid authorization for Leamout-managed provider obligations.
+A future Self-Hosted Managed composition may combine the enterprise software license with prepaid authorization for Leamout-managed provider obligations, but it is not part of the current Self-Hosted BYOC runtime.
 
 ```text
 Cloud
@@ -157,3 +157,19 @@ Self-Hosted release artifacts must contain only what is required to operate Leam
 5. Attach wallet authorization only to managed-provider paths.
 6. Split Cloud and Self-Hosted release composition where needed.
 7. Keep acceptance coverage proving Cloud, Self-Hosted BYOC, and Self-Hosted Managed independently.
+
+## Deployment compositions
+
+The source tree exposes independent Compose entry points:
+
+```text
+deploy/cloud/compose.yaml         Cloud API, Cloud worker, Backoffice, managed providers, and PAYG
+deploy/self-hosted/compose.yaml   Self-Hosted API and worker with customer-owned BYOC connectivity
+```
+
+`make` defaults to the Self-Hosted composition. Operators and CI can select Cloud explicitly with
+`COMPOSE_FILE=deploy/cloud/compose.yaml`. The Self-Hosted image contains the runtime server, worker,
+and `leamout` lifecycle CLI; it does not contain Backoffice. Its API and worker dependency graphs
+exclude Commercial, payment adapters, managed-provider jobs, provider diagnostics, and managed SIP/CDR
+internal handlers. Offline software-license validation remains in the `leamout` lifecycle boundary and
+does not introduce wallet authorization into the communications runtime.

@@ -38,9 +38,24 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/backoffice \
-        ./cmd/backoffice
+        ./cmd/backoffice; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/selfhosted-server \
+        ./cmd/selfhosted; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/selfhosted-worker \
+        ./cmd/selfhosted-worker; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/leamout \
+        ./cmd/leamout
 
-FROM alpine:3.22
+FROM alpine:3.22 AS runtime
 
 WORKDIR /leamout
 
@@ -50,9 +65,20 @@ RUN apk add --no-cache \
     && addgroup -S leamout \
     && adduser -S -D -H -G leamout leamout
 
+USER leamout
+
+FROM runtime AS cloud
+
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
 COPY --from=build /out/backoffice /leamout/backoffice
-USER leamout
+
+CMD ["/leamout/server"]
+
+FROM runtime AS self-hosted
+
+COPY --from=build /out/selfhosted-server /leamout/server
+COPY --from=build /out/selfhosted-worker /leamout/worker
+COPY --from=build /out/leamout /leamout/leamout
 
 CMD ["/leamout/server"]

@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 ENV_FILE ?= .env
-COMPOSE_FILE ?= deploy/compose.yaml
+COMPOSE_FILE ?= deploy/self-hosted/compose.yaml
 COMPOSE := docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 CERT_DIR ?= deploy/certs
 DEPLOY_ENV := ENV_FILE=$(ENV_FILE) COMPOSE_FILE=$(COMPOSE_FILE) CERT_DIR=$(CERT_DIR)

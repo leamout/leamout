@@ -5,11 +5,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/identity"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/webhooks"
-	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
@@ -24,14 +22,6 @@ import (
 )
 
 func RegisterRoutes(r *chi.Mux, modules Modules) {
-	if modules.Edge.Handler != nil {
-		r.Post("/internal/v1/sip-edge/authorize", modules.Edge.Handler.Admit)
-	}
-	if modules.Wholesale.Handler != nil {
-		r.Post("/internal/v1/provider-cdrs/reconcile", modules.Wholesale.Handler.Reconcile)
-	}
-	providerdiagnostics.RegisterRoutes(r, modules.ProviderDiagnostics.Handler)
-
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
 			requireAuthenticated := modules.OrganizationsContext.RequireAuthenticated(modules.Authn)
@@ -55,15 +45,6 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	}
 
 	r.Route("/v1", func(r chi.Router) {
-		if modules.Commercial != nil {
-			commercial.RegisterRoutes(
-				r,
-				modules.Commercial,
-				modules.Authn.RequireSession,
-				organizationAccess,
-				modules.Idempotency.Middleware.Handle,
-			)
-		}
 		identity.RegisterRoutes(r, modules.Identity, modules.Authn.RequireSession)
 		tenancy.RegisterRoutes(
 			r,

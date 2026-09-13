@@ -200,7 +200,6 @@ func NewModules(
 	}
 
 	return Modules{
-		Commercial:           nil,
 		Identity:             identityModule,
 		Tenancy:              tenancyModule,
 		Voice:                VoiceModule{Repository: voiceRepository, Service: voiceService, Handler: voice.NewHandler(voiceService)},

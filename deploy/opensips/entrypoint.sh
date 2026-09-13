@@ -5,6 +5,7 @@ config=${OPENSIPS_CONFIG:-/etc/opensips/opensips.cfg}
 advertised_address=${OPENSIPS_ADVERTISED_ADDRESS:-}
 database_password=${OPENSIPS_DATABASE_PASSWORD:-}
 admission_secret=${MANAGED_SIP_ADMISSION_SECRET:-}
+managed_admission_enabled=${MANAGED_SIP_ADMISSION_ENABLED:-true}
 
 [ -n "$database_password" ] || {
   echo "OPENSIPS_DATABASE_PASSWORD is required" >&2
@@ -16,6 +17,8 @@ case "$database_password" in
     exit 1
     ;;
 esac
+
+[ "$managed_admission_enabled" = "false" ] && admission_secret="disabled"
 
 [ -n "$admission_secret" ] || {
   echo "MANAGED_SIP_ADMISSION_SECRET is required" >&2

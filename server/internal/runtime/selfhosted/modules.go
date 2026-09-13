@@ -1,17 +1,14 @@
 package server
 
 import (
-	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/identity"
 	"github.com/leamout/leamout/internal/modules/audit"
 	"github.com/leamout/leamout/internal/modules/idempotency"
 	"github.com/leamout/leamout/internal/modules/webhooks"
 	"github.com/leamout/leamout/internal/platform/middleware"
-	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
 	"github.com/leamout/leamout/internal/telecom/calls"
 	"github.com/leamout/leamout/internal/telecom/carriers"
 	"github.com/leamout/leamout/internal/telecom/conferences"
-	"github.com/leamout/leamout/internal/telecom/edge"
 	"github.com/leamout/leamout/internal/telecom/numbers"
 	"github.com/leamout/leamout/internal/telecom/realtime"
 	"github.com/leamout/leamout/internal/telecom/recordings"
@@ -20,12 +17,10 @@ import (
 	"github.com/leamout/leamout/internal/telecom/subscribers"
 	"github.com/leamout/leamout/internal/telecom/trunks"
 	"github.com/leamout/leamout/internal/telecom/voice"
-	"github.com/leamout/leamout/internal/telecom/wholesale"
 	"github.com/leamout/leamout/internal/tenancy"
 )
 
 type Modules struct {
-	Commercial           *commercial.Module
 	Identity             *identity.Module
 	Tenancy              *tenancy.Module
 	Voice                VoiceModule
@@ -42,30 +37,9 @@ type Modules struct {
 	Trunks               TrunksModule
 	Carriers             CarriersModule
 	Realtime             RealtimeModule
-	Edge                 EdgeModule
 	Routing              *routing.Service
-	Wholesale            WholesaleModule
-	ProviderDiagnostics  ProviderDiagnosticsModule
 	Authn                *middleware.AuthnMiddleware
 	OrganizationsContext *middleware.OrganizationMiddleware
-}
-
-type ProviderDiagnosticsModule struct {
-	Repository *providerdiagnostics.Repository
-	Service    *providerdiagnostics.Service
-	Handler    *providerdiagnostics.Handler
-}
-
-type WholesaleModule struct {
-	Repository *wholesale.Repository
-	Service    *wholesale.Service
-	Handler    *wholesale.Handler
-}
-
-type EdgeModule struct {
-	Repository *edge.Repository
-	Service    *edge.Service
-	Handler    *edge.Handler
 }
 
 type VoiceModule struct {
