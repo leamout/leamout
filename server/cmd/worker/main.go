@@ -24,7 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	worker, err := runtimeworker.New(ctx, cfg)
+	worker, err := runtimeworker.NewCloud(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
