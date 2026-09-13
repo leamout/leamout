@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/leamout/leamout/internal/platform/config"
-	selfhostedruntime "github.com/leamout/leamout/internal/runtime/selfhosted"
+	selfhostedworkerruntime "github.com/leamout/leamout/internal/runtime/selfhostedworker"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	worker, err := selfhostedruntime.NewWorker(ctx, cfg)
+	worker, err := selfhostedworkerruntime.New(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

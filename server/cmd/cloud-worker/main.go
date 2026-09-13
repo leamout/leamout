@@ -8,7 +8,7 @@ import (
 	"syscall"
 
 	"github.com/leamout/leamout/internal/platform/config"
-	cloudruntime "github.com/leamout/leamout/internal/runtime/cloud"
+	cloudworkerruntime "github.com/leamout/leamout/internal/runtime/cloudworker"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	worker, err := cloudruntime.NewWorker(ctx, cfg)
+	worker, err := cloudworkerruntime.New(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
