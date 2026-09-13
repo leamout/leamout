@@ -25,7 +25,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, input Cr
 	if err != nil {
 		return License{}, err
 	}
-	return s.repo.Create(ctx, organizationID, normalized.MaxDeployments, normalized.SigningKeyID, issuedAt, normalized.ExpiresAt)
+	return s.repo.Create(ctx, organizationID, normalized.SigningKeyID, issuedAt, normalized.ExpiresAt)
 }
 
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (License, error) {
@@ -108,17 +108,17 @@ func (s *Service) ListDeployments(ctx context.Context, organizationID, licenseID
 }
 
 func (s *Service) TouchDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
-	normalized, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: deploymentID})
+	normalized, err := normalizeDeploymentID(deploymentID)
 	if err != nil {
 		return Deployment{}, err
 	}
-	return s.repo.TouchDeployment(ctx, organizationID, licenseID, normalized.DeploymentID, s.now())
+	return s.repo.TouchDeployment(ctx, organizationID, licenseID, normalized, s.now())
 }
 
 func (s *Service) DeactivateDeployment(ctx context.Context, organizationID, licenseID uuid.UUID, deploymentID string) (Deployment, error) {
-	normalized, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: deploymentID})
+	normalized, err := normalizeDeploymentID(deploymentID)
 	if err != nil {
 		return Deployment{}, err
 	}
-	return s.repo.DeactivateDeployment(ctx, organizationID, licenseID, normalized.DeploymentID)
+	return s.repo.DeactivateDeployment(ctx, organizationID, licenseID, normalized)
 }

@@ -2,6 +2,7 @@ package licensing
 
 import (
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -27,19 +28,12 @@ func TestSignerRoundTripV1(t *testing.T) {
 
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
 	claims := LicenseClaimsV1{
-		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		DeploymentID:   "node-01",
-		IssuedAt:       issuedAt,
-		ExpiresAt:      issuedAt.Add(24 * time.Hour),
-		Features: map[string]bool{
-			"recording.enabled": true,
-			"byoc.enabled":      true,
-		},
-		Limits: map[string]int64{
-			"max.concurrent_calls": 500,
-			"max.deployments":      3,
-		},
+		LicenseID:           uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		OrganizationID:      uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		DeploymentID:        "node-01",
+		DeploymentPublicKey: testDeploymentPublicKey(1),
+		IssuedAt:            issuedAt,
+		ExpiresAt:           issuedAt.Add(24 * time.Hour),
 	}
 
 	artifact, err := signer.SignV1(claims)
@@ -50,11 +44,8 @@ func TestSignerRoundTripV1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("VerifyV1() error = %v", err)
 	}
-	if verified.LicenseID != claims.LicenseID || verified.OrganizationID != claims.OrganizationID {
-		t.Fatalf("verified identity = %#v, want %#v", verified, claims)
-	}
-	if !verified.Features["recording.enabled"] || verified.Limits["max.concurrent_calls"] != 500 {
-		t.Fatalf("verified claims = %#v / %#v", verified.Features, verified.Limits)
+	if verified != claims {
+		t.Fatalf("verified claims = %#v, want %#v", verified, claims)
 	}
 }
 
@@ -67,13 +58,12 @@ func TestSignerV1IsDeterministicForNormalizedClaims(t *testing.T) {
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 999, time.UTC)
 	claims := LicenseClaimsV1{
-		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		DeploymentID:   " node-01 ",
-		IssuedAt:       issuedAt,
-		ExpiresAt:      issuedAt.Add(time.Hour),
-		Features:       map[string]bool{"z.feature": true, "a.feature": false},
-		Limits:         map[string]int64{"z.limit": 9, "a.limit": 1},
+		LicenseID:           uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		OrganizationID:      uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		DeploymentID:        " node-01 ",
+		DeploymentPublicKey: testDeploymentPublicKey(2),
+		IssuedAt:            issuedAt,
+		ExpiresAt:           issuedAt.Add(time.Hour),
 	}
 
 	first, err := signer.SignV1(claims)
@@ -102,7 +92,8 @@ func TestVerifyV1RejectsTamperingAndWrongDeployment(t *testing.T) {
 		t.Fatalf("NewKeyring() error = %v", err)
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	artifact, err := signer.SignV1(validTestClaims(issuedAt))
+	claims := validTestClaims(issuedAt)
+	artifact, err := signer.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
@@ -135,7 +126,8 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 		t.Fatalf("NewSigner(old) error = %v", err)
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	artifact, err := oldSigner.SignV1(validTestClaims(issuedAt))
+	claims := validTestClaims(issuedAt)
+	artifact, err := oldSigner.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
@@ -165,14 +157,21 @@ func TestVerifyV1EnforcesValidityWindowAndKeyRotation(t *testing.T) {
 
 func validTestClaims(issuedAt time.Time) LicenseClaimsV1 {
 	return LicenseClaimsV1{
-		LicenseID:      uuid.MustParse("11111111-1111-1111-1111-111111111111"),
-		OrganizationID: uuid.MustParse("22222222-2222-2222-2222-222222222222"),
-		DeploymentID:   "node-01",
-		IssuedAt:       issuedAt,
-		ExpiresAt:      issuedAt.Add(2 * time.Hour),
-		Features:       map[string]bool{"recording.enabled": true},
-		Limits:         map[string]int64{"max.deployments": 3},
+		LicenseID:           uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+		OrganizationID:      uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		DeploymentID:        "node-01",
+		DeploymentPublicKey: testDeploymentPublicKey(3),
+		IssuedAt:            issuedAt,
+		ExpiresAt:           issuedAt.Add(2 * time.Hour),
 	}
+}
+
+func testDeploymentPublicKey(marker byte) string {
+	key := make([]byte, ed25519.PublicKeySize)
+	for index := range key {
+		key[index] = marker + byte(index)
+	}
+	return base64.RawURLEncoding.EncodeToString(key)
 }
 
 func testPrivateKey(marker byte) ed25519.PrivateKey {

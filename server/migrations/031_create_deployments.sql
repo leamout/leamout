@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS deployments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     license_id UUID NOT NULL REFERENCES licenses(id),
     deployment_id TEXT NOT NULL,
+    public_key TEXT NOT NULL,
     name TEXT,
     status TEXT NOT NULL DEFAULT 'active',
     activated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -10,8 +11,10 @@ CREATE TABLE IF NOT EXISTS deployments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
-    CONSTRAINT uq_deployments_license_deployment UNIQUE (license_id, deployment_id),
+    CONSTRAINT uq_deployments_license UNIQUE (license_id),
+    CONSTRAINT uq_deployments_deployment_id UNIQUE (deployment_id),
     CONSTRAINT chk_deployments_deployment_id CHECK (length(trim(deployment_id)) > 0),
+    CONSTRAINT chk_deployments_public_key CHECK (length(trim(public_key)) > 0),
     CONSTRAINT chk_deployments_name CHECK (
         name IS NULL OR length(trim(name)) > 0
     ),

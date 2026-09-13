@@ -2,6 +2,7 @@ package leamout
 
 import (
 	"bytes"
+	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -9,6 +10,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
@@ -30,8 +34,9 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 	}
 
 	statePath := filepath.Join(stateDir, "deployment.json")
+	identityKeyPath := filepath.Join(stateDir, "deployment.key")
 	envPath := filepath.Join(configDir, "leamout.env")
-	for _, path := range []string{statePath, envPath} {
+	for _, path := range []string{statePath, identityKeyPath, envPath} {
 		info, err := os.Stat(path)
 		if err != nil {
 			t.Fatalf("stat %s: %v", path, err)
@@ -51,6 +56,13 @@ func TestInitCreatesDurableDeploymentStateAndSecrets(t *testing.T) {
 	}
 	if state.DeploymentID == "" || state.Mode != deploymentMode || state.SchemaVersion != deploymentStateSchemaVersion {
 		t.Fatalf("unexpected deployment state: %+v", state)
+	}
+	publicKey, err := base64.RawURLEncoding.DecodeString(state.PublicKey)
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
+		t.Fatalf("invalid deployment public key: len=%d err=%v", len(publicKey), err)
+	}
+	if _, err := loadDeploymentPrivateKey(identityKeyPath, state.PublicKey); err != nil {
+		t.Fatalf("deployment identity key invalid: %v", err)
 	}
 
 	envBytes, err := os.ReadFile(envPath)
@@ -138,8 +150,13 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 
 	run()
 	statePath := filepath.Join(stateDir, "deployment.json")
+	identityKeyPath := filepath.Join(stateDir, "deployment.key")
 	envPath := filepath.Join(configDir, "leamout.env")
 	stateBefore, err := os.ReadFile(statePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	identityKeyBefore, err := os.ReadFile(identityKeyPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,15 +167,51 @@ func TestInitIsIdempotentAndPreservesIdentityAndSecrets(t *testing.T) {
 
 	stdout := run()
 	stateAfter, _ := os.ReadFile(statePath)
+	identityKeyAfter, _ := os.ReadFile(identityKeyPath)
 	envAfter, _ := os.ReadFile(envPath)
 	if !bytes.Equal(stateBefore, stateAfter) {
 		t.Fatal("deployment identity changed on repeated init")
+	}
+	if !bytes.Equal(identityKeyBefore, identityKeyAfter) {
+		t.Fatal("deployment identity key changed on repeated init")
 	}
 	if !bytes.Equal(envBefore, envAfter) {
 		t.Fatal("deployment secrets changed on repeated init")
 	}
 	if !strings.Contains(stdout, "Existing deployment identity and secrets preserved") || !strings.Contains(stdout, "Production runtime verified") {
 		t.Fatalf("unexpected repeat init output: %s", stdout)
+	}
+}
+
+func TestEnsureDeploymentIdentityMigratesLegacyState(t *testing.T) {
+	root := t.TempDir()
+	statePath := filepath.Join(root, "deployment.json")
+	legacy := deploymentState{
+		SchemaVersion: deploymentStateSchemaVersion,
+		DeploymentID:  uuid.NewString(),
+		Mode:          deploymentMode,
+		CreatedAt:     time.Now().UTC(),
+	}
+	content, err := json.MarshalIndent(legacy, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(statePath, append(content, '\n'), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := ensureDeploymentIdentity(statePath)
+	if err != nil {
+		t.Fatalf("migrate legacy deployment identity: %v", err)
+	}
+	if state.PublicKey == "" {
+		t.Fatal("migrated deployment public key is empty")
+	}
+	if _, err := loadDeploymentPrivateKey(filepath.Join(root, "deployment.key"), state.PublicKey); err != nil {
+		t.Fatalf("migrated deployment private key: %v", err)
+	}
+	if _, err := loadDeploymentState(statePath); err != nil {
+		t.Fatalf("load migrated deployment state: %v", err)
 	}
 }
 
@@ -203,7 +256,11 @@ func TestInitRollsBackIdentityWhenRuntimeInstallationFails(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("init unexpectedly succeeded: %s", stdout.String())
 	}
-	for _, path := range []string{filepath.Join(stateDir, "deployment.json"), filepath.Join(configDir, "leamout.env")} {
+	for _, path := range []string{
+		filepath.Join(stateDir, "deployment.json"),
+		filepath.Join(stateDir, "deployment.key"),
+		filepath.Join(configDir, "leamout.env"),
+	} {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Fatalf("partial initialization left behind %s: %v", path, err)
 		}

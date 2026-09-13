@@ -44,16 +44,16 @@ func TestNormalizeCreate(t *testing.T) {
 	issuedAt := time.Date(2026, 8, 31, 20, 0, 0, 0, time.UTC)
 	expiresAt := issuedAt.Add(24 * time.Hour)
 	key := " key-2026 "
-	got, gotIssuedAt, err := normalizeCreate(CreateInput{MaxDeployments: 1, SigningKeyID: &key, ExpiresAt: &expiresAt}, issuedAt)
+	got, gotIssuedAt, err := normalizeCreate(CreateInput{SigningKeyID: &key, ExpiresAt: &expiresAt}, issuedAt)
 	if err != nil {
 		t.Fatalf("normalizeCreate() error = %v", err)
 	}
-	if gotIssuedAt != issuedAt || got.MaxDeployments != 1 || got.SigningKeyID == nil || *got.SigningKeyID != "key-2026" {
+	if gotIssuedAt != issuedAt || got.SigningKeyID == nil || *got.SigningKeyID != "key-2026" {
 		t.Fatalf("unexpected normalized create: %#v, %v", got, gotIssuedAt)
 	}
 
 	invalidExpiry := issuedAt
-	_, _, err = normalizeCreate(CreateInput{MaxDeployments: 1, ExpiresAt: &invalidExpiry}, issuedAt)
+	_, _, err = normalizeCreate(CreateInput{ExpiresAt: &invalidExpiry}, issuedAt)
 	if !errors.Is(err, ErrInvalidExpiration) {
 		t.Fatalf("normalizeCreate() error = %v, want %v", err, ErrInvalidExpiration)
 	}
@@ -63,16 +63,22 @@ func TestNormalizeDeployment(t *testing.T) {
 	t.Parallel()
 
 	name := " Production Node "
-	got, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: " node-01 ", Name: &name})
+	publicKey := testDeploymentPublicKey(8)
+	got, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: " node-01 ", PublicKey: publicKey, Name: &name})
 	if err != nil {
 		t.Fatalf("normalizeDeployment() error = %v", err)
 	}
-	if got.DeploymentID != "node-01" || got.Name == nil || *got.Name != "Production Node" {
+	if got.DeploymentID != "node-01" || got.PublicKey != publicKey || got.Name == nil || *got.Name != "Production Node" {
 		t.Fatalf("unexpected normalized deployment: %#v", got)
 	}
 
-	_, err = normalizeDeployment(ActivateDeploymentInput{DeploymentID: "node 01"})
+	_, err = normalizeDeployment(ActivateDeploymentInput{DeploymentID: "node 01", PublicKey: publicKey})
 	if !errors.Is(err, ErrInvalidDeploymentID) {
 		t.Fatalf("normalizeDeployment() error = %v, want %v", err, ErrInvalidDeploymentID)
+	}
+
+	_, err = normalizeDeployment(ActivateDeploymentInput{DeploymentID: "node-01"})
+	if !errors.Is(err, ErrDeploymentPublicKeyRequired) {
+		t.Fatalf("normalizeDeployment() error = %v, want %v", err, ErrDeploymentPublicKeyRequired)
 	}
 }

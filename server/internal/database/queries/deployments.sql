@@ -2,11 +2,13 @@
 INSERT INTO deployments (
     license_id,
     deployment_id,
+    public_key,
     name
 )
 SELECT
     l.id AS license_id,
     sqlc.arg(deployment_id) AS deployment_id,
+    sqlc.arg(public_key) AS public_key,
     sqlc.narg(name) AS name
 FROM licenses AS l
 JOIN organizations AS o ON o.id = l.organization_id
@@ -38,17 +40,6 @@ WHERE d.license_id = sqlc.arg(license_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
 ORDER BY d.created_at DESC;
-
--- name: CountActiveDeploymentsByLicense :one
-SELECT COUNT(*)
-FROM deployments AS d
-JOIN licenses AS l ON l.id = d.license_id
-JOIN organizations AS o ON o.id = l.organization_id
-WHERE d.license_id = sqlc.arg(license_id)
-  AND d.status = 'active'
-  AND l.organization_id = sqlc.arg(organization_id)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL;
 
 -- name: TouchDeployment :one
 UPDATE deployments AS d

@@ -16,20 +16,25 @@ import (
 )
 
 func TestLicenseInstallVerifiesDeploymentBindingAndPersistsArtifact(t *testing.T) {
-	_, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	_, signingPrivateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
-	signer, err := licensing.NewSigner("release-2026", privateKey)
+	signer, err := licensing.NewSigner("release-2026", signingPrivateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
+	deploymentPublicKey, deploymentPrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deploymentPublicKeyEncoded := base64.RawURLEncoding.EncodeToString(deploymentPublicKey)
 	now := time.Date(2026, 9, 4, 12, 0, 0, 0, time.UTC)
 	deploymentID := uuid.NewString()
 	artifact, err := signer.SignV1(licensing.LicenseClaimsV1{
-		LicenseID: uuid.New(), OrganizationID: uuid.New(),
-		DeploymentID: deploymentID, IssuedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
-		Features: map[string]bool{"voice.enabled": true}, Limits: map[string]int64{"voice.concurrent_calls": 10},
+		LicenseID: uuid.New(), OrganizationID: uuid.New(), DeploymentID: deploymentID,
+		DeploymentPublicKey: deploymentPublicKeyEncoded,
+		IssuedAt:            now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -38,10 +43,17 @@ func TestLicenseInstallVerifiesDeploymentBindingAndPersistsArtifact(t *testing.T
 	artifactPath := filepath.Join(root, "artifact.json")
 	keyringPath := filepath.Join(root, "keyring.json")
 	statePath := filepath.Join(root, "deployment.json")
+	identityKeyPath := filepath.Join(root, "deployment.key")
 	licenseDir := filepath.Join(root, "license")
-	state, _ := json.Marshal(deploymentState{SchemaVersion: 1, DeploymentID: deploymentID, Mode: deploymentMode, CreatedAt: now})
-	keyring, _ := json.Marshal(licenseKeyringFile{Version: 1, Keys: map[string]string{"release-2026": base64.RawURLEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey))}})
-	for path, content := range map[string][]byte{artifactPath: artifact, keyringPath: keyring, statePath: state} {
+	state, _ := json.Marshal(deploymentState{SchemaVersion: 1, DeploymentID: deploymentID, PublicKey: deploymentPublicKeyEncoded, Mode: deploymentMode, CreatedAt: now})
+	keyring, _ := json.Marshal(licenseKeyringFile{Version: 1, Keys: map[string]string{"release-2026": base64.RawURLEncoding.EncodeToString(signingPrivateKey.Public().(ed25519.PublicKey))}})
+	files := map[string][]byte{
+		artifactPath:    artifact,
+		keyringPath:     keyring,
+		statePath:       state,
+		identityKeyPath: []byte(base64.RawURLEncoding.EncodeToString(deploymentPrivateKey) + "\n"),
+	}
+	for path, content := range files {
 		if err := os.WriteFile(path, content, 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -63,12 +75,37 @@ func TestLicenseInstallVerifiesDeploymentBindingAndPersistsArtifact(t *testing.T
 }
 
 func TestLicenseVerificationRejectsAnotherDeployment(t *testing.T) {
-	_, privateKey, _ := ed25519.GenerateKey(rand.Reader)
-	signer, _ := licensing.NewSigner("key", privateKey)
+	_, signingPrivateKey, _ := ed25519.GenerateKey(rand.Reader)
+	deploymentPublicKey, _, _ := ed25519.GenerateKey(rand.Reader)
+	deploymentPublicKeyEncoded := base64.RawURLEncoding.EncodeToString(deploymentPublicKey)
+	signer, _ := licensing.NewSigner("key", signingPrivateKey)
 	now := time.Now().UTC()
-	artifact, _ := signer.SignV1(licensing.LicenseClaimsV1{LicenseID: uuid.New(), OrganizationID: uuid.New(), DeploymentID: uuid.NewString(), IssuedAt: now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour)})
-	keyring, _ := json.Marshal(licenseKeyringFile{Version: 1, Keys: map[string]string{"key": base64.RawURLEncoding.EncodeToString(privateKey.Public().(ed25519.PublicKey))}})
-	if _, err := verifyOfflineLicense(artifact, keyring, uuid.NewString(), now); err == nil {
+	artifact, _ := signer.SignV1(licensing.LicenseClaimsV1{
+		LicenseID: uuid.New(), OrganizationID: uuid.New(), DeploymentID: uuid.NewString(),
+		DeploymentPublicKey: deploymentPublicKeyEncoded,
+		IssuedAt:            now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
+	})
+	keyring, _ := json.Marshal(licenseKeyringFile{Version: 1, Keys: map[string]string{"key": base64.RawURLEncoding.EncodeToString(signingPrivateKey.Public().(ed25519.PublicKey))}})
+	if _, err := verifyOfflineLicense(artifact, keyring, uuid.NewString(), deploymentPublicKeyEncoded, now); err == nil {
 		t.Fatal("wrong deployment license accepted")
+	}
+}
+
+func TestLicenseVerificationRejectsAnotherDeploymentKey(t *testing.T) {
+	_, signingPrivateKey, _ := ed25519.GenerateKey(rand.Reader)
+	deploymentPublicKey, _, _ := ed25519.GenerateKey(rand.Reader)
+	otherPublicKey, _, _ := ed25519.GenerateKey(rand.Reader)
+	deploymentPublicKeyEncoded := base64.RawURLEncoding.EncodeToString(deploymentPublicKey)
+	signer, _ := licensing.NewSigner("key", signingPrivateKey)
+	now := time.Now().UTC()
+	deploymentID := uuid.NewString()
+	artifact, _ := signer.SignV1(licensing.LicenseClaimsV1{
+		LicenseID: uuid.New(), OrganizationID: uuid.New(), DeploymentID: deploymentID,
+		DeploymentPublicKey: deploymentPublicKeyEncoded,
+		IssuedAt:            now.Add(-time.Minute), ExpiresAt: now.Add(time.Hour),
+	})
+	keyring, _ := json.Marshal(licenseKeyringFile{Version: 1, Keys: map[string]string{"key": base64.RawURLEncoding.EncodeToString(signingPrivateKey.Public().(ed25519.PublicKey))}})
+	if _, err := verifyOfflineLicense(artifact, keyring, deploymentID, base64.RawURLEncoding.EncodeToString(otherPublicKey), now); err == nil {
+		t.Fatal("wrong deployment key license accepted")
 	}
 }

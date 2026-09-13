@@ -199,6 +199,7 @@ type Deployment struct {
 	ID            uuid.UUID          `db:"id" json:"id"`
 	LicenseID     uuid.UUID          `db:"license_id" json:"license_id"`
 	DeploymentID  string             `db:"deployment_id" json:"deployment_id"`
+	PublicKey     string             `db:"public_key" json:"public_key"`
 	Name          *string            `db:"name" json:"name"`
 	Status        string             `db:"status" json:"status"`
 	ActivatedAt   pgtype.Timestamptz `db:"activated_at" json:"activated_at"`
@@ -231,7 +232,6 @@ type License struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Status         string             `db:"status" json:"status"`
-	MaxDeployments int32              `db:"max_deployments" json:"max_deployments"`
 	SigningKeyID   *string            `db:"signing_key_id" json:"signing_key_id"`
 	IssuedAt       pgtype.Timestamptz `db:"issued_at" json:"issued_at"`
 	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`

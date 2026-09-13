@@ -52,7 +52,7 @@ func runLicenseAt(stdout, stderr io.Writer, args []string, statePath, licenseDir
 		writeln(stderr, "--artifact and --keyring are required")
 		return 2
 	}
-	state, err := loadDeploymentState(statePath)
+	state, err := ensureDeploymentIdentity(statePath)
 	if err != nil {
 		writef(stderr, "load deployment identity: %v\n", err)
 		return 1
@@ -67,7 +67,7 @@ func runLicenseAt(stdout, stderr io.Writer, args []string, statePath, licenseDir
 		writef(stderr, "read license keyring: %v\n", err)
 		return 1
 	}
-	claims, err := verifyOfflineLicense(artifact, keyringBytes, state.DeploymentID, now)
+	claims, err := verifyOfflineLicense(artifact, keyringBytes, state.DeploymentID, state.PublicKey, now)
 	if err != nil {
 		writef(stderr, "verify offline license: %v\n", err)
 		return 1
@@ -93,7 +93,7 @@ func runLicenseAt(stdout, stderr io.Writer, args []string, statePath, licenseDir
 	return 0
 }
 
-func verifyOfflineLicense(artifact, keyringBytes []byte, deploymentID string, now time.Time) (licensing.LicenseClaimsV1, error) {
+func verifyOfflineLicense(artifact, keyringBytes []byte, deploymentID, deploymentPublicKey string, now time.Time) (licensing.LicenseClaimsV1, error) {
 	var file licenseKeyringFile
 	if err := json.Unmarshal(keyringBytes, &file); err != nil {
 		return licensing.LicenseClaimsV1{}, fmt.Errorf("decode keyring: %w", err)
@@ -113,7 +113,14 @@ func verifyOfflineLicense(artifact, keyringBytes []byte, deploymentID string, no
 	if err != nil {
 		return licensing.LicenseClaimsV1{}, err
 	}
-	return keyring.VerifyV1(artifact, deploymentID, now)
+	claims, err := keyring.VerifyV1(artifact, deploymentID, now)
+	if err != nil {
+		return licensing.LicenseClaimsV1{}, err
+	}
+	if claims.DeploymentPublicKey != deploymentPublicKey {
+		return licensing.LicenseClaimsV1{}, licensing.ErrDeploymentKeyMismatch
+	}
+	return claims, nil
 }
 
 func writeAtomicFile(path string, content []byte, mode os.FileMode) error {

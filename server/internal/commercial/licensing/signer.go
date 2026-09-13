@@ -105,11 +105,14 @@ func (k *Keyring) VerifyV1(artifact []byte, expectedDeploymentID string, at time
 		return LicenseClaimsV1{}, err
 	}
 
-	expected, err := normalizeDeployment(ActivateDeploymentInput{DeploymentID: expectedDeploymentID})
-	if err != nil {
-		return LicenseClaimsV1{}, err
+	expectedDeploymentID = strings.TrimSpace(expectedDeploymentID)
+	if expectedDeploymentID == "" {
+		return LicenseClaimsV1{}, ErrDeploymentIDRequired
 	}
-	if claims.DeploymentID != expected.DeploymentID {
+	if strings.IndexFunc(expectedDeploymentID, unicode.IsSpace) >= 0 {
+		return LicenseClaimsV1{}, ErrInvalidDeploymentID
+	}
+	if claims.DeploymentID != expectedDeploymentID {
 		return LicenseClaimsV1{}, ErrDeploymentMismatch
 	}
 	at = at.UTC()

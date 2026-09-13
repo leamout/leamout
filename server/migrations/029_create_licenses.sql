@@ -2,7 +2,6 @@ CREATE TABLE IF NOT EXISTS licenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id),
     status TEXT NOT NULL DEFAULT 'pending',
-    max_deployments INTEGER NOT NULL DEFAULT 1,
     signing_key_id TEXT,
     issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     expires_at TIMESTAMPTZ,
@@ -12,7 +11,6 @@ CREATE TABLE IF NOT EXISTS licenses (
     CONSTRAINT chk_licenses_status CHECK (
         status IN ('pending', 'active', 'suspended', 'expired', 'revoked')
     ),
-    CONSTRAINT chk_licenses_max_deployments CHECK (max_deployments > 0),
     CONSTRAINT chk_licenses_signing_key_id CHECK (
         signing_key_id IS NULL OR length(trim(signing_key_id)) > 0
     ),

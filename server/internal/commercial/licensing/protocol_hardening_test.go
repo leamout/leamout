@@ -25,7 +25,8 @@ func TestVerifyV1AuthenticatesKeyID(t *testing.T) {
 		t.Fatalf("NewKeyring() error = %v", err)
 	}
 	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	artifact, err := signer.SignV1(validTestClaims(issuedAt))
+	claims := validTestClaims(issuedAt)
+	artifact, err := signer.SignV1(claims)
 	if err != nil {
 		t.Fatalf("SignV1() error = %v", err)
 	}
@@ -41,18 +42,5 @@ func TestVerifyV1AuthenticatesKeyID(t *testing.T) {
 	}
 	if _, err := keyring.VerifyV1(tampered, "node-01", issuedAt.Add(time.Minute)); !errors.Is(err, ErrInvalidSignature) {
 		t.Fatalf("VerifyV1() error = %v, want %v", err, ErrInvalidSignature)
-	}
-}
-
-func TestNormalizeClaimsV1RejectsFeatureLimitKeyCollision(t *testing.T) {
-	t.Parallel()
-
-	issuedAt := time.Date(2026, 8, 31, 20, 30, 0, 0, time.UTC)
-	claims := validTestClaims(issuedAt)
-	claims.Features["shared.key"] = true
-	claims.Limits["shared.key"] = 1
-
-	if _, err := normalizeClaimsV1(claims); !errors.Is(err, ErrDuplicateClaimKey) {
-		t.Fatalf("normalizeClaimsV1() error = %v, want %v", err, ErrDuplicateClaimKey)
 	}
 }
