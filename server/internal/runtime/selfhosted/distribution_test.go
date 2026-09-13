@@ -23,10 +23,12 @@ func TestSelfHostedBinariesExcludeCloudOnlyDependencies(t *testing.T) {
 		"github.com/leamout/leamout/internal/telecom/edge",
 		"github.com/leamout/leamout/internal/telecom/wholesale",
 	}
-	dependencies := "\n" + string(output)
+	dependencies := strings.Split(strings.TrimSpace(string(output)), "\n")
 	for _, dependency := range forbidden {
-		if strings.Contains(dependencies, "\n"+dependency+"\n") {
-			t.Errorf("self-hosted binaries include cloud-only dependency %q", dependency)
+		for _, included := range dependencies {
+			if included == dependency || strings.HasPrefix(included, dependency+"/") {
+				t.Errorf("self-hosted binaries include cloud-only dependency %q", included)
+			}
 		}
 	}
 }

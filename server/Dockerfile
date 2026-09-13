@@ -1,22 +1,23 @@
 ARG GO_VERSION=1.26.6
 
-FROM golang:${GO_VERSION}-alpine AS build
+FROM golang:${GO_VERSION}-alpine AS source
 
 WORKDIR /src
 
 RUN apk add --no-cache \
     ca-certificates \
     git \
-    nodejs \
-    npm \
     tzdata
-
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+FROM source AS cloud-build
+
+RUN apk add --no-cache nodejs npm \
+    && go install github.com/a-h/templ/cmd/templ@v0.3.1020
 
 RUN templ generate
 
@@ -38,7 +39,11 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/backoffice \
-        ./cmd/backoffice; \
+        ./cmd/backoffice
+
+FROM source AS self-hosted-build
+
+RUN set -eux; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
@@ -69,16 +74,16 @@ USER leamout
 
 FROM runtime AS cloud
 
-COPY --from=build /out/server /leamout/server
-COPY --from=build /out/worker /leamout/worker
-COPY --from=build /out/backoffice /leamout/backoffice
+COPY --from=cloud-build /out/server /leamout/server
+COPY --from=cloud-build /out/worker /leamout/worker
+COPY --from=cloud-build /out/backoffice /leamout/backoffice
 
 CMD ["/leamout/server"]
 
 FROM runtime AS self-hosted
 
-COPY --from=build /out/selfhosted-server /leamout/server
-COPY --from=build /out/selfhosted-worker /leamout/worker
-COPY --from=build /out/leamout /leamout/leamout
+COPY --from=self-hosted-build /out/selfhosted-server /leamout/server
+COPY --from=self-hosted-build /out/selfhosted-worker /leamout/worker
+COPY --from=self-hosted-build /out/leamout /leamout/leamout
 
 CMD ["/leamout/server"]

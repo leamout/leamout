@@ -18,7 +18,12 @@ case "$database_password" in
     ;;
 esac
 
-[ "$managed_admission_enabled" = "false" ] && admission_secret="disabled"
+if [ "$managed_admission_enabled" = "false" ]; then
+  admission_secret="disabled"
+  # The Self-Hosted BYOC distribution must not retain the hosted managed-SIP
+  # route, even as unreachable configuration.
+  sed -i '/# BEGIN MANAGED SIP ADMISSION/,/# END MANAGED SIP ADMISSION/d' "$config"
+fi
 
 [ -n "$admission_secret" ] || {
   echo "MANAGED_SIP_ADMISSION_SECRET is required" >&2

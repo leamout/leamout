@@ -76,7 +76,7 @@ services:
       - private-control
 
   server:
-    image: leamout/server:1.0.0
+    image: leamout/self-hosted:1.0.0
     build:
       context: ../../server
       dockerfile: Dockerfile
@@ -103,7 +103,7 @@ services:
       - private-control
 
   worker:
-    image: leamout/worker:1.0.0
+    image: leamout/self-hosted:1.0.0
     build:
       context: ../../server
       dockerfile: Dockerfile

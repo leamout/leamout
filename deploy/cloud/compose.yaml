@@ -88,7 +88,7 @@ services:
       - private-control
 
   server:
-    image: leamout/server:1.0.0
+    image: leamout/cloud:1.0.0
     build:
       context: ../../server
       dockerfile: Dockerfile
@@ -117,7 +117,7 @@ services:
   # Operator UI. It reads the same database and validates the same
   # leamout-session cookie as the customer API; it has no separate login.
   backoffice:
-    image: leamout/server:1.0.0
+    image: leamout/cloud:1.0.0
     build:
       context: ../../server
       dockerfile: Dockerfile
@@ -139,7 +139,7 @@ services:
       - private-control
 
   worker:
-    image: leamout/worker:1.0.0
+    image: leamout/cloud:1.0.0
     build:
       context: ../../server
       dockerfile: Dockerfile
