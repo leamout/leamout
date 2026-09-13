@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv, err := server.New(ctx, cfg)
+	srv, err := server.NewCloud(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
