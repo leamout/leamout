@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/leamout/leamout/internal/platform/config"
-	"github.com/leamout/leamout/internal/runtime/server"
+	selfhostedruntime "github.com/leamout/leamout/internal/runtime/selfhosted"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv, err := server.NewSelfHosted(ctx, cfg)
+	srv, err := selfhostedruntime.NewServer(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
