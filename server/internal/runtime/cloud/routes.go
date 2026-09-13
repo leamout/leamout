@@ -55,13 +55,15 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 	}
 
 	r.Route("/v1", func(r chi.Router) {
-		commercial.RegisterRoutes(
-			r,
-			modules.Commercial,
-			modules.Authn.RequireSession,
-			organizationAccess,
-			modules.Idempotency.Middleware.Handle,
-		)
+		if modules.Commercial != nil {
+			commercial.RegisterRoutes(
+				r,
+				modules.Commercial,
+				modules.Authn.RequireSession,
+				organizationAccess,
+				modules.Idempotency.Middleware.Handle,
+			)
+		}
 		identity.RegisterRoutes(r, modules.Identity, modules.Authn.RequireSession)
 		tenancy.RegisterRoutes(
 			r,

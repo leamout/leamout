@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/leamout/leamout/internal/runtime/middleware"
+	"github.com/leamout/leamout/internal/platform/middleware"
 	"github.com/leamout/leamout/pkg/apperror"
 	"github.com/leamout/leamout/pkg/httputil"
 )

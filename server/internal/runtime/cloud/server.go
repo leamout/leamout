@@ -23,8 +23,8 @@ import (
 	"github.com/leamout/leamout/internal/platform/config"
 	"github.com/leamout/leamout/internal/platform/logging"
 	"github.com/leamout/leamout/internal/platform/metrics"
+	"github.com/leamout/leamout/internal/platform/middleware"
 	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
-	"github.com/leamout/leamout/internal/runtime/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 	"github.com/leamout/leamout/internal/security/encryption"
 	"github.com/leamout/leamout/internal/telecom/calls"
@@ -53,7 +53,21 @@ type Server struct {
 	Metrics    *metrics.Registry
 }
 
+type moduleFactory func(*pgxpool.Pool, calls.Controller, conferences.Controller, *encryption.Cipher, *realtime.Service, *redisintegration.Client) (Modules, error)
+
 func New(ctx context.Context, cfg config.Config) (*Server, error) {
+	return NewCloud(ctx, cfg)
+}
+
+func NewCloud(ctx context.Context, cfg config.Config) (*Server, error) {
+	return newServer(ctx, cfg, NewCloudModules)
+}
+
+func NewSelfHosted(ctx context.Context, cfg config.Config) (*Server, error) {
+	return newServer(ctx, cfg, NewSelfHostedModules)
+}
+
+func newServer(ctx context.Context, cfg config.Config, newModules moduleFactory) (*Server, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("database URL is required")
 	}
@@ -100,28 +114,32 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 		db.Close()
 		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
 	}
-	modules, err := NewModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient)
+	modules, err := newModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient)
 	if err != nil {
 		_ = freeSwitch.Close()
 		_ = redisClient.Close()
 		db.Close()
 		return nil, fmt.Errorf("initialize modules: %w", err)
 	}
-	if err := configurePaymentProviders(cfg, modules.Commercial.Billing.Payments.Providers); err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize payment providers: %w", err)
+	if modules.Commercial != nil {
+		if err := configurePaymentProviders(cfg, modules.Commercial.Billing.Payments.Providers); err != nil {
+			_ = freeSwitch.Close()
+			_ = redisClient.Close()
+			db.Close()
+			return nil, fmt.Errorf("initialize payment providers: %w", err)
+		}
+		if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
+			_ = freeSwitch.Close()
+			_ = redisClient.Close()
+			db.Close()
+			return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
+		}
 	}
-	if err := configureManagedNumberAcquisition(cfg, modules.Numbers.Service); err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		db.Close()
-		return nil, fmt.Errorf("initialize managed number acquisition: %w", err)
+	if modules.Commercial != nil {
+		modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, cfg.ManagedSIP.AdmissionSecret)
+		modules.Wholesale.Handler = wholesale.NewHandler(modules.Wholesale.Service, cfg.ManagedSIP.AdmissionSecret)
+		modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(modules.ProviderDiagnostics.Service, cfg.OperatorAPISecret)
 	}
-	modules.Edge.Handler = edge.NewHandler(modules.Edge.Service, cfg.ManagedSIP.AdmissionSecret)
-	modules.Wholesale.Handler = wholesale.NewHandler(modules.Wholesale.Service, cfg.ManagedSIP.AdmissionSecret)
-	modules.ProviderDiagnostics.Handler = providerdiagnostics.NewHandler(modules.ProviderDiagnostics.Service, cfg.OperatorAPISecret)
 	router := chi.NewRouter()
 	router.Use(middleware.Recovery, middleware.Tracing(), middleware.Request(), middleware.Logging(logger), middleware.Metrics(metricsRegistry), middleware.Secure, middleware.CORS(cfg.CORSOrigins, cfg.IsDevelopment()))
 	RegisterHealthRoutes(router, db, redisClient, freeSwitch)
@@ -131,8 +149,19 @@ func New(ctx context.Context, cfg config.Config) (*Server, error) {
 }
 
 func NewModules(db *pgxpool.Pool, callsController calls.Controller, conferenceController conferences.Controller, credentialCipher *encryption.Cipher, turnService *realtime.Service, redisClient *redisintegration.Client) (Modules, error) {
+	return NewCloudModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient)
+}
+
+func NewCloudModules(db *pgxpool.Pool, callsController calls.Controller, conferenceController conferences.Controller, credentialCipher *encryption.Cipher, turnService *realtime.Service, redisClient *redisintegration.Client) (Modules, error) {
+	return newModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient, commercial.NewCloud(db))
+}
+
+func NewSelfHostedModules(db *pgxpool.Pool, callsController calls.Controller, conferenceController conferences.Controller, credentialCipher *encryption.Cipher, turnService *realtime.Service, redisClient *redisintegration.Client) (Modules, error) {
+	return newModules(db, callsController, conferenceController, credentialCipher, turnService, redisClient, nil)
+}
+
+func newModules(db *pgxpool.Pool, callsController calls.Controller, conferenceController conferences.Controller, credentialCipher *encryption.Cipher, turnService *realtime.Service, redisClient *redisintegration.Client, commercialModule *commercial.Module) (Modules, error) {
 	queries := sqlc.New(db)
-	commercialModule := commercial.New(db)
 	identityModule := identity.New(queries)
 	tenancyModule := tenancy.New(queries)
 	voiceRepository := voice.NewRepository(queries)
@@ -157,7 +186,9 @@ func NewModules(db *pgxpool.Pool, callsController calls.Controller, conferenceCo
 	subscribersService := subscribers.NewService(subscribersRepository)
 	numbersRepository := numbers.NewRepository(db, redisClient)
 	numbersService := numbers.NewService(numbersRepository)
-	numbersService.SetManagedPurchaseAuthority(commercialModule.Wallets.Service)
+	if commercialModule != nil {
+		numbersService.SetManagedPurchaseAuthority(commercialModule.Wallets.Service)
+	}
 	sipDomainsRepository := sip_domains.NewRepository(queries)
 	sipDomainsService := sip_domains.NewService(sipDomainsRepository)
 	carriersRepository := carriers.NewRepository(db)

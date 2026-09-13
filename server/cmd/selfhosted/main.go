@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/leamout/leamout/internal/platform/config"
-	"github.com/leamout/leamout/internal/runtime/server"
+	selfhostedruntime "github.com/leamout/leamout/internal/runtime/selfhosted"
 )
 
 func main() {
@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	srv, err := server.New(ctx, cfg)
+	srv, err := selfhostedruntime.NewSelfHosted(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func main() {
 	serverErr := make(chan error, 1)
 
 	go func() {
-		log.Printf("server listening on %s", httpServer.Addr)
+		log.Printf("self-hosted server listening on %s", httpServer.Addr)
 		serverErr <- httpServer.ListenAndServe()
 	}()
 
@@ -55,14 +55,10 @@ func main() {
 		if !errors.Is(err, http.ErrServerClosed) {
 			log.Fatal(err)
 		}
-
 	case <-ctx.Done():
 	}
 
-	shutdownCtx, cancel := context.WithTimeout(
-		context.Background(),
-		10*time.Second,
-	)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {

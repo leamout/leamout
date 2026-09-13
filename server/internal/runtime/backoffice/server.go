@@ -10,7 +10,7 @@ import (
 	"github.com/leamout/leamout/internal/database/sqlc"
 	"github.com/leamout/leamout/internal/identity/session"
 	"github.com/leamout/leamout/internal/platform/config"
-	runtimemiddleware "github.com/leamout/leamout/internal/runtime/middleware"
+	platformmiddleware "github.com/leamout/leamout/internal/platform/middleware"
 	"github.com/leamout/leamout/internal/security/authn"
 )
 
@@ -40,7 +40,7 @@ func New(ctx context.Context, cfg config.BackofficeConfig) (*Server, error) {
 	sessionRepository := session.NewRepository(queries)
 	sessionService := session.NewService(sessionRepository)
 	resolver := authn.NewResolver(sessionService, nil)
-	authMiddleware := runtimemiddleware.NewAuthnMiddleware(resolver)
+	authMiddleware := platformmiddleware.NewAuthnMiddleware(resolver)
 
 	return newServer(
 		db,
