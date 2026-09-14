@@ -141,10 +141,11 @@ CREATE INDEX IF NOT EXISTS idx_trunk_endpoints_health_probe
     ON trunk_endpoints (health_status, cooldown_until, last_checked_at)
     WHERE enabled = true;
 
--- Customer-selected carrier trunks and internal platform trunks inherit
--- organization ownership from their carrier connection. Cloud managed
--- carrier-edge access has no carrier connection and preserves the tenant
--- organization supplied by the control plane.
+-- Carrier-backed trunks inherit organization ownership from their carrier
+-- connection. This keeps the carrier connection as the ownership source of
+-- truth while allowing the table CHECK constraints to enforce the valid trunk
+-- shapes. Tenant carrier-edge access has no carrier connection and preserves
+-- the organization supplied by the control plane.
 CREATE FUNCTION derive_trunk_organization_id()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -164,61 +165,6 @@ CREATE TRIGGER derive_trunk_organization_id
 BEFORE INSERT OR UPDATE OF carrier_connection_id ON trunks
 FOR EACH ROW
 EXECUTE FUNCTION derive_trunk_organization_id();
-
--- Enforce the runtime/connectivity boundary at persistence:
---   organization carrier trunk -> BYOC, regardless of provider brand
---   tenant carrier-edge access  -> managed, no carrier connection
---   platform carrier trunk      -> managed, platform carrier connection
-CREATE FUNCTION validate_trunk_connectivity()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-DECLARE
-    connection_scope TEXT;
-    connection_org UUID;
-BEGIN
-    IF NEW.carrier_connection_id IS NULL THEN
-        IF NEW.organization_id IS NULL OR NEW.provisioning_mode <> 'managed' THEN
-            RAISE EXCEPTION 'only tenant carrier-edge access may omit carrier_connection_id';
-        END IF;
-        RETURN NEW;
-    END IF;
-
-    SELECT cc.scope, cc.organization_id
-    INTO connection_scope, connection_org
-    FROM carrier_connections AS cc
-    WHERE cc.id = NEW.carrier_connection_id;
-
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'carrier connection does not exist';
-    END IF;
-
-    IF NEW.organization_id IS NULL THEN
-        IF NEW.provisioning_mode <> 'managed'
-           OR connection_scope <> 'platform'
-           OR connection_org IS NOT NULL THEN
-            RAISE EXCEPTION 'platform trunks require a platform managed carrier connection';
-        END IF;
-        RETURN NEW;
-    END IF;
-
-    IF connection_scope <> 'organization'
-       OR connection_org IS DISTINCT FROM NEW.organization_id THEN
-        RAISE EXCEPTION 'tenant trunk carrier connection must belong to the same organization';
-    END IF;
-
-    IF NEW.provisioning_mode <> 'byoc' THEN
-        RAISE EXCEPTION 'organization carrier connections require BYOC trunks';
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-CREATE TRIGGER validate_trunk_connectivity
-BEFORE INSERT OR UPDATE OF organization_id, carrier_connection_id, provisioning_mode ON trunks
-FOR EACH ROW
-EXECUTE FUNCTION validate_trunk_connectivity();
 
 CREATE FUNCTION derive_trunk_endpoint_organization_id()
 RETURNS TRIGGER
