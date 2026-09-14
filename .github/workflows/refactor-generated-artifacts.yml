@@ -23,37 +23,33 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          def sub(path, old, new, required=True):
+          def sub(path, old, new, required=False):
               p=Path(path); s=p.read_text()
               if old not in s:
                   if required: raise SystemExit(f"missing pattern in {path}")
                   return
               p.write_text(s.replace(old,new))
 
-          # Phone numbers: remove old mode/second-connection state.
-          sub("server/internal/telecom/numbers/repository.go", "\n\t\tProviderConnectionID: providerConnectionID,", "", False)
-          sub("server/internal/database/queries/managed_routing.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL", False)
-          sub("server/internal/database/queries/calls.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL", False)
-          sub("server/internal/telecom/routing/resolver.go", "connection.OrganizationID != nil ||\n\t\t\tphoneNumber.ProviderConnectionID == nil ||\n\t\t\t*phoneNumber.ProviderConnectionID != connection.ID", "connection.OrganizationID != nil || phoneNumber.CarrierConnectionID != nil", False)
-          sub("containers/opensips/cloud/opensips.cfg", "pn.provider_connection_id = cc.id", "pn.carrier_connection_id IS NULL", False)
-
-          p=Path("server/internal/database/queries/phone_numbers.sql"); s=p.read_text()
-          for old in ["    provider_connection_id,\n", "    NULL::UUID AS provider_connection_id,\n", "    provider_cc.id AS provider_connection_id,\n", "    CAST(COALESCE(pn.provider_connection_id::TEXT, '—') AS TEXT) AS provider_connection_id,\n", "    COALESCE(provider_cc.name, '—') AS provider_connection_name,\n", "LEFT JOIN carrier_connections AS provider_cc ON provider_cc.id = pn.provider_connection_id\n"]: s=s.replace(old,"")
-          s=s.replace("JOIN carrier_connections AS provider_cc\n  ON provider_cc.id = sqlc.arg(provider_connection_id)\n AND provider_cc.scope = 'platform'\n AND provider_cc.organization_id IS NULL\n AND provider_cc.provider_id = cp.id\n AND provider_cc.status = 'active'\n","")
-          p.write_text(s)
+          sub("server/internal/telecom/numbers/repository.go", "\n\t\tProviderConnectionID: providerConnectionID,", "")
+          sub("server/internal/database/queries/managed_routing.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL")
+          sub("server/internal/database/queries/calls.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL")
+          sub("server/internal/telecom/routing/resolver.go", "connection.OrganizationID != nil ||\n\t\t\tphoneNumber.ProviderConnectionID == nil ||\n\t\t\t*phoneNumber.ProviderConnectionID != connection.ID", "connection.OrganizationID != nil || phoneNumber.CarrierConnectionID != nil")
+          sub("containers/opensips/cloud/opensips.cfg", "pn.provider_connection_id = cc.id", "pn.carrier_connection_id IS NULL")
+          sub("server/internal/telecom/calls/repository.go", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: &event.CarrierConnectionID,\n\t\tApplicationID:", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: event.CarrierConnectionID,\n\t\tApplicationID:")
 
           p=Path("server/internal/backoffice/numbers/model.go"); s=p.read_text().replace("\tProviderConnectionID string\n","").replace("\tProviderConnection   string\n",""); p.write_text(s)
           p=Path("server/internal/backoffice/numbers/repository.go"); s=p.read_text().replace("\n\t\tProviderConnectionID: row.ProviderConnectionID,","").replace("\n\t\tProviderConnection:   row.ProviderConnectionName,",""); p.write_text(s)
           p=Path("server/internal/backoffice/numbers/pages.templ"); s=p.read_text().replace("\n\t\t\t\t@DetailField(\"Provider connection\", number.ProviderConnection)","").replace("\n\t\t\t\t@DetailField(\"Provider connection ID\", number.ProviderConnectionID)",""); p.write_text(s)
           p=Path("server/internal/telecom/routing/resolver_test.go"); s=p.read_text().replace("OrganizationID: organizationID, ProviderConnectionID: &connectionID,", "OrganizationID: organizationID,"); p.write_text(s)
-          sub("server/internal/telecom/calls/repository.go", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: &event.CarrierConnectionID,\n\t\tApplicationID:", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: event.CarrierConnectionID,\n\t\tApplicationID:", False)
 
-          # Carrier source IPs: ownership comes only from carrier_connection_id.
           p=Path("server/internal/database/queries/carrier_connections.sql"); s=p.read_text()
           s=s.replace("INSERT INTO carrier_connection_source_ips (\n    organization_id,\n    carrier_connection_id,\n    cidr\n)\nSELECT\n    sqlc.arg(organization_id) AS organization_id,\n    sqlc.arg(carrier_connection_id) AS carrier_connection_id,\n    sqlc.arg(cidr) AS cidr", "INSERT INTO carrier_connection_source_ips (\n    carrier_connection_id,\n    cidr\n)\nSELECT\n    cc.id AS carrier_connection_id,\n    sqlc.arg(cidr) AS cidr")
           s=s.replace("  ON cc.id = src.carrier_connection_id\n AND cc.organization_id = src.organization_id", "  ON cc.id = src.carrier_connection_id")
           s=s.replace("  AND src.organization_id = sqlc.arg(organization_id)\n", "")
           s=s.replace("  AND cc.organization_id = src.organization_id;", "  AND cc.organization_id = sqlc.arg(organization_id);")
+          old="WHERE src.carrier_connection_id = sqlc.arg(carrier_connection_id)\n  AND cc.scope = 'organization'\nORDER BY src.cidr ASC;"
+          new="WHERE src.carrier_connection_id = sqlc.arg(carrier_connection_id)\n  AND cc.scope = 'organization'\n  AND cc.organization_id = sqlc.arg(organization_id)\nORDER BY src.cidr ASC;"
+          s=s.replace(old,new)
           p.write_text(s)
 
           p=Path("server/internal/database/queries/managed_routing.sql"); s=p.read_text()
@@ -63,10 +59,9 @@ jobs:
           p.write_text(s)
 
           for path in ["containers/opensips/cloud/opensips.cfg", "containers/opensips/self-hosted/opensips.cfg"]:
-              p=Path(path); s=p.read_text()
-              s=s.replace(" AND src.organization_id IS NOT DISTINCT FROM cc.organization_id", "")
-              s=s.replace(" AND src.organization_id = cc.organization_id", "")
-              p.write_text(s)
+              p=Path(path); s=p.read_text().replace(" AND src.organization_id IS NOT DISTINCT FROM cc.organization_id", "").replace(" AND src.organization_id = cc.organization_id", ""); p.write_text(s)
+
+          p=Path("server/internal/telecom/carriers/model.go"); s=p.read_text().replace("\tOrganizationID      *uuid.UUID   `json:\"organization_id,omitempty\"`\n", "").replace("\n\t\tOrganizationID:      sourceIP.OrganizationID,", ""); p.write_text(s)
           PY
 
       - uses: actions/setup-go@v7
@@ -76,7 +71,7 @@ jobs:
 
       - name: Format and regenerate
         run: |
-          gofmt -w server/internal/telecom/numbers server/internal/telecom/routing server/internal/telecom/calls server/internal/backoffice/numbers
+          gofmt -w server/internal/telecom/numbers server/internal/telecom/routing server/internal/telecom/calls server/internal/telecom/carriers server/internal/backoffice/numbers
           cd server
           go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
           go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
