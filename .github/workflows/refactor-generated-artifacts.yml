@@ -9,14 +9,16 @@ on:
       - ".github/workflows/refactor-generated-artifacts.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout branch
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.head_ref }}
 
       - name: Apply large-file refactor substitutions
         run: |
@@ -68,11 +70,12 @@ jobs:
           }
           for path, replacement in queries.items():
               lines = path.read_text().splitlines()
-              matches = [i for i, line in enumerate(lines) if "FROM phone_numbers AS pn JOIN carrier_connections AS cc" in line and "pn.provisioning_mode" in line]
-              if len(matches) != 1:
-                  raise SystemExit(f"expected one legacy phone-number routing query in {path}, found {len(matches)}")
-              lines[matches[0]] = replacement
-              path.write_text("\n".join(lines) + "\n")
+              legacy = [i for i, line in enumerate(lines) if "FROM phone_numbers AS pn JOIN carrier_connections AS cc" in line and "pn.provisioning_mode" in line]
+              if legacy:
+                  if len(legacy) != 1:
+                      raise SystemExit(f"expected at most one legacy phone-number routing query in {path}, found {len(legacy)}")
+                  lines[legacy[0]] = replacement
+                  path.write_text("\n".join(lines) + "\n")
           PY
 
       - name: Set up Go
@@ -115,17 +118,23 @@ jobs:
             exit 1
           fi
 
-      - name: Upload generated artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: refactor-generated-artifacts
-          path: |
-            server/internal/database/sqlc/
-            server/migrations/atlas.sum
-            server/internal/telecom/numbers/
-            server/internal/telecom/routing/
-            server/internal/telecom/edge/
-            server/internal/backoffice/numbers/
-            containers/opensips/cloud/opensips.cfg
-            containers/opensips/self-hosted/opensips.cfg
+      - name: Commit deterministic outputs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            server/internal/database/sqlc \
+            server/migrations/atlas.sum \
+            server/internal/telecom/numbers \
+            server/internal/telecom/routing \
+            server/internal/telecom/edge \
+            server/internal/backoffice/numbers \
+            containers/opensips/cloud/opensips.cfg \
+            containers/opensips/self-hosted/opensips.cfg \
             tests/acceptance/cloud-managed/acceptance.py
+          if git diff --cached --quiet; then
+            echo "No deterministic output changes"
+          else
+            git commit -m "chore: regenerate phone number refactor artifacts"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
