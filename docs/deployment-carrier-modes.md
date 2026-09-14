@@ -1,76 +1,136 @@
 # Deployment and carrier modes
 
-Leamout has two independent axes:
-
-1. **Hosting mode** — where the Leamout control plane runs.
-2. **Carrier mode** — who owns and operates the telecom carrier relationship.
-
-Do not infer carrier mode from hosting mode, or hosting mode from carrier mode.
-
-| Hosting mode | Carrier mode | Meaning |
-| --- | --- | --- |
-| Self-Hosted | BYOC | Customer runs Leamout and connects customer-owned carriers. |
-| Leamout Cloud | Managed Carrier | Leamout runs the control plane and provides Leamout-managed carrier connectivity. |
-| Self-Hosted | Managed Carrier | Customer runs Leamout and connects their deployment to Leamout's managed SIP service using connection details supplied by Leamout. |
-| Leamout Cloud | BYOC | Leamout runs the control plane while the customer connects customer-owned carriers. |
-
-The routing rule is two-dimensional:
+Leamout has two runtime placements, but they do not expose the same connectivity choices.
 
 ```text
-Runtime = where Leamout executes
-Connectivity = whose carrier network Leamout uses
+                         LEAMOUT
+                            │
+              ┌─────────────┴─────────────┐
+              │                           │
+         LEAMOUT CLOUD                SELF-HOSTED
+              │                           │
+        ┌─────┴─────┐                     │
+        │           │                     │
+       BYOC       MANAGED                BYOC
+        │           │                     │
+ customer        Leamout             customer selects
+ selects         supplies            the carrier
+ carrier         telecom                  │
+                                      any carrier,
+                                      including Leamout
 ```
 
-## Model invariants
+This produces three product delivery modes:
 
-### Hosting mode
+| Runtime | Connectivity | Meaning |
+| --- | --- | --- |
+| Self-Hosted | BYOC | Customer runs Leamout and selects/configures the carrier, including Leamout Carrier if desired. |
+| Leamout Cloud | BYOC | Leamout runs the runtime while the customer selects/configures the carrier. |
+| Leamout Cloud | Managed | Leamout runs the runtime and supplies/selects the telecom connectivity. |
 
-Hosting mode controls deployment ownership and runtime operations. It must not decide whether a carrier connection is BYOC or managed.
+There is no separate **Self-Hosted + Managed Carrier** delivery mode.
 
-- `self-hosted` means the customer operates the Leamout deployment.
-- `cloud` means Leamout operates the Leamout deployment.
+## Definitions
 
-### Carrier mode
+### Runtime placement
 
-Carrier mode controls carrier ownership and provider-facing operations. It must not decide where Leamout is hosted.
+Runtime placement answers where the Leamout communications runtime executes.
 
-- **BYOC** means the customer owns and configures the upstream carrier relationship.
-- **Managed Carrier** means Leamout owns and operates the upstream carrier/provider relationship.
+- `self-hosted` means the customer operates the Leamout runtime on customer-controlled infrastructure.
+- `cloud` means Leamout operates the runtime.
 
-A self-hosted customer using Managed Carrier does not receive or configure Leamout's wholesale provider credentials. They configure the Leamout-managed SIP service as a carrier connection on their own deployment.
+### BYOC
 
-Provider-specific resources such as DIDWW Voice IN trunks, CommPeak credentials, provider source networks, and wholesale resource IDs remain on the Leamout-operated side of that boundary.
+BYOC means the customer selects and configures the carrier connection used by the runtime.
+
+The carrier does not have to be owned by the customer. It may be any supported carrier or telecom provider, including Leamout Carrier.
+
+For example, all of these are ordinary Self-Hosted + BYOC connections:
+
+```text
+Self-Hosted Leamout
+        │
+        ├── DIDWW
+        ├── CommPeak
+        ├── Telnyx
+        ├── local carrier
+        └── Leamout Carrier
+```
+
+Using Leamout Carrier does not change the deployment mode. In that relationship Leamout is acting as a telecom provider, while the customer still chooses and configures the carrier connection in their self-hosted runtime.
+
+### Managed
+
+Managed connectivity exists only in Leamout Cloud.
+
+Managed means Leamout supplies, selects, operates, and authorizes the telecom connectivity behind the Cloud runtime. The customer does not configure Leamout's wholesale carrier connections or physical SIP endpoints.
+
+Leamout may fulfill managed connectivity through DIDWW, CommPeak, other wholesalers, or future direct interconnects. Those upstream details remain behind the Leamout-operated boundary.
+
+## Resource ownership
+
+Carrier scope, not provider brand, determines the resource boundary.
+
+```text
+organization-scoped carrier connection
+        = customer-selected connectivity / BYOC
+
+platform-scoped carrier connection
+        = Leamout-owned upstream connectivity for Cloud Managed
+```
+
+An organization-scoped carrier connection may use `provider = leamout`. It is still BYOC.
+
+A platform-scoped carrier connection is internal Leamout infrastructure. It is not exposed as a customer's carrier connection.
+
+Trunks and endpoints inherit that ownership boundary from their carrier connection. A physical trunk endpoint does not need its own `byoc` or `managed` type.
 
 ## API boundary
 
-Customer-facing APIs remain consistent across hosting modes:
+Customer-facing telecom APIs should preserve the same carrier primitives across runtimes while respecting the runtime's allowed connectivity model:
 
-- customer BYOC resources stay organization-scoped;
-- managed numbers stay customer-owned number resources;
-- provider IDs, provider credentials, wholesale resources, and provider operations remain internal.
+- organization-scoped carrier connections are customer-selected/BYOC resources;
+- self-hosted exposes organization-scoped carrier connectivity only;
+- Cloud may expose organization-scoped BYOC resources and Cloud-managed product workflows;
+- platform-scoped carrier connections, provider credentials, wholesale resources, and physical managed endpoints remain internal;
+- managed numbers remain organization-owned Leamout number resources even though their upstream provider resources remain internal.
 
-Hosting mode must not expose provider ownership details through separate customer-facing telecom APIs.
+Do not create a special self-hosted telecom API merely because the selected provider is Leamout.
 
 ## Provider administration boundary
 
-Provider-specific managed-carrier administration is a Leamout operator concern, not a deployment/bootstrap concern.
+Provider-specific wholesale administration is a Leamout operator concern.
 
-Self-hosted deployment configuration must not require DIDWW or CommPeak provider-infrastructure settings merely because the customer elects to use Leamout-managed carrier service.
+A self-hosted customer choosing Leamout Carrier receives customer-facing carrier connection details in the same way they would configure another supported carrier. They do not receive DIDWW, CommPeak, or other Leamout wholesale credentials.
 
-Leamout-owned provider resources should be managed through internal services and the future Backoffice operator surface. Runtime/server startup must not create or reconcile wholesale provider topology as a side effect.
+Cloud Managed may use platform-scoped provider resources internally. Runtime/server startup must not create or reconcile wholesale provider topology as a side effect.
 
 `LEAMOUT_DEPLOYMENT_ID` identifies a Leamout runtime/deployment. It is not a provider resource identifier.
 
 ## Design rule
 
-When adding a feature, answer these separately:
+When adding a telecom feature, determine the runtime first:
 
 ```text
-Where is Leamout hosted?
-  self-hosted | cloud
+Self-Hosted
+    → connectivity is BYOC
+    → customer chooses the carrier
+    → provider may be Leamout
 
-Who owns the carrier relationship?
-  customer/BYOC | Leamout/managed
+Leamout Cloud
+    → BYOC
+      or
+    → Managed
 ```
 
-If the carrier is Leamout-managed, provider credentials and provider-side topology stay behind the Leamout-managed boundary. If the runtime is self-hosted, that deployment connects to the managed SIP service using the customer-facing SIP connection details supplied by Leamout.
+Then determine resource ownership:
+
+```text
+customer-selected carrier
+    → organization-scoped carrier connection
+
+Leamout Cloud managed upstream
+    → platform-scoped carrier connection
+```
+
+Do not infer connectivity ownership from the carrier's brand. `provider = leamout` does not mean `managed` when the connection is organization-scoped.
