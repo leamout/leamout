@@ -362,11 +362,14 @@ func (r *Resolver) resolveInboundOwnership(
 	case "organization":
 		if connection.OrganizationID == nil ||
 			*connection.OrganizationID != organizationID ||
-			phoneNumber.ProvisioningMode != provisioningModeBYOC {
+			phoneNumber.CarrierConnectionID == nil ||
+			*phoneNumber.CarrierConnectionID != connection.ID {
 			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
 		}
 	case "platform":
-		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != provisioningModeManaged {
+		if connection.OrganizationID != nil ||
+			phoneNumber.ProviderConnectionID == nil ||
+			*phoneNumber.ProviderConnectionID != connection.ID {
 			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
 		}
 	default:
