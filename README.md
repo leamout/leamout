@@ -2,7 +2,7 @@
 
 **Leamout** is a programmable communications control plane for building and operating voice, messaging, numbering, routing, and carrier-connected telecom products.
 
-Leamout starts with self-hosted programmable voice and BYOC, then grows toward managed carrier connectivity, Leamout Cloud runtimes, multi-carrier orchestration, number provisioning, messaging, realtime media, and AI communications.
+Leamout starts with self-hosted programmable voice and BYOC, then grows toward Leamout Carrier, Leamout Cloud runtimes, Cloud-managed connectivity, multi-carrier orchestration, number provisioning, messaging, realtime media, and AI communications.
 
 The goal is to give applications a stable communications API without forcing customers to give up control of their telecom infrastructure or carrier relationships.
 
@@ -10,7 +10,7 @@ The goal is to give applications a stable communications API without forcing cus
 
 Leamout separates the customer-facing control plane from communications resources, runtime placement, carrier connectivity, and telecom execution.
 
-`console.leamout.com` is the planned shared management surface for both self-hosted and Leamout Cloud customers. Runtime placement and carrier ownership are independent choices: customers can run Leamout themselves or use Leamout Cloud, and they can bring their own carriers or use Leamout-managed connectivity.
+`console.leamout.com` is the planned shared management surface for both self-hosted and Leamout Cloud customers.
 
 ```text
                             console.leamout.com
@@ -44,49 +44,47 @@ Leamout separates the customer-facing control plane from communications resource
                                    │
                            Routing / Policy Engine
                                    │
-                ┌──────────────────┴──────────────────┐
-                │                                     │
-             Runtime                             Connectivity
-                │                                     │
-        ┌───────┴────────┐                   ┌────────┴────────┐
-        │                │                   │                 │
-   Self-Hosted      Leamout Cloud          BYOC           Managed
-        │                │                   │                 │
-        │                │              Customer          Leamout
-        │                │              carriers          carriers
-        │                │                   │                 │
-        └──────────────┬─┘                   └────────┬────────┘
-                       │                              │
-                       └──────────┬───────────────────┘
-                                  │
-                          Telecom Execution
-                                  │
-              ┌───────────────────┼────────────────────┐
-              │                   │                    │
-             SIP                 Media              Realtime
-          OpenSIPS          RTPengine/FS             Coturn
-              │                   │                    │
-              └───────────────────┼────────────────────┘
-                                  │
-                           Telecom Networks
-                                  │
-                     ┌────────────┼────────────┐
-                     │            │            │
-                    PSTN         Mobile       SIP/VoIP
+                                   ▼
+                                Runtime
+                                   │
+                 ┌─────────────────┴─────────────────┐
+                 │                                   │
+            Self-Hosted                         Leamout Cloud
+                 │                                   │
+                BYOC                          ┌───────┴───────┐
+                 │                            │               │
+        customer selects                    BYOC          Managed
+        the carrier                          │               │
+                 │                     customer selects   Leamout supplies
+        ┌────────┼────────┐              the carrier      connectivity
+        │        │        │
+     carrier  carrier  Leamout
+       A        B      Carrier
 ```
 
-This produces four product delivery modes without creating four separate communications platforms:
+This produces three product delivery modes:
 
 | Runtime | Connectivity | Delivery mode |
 | --- | --- | --- |
-| Self-Hosted | Customer BYOC | **Self-Hosted + BYOC** |
-| Self-Hosted | Leamout-managed carrier | **Self-Hosted + Managed Carrier** |
-| Leamout Cloud | Customer BYOC | **Leamout Cloud + BYOC** |
-| Leamout Cloud | Leamout-managed carrier | **Leamout Cloud + Managed Carrier** |
+| Self-Hosted | Customer-selected carrier | **Self-Hosted + BYOC** |
+| Leamout Cloud | Customer-selected carrier | **Leamout Cloud + BYOC** |
+| Leamout Cloud | Leamout-supplied connectivity | **Leamout Cloud + Managed** |
 
-The API and communications-resource model should remain stable across these modes. Moving a workload between self-hosted and Leamout Cloud should primarily change runtime placement; moving between BYOC and managed connectivity should primarily change carrier and routing policy.
+There is no separate **Self-Hosted + Managed Carrier** mode. A self-hosted customer can select Leamout Carrier just as they can select another supported carrier. In that relationship Leamout is acting as the telecom provider, while the runtime remains Self-Hosted + BYOC.
 
-BYOC remains a first-class model. Carrier-specific behavior belongs behind adapters so the same control plane can work with customer-owned carriers, Leamout-managed connectivity, and multiple markets.
+The resource boundary follows ownership rather than provider brand:
+
+```text
+organization-scoped carrier connection
+        = customer-selected / BYOC
+
+platform-scoped carrier connection
+        = internal Leamout upstream / Cloud Managed
+```
+
+An organization-scoped carrier connection may use `provider = leamout`; it is still BYOC. Physical trunk endpoints inherit that ownership from the carrier connection and do not need an independent BYOC/managed type.
+
+BYOC remains a first-class model. Carrier-specific behavior belongs behind adapters so the same control plane can work with customer-selected carriers, Leamout Carrier, Cloud-managed connectivity, and multiple markets.
 
 ## Current implementation
 
@@ -147,8 +145,10 @@ Browser media ── TURN/STUN via Coturn ──► RTPengine
 
 ## Core principles
 
-- **One control plane, multiple delivery modes.** Self-hosted and Leamout Cloud runtimes should expose the same communications model and be managed through the same Leamout control-plane experience.
-- **Runtime and connectivity are independent.** Runtime placement must not dictate whether connectivity is BYOC or Leamout-managed.
+- **One control plane, two runtime distributions.** Self-Hosted and Leamout Cloud should expose the same communications resource model without becoming forks.
+- **Self-Hosted is BYOC.** A self-hosted customer selects and configures the carrier. Leamout Carrier is one possible carrier, not a separate self-hosted mode.
+- **Cloud supports BYOC and Managed.** Cloud customers may select their own carrier or use connectivity supplied and operated by Leamout.
+- **Ownership beats provider brand.** Organization-scoped carrier connections are BYOC even when the provider is Leamout; platform-scoped carrier connections are internal Cloud-managed upstream resources.
 - **BYOC stays open.** Customers should not be forced onto Leamout carrier connectivity.
 - **The control plane owns business logic.** Routing, policy, usage, rating, billing, provisioning, and events should not be delegated to upstream carriers.
 - **Carrier integrations stay behind adapters.** Market-specific connectivity should not leak into core platform APIs.
@@ -167,11 +167,11 @@ self-hosted, and telecom workloads are documented in the
         ↓
 1. Self-Hosted + BYOC
         ↓
-2. Self-Hosted + Managed Carrier
+2. Leamout Carrier as a BYOC provider
         ↓
 3. Leamout Cloud + BYOC
         ↓
-4. Leamout Cloud + Managed Carrier
+4. Leamout Cloud + Managed
         ↓
 5. Multi-carrier orchestration
         ↓
