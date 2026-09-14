@@ -144,12 +144,11 @@ func (q *Queries) ResolveCarrierConnectionBySourceIPAnyScope(ctx context.Context
 }
 
 const resolveInboundPhoneNumber = `-- name: ResolveInboundPhoneNumber :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.provisioning_mode, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
-JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id
+JOIN carrier_connections AS cc ON cc.id = $1
 JOIN organizations AS o ON o.id = pn.organization_id
-WHERE pn.number = $1
-  AND pn.carrier_connection_id = $2
+WHERE pn.number = $2
   AND pn.status = 'active'
   AND pn.voice_enabled = true
   AND cc.status = 'active'
@@ -158,12 +157,12 @@ WHERE pn.number = $1
       (
           cc.scope = 'organization'
           AND cc.organization_id = pn.organization_id
-          AND pn.provisioning_mode = 'byoc'
+          AND pn.carrier_connection_id = cc.id
       )
       OR (
           cc.scope = 'platform'
           AND cc.organization_id IS NULL
-          AND pn.provisioning_mode = 'managed'
+          AND pn.provider_connection_id = cc.id
       )
   )
   AND o.status = 'active'
@@ -172,20 +171,20 @@ LIMIT 1
 `
 
 type ResolveInboundPhoneNumberParams struct {
-	Number              string     `db:"number" json:"number"`
-	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	CarrierConnectionID uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	Number              string    `db:"number" json:"number"`
 }
 
 func (q *Queries) ResolveInboundPhoneNumber(ctx context.Context, arg ResolveInboundPhoneNumberParams) (PhoneNumber, error) {
-	row := q.db.QueryRow(ctx, resolveInboundPhoneNumber, arg.Number, arg.CarrierConnectionID)
+	row := q.db.QueryRow(ctx, resolveInboundPhoneNumber, arg.CarrierConnectionID, arg.Number)
 	var i PhoneNumber
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
 		&i.Number,
 		&i.CountryCode,
-		&i.ProvisioningMode,
 		&i.CarrierConnectionID,
+		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,

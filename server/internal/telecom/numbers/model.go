@@ -108,17 +108,17 @@ type NumberError struct {
 }
 
 type Response struct {
-	ID                  uuid.UUID  `json:"id"`
-	OrganizationID      uuid.UUID  `json:"organization_id"`
-	Number              string     `json:"number"`
-	CountryCode         string     `json:"country_code"`
-	CarrierConnectionID *uuid.UUID `json:"carrier_connection_id,omitempty"`
-	VoiceEnabled        bool       `json:"voice_enabled"`
-	SMSEnabled          bool       `json:"sms_enabled"`
-	Status              string     `json:"status"`
+	ID                  uuid.UUID    `json:"id"`
+	OrganizationID      uuid.UUID    `json:"organization_id"`
+	Number              string       `json:"number"`
+	CountryCode         string       `json:"country_code"`
+	CarrierConnectionID *uuid.UUID   `json:"carrier_connection_id,omitempty"`
+	VoiceEnabled        bool         `json:"voice_enabled"`
+	SMSEnabled          bool         `json:"sms_enabled"`
+	Status              string       `json:"status"`
 	Error               *NumberError `json:"error,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	CreatedAt           time.Time    `json:"created_at"`
+	UpdatedAt           time.Time    `json:"updated_at"`
 }
 
 func response(number sqlc.PhoneNumber) Response {

@@ -98,7 +98,6 @@ WHERE pn.id = $6
   AND pn.organization_id = $1
   AND pn.provider_id = $2
   AND pn.provider_resource_id = $5
-  AND pn.provisioning_mode = 'managed'
   AND pn.status IN ('active', 'disabled')
 ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
