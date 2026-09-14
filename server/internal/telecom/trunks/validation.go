@@ -17,13 +17,10 @@ func validateID(id uuid.UUID, field string) error {
 
 func normalizeProvisioningMode(value ProvisioningMode) (ProvisioningMode, error) {
 	value = ProvisioningMode(strings.ToLower(strings.TrimSpace(string(value))))
-	if value == "" {
+	if value == "" || value == ProvisioningModeBYOC {
 		return ProvisioningModeBYOC, nil
 	}
-	if value != ProvisioningModeBYOC && value != ProvisioningModeManaged {
-		return "", apperror.NewBadRequest("type must be byoc or managed")
-	}
-	return value, nil
+	return "", apperror.NewBadRequest("type must be byoc")
 }
 
 func normalizeName(value string) (string, error) {
