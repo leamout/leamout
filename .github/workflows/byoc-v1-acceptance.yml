@@ -6,6 +6,7 @@ on:
     paths:
       - "server/**"
       - "deploy/**"
+      - "containers/**"
       - "tests/acceptance/byoc-v1/**"
       - ".github/workflows/byoc-v1-acceptance.yml"
 

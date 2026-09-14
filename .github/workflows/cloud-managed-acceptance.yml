@@ -6,6 +6,7 @@ on:
     paths:
       - "server/**"
       - "deploy/**"
+      - "containers/**"
       - "tests/acceptance/cloud-managed/**"
       - ".github/workflows/cloud-managed-acceptance.yml"
 

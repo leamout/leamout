@@ -2,15 +2,15 @@ services:
   self-hosted-opensips:
     image: leamout/opensips:4.0.1
     build:
-      context: ./opensips
+      context: ../../containers/opensips
       dockerfile: Dockerfile
       args:
         OPENSIPS_VERSION: 4.0.1
+        DISTRIBUTION: self-hosted
     restart: unless-stopped
     environment:
       OPENSIPS_DATABASE_PASSWORD: leamout
       OPENSIPS_ADVERTISED_ADDRESS: self-hosted-opensips
-      MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?required}
     ports:
       - "5070:5060/udp"
     volumes:

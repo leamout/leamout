@@ -5,7 +5,7 @@ import socket
 import subprocess
 import time
 
-COMPOSE = ["docker", "compose", "-f", "deploy/cloud/compose.yaml", "-f", "tests/acceptance/self-hosted-managed/compose.yaml"]
+COMPOSE = ["docker", "compose", "-f", "deploy/self-hosted/compose.yaml", "-f", "tests/acceptance/self-hosted-managed/compose.yaml"]
 DID = "+15551235001"
 ESL_PASSWORD = os.environ["FREESWITCH_ESL_PASSWORD"]
 
