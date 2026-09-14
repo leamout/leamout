@@ -14,11 +14,11 @@ INSERT INTO carrier_connection_source_ips (organization_id, carrier_connection_i
 ('00000000-0000-0000-0000-000000005001', '00000000-0000-0000-0000-000000005020', '172.32.0.1/32');
 
 INSERT INTO phone_numbers (
-    id, organization_id, number, country_code, provisioning_mode,
+    id, organization_id, number, country_code,
     carrier_connection_id, voice_enabled, status
 ) VALUES (
     '00000000-0000-0000-0000-000000005030',
-    '00000000-0000-0000-0000-000000005001', '+15551235001', 'US', 'byoc',
+    '00000000-0000-0000-0000-000000005001', '+15551235001', 'US',
     '00000000-0000-0000-0000-000000005020', true, 'active'
 );
 INSERT INTO voice_applications (id, organization_id, name, status) VALUES
