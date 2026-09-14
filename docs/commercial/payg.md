@@ -4,18 +4,19 @@ Everything in Leamout is prepaid pay-as-you-go except Self-Hosted software licen
 
 Self-Hosted software licenses are enterprise software agreements and are settled separately, normally through contract, invoice, and bank transfer. They are not funded from a Leamout usage wallet.
 
-All Cloud and managed communications charges are prepaid.
+All Cloud and Leamout-provided communications charges are prepaid.
 
 ## Delivery modes
 
 | Delivery mode | Commercial treatment |
 | --- | --- |
-| Self-Hosted + BYOC | Enterprise Self-Hosted software license |
-| Self-Hosted + Managed | Enterprise Self-Hosted software license + prepaid PAYG managed usage |
-| Leamout Cloud + BYOC | Prepaid PAYG for Leamout Cloud/platform consumption; customer carrier cost remains outside Leamout |
-| Leamout Cloud + Managed | Prepaid PAYG |
+| Self-Hosted + BYOC | Enterprise Self-Hosted software license; customer separately pays the selected carrier, including Leamout Carrier when chosen |
+| Leamout Cloud + BYOC | Prepaid PAYG for Leamout Cloud/platform consumption; customer-selected carrier cost remains outside Cloud-managed usage |
+| Leamout Cloud + Managed | Prepaid PAYG for Leamout Cloud/platform and managed telecom usage |
 
-BYOC means the customer owns the carrier relationship. It does not create a postpaid Leamout billing model.
+There is no separate Self-Hosted + Managed mode.
+
+BYOC means the customer selects and configures the carrier relationship. The selected carrier may be a third party or Leamout Carrier. Choosing Leamout Carrier does not change the deployment mode.
 
 ## Prepaid customer flow
 
@@ -26,7 +27,7 @@ create wallet
     ↓
 fund wallet
     ↓
-use Leamout Cloud or managed services
+use Leamout Cloud or Leamout-provided telecom service
     ↓
 Leamout authorizes prepaid value before charge/provider exposure
     ↓
@@ -52,17 +53,17 @@ Self-Hosted license
 deployment(s)
 ```
 
-The enterprise license and prepaid usage balance are separate commercial facts.
+The enterprise software license and any carrier balance are separate commercial facts.
 
-For Self-Hosted + Managed:
+For a self-hosted customer choosing Leamout Carrier:
 
 ```text
 Self-Hosted license
         +
-prepaid managed-usage wallet
+prepaid Leamout Carrier telecom balance
 ```
 
-The license never acts as managed-usage credit.
+The customer is still Self-Hosted + BYOC. The license never acts as telecom usage credit.
 
 ## Commercial responsibilities
 
@@ -76,7 +77,7 @@ The license never acts as managed-usage credit.
 
 ## Pay-before-use invariant
 
-A chargeable Leamout Cloud or managed operation must not proceed beyond its authorized prepaid value.
+A chargeable Leamout Cloud or Leamout-provided telecom operation must not proceed beyond its authorized prepaid value.
 
 For a managed-provider operation, Leamout must have enough committed customer funds before the operation can create an upstream provider obligation.
 
@@ -85,6 +86,7 @@ Examples:
 - managed DID: reserve fixed customer price before DIDWW order;
 - managed voice: reserve an initial authorization window before carrier originate, then increase the target reservation before extending authorized call time;
 - managed messaging: reserve customer price before provider submission;
+- Leamout Carrier usage: authorize prepaid customer value before Leamout incurs upstream telecom cost;
 - Cloud platform consumption: authorize prepaid customer value before allowing chargeable consumption beyond the funded amount.
 
 ## Explicit non-goals

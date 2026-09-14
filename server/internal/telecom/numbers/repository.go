@@ -31,14 +31,14 @@ func NewRepository(db *pgxpool.Pool, redis *redisintegration.Client) *Repository
 
 func (r *Repository) SaveManagedSelection(ctx context.Context, organizationID uuid.UUID, candidate ManagedNumberCandidate) (string, error) {
 	if r == nil || r.redis == nil {
-		return "", fmt.Errorf("managed number selection store is unavailable")
+		return "", fmt.Errorf("number selection store is unavailable")
 	}
 	if organizationID == uuid.Nil {
 		return "", fmt.Errorf("organization id is required")
 	}
 	selectionID := "sel_" + uuid.NewString()
 	if err := r.redis.SetJSON(ctx, selectionKey(organizationID, selectionID), candidate, managedNumberSelectionTTL); err != nil {
-		return "", fmt.Errorf("store managed number selection: %w", err)
+		return "", fmt.Errorf("store number selection: %w", err)
 	}
 	return selectionID, nil
 }
@@ -47,8 +47,8 @@ func (r *Repository) LoadManagedSelection(ctx context.Context, organizationID uu
 	return r.loadSelection(ctx, organizationID, selectionID)
 }
 
-func (r *Repository) CreateBYOC(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
-	return r.queries.CreateBYOCPhoneNumber(ctx, sqlc.CreateBYOCPhoneNumberParams{
+func (r *Repository) CreateCustomer(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
+	return r.queries.CreateCustomerPhoneNumber(ctx, sqlc.CreateCustomerPhoneNumberParams{
 		OrganizationID:      organizationID,
 		Number:              req.Number,
 		CountryCode:         req.CountryCode,
@@ -58,9 +58,10 @@ func (r *Repository) CreateBYOC(ctx context.Context, organizationID uuid.UUID, r
 	})
 }
 
-func (r *Repository) CreateManaged(
+func (r *Repository) CreateProvider(
 	ctx context.Context,
 	organizationID uuid.UUID,
+	req CreateRequest,
 	selectionID string,
 	authorization ManagedNumberPurchaseAuthorization,
 ) (sqlc.PhoneNumber, error) {
@@ -84,17 +85,18 @@ func (r *Repository) CreateManaged(
 		return sqlc.PhoneNumber{}, err
 	}
 
-	carrierConnectionID, providerRoutingResourceID, err := resolveProviderRoutingTarget(ctx, queries, provider.ID)
+	providerConnectionID, providerRoutingResourceID, err := resolveProviderRoutingTarget(ctx, queries, provider.ID)
 	if err != nil {
 		return sqlc.PhoneNumber{}, err
 	}
 
-	number, err := queries.CreateProvisioningManagedPhoneNumber(ctx, sqlc.CreateProvisioningManagedPhoneNumberParams{
-		OrganizationID:      organizationID,
-		Number:              selection.Number,
-		CountryCode:         selection.CountryCode,
-		ProviderID:          provider.ID,
-		CarrierConnectionID: carrierConnectionID,
+	number, err := queries.CreateProvisioningProviderPhoneNumber(ctx, sqlc.CreateProvisioningProviderPhoneNumberParams{
+		OrganizationID:       organizationID,
+		Number:               selection.Number,
+		CountryCode:          selection.CountryCode,
+		ProviderID:           provider.ID,
+		ProviderConnectionID: providerConnectionID,
+		CarrierConnectionID:  req.CarrierConnectionID,
 	})
 	if err != nil {
 		return sqlc.PhoneNumber{}, err
@@ -106,7 +108,7 @@ func (r *Repository) CreateManaged(
 		ProviderProductID:         selection.ProviderProductID,
 		Number:                    selection.Number,
 		CountryCode:               selection.CountryCode,
-		CarrierConnectionID:       carrierConnectionID,
+		CarrierConnectionID:       providerConnectionID,
 		ProviderRoutingResourceID: providerRoutingResourceID,
 		PurchaseAuthorization:     authorization,
 	})
@@ -159,8 +161,8 @@ func (r *Repository) Update(ctx context.Context, organizationID, id uuid.UUID, r
 	})
 }
 
-func (r *Repository) ReleaseBYOC(ctx context.Context, organizationID, id uuid.UUID) (sqlc.PhoneNumber, error) {
-	return r.queries.ReleaseBYOCPhoneNumber(ctx, sqlc.ReleaseBYOCPhoneNumberParams{ID: id, OrganizationID: organizationID})
+func (r *Repository) ReleaseCustomer(ctx context.Context, organizationID, id uuid.UUID) (sqlc.PhoneNumber, error) {
+	return r.queries.ReleaseCustomerPhoneNumber(ctx, sqlc.ReleaseCustomerPhoneNumberParams{ID: id, OrganizationID: organizationID})
 }
 
 func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, id, connectionID uuid.UUID, event audit.Event) (sqlc.PhoneNumber, error) {
@@ -169,7 +171,7 @@ func (r *Repository) SetCarrierConnection(ctx context.Context, organizationID, i
 		return sqlc.PhoneNumber{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	number, err := r.queries.WithTx(tx).SetBYOCPhoneNumberCarrierConnection(ctx, sqlc.SetBYOCPhoneNumberCarrierConnectionParams{
+	number, err := r.queries.WithTx(tx).SetPhoneNumberCarrierConnection(ctx, sqlc.SetPhoneNumberCarrierConnectionParams{
 		ID: id, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
 	})
 	if err != nil {
@@ -234,7 +236,7 @@ func (r *Repository) RecordProviderOperationFailure(ctx context.Context, id uuid
 }
 
 func (r *Repository) FailProviderOperation(ctx context.Context, operation sqlc.ProviderOperation, cause error) error {
-	message := "managed number provisioning failed"
+	message := "number provisioning failed"
 	if cause != nil {
 		message = cause.Error()
 	}
@@ -247,7 +249,7 @@ func (r *Repository) FailProviderOperation(ctx context.Context, operation sqlc.P
 	if err := queries.MarkProviderOperationFailed(ctx, sqlc.MarkProviderOperationFailedParams{LastError: &message, ID: operation.ID}); err != nil {
 		return err
 	}
-	if err := queries.MarkManagedPhoneNumberFailed(ctx, sqlc.MarkManagedPhoneNumberFailedParams{
+	if err := queries.MarkProviderPhoneNumberFailed(ctx, sqlc.MarkProviderPhoneNumberFailedParams{
 		ErrorMessage:   &message,
 		ID:             operation.PhoneNumberID,
 		OrganizationID: operation.OrganizationID,
@@ -266,7 +268,7 @@ func (r *Repository) CompleteProviderOperation(ctx context.Context, operation sq
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := r.queries.WithTx(tx)
 
-	number, err := queries.LockManagedPhoneNumberForProviderOperation(ctx, sqlc.LockManagedPhoneNumberForProviderOperationParams{
+	number, err := queries.LockProviderPhoneNumberForOperation(ctx, sqlc.LockProviderPhoneNumberForOperationParams{
 		ID:             operation.PhoneNumberID,
 		OrganizationID: operation.OrganizationID,
 		ProviderID:     &operation.CarrierProviderID,
@@ -277,11 +279,11 @@ func (r *Repository) CompleteProviderOperation(ctx context.Context, operation sq
 		return err
 	}
 	if number.Status != "provisioning" {
-		return fmt.Errorf("managed phone number is not provisioning")
+		return fmt.Errorf("phone number is not provisioning")
 	}
 
 	resourceID := providerResourceID
-	if _, err := queries.MarkManagedPhoneNumberActive(ctx, sqlc.MarkManagedPhoneNumberActiveParams{
+	if _, err := queries.MarkProviderPhoneNumberActive(ctx, sqlc.MarkProviderPhoneNumberActiveParams{
 		ProviderResourceID: &resourceID,
 		ID:                 number.ID,
 		OrganizationID:     number.OrganizationID,
@@ -304,14 +306,14 @@ func (r *Repository) CompleteProviderOperation(ctx context.Context, operation sq
 
 func (r *Repository) loadSelection(ctx context.Context, organizationID uuid.UUID, selectionID string) (ManagedNumberCandidate, error) {
 	if r == nil || r.redis == nil {
-		return ManagedNumberCandidate{}, fmt.Errorf("managed number selection store is unavailable")
+		return ManagedNumberCandidate{}, fmt.Errorf("number selection store is unavailable")
 	}
 	var selection ManagedNumberCandidate
 	if err := r.redis.GetJSON(ctx, selectionKey(organizationID, selectionID), &selection); err != nil {
 		if errors.Is(err, redisv9.Nil) {
 			return ManagedNumberCandidate{}, ErrSelectionNotFound
 		}
-		return ManagedNumberCandidate{}, fmt.Errorf("load managed number selection: %w", err)
+		return ManagedNumberCandidate{}, fmt.Errorf("load number selection: %w", err)
 	}
 	return selection, nil
 }

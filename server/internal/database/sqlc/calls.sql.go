@@ -315,17 +315,16 @@ SELECT
     cc.max_daily_minutes
 FROM phone_numbers AS pn
 JOIN carrier_connections AS cc
-  ON cc.id = pn.carrier_connection_id
+  ON cc.id = $1
 JOIN voice_bindings AS vb
   ON vb.phone_number_id = pn.id
 JOIN voice_applications AS va
   ON va.id = vb.voice_application_id
 JOIN organizations AS o
   ON o.id = pn.organization_id
-WHERE pn.id = $1
-  AND pn.organization_id = $2
-  AND pn.number = $3
-  AND pn.carrier_connection_id = $4
+WHERE pn.id = $2
+  AND pn.organization_id = $3
+  AND pn.number = $4
   AND pn.status = 'active'
   AND pn.voice_enabled = true
   AND cc.status = 'active'
@@ -334,12 +333,12 @@ WHERE pn.id = $1
       (
           cc.scope = 'organization'
           AND cc.organization_id = pn.organization_id
-          AND pn.provisioning_mode = 'byoc'
+          AND pn.carrier_connection_id = cc.id
       )
       OR (
           cc.scope = 'platform'
           AND cc.organization_id IS NULL
-          AND pn.provisioning_mode = 'managed'
+          AND pn.provider_connection_id = cc.id
       )
   )
   AND va.id = $5
@@ -351,11 +350,11 @@ LIMIT 1
 `
 
 type GetInboundCallContextParams struct {
-	PhoneNumberID       uuid.UUID  `db:"phone_number_id" json:"phone_number_id"`
-	OrganizationID      uuid.UUID  `db:"organization_id" json:"organization_id"`
-	CalledNumber        string     `db:"called_number" json:"called_number"`
-	CarrierConnectionID *uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
-	ApplicationID       uuid.UUID  `db:"application_id" json:"application_id"`
+	CarrierConnectionID uuid.UUID `db:"carrier_connection_id" json:"carrier_connection_id"`
+	PhoneNumberID       uuid.UUID `db:"phone_number_id" json:"phone_number_id"`
+	OrganizationID      uuid.UUID `db:"organization_id" json:"organization_id"`
+	CalledNumber        string    `db:"called_number" json:"called_number"`
+	ApplicationID       uuid.UUID `db:"application_id" json:"application_id"`
 }
 
 type GetInboundCallContextRow struct {
@@ -368,10 +367,10 @@ type GetInboundCallContextRow struct {
 // persists or admits an inbound call.
 func (q *Queries) GetInboundCallContext(ctx context.Context, arg GetInboundCallContextParams) (GetInboundCallContextRow, error) {
 	row := q.db.QueryRow(ctx, getInboundCallContext,
+		arg.CarrierConnectionID,
 		arg.PhoneNumberID,
 		arg.OrganizationID,
 		arg.CalledNumber,
-		arg.CarrierConnectionID,
 		arg.ApplicationID,
 	)
 	var i GetInboundCallContextRow

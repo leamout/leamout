@@ -7,7 +7,7 @@ import (
 
 templ NumberTable(numbers []Number) {
 	@components.TableWithLinks(
-		[]string{"Number", "Organization", "Country", "Mode", "Provider", "Voice", "SMS", "Status", "Created"},
+		[]string{"Number", "Organization", "Country", "Source", "Provider", "Voice", "SMS", "Status", "Created"},
 		numberRows(numbers),
 		numberLinks(numbers),
 	)
@@ -35,7 +35,7 @@ func numberRows(numbers []Number) [][]string {
 			number.Number,
 			number.Organization,
 			number.CountryCode,
-			number.Mode,
+			number.Source,
 			number.Provider,
 			fmt.Sprint(number.Voice),
 			fmt.Sprint(number.SMS),

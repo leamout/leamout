@@ -1,9 +1,8 @@
--- name: CreateBYOCPhoneNumber :one
+-- name: CreateCustomerPhoneNumber :one
 INSERT INTO phone_numbers (
     organization_id,
     number,
     country_code,
-    provisioning_mode,
     carrier_connection_id,
     provider_id,
     provider_resource_id,
@@ -14,8 +13,7 @@ SELECT
     sqlc.arg(organization_id) AS organization_id,
     sqlc.arg(number) AS number,
     sqlc.arg(country_code) AS country_code,
-    'byoc' AS provisioning_mode,
-    sqlc.narg(carrier_connection_id) AS carrier_connection_id,
+    cc.id AS carrier_connection_id,
     NULL::UUID AS provider_id,
     NULL::TEXT AS provider_resource_id,
     COALESCE(sqlc.narg(voice_enabled), true) AS voice_enabled,
@@ -35,54 +33,11 @@ WHERE o.id = sqlc.arg(organization_id)
   )
 RETURNING *;
 
--- name: CreateManagedPhoneNumber :one
+-- name: CreateProvisioningProviderPhoneNumber :one
 INSERT INTO phone_numbers (
     organization_id,
     number,
     country_code,
-    provisioning_mode,
-    carrier_connection_id,
-    provider_id,
-    provider_resource_id,
-    voice_enabled,
-    sms_enabled
-)
-SELECT
-    sqlc.arg(organization_id) AS organization_id,
-    sqlc.arg(number) AS number,
-    sqlc.arg(country_code) AS country_code,
-    'managed' AS provisioning_mode,
-    sqlc.narg(carrier_connection_id) AS carrier_connection_id,
-    sqlc.arg(provider_id) AS provider_id,
-    sqlc.arg(provider_resource_id) AS provider_resource_id,
-    COALESCE(sqlc.narg(voice_enabled), true) AS voice_enabled,
-    COALESCE(sqlc.narg(sms_enabled), false) AS sms_enabled
-FROM organizations AS o
-JOIN carrier_providers AS cp
-  ON cp.id = sqlc.arg(provider_id)
- AND cp.status = 'active'
-LEFT JOIN carrier_connections AS cc
-  ON cc.id = sqlc.narg(carrier_connection_id)::UUID
- AND cc.scope = 'platform'
- AND cc.organization_id IS NULL
- AND cc.provider_id = cp.id
- AND cc.status = 'active'
-WHERE o.id = sqlc.arg(organization_id)
-  AND o.status = 'active'
-  AND o.deleted_at IS NULL
-  AND length(btrim(sqlc.arg(provider_resource_id))) > 0
-  AND (
-      sqlc.narg(carrier_connection_id)::UUID IS NULL
-      OR cc.id IS NOT NULL
-  )
-RETURNING *;
-
--- name: CreateProvisioningManagedPhoneNumber :one
-INSERT INTO phone_numbers (
-    organization_id,
-    number,
-    country_code,
-    provisioning_mode,
     carrier_connection_id,
     provider_id,
     provider_resource_id,
@@ -94,8 +49,7 @@ SELECT
     sqlc.arg(organization_id) AS organization_id,
     sqlc.arg(number) AS number,
     sqlc.arg(country_code) AS country_code,
-    'managed' AS provisioning_mode,
-    cc.id AS carrier_connection_id,
+    customer_cc.id AS carrier_connection_id,
     cp.id AS provider_id,
     NULL::TEXT AS provider_resource_id,
     true AS voice_enabled,
@@ -105,29 +59,31 @@ FROM organizations AS o
 JOIN carrier_providers AS cp
   ON cp.id = sqlc.arg(provider_id)
  AND cp.status = 'active'
-JOIN carrier_connections AS cc
-  ON cc.id = sqlc.arg(carrier_connection_id)
- AND cc.scope = 'platform'
- AND cc.organization_id IS NULL
- AND cc.provider_id = cp.id
- AND cc.status = 'active'
+LEFT JOIN carrier_connections AS customer_cc
+  ON customer_cc.id = sqlc.narg(carrier_connection_id)::UUID
+ AND customer_cc.scope = 'organization'
+ AND customer_cc.organization_id = sqlc.arg(organization_id)
+ AND customer_cc.status = 'active'
 WHERE o.id = sqlc.arg(organization_id)
   AND o.status = 'active'
   AND o.deleted_at IS NULL
+  AND (
+      sqlc.narg(carrier_connection_id)::UUID IS NULL
+      OR customer_cc.id IS NOT NULL
+  )
 RETURNING *;
 
--- name: LockManagedPhoneNumberForProviderOperation :one
+-- name: LockProviderPhoneNumberForOperation :one
 SELECT *
 FROM phone_numbers
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
   AND provider_id = sqlc.arg(provider_id)
-  AND provisioning_mode = 'managed'
   AND number = sqlc.arg(number)
   AND country_code = sqlc.arg(country_code)
 FOR UPDATE;
 
--- name: MarkManagedPhoneNumberActive :one
+-- name: MarkProviderPhoneNumberActive :one
 UPDATE phone_numbers
 SET
     provider_resource_id = sqlc.arg(provider_resource_id),
@@ -137,11 +93,10 @@ SET
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
   AND provider_id = sqlc.arg(provider_id)
-  AND provisioning_mode = 'managed'
   AND status = 'provisioning'
 RETURNING *;
 
--- name: MarkManagedPhoneNumberFailed :exec
+-- name: MarkProviderPhoneNumberFailed :exec
 UPDATE phone_numbers
 SET
     status = 'failed',
@@ -152,7 +107,6 @@ SET
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
   AND provider_id = sqlc.arg(provider_id)
-  AND provisioning_mode = 'managed'
   AND status = 'provisioning';
 
 -- name: GetPhoneNumberByID :one
@@ -214,7 +168,7 @@ WHERE pn.id = sqlc.arg(id)
   AND pn.status = 'active'
 RETURNING pn.*;
 
--- name: SetBYOCPhoneNumberCarrierConnection :one
+-- name: SetPhoneNumberCarrierConnection :one
 UPDATE phone_numbers AS pn
 SET
     carrier_connection_id = sqlc.arg(carrier_connection_id),
@@ -222,7 +176,6 @@ SET
 FROM carrier_connections AS cc
 WHERE pn.id = sqlc.arg(id)
   AND pn.organization_id = sqlc.arg(organization_id)
-  AND pn.provisioning_mode = 'byoc'
   AND pn.status = 'active'
   AND cc.id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'organization'
@@ -230,58 +183,14 @@ WHERE pn.id = sqlc.arg(id)
   AND cc.status = 'active'
 RETURNING pn.*;
 
--- name: SetManagedPhoneNumberCarrierConnection :one
-UPDATE phone_numbers AS pn
-SET
-    carrier_connection_id = sqlc.arg(carrier_connection_id),
-    updated_at = NOW()
-FROM carrier_connections AS cc
-WHERE pn.id = sqlc.arg(id)
-  AND pn.organization_id = sqlc.arg(organization_id)
-  AND pn.provisioning_mode = 'managed'
-  AND pn.status = 'active'
-  AND pn.provider_id IS NOT NULL
-  AND cc.id = sqlc.arg(carrier_connection_id)
-  AND cc.scope = 'platform'
-  AND cc.organization_id IS NULL
-  AND cc.provider_id = pn.provider_id
-  AND cc.status = 'active'
-RETURNING pn.*;
-
--- name: DisableManagedPhoneNumberForRelease :one
-UPDATE phone_numbers
-SET
-    status = 'disabled',
-    voice_enabled = false,
-    sms_enabled = false,
-    updated_at = now()
-WHERE id = sqlc.arg(id)
-  AND organization_id = sqlc.arg(organization_id)
-  AND provisioning_mode = 'managed'
-  AND status IN ('active', 'disabled')
-RETURNING *;
-
--- name: ReleaseManagedPhoneNumber :one
-UPDATE phone_numbers
-SET
-    status = 'released',
-    carrier_connection_id = NULL,
-    voice_enabled = false,
-    sms_enabled = false,
-    updated_at = now()
-WHERE id = sqlc.arg(id)
-  AND provisioning_mode = 'managed'
-  AND status IN ('active', 'disabled')
-RETURNING *;
-
--- name: ReleaseBYOCPhoneNumber :one
+-- name: ReleaseCustomerPhoneNumber :one
 UPDATE phone_numbers
 SET
     status = 'released',
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND organization_id = sqlc.arg(organization_id)
-  AND provisioning_mode = 'byoc'
+  AND provider_id IS NULL
   AND status IN ('active', 'disabled')
 RETURNING *;
 
@@ -314,8 +223,8 @@ SELECT
     o.name AS organization_name,
     pn.number,
     pn.country_code::TEXT AS country_code,
-    pn.provisioning_mode,
-    COALESCE(cp.name, 'BYOC') AS provider_name,
+    CASE WHEN pn.provider_id IS NULL THEN 'customer' ELSE 'leamout' END::TEXT AS source,
+    COALESCE(cp.name, 'Customer') AS provider_name,
     pn.voice_enabled,
     pn.sms_enabled,
     pn.status,
@@ -333,11 +242,11 @@ SELECT
     o.name AS organization_name,
     pn.number,
     pn.country_code::TEXT AS country_code,
-    pn.provisioning_mode,
+    CASE WHEN pn.provider_id IS NULL THEN 'customer' ELSE 'leamout' END::TEXT AS source,
     CAST(COALESCE(pn.carrier_connection_id::TEXT, '—') AS TEXT) AS carrier_connection_id,
     COALESCE(cc.name, '—') AS carrier_connection_name,
     CAST(COALESCE(pn.provider_id::TEXT, '—') AS TEXT) AS provider_id,
-    COALESCE(cp.name, 'BYOC') AS provider_name,
+    COALESCE(cp.name, 'Customer') AS provider_name,
     COALESCE(pn.provider_resource_id, '—') AS provider_resource_id,
     pn.voice_enabled,
     pn.sms_enabled,

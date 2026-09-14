@@ -1,14 +1,16 @@
 # DIDWW provider
 
-DIDWW is the initial Leamout-managed provider for DID inventory, acquisition, and inbound PSTN routing.
+DIDWW is an initial upstream provider used by Leamout for DID inventory, acquisition, and inbound PSTN routing.
 
 DIDWW provider identifiers, credentials, Voice IN trunks, and other wholesale resources are internal Leamout infrastructure. They are not customer-facing API resources and they are not part of ordinary Self-Hosted deployment configuration.
 
 ## Product boundary
 
-Self-Hosted Leamout does not provision or administer DIDWW directly.
+Self-Hosted Leamout does not provision or administer Leamout's DIDWW account directly.
 
-A self-hosted customer normally connects their own carriers through BYOC. If a self-hosted customer uses Leamout-managed carrier connectivity, they connect to the Leamout-managed SIP service using the SIP configuration supplied by Leamout; they do not receive DIDWW credentials or create DIDWW resources themselves.
+A self-hosted customer selects and configures carriers through BYOC. If the selected carrier is Leamout Carrier, the customer configures the SIP connection details supplied by Leamout just as they would configure another supported carrier. They do not receive DIDWW credentials or create Leamout's DIDWW resources themselves.
+
+Choosing Leamout Carrier does not create a Self-Hosted + Managed mode. The self-hosted runtime remains BYOC; Leamout is acting as the telecom provider.
 
 Leamout-operated carrier infrastructure owns the DIDWW account and provider-side configuration. A future Backoffice/operator surface should manage that infrastructure.
 
@@ -29,9 +31,9 @@ DIDWW order
   ↓
 DIDWW DID
   ↓
-existing Leamout-managed DIDWW Voice IN trunk
+existing Leamout-owned DIDWW Voice IN trunk
   ↓
-Leamout-managed SIP infrastructure
+Leamout-operated SIP infrastructure
 ```
 
 The provider-operation executor reconciles by the Leamout provider-operation UUID before purchasing so ambiguous provider responses do not create duplicate orders.
@@ -43,15 +45,17 @@ Use the existing carrier and number primitives.
 | Leamout object | DIDWW use |
 | --- | --- |
 | `carrier_providers` | Built-in DIDWW provider definition. |
-| `carrier_connections` | Internal Leamout-managed carrier connection. |
+| `carrier_connections` | Internal platform-scoped Leamout upstream connection. |
 | `carrier_connection_source_ips` | Provider signaling networks accepted for that internal connection. |
-| `trunks` | Internal SIP topology for the managed carrier service. |
+| `trunks` | Internal SIP topology for Leamout-operated carrier service. |
 | `trunk_endpoints` | Internal signaling endpoints. |
 | `carrier_connection_provider_resources` | Maps internal carrier connections to provider resources such as a DIDWW `voice_in_trunk`. |
 | `phone_numbers` | Purchased DIDs; `provider_resource_id` stores the DIDWW DID resource ID. |
 | `voice_bindings` | Maps a DID to a voice application. |
 
-Managed inbound tenancy is derived from the called DID. Provider resources remain internal and do not become customer carrier resources.
+For Cloud Managed inbound traffic, tenancy is derived from the called DID. Provider resources remain internal and do not become customer carrier resources.
+
+For Self-Hosted + BYOC using Leamout Carrier, the self-hosted deployment sees only its organization-scoped Leamout Carrier connection. DIDWW remains behind the Leamout-operated carrier boundary.
 
 ## Control-plane adapter
 
@@ -71,7 +75,7 @@ The adapter currently owns provider API behavior needed by the managed-number li
 
 It does **not** create or reconcile the DIDWW Voice IN trunk itself. Provider-side carrier infrastructure is an operator concern and should eventually be managed through Backoffice/internal services.
 
-DIDWW API credentials are managed-carrier provider configuration. They do not belong in customer `carrier_connections`.
+DIDWW API credentials are Leamout upstream-provider configuration. They do not belong in customer `carrier_connections`.
 
 ## Routing purchased numbers
 
@@ -102,13 +106,13 @@ SIP_PUBLIC_TRANSPORT
 
 They also must not run an internal DIDWW provisioning command.
 
-A self-hosted deployment using Leamout-managed carrier connectivity configures the Leamout-managed SIP service as a carrier connection using the connection details provided by Leamout. DIDWW remains behind the Leamout-managed carrier boundary.
+A self-hosted deployment using Leamout Carrier configures Leamout Carrier as an ordinary organization-scoped BYOC carrier connection using the customer-facing connection details provided by Leamout. DIDWW remains behind the Leamout Carrier boundary.
 
 ## Capacity and wholesale cost
 
 DIDWW capacity selection is provider state, not customer pricing. The current managed-number acquisition path excludes DID+0 until DIDWW Capacity provisioning is implemented.
 
-`usage_rates` is customer-facing commercial pricing. DIDWW wholesale cost belongs in provider/wholesale accounting resources, not customer rate tables.
+Customer-facing Catalog prices are separate from DIDWW wholesale cost. DIDWW wholesale cost belongs in provider/wholesale accounting resources, not customer rate tables.
 
 ## Reconciliation
 
@@ -118,7 +122,7 @@ Future inventory/routing reconciliation should detect at least:
 
 - DID exists at DIDWW but not in Leamout;
 - DID exists in Leamout but no longer exists at DIDWW;
-- DIDWW routing no longer points at the expected managed Voice IN trunk;
+- DIDWW routing no longer points at the expected Leamout-owned Voice IN trunk;
 - provider status changed outside Leamout.
 
 Do not silently delete local state during reconciliation.

@@ -385,7 +385,6 @@ type PhoneNumber struct {
 	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Number              string             `db:"number" json:"number"`
 	CountryCode         string             `db:"country_code" json:"country_code"`
-	ProvisioningMode    string             `db:"provisioning_mode" json:"provisioning_mode"`
 	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
 	ProviderID          *uuid.UUID         `db:"provider_id" json:"provider_id"`
 	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`

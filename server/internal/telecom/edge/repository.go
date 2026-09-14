@@ -20,7 +20,7 @@ FROM trunk_credentials tc
 JOIN trunks customer_trunk ON customer_trunk.id = tc.trunk_id
  AND customer_trunk.organization_id = tc.organization_id
 JOIN phone_numbers pn ON pn.organization_id = tc.organization_id
- AND pn.number = $3 AND pn.provisioning_mode = 'managed'
+ AND pn.number = $3
  AND pn.status = 'active' AND pn.voice_enabled = true
 JOIN trunks platform_trunk ON platform_trunk.organization_id IS NULL
  AND platform_trunk.provisioning_mode = 'managed'

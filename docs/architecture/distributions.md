@@ -19,10 +19,16 @@ The repository must share product behavior while keeping deployment and commerci
              │                                   │
        prepaid PAYG                      enterprise license
              │                                   │
-      BYOC + Managed                       BYOC core
+      BYOC + Managed                         BYOC only
+                                                  │
+                                          customer selects
+                                          any carrier,
+                                          including Leamout
 ```
 
 Cloud and Self-Hosted are not forks and must not duplicate telecom, identity, tenancy, or shared platform code.
+
+There is no separate Self-Hosted + Managed distribution. If a self-hosted customer chooses Leamout Carrier, the deployment remains Self-Hosted + BYOC and Leamout is acting as the selected telecom provider.
 
 ## Shared product core
 
@@ -42,31 +48,57 @@ The following belong to the shared platform and must not depend on Cloud or Self
 
 Shared telecom code must not require a prepaid wallet merely because it is running in Self-Hosted.
 
+## Connectivity boundary
+
+The runtime composition determines which connectivity policies are available:
+
+```text
+Self-Hosted
+    → organization-scoped carrier connections
+    → BYOC only
+
+Cloud
+    → organization-scoped carrier connections
+    → BYOC
+
+Cloud
+    → platform-scoped carrier connections
+    → Managed
+```
+
+An organization-scoped carrier connection remains BYOC even when `provider = leamout`.
+
+Platform-scoped carrier connections are Leamout-owned upstream resources used behind Cloud Managed. Provider credentials, physical SIP endpoints, wholesale resources, and provider-specific topology stay inside the Leamout-operated boundary.
+
+Trunks and endpoints inherit connectivity ownership from the carrier connection. Distribution code must not create an independent BYOC/managed type on physical endpoints.
+
 ## Commercial boundaries
 
 Cloud is prepaid PAYG.
 
-Self-Hosted BYOC is governed by the enterprise software license and must not require wallet balance for customer-owned carrier usage.
+Self-Hosted is governed by the enterprise software license and must not require a Leamout wallet for the customer's carrier usage.
 
-A future Self-Hosted Managed composition may combine the enterprise software license with prepaid authorization for Leamout-managed provider obligations, but it is not part of the current Self-Hosted BYOC runtime.
+If a self-hosted customer separately purchases telecom service from Leamout Carrier, that carrier relationship may have its own prepaid telecom balance or carrier billing. It does not create a different Self-Hosted software distribution.
 
 ```text
-Cloud
-    → prepaid PAYG
+Cloud + BYOC
+    → prepaid Cloud/platform charges
+    → customer-selected carrier relationship
+
+Cloud + Managed
+    → prepaid Cloud/platform charges
+    + Leamout-managed telecom usage
 
 Self-Hosted + BYOC
-    → enterprise license
-    → customer carrier
-    → no Leamout managed-carrier wallet charge
-
-Self-Hosted + Managed
-    → enterprise license
-    + prepaid managed-usage wallet
+    → enterprise software license
+    → customer-selected carrier
+       ├── third-party carrier
+       └── Leamout Carrier
 ```
 
 The invariant is:
 
-> PAYG protects Leamout-owned provider exposure. It is not a prerequisite for Self-Hosted BYOC platform operation.
+> Software deployment mode and carrier commercial relationship are separate concerns. Choosing Leamout Carrier must not turn a self-hosted runtime into a managed distribution.
 
 ## Runtime ownership
 
@@ -184,11 +216,12 @@ Self-Hosted release artifacts must contain only what is required to operate Leam
 
 1. Keep command and runtime packages aligned one-to-one.
 2. Keep shared behavior in domain and platform packages, not in a generic application layer.
-3. Stop constructing the full Commercial module for every runtime.
-4. Ensure Self-Hosted BYOC works without wallet, checkout, or payment-provider dependencies.
-5. Attach wallet authorization only to managed-provider paths.
-6. Split Cloud and Self-Hosted release composition where needed.
-7. Keep acceptance coverage proving Cloud, Self-Hosted BYOC, and Self-Hosted Managed independently.
+3. Keep Self-Hosted free of Commercial, wallet, payment-provider, and managed-provider runtime dependencies.
+4. Make every organization-scoped carrier connection BYOC regardless of provider slug.
+5. Keep Cloud Managed on platform-scoped carrier resources and Cloud-only policy paths.
+6. Remove customer-facing self-hosted managed trunk/endpoint states and stale naming.
+7. Split Cloud and Self-Hosted release composition where needed.
+8. Keep acceptance coverage proving Self-Hosted BYOC with third-party carriers, Self-Hosted BYOC with Leamout Carrier, Cloud BYOC, and Cloud Managed independently.
 
 ## Deployment compositions
 
@@ -196,7 +229,7 @@ The source tree exposes independent Compose entry points:
 
 ```text
 deploy/cloud/compose.yaml         Cloud API, Cloud worker, Backoffice, managed providers, and PAYG
-deploy/self-hosted/compose.yaml   Self-Hosted API and worker with customer-owned BYOC connectivity
+deploy/self-hosted/compose.yaml   Self-Hosted API and worker with customer-selected BYOC connectivity
 ```
 
 `make` defaults to the Self-Hosted composition. Operators and CI can select Cloud explicitly with

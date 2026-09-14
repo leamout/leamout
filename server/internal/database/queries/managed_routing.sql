@@ -56,10 +56,9 @@ LIMIT 1;
 -- name: ResolveInboundPhoneNumber :one
 SELECT pn.*
 FROM phone_numbers AS pn
-JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id
+JOIN carrier_connections AS cc ON cc.id = sqlc.arg(carrier_connection_id)
 JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.number = sqlc.arg(number)
-  AND pn.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND pn.status = 'active'
   AND pn.voice_enabled = true
   AND cc.status = 'active'
@@ -68,12 +67,12 @@ WHERE pn.number = sqlc.arg(number)
       (
           cc.scope = 'organization'
           AND cc.organization_id = pn.organization_id
-          AND pn.provisioning_mode = 'byoc'
+          AND pn.carrier_connection_id = cc.id
       )
       OR (
           cc.scope = 'platform'
           AND cc.organization_id IS NULL
-          AND pn.provisioning_mode = 'managed'
+          AND pn.carrier_connection_id IS NULL
       )
   )
   AND o.status = 'active'

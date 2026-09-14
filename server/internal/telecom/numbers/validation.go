@@ -26,14 +26,6 @@ func validateNumberID(id uuid.UUID) error {
 	return nil
 }
 
-func normalizeProvisioningMode(value ProvisioningMode) (ProvisioningMode, error) {
-	value = ProvisioningMode(strings.ToLower(strings.TrimSpace(string(value))))
-	if value != ProvisioningModeBYOC && value != ProvisioningModeManaged {
-		return "", apperror.NewBadRequest("type must be byoc or managed")
-	}
-	return value, nil
-}
-
 func normalizeSelectionID(value string) (string, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {

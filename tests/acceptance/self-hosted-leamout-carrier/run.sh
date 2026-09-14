@@ -3,16 +3,16 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
-CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-self-hosted-managed.XXXXXX")
-export SELF_HOSTED_MANAGED_CERT_DIR="$CERT_DIR"
-export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-self-hosted-managed-esl}"
+CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-self-hosted-leamout-carrier.XXXXXX")
+export SELF_HOSTED_LEAMOUT_CARRIER_CERT_DIR="$CERT_DIR"
+export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-self-hosted-leamout-carrier-esl}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-$(openssl rand -hex 32)}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
-export TURN_REALM="${TURN_REALM:-self-hosted-managed.local}"
+export TURN_REALM="${TURN_REALM:-self-hosted-leamout-carrier.local}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
-COMPOSE="docker compose -f deploy/self-hosted/compose.yaml -f tests/acceptance/self-hosted-managed/compose.yaml"
+COMPOSE="docker compose -f deploy/self-hosted/compose.yaml -f tests/acceptance/self-hosted-leamout-carrier/compose.yaml"
 
 freeswitch_sip_ready() {
     $COMPOSE exec -T freeswitch sh -c '
@@ -40,7 +40,7 @@ cleanup() {
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
         (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=400 server self-hosted-opensips freeswitch postgres) || true
     fi
-    if [ "${SELF_HOSTED_MANAGED_KEEP_STACK:-0}" != "1" ]; then
+    if [ "${SELF_HOSTED_LEAMOUT_CARRIER_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true
         rm -rf "$CERT_DIR"
     fi
@@ -57,7 +57,7 @@ $COMPOSE config --quiet
 $COMPOSE up -d --build postgres redis nats rtpengine freeswitch
 until $COMPOSE exec -T postgres pg_isready -U leamout -d leamout >/dev/null 2>&1; do sleep 1; done
 $COMPOSE up --build migrate
-$COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U leamout -d leamout <tests/acceptance/self-hosted-managed/bootstrap.sql >/dev/null
+$COMPOSE exec -T postgres psql -v ON_ERROR_STOP=1 -U leamout -d leamout <tests/acceptance/self-hosted-leamout-carrier/bootstrap.sql >/dev/null
 $COMPOSE up -d --build server self-hosted-opensips
 
 ready=0
@@ -71,7 +71,7 @@ for _ in $(seq 1 90); do
     sleep 1
 done
 if [ "$ready" -ne 1 ]; then
-    echo "self-hosted managed stack did not become ready" >&2
+    echo "self-hosted Leamout Carrier stack did not become ready" >&2
     show_freeswitch_sip_status >&2
     exit 1
 fi
@@ -80,4 +80,4 @@ $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
     -p "$FREESWITCH_ESL_PASSWORD" -x "console loglevel debug" >/dev/null
 $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 \
     -p "$FREESWITCH_ESL_PASSWORD" -x "sofia global siptrace on" >/dev/null
-python3 tests/acceptance/self-hosted-managed/acceptance.py
+python3 tests/acceptance/self-hosted-leamout-carrier/acceptance.py

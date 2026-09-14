@@ -10,16 +10,17 @@ Everything in Leamout is prepaid pay-as-you-go except Self-Hosted software licen
 
 Self-Hosted software licenses are enterprise software agreements. They are sold separately from prepaid usage, normally through a negotiated contract, invoice, and bank transfer. They are not Stripe/Paystack checkout products and do not consume a Leamout wallet.
 
-Every Cloud or managed communications charge is prepaid. Leamout does not extend postpaid telecom or platform usage credit.
+Every Cloud or Leamout-provided communications charge is prepaid. Leamout does not extend postpaid telecom or platform usage credit.
 
-| Delivery mode | Software / platform | Managed Leamout usage |
+| Delivery mode | Software / platform | Telecom relationship |
 | --- | --- | --- |
-| Self-Hosted + BYOC | Enterprise Self-Hosted license | None unless the customer uses a Leamout managed service |
-| Self-Hosted + Managed | Enterprise Self-Hosted license | Prepaid PAYG |
-| Leamout Cloud + BYOC | Prepaid PAYG | Customer carrier cost remains outside Leamout |
-| Leamout Cloud + Managed | Prepaid PAYG | Prepaid PAYG |
+| Self-Hosted + BYOC | Enterprise Self-Hosted license | Customer-selected carrier; may be a third party or Leamout Carrier |
+| Leamout Cloud + BYOC | Prepaid PAYG | Customer-selected carrier cost remains outside Cloud-managed usage |
+| Leamout Cloud + Managed | Prepaid PAYG | Leamout-managed telecom usage is prepaid PAYG |
 
-BYOC does not mean postpaid. It means the customer owns the carrier relationship, so that carrier cost is not a Leamout managed-provider charge. Any Leamout Cloud/platform consumption that is monetized remains prepaid PAYG.
+There is no separate Self-Hosted + Managed commercial mode. If a self-hosted customer chooses Leamout Carrier, the software relationship remains an enterprise Self-Hosted license and the telecom relationship is billed separately as a carrier service.
+
+BYOC means the customer selects and configures the carrier relationship. It does not mean the carrier must be a third party and it does not create a postpaid Leamout billing model.
 
 ## Product model
 
@@ -39,17 +40,21 @@ enterprise software agreement
 Leamout license
     ↓
 customer deployment(s)
+    ↓
+customer-selected carrier
+    ├── third-party carrier
+    └── Leamout Carrier
 ```
 
-Self-Hosted + Managed combines both commercial paths:
+When a self-hosted customer also buys Leamout Carrier service, the two commercial relationships remain separate:
 
 ```text
 enterprise Self-Hosted license
             +
-prepaid PAYG managed usage
+prepaid Leamout Carrier telecom service
 ```
 
-The license is not funded from the usage wallet. Managed usage still requires prepaid wallet authorization before Leamout creates managed-provider obligations.
+The software license is not funded from the telecom wallet and never acts as telecom usage credit.
 
 There is no customer subscription lifecycle in the current model.
 
@@ -82,7 +87,7 @@ Managed telecom wholesale cost is separate COGS. DIDWW, CommPeak, and other prov
 
 ## Responsibilities
 
-- [PAYG](payg.md) — the default commercial model for all Cloud and managed usage.
+- [PAYG](payg.md) — the default commercial model for all Cloud and Leamout-provided usage.
 - [Catalog](catalog.md) — Leamout-owned products, plans, prices, meters, and stable offer configuration.
 - [Payments](payments.md) — prepaid wallet funding and payment-provider reconciliation.
 - [Wallets](wallets.md) — currency-scoped prepaid value, immutable ledger movements, and reservations.
@@ -93,20 +98,20 @@ Managed telecom wholesale cost is separate COGS. DIDWW, CommPeak, and other prov
 
 ## Pay-before-use invariants
 
-1. All Cloud and managed communications charges are prepaid PAYG.
+1. All Cloud and Leamout-provided communications charges are prepaid PAYG.
 2. A managed-provider obligation requires sufficient prepaid wallet authorization first.
-3. BYOC carrier usage does not consume a Leamout managed-carrier wallet merely because it passes through Leamout.
-4. Pending, processing, failed, or unverified provider payments never create spendable credit.
-5. Only authenticated, idempotently reconciled payment success may create a wallet top-up credit.
-6. Spendable balance is posted ledger credits minus posted ledger debits minus active reservations.
-7. Reservation admission serializes on the wallet so concurrent operations cannot overdraw it.
-8. Successful provider work captures authorized value; failed or abandoned work releases its reservation according to operation policy.
-9. Ledger history is append-only. Refunds, chargebacks, and corrections are compensating entries.
-10. PostgreSQL is the monetary source of truth. Redis may coordinate realtime authorization but cannot create or destroy value.
-11. Money is never mixed across currencies.
-12. Provider wholesale cost remains separate from customer-facing Catalog prices.
-13. Self-Hosted software licensing is independent of prepaid usage wallets and does not require a customer subscription.
-14. A Self-Hosted + Managed customer still prepays managed usage; the enterprise license does not create usage credit.
+3. Customer-selected third-party carrier usage does not consume a Leamout managed-carrier wallet merely because it passes through Leamout.
+4. A self-hosted customer using Leamout Carrier may have a separate prepaid carrier balance; this does not change the Self-Hosted + BYOC deployment mode.
+5. Pending, processing, failed, or unverified provider payments never create spendable credit.
+6. Only authenticated, idempotently reconciled payment success may create a wallet top-up credit.
+7. Spendable balance is posted ledger credits minus posted ledger debits minus active reservations.
+8. Reservation admission serializes on the wallet so concurrent operations cannot overdraw it.
+9. Successful provider work captures authorized value; failed or abandoned work releases its reservation according to operation policy.
+10. Ledger history is append-only. Refunds, chargebacks, and corrections are compensating entries.
+11. PostgreSQL is the monetary source of truth. Redis may coordinate realtime authorization but cannot create or destroy value.
+12. Money is never mixed across currencies.
+13. Provider wholesale cost remains separate from customer-facing Catalog prices.
+14. Self-Hosted software licensing is independent of prepaid usage wallets and does not require a customer subscription.
 
 ## Module structure
 
@@ -120,8 +125,8 @@ Commercial modules use files only when they own the corresponding responsibility
 | `validation.go` | Reusable domain/input validation. |
 | `handler.go` | HTTP handlers. |
 | `routes.go` | HTTP route registration. |
-| `consumer.go` | Asynchronous events entering the module. |
-| `publisher.go` | Asynchronous events leaving the module. |
+| `consumer.go` | Asynchronous events entering a module. |
+| `publisher.go` | Asynchronous events leaving a module. |
 | `jobs.go` | Scheduled or recurring work. |
 
 Do not create empty scaffold files for speculative future behavior.

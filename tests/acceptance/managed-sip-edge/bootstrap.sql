@@ -17,5 +17,5 @@ INSERT INTO trunks (id, organization_id, provisioning_mode, name, direction, sta
 ('00000000-0000-0000-0000-000000004030', '00000000-0000-0000-0000-000000004001', 'managed', 'Customer managed trunk', 'outbound', 'active');
 INSERT INTO trunk_credentials (trunk_id, organization_id, username, realm, ha1_md5) VALUES
 ('00000000-0000-0000-0000-000000004030', '00000000-0000-0000-0000-000000004001', 'edge-user', 'sip.leamout.com', md5('edge-user:sip.leamout.com:edge-password'));
-INSERT INTO phone_numbers (id, organization_id, number, country_code, provisioning_mode, provider_id, provider_resource_id, voice_enabled, status) VALUES
-('00000000-0000-0000-0000-000000004040', '00000000-0000-0000-0000-000000004001', '+15551234001', 'US', 'managed', (SELECT id FROM carrier_providers WHERE slug = 'didww'), 'managed-edge-caller', true, 'active');
+INSERT INTO phone_numbers (id, organization_id, number, country_code, provider_id, provider_resource_id, voice_enabled, status) VALUES
+('00000000-0000-0000-0000-000000004040', '00000000-0000-0000-0000-000000004001', '+15551234001', 'US', (SELECT id FROM carrier_providers WHERE slug = 'didww'), 'managed-edge-caller', true, 'active');

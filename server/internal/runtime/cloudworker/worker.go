@@ -60,7 +60,7 @@ var componentNames = []string{
 	"idempotency-cleanup",
 }
 
-func New(ctx context.Context, cfg config.Config) (*Worker, error) {
+func New(ctx context.Context, cfg config.CloudConfig) (*Worker, error) {
 	deps, err := newDependencies(ctx, cfg)
 	if err != nil {
 		return nil, err

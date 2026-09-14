@@ -40,15 +40,16 @@ func TestNormalizeChoices(t *testing.T) {
 }
 
 func TestNormalizeProvisioningMode(t *testing.T) {
-	got, err := normalizeProvisioningMode("")
-	if err != nil || got != ProvisioningModeBYOC {
-		t.Fatalf("empty type = %q, %v; want byoc", got, err)
+	for _, value := range []ProvisioningMode{"", ProvisioningModeBYOC, " BYOC "} {
+		got, err := normalizeProvisioningMode(value)
+		if err != nil || got != ProvisioningModeBYOC {
+			t.Fatalf("normalizeProvisioningMode(%q) = %q, %v; want byoc", value, got, err)
+		}
 	}
-	got, err = normalizeProvisioningMode(" MANAGED ")
-	if err != nil || got != ProvisioningModeManaged {
-		t.Fatalf("managed type = %q, %v", got, err)
-	}
-	if _, err := normalizeProvisioningMode("other"); err == nil {
-		t.Fatal("invalid provisioning mode accepted")
+
+	for _, value := range []ProvisioningMode{ProvisioningModeManaged, " MANAGED ", "other"} {
+		if _, err := normalizeProvisioningMode(value); err == nil {
+			t.Fatalf("normalizeProvisioningMode(%q) accepted non-BYOC customer trunk mode", value)
+		}
 	}
 }

@@ -10,6 +10,11 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/briandowns/spinner"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
 )
 
 type BuildInfo struct {
@@ -19,47 +24,160 @@ type BuildInfo struct {
 }
 
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build BuildInfo) int {
-	if len(args) == 0 {
-		printHelp(stdout)
-		return 0
-	}
-
-	switch args[0] {
-	case "help", "--help", "-h":
-		printHelp(stdout)
-		return 0
-	case "version", "--version", "-v":
-		writef(stdout, "leamout %s\ncommit: %s\nbuilt: %s\n", build.Version, build.Commit, build.BuiltAt)
-		return 0
-	case "init":
-		return runInit(stdout, stderr, build.Version)
-	case "up":
-		return runLicensedInstalledCompose(ctx, stdout, stderr, "up", "-d")
-	case "down":
-		return runInstalledCompose(ctx, stdout, stderr, "down")
-	case "status":
-		return runInstalledCompose(ctx, stdout, stderr, "ps")
-	case "logs":
-		composeArgs := []string{"logs", "-f", "--tail=200"}
-		composeArgs = append(composeArgs, args[1:]...)
-		return runInstalledCompose(ctx, stdout, stderr, composeArgs...)
-	case "doctor":
-		return runDoctor(ctx, stdout, stderr)
-	case "license":
-		return runLicense(stdout, stderr, args[1:])
-	case "certs":
-		return runCerts(stdout, stderr, args[1:])
-	case "backup":
-		return runBackup(ctx, stdout, stderr, args[1:])
-	case "restore":
-		return runRestore(ctx, stdout, stderr, args[1:])
-	case "update":
-		return runUpdate(ctx, stdout, stderr, args[1:], build.Version)
-	default:
-		writef(stderr, "unknown command: %s\n\n", args[0])
-		printHelp(stderr)
+	root := newRootCommand(ctx, stdout, stderr, build)
+	root.SetArgs(args)
+	if err := root.ExecuteContext(ctx); err != nil {
+		var status commandStatus
+		if errors.As(err, &status) {
+			return status.code
+		}
+		if len(args) > 0 && strings.HasPrefix(err.Error(), "unknown command") {
+			writef(stderr, "unknown command: %s\n\n", args[0])
+		} else {
+			writef(stderr, "%v\n\n", err)
+		}
+		root.SetOut(stderr)
+		_ = root.Help()
 		return 2
 	}
+	return 0
+}
+
+type commandStatus struct{ code int }
+
+func (e commandStatus) Error() string { return fmt.Sprintf("command exited with status %d", e.code) }
+
+func newRootCommand(ctx context.Context, stdout, stderr io.Writer, build BuildInfo) *cobra.Command {
+	root := &cobra.Command{
+		Use:           "leamout",
+		Short:         "Operate a sovereign Leamout Self-Hosted deployment",
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		Args:          cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if version, _ := cmd.Flags().GetBool("version"); version {
+				printVersion(stdout, build)
+				return nil
+			}
+			return cmd.Help()
+		},
+	}
+	root.SetOut(stdout)
+	root.SetErr(stderr)
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.SuggestionsMinimumDistance = 1
+	root.Flags().BoolP("version", "v", false, "print CLI build information")
+
+	addCommand := func(use, summary string, run func([]string) int) {
+		root.AddCommand(&cobra.Command{
+			Use:                use,
+			Short:              summary,
+			DisableFlagParsing: true,
+			RunE: func(_ *cobra.Command, args []string) error {
+				if code := run(args); code != 0 {
+					return commandStatus{code: code}
+				}
+				return nil
+			},
+		})
+	}
+
+	root.AddCommand(&cobra.Command{
+		Use:     "version",
+		Aliases: []string{"ver"},
+		Short:   "Print CLI build information",
+		Args:    cobra.NoArgs,
+		Run:     func(*cobra.Command, []string) { printVersion(stdout, build) },
+	})
+	addCommand("init", "Initialize the local deployment", func([]string) int {
+		return runWithSpinner(stderr, "Initializing deployment", func() int { return runInit(stdout, stderr, build.Version) })
+	})
+	addCommand("up", "Start the installed runtime", func(args []string) int {
+		if len(args) != 0 {
+			writeln(stderr, "usage: leamout up")
+			return 2
+		}
+		return runLicensedInstalledCompose(ctx, stdout, stderr, "up", "-d")
+	})
+	addCommand("down", "Stop the installed runtime", func(args []string) int {
+		if len(args) != 0 {
+			writeln(stderr, "usage: leamout down")
+			return 2
+		}
+		return runInstalledCompose(ctx, stdout, stderr, "down")
+	})
+	addCommand("status", "Show runtime service status", func(args []string) int {
+		if len(args) != 0 {
+			writeln(stderr, "usage: leamout status")
+			return 2
+		}
+		return runInstalledCompose(ctx, stdout, stderr, "ps")
+	})
+	addCommand("logs [service...]", "Follow runtime logs", func(args []string) int {
+		return runInstalledCompose(ctx, stdout, stderr, append([]string{"logs", "-f", "--tail=200"}, args...)...)
+	})
+	addCommand("doctor", "Validate the local deployment", func(args []string) int {
+		if len(args) != 0 {
+			writeln(stderr, "usage: leamout doctor")
+			return 2
+		}
+		return runWithSpinner(stderr, "Checking deployment", func() int { return runDoctor(ctx, stdout, stderr) })
+	})
+	addCommand("license", "Install or verify an offline license", func(args []string) int { return runLicense(stdout, stderr, args) })
+	addCommand("certs", "Install or verify TLS certificates", func(args []string) int { return runCerts(stdout, stderr, args) })
+	addCommand("backup", "Create a portable deployment backup", func(args []string) int { return runBackup(ctx, stdout, stderr, args) })
+	addCommand("restore", "Restore a deployment backup", func(args []string) int {
+		if len(args) == 1 {
+			if !confirmRestore(args[0], stdout, stderr) {
+				writeln(stderr, "restore cancelled")
+				return 1
+			}
+			args = []string{"--force", args[0]}
+		}
+		return runRestore(ctx, stdout, stderr, args)
+	})
+	addCommand("update", "Install or roll back a runtime update", func(args []string) int { return runUpdate(ctx, stdout, stderr, args, build.Version) })
+	return root
+}
+
+func printVersion(w io.Writer, build BuildInfo) {
+	label := color.New(color.FgCyan, color.Bold)
+	_, _ = label.Fprintf(w, "leamout %s\n", build.Version)
+	writef(w, "commit: %s\nbuilt: %s\n", build.Commit, build.BuiltAt)
+}
+
+func runWithSpinner(w io.Writer, message string, run func() int) int {
+	file, interactive := w.(*os.File)
+	if !interactive {
+		return run()
+	}
+	info, err := file.Stat()
+	if err != nil || info.Mode()&os.ModeCharDevice == 0 {
+		return run()
+	}
+	progress := spinner.New(spinner.CharSets[14], 100*time.Millisecond, spinner.WithWriter(w))
+	progress.Suffix = " " + message
+	progress.Start()
+	code := run()
+	progress.Stop()
+	return code
+}
+
+func confirmRestore(path string, stdout, stderr io.Writer) bool {
+	out, outOK := stdout.(*os.File)
+	if !outOK {
+		return false
+	}
+	confirmed := false
+	prompt := &survey.Confirm{
+		Message: fmt.Sprintf("Restore %s? Existing deployment state will be replaced.", path),
+		Default: false,
+	}
+	if err := survey.AskOne(prompt, &confirmed, survey.WithStdio(os.Stdin, out, stderr)); err != nil {
+		writef(stderr, "confirm restore: %v\n", err)
+		return false
+	}
+	return confirmed
 }
 
 func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
@@ -154,28 +272,6 @@ func exitCode(err error, stderr io.Writer) int {
 		writef(stderr, "%v\n", err)
 	}
 	return 1
-}
-
-func printHelp(w io.Writer) {
-	writeln(w, `Leamout self-hosted operator CLI
-
-Usage:
-  leamout <command>
-
-Commands:
-  init       Initialize deployment identity, secrets, configuration, and production runtime
-  up         Start the installed Leamout runtime
-  down       Stop the installed Leamout runtime
-  status     Show installed runtime service status
-  logs       Follow installed runtime logs
-  doctor     Validate the local Leamout deployment
-  license    Install or verify a signed offline license
-  certs      Install or verify TLS certificate material
-  backup     Create a portable deployment backup
-  restore    Restore a deployment backup
-  update     Install the staged runtime, or recover with update --rollback
-  version    Print CLI build information
-  help       Show this help`)
 }
 
 // CLI output is best-effort. Commands return lifecycle/process failures; a closed

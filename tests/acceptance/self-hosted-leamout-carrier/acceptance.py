@@ -5,7 +5,7 @@ import socket
 import subprocess
 import time
 
-COMPOSE = ["docker", "compose", "-f", "deploy/self-hosted/compose.yaml", "-f", "tests/acceptance/self-hosted-managed/compose.yaml"]
+COMPOSE = ["docker", "compose", "-f", "deploy/self-hosted/compose.yaml", "-f", "tests/acceptance/self-hosted-leamout-carrier/compose.yaml"]
 DID = "+15551235001"
 ESL_PASSWORD = os.environ["FREESWITCH_ESL_PASSWORD"]
 
@@ -30,7 +30,7 @@ def sql(statement):
 
 
 def invite(timeout=6):
-    call_id = f"{random.getrandbits(96):x}@self-hosted-managed"
+    call_id = f"{random.getrandbits(96):x}@self-hosted-leamout-carrier"
     branch = f"z9hG4bK{random.getrandbits(64):x}"
     tag = f"{random.getrandbits(48):x}"
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -40,7 +40,7 @@ def invite(timeout=6):
     sdp = (
         "v=0\r\n"
         "o=- 1 1 IN IP4 127.0.0.1\r\n"
-        "s=leamout-managed-carrier-acceptance\r\n"
+        "s=leamout-carrier-acceptance\r\n"
         "c=IN IP4 127.0.0.1\r\n"
         "t=0 0\r\n"
         "m=audio 40000 RTP/AVP 0 101\r\n"
@@ -93,22 +93,22 @@ def wait_for_channel(call_id):
 
 def main():
     shape = sql(
-        "SELECT cp.slug || ',' || cc.scope || ',' || pn.provisioning_mode "
+        "SELECT cp.slug || ',' || cc.scope "
         "FROM carrier_connections cc "
         "JOIN carrier_providers cp ON cp.id=cc.provider_id "
         "JOIN phone_numbers pn ON pn.carrier_connection_id=cc.id "
         "WHERE cc.id='00000000-0000-0000-0000-000000005020'::uuid"
     )
-    if shape != "leamout,organization,byoc":
-        raise Failure(f"self-hosted managed carrier is not ordinary SIP/BYOC state: {shape}")
-    print("PASS self-hosted runtime models Leamout Managed Carrier as an ordinary SIP carrier connection")
+    if shape != "leamout,organization":
+        raise Failure(f"Leamout Carrier is not modeled as customer-selected self-hosted connectivity: {shape}")
+    print("PASS self-hosted runtime models Leamout Carrier as an organization-scoped customer-selected carrier connection")
 
     call_id, responses = invite()
     statuses = [int(response.split()[1]) for response in responses]
     if 180 not in statuses:
-        raise Failure(f"ordinary Leamout carrier ingress did not reach self-hosted runtime: responses={responses}")
+        raise Failure(f"ordinary Leamout Carrier ingress did not reach self-hosted runtime: responses={responses}")
     wait_for_channel(call_id)
-    print("PASS Leamout Managed Carrier reached self-hosted OpenSIPS and FreeSWITCH through normal carrier ingress")
+    print("PASS Leamout Carrier reached self-hosted OpenSIPS and FreeSWITCH through normal carrier ingress")
 
     sql("UPDATE carrier_connections SET status='disabled' WHERE id='00000000-0000-0000-0000-000000005020'")
     try:
@@ -118,7 +118,7 @@ def main():
     statuses = [int(response.split()[1]) for response in responses]
     if 180 in statuses:
         raise Failure(f"disabled ordinary carrier connection still reached the self-hosted runtime: responses={responses}")
-    print("PASS self-hosted managed-carrier ingress is controlled by the generic carrier connection state")
+    print("PASS Leamout Carrier ingress is controlled by generic carrier connection state")
 
 
 if __name__ == "__main__":

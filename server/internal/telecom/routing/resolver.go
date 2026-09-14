@@ -66,9 +66,9 @@ func (r *Resolver) resolveExplicitOutbound(
 	}
 
 	switch trunk.ProvisioningMode {
-	case provisioningModeBYOC:
+	case "byoc":
 		return r.resolveExplicitTenantTrunk(ctx, req, trunk, false)
-	case provisioningModeManaged:
+	case "managed":
 		if trunk.CarrierConnectionID == nil {
 			return r.resolveCloudManagedTrunk(ctx, req, trunk)
 		}
@@ -362,11 +362,13 @@ func (r *Resolver) resolveInboundOwnership(
 	case "organization":
 		if connection.OrganizationID == nil ||
 			*connection.OrganizationID != organizationID ||
-			phoneNumber.ProvisioningMode != provisioningModeBYOC {
+			phoneNumber.CarrierConnectionID == nil ||
+			*phoneNumber.CarrierConnectionID != connection.ID {
 			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
 		}
 	case "platform":
-		if connection.OrganizationID != nil || phoneNumber.ProvisioningMode != provisioningModeManaged {
+		if connection.OrganizationID != nil ||
+			phoneNumber.CarrierConnectionID != nil {
 			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
 		}
 	default:
