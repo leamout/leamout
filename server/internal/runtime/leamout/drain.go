@@ -36,7 +36,7 @@ func drainInstalledRuntime(ctx context.Context, stdout, stderr io.Writer, timeou
 			return nil
 		}
 		if time.Now().Add(poll).After(deadline) {
-			resumeInstalledRuntime(ctx, stderr)
+			_ = resumeInstalledRuntime(ctx, stderr)
 			return errors.New("deadline reached with active telecom sessions")
 		}
 		select {
