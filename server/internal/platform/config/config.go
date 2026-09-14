@@ -36,37 +36,54 @@ type PaystackConfig struct {
 }
 
 type Config struct {
-	AppEnv                string           `env:"APP_ENV" envDefault:"development"`
-	DeploymentID          string           `env:"LEAMOUT_DEPLOYMENT_ID"`
-	DatabaseURL           string           `env:"DATABASE_URL,required"`
-	RedisURL              string           `env:"REDIS_URL,required"`
-	NATSURL               string           `env:"NATS_URL,required"`
-	NATSStreamReplicas    int              `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
-	FreeSWITCHESLAddress  string           `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
-	FreeSWITCHESLPassword string           `env:"FREESWITCH_ESL_PASSWORD,required"`
-	CarrierCredentialKey  string           `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
-	DIDWW                 DIDWWConfig      `envPrefix:"DIDWW_"`
-	CommPeak              CommPeakConfig   `envPrefix:"COMMPEAK_"`
-	ManagedSIP            ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
-	Stripe                StripeConfig     `envPrefix:"STRIPE_"`
-	Paystack              PaystackConfig   `envPrefix:"PAYSTACK_"`
-	OperatorAPISecret     string           `env:"OPERATOR_API_SECRET"`
-	TURNAuthSecret        string           `env:"TURN_AUTH_SECRET,required"`
-	TURNPublicURLs        []string         `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
-	CORSOrigins           []string         `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+	AppEnv                string   `env:"APP_ENV" envDefault:"development"`
+	DeploymentID          string   `env:"LEAMOUT_DEPLOYMENT_ID"`
+	DatabaseURL           string   `env:"DATABASE_URL,required"`
+	RedisURL              string   `env:"REDIS_URL,required"`
+	NATSURL               string   `env:"NATS_URL,required"`
+	NATSStreamReplicas    int      `env:"NATS_STREAM_REPLICAS" envDefault:"1"`
+	FreeSWITCHESLAddress  string   `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
+	FreeSWITCHESLPassword string   `env:"FREESWITCH_ESL_PASSWORD,required"`
+	CarrierCredentialKey  string   `env:"CARRIER_CREDENTIAL_ENCRYPTION_KEY,required"`
+	TURNAuthSecret        string   `env:"TURN_AUTH_SECRET,required"`
+	TURNPublicURLs        []string `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+}
+
+// CloudConfig contains the provider and operator capabilities that only the
+// Leamout Cloud composition roots may consume.
+type CloudConfig struct {
+	Config
+	DIDWW             DIDWWConfig      `envPrefix:"DIDWW_"`
+	CommPeak          CommPeakConfig   `envPrefix:"COMMPEAK_"`
+	ManagedSIP        ManagedSIPConfig `envPrefix:"MANAGED_SIP_"`
+	Stripe            StripeConfig     `envPrefix:"STRIPE_"`
+	Paystack          PaystackConfig   `envPrefix:"PAYSTACK_"`
+	OperatorAPISecret string           `env:"OPERATOR_API_SECRET"`
 }
 
 func Load() (Config, error) {
+	return load[Config]((*Config).normalize)
+}
+
+// LoadCloud loads the shared runtime configuration together with Cloud-only
+// provider, payment, managed-connectivity, and operator configuration.
+func LoadCloud() (CloudConfig, error) {
+	return load[CloudConfig]((*CloudConfig).normalize)
+}
+
+func load[T any](normalize func(*T)) (T, error) {
+	var zero T
 	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return Config{}, fmt.Errorf("load .env: %w", err)
+		return zero, fmt.Errorf("load .env: %w", err)
 	}
 
-	cfg, err := env.ParseAs[Config]()
+	cfg, err := env.ParseAs[T]()
 	if err != nil {
-		return Config{}, fmt.Errorf("parse environment: %w", err)
+		return zero, fmt.Errorf("parse environment: %w", err)
 	}
 
-	cfg.normalize()
+	normalize(&cfg)
 
 	return cfg, nil
 }
@@ -84,6 +101,13 @@ func (c *Config) normalize() {
 	c.FreeSWITCHESLAddress = strings.TrimSpace(c.FreeSWITCHESLAddress)
 	c.FreeSWITCHESLPassword = strings.TrimSpace(c.FreeSWITCHESLPassword)
 	c.CarrierCredentialKey = strings.TrimSpace(c.CarrierCredentialKey)
+	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
+	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
+	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
+}
+
+func (c *CloudConfig) normalize() {
+	c.Config.normalize()
 	c.DIDWW.APIKey = strings.TrimSpace(c.DIDWW.APIKey)
 	c.DIDWW.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.DIDWW.APIBaseURL), "/")
 	c.CommPeak.Authorization = strings.TrimSpace(c.CommPeak.Authorization)
@@ -95,9 +119,6 @@ func (c *Config) normalize() {
 	c.Paystack.SecretKey = strings.TrimSpace(c.Paystack.SecretKey)
 	c.Paystack.APIBaseURL = strings.TrimRight(strings.TrimSpace(c.Paystack.APIBaseURL), "/")
 	c.OperatorAPISecret = strings.TrimSpace(c.OperatorAPISecret)
-	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
-	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
-	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
 }
 
 func normalizeStrings(values []string) []string {

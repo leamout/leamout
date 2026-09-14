@@ -388,7 +388,7 @@ func TestResolveInboundCloudManagedStaysOnLocalRuntimePath(t *testing.T) {
 	store := &fakeRouteStore{
 		connection: sqlc.CarrierConnection{ID: connectionID, Scope: "platform"},
 		inboundPhone: sqlc.PhoneNumber{
-			ID: phoneNumberID, OrganizationID: organizationID, ProviderConnectionID: &connectionID,
+			ID: phoneNumberID, OrganizationID: organizationID,
 			Number: "+233200000001", VoiceEnabled: true,
 		},
 		binding: sqlc.GetVoiceBindingByNumberRow{
