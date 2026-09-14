@@ -11,17 +11,17 @@ import (
 )
 
 type fakeNumberRepository struct {
-	createdCustomer      CreateRequest
-	providerRequest      CreateRequest
-	providerSelectionID  string
+	createdCustomer       CreateRequest
+	providerRequest       CreateRequest
+	providerSelectionID   string
 	providerAuthorization ManagedNumberPurchaseAuthorization
-	providerCreateErr    error
-	getNumber            sqlc.PhoneNumber
-	getForRelease        sqlc.PhoneNumber
-	releaseCalls         int
-	selectionOrgID       uuid.UUID
-	selectionCandidate   ManagedNumberCandidate
-	selectionID          string
+	providerCreateErr     error
+	getNumber             sqlc.PhoneNumber
+	getForRelease         sqlc.PhoneNumber
+	releaseCalls          int
+	selectionOrgID        uuid.UUID
+	selectionCandidate    ManagedNumberCandidate
+	selectionID           string
 }
 
 func (f *fakeNumberRepository) CreateCustomer(_ context.Context, _ uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
