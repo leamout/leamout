@@ -26,8 +26,8 @@ templ DetailContent(number Detail) {
 	</div>
 	<div class="stats stats-vertical lg:stats-horizontal mt-6 w-full border border-base-300 bg-base-100 shadow-sm">
 		<div class="stat">
-			<div class="stat-title">Provisioning</div>
-			<div class="stat-value text-2xl">{ number.Mode }</div>
+			<div class="stat-title">Source</div>
+			<div class="stat-value text-2xl">{ number.Source }</div>
 			<div class="stat-desc">{ number.Provider }</div>
 		</div>
 		<div class="stat">
@@ -47,8 +47,10 @@ templ DetailContent(number Detail) {
 			<dl class="mt-5 grid gap-5 sm:grid-cols-2">
 				@DetailField("Organization", number.Organization)
 				@DetailField("Organization ID", number.OrganizationID)
-				@DetailField("Carrier connection", number.CarrierConnection)
-				@DetailField("Carrier connection ID", number.CarrierConnectionID)
+				@DetailField("Customer carrier connection", number.CarrierConnection)
+				@DetailField("Customer carrier connection ID", number.CarrierConnectionID)
+				@DetailField("Provider connection", number.ProviderConnection)
+				@DetailField("Provider connection ID", number.ProviderConnectionID)
 				@DetailField("Provider", number.Provider)
 				@DetailField("Provider resource ID", number.ProviderResourceID)
 			</dl>
@@ -71,7 +73,7 @@ templ Content(numbers []Number) {
 	<div class="mb-6">
 		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telecom</p>
 		<h1 class="mt-2 text-3xl font-bold">Phone Numbers</h1>
-		<p class="mt-2 text-base-content/70">Inspect number inventory, ownership, provisioning mode, provider, and lifecycle state across organizations.</p>
+		<p class="mt-2 text-base-content/70">Inspect number inventory, source, provider ownership, routing connections, and lifecycle state across organizations.</p>
 	</div>
 	if len(numbers) == 0 {
 		@EmptyState()
