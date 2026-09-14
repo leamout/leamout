@@ -53,7 +53,15 @@ type PaymentsModule struct {
 	Handler    *payments.Handler
 }
 
+// New preserves the existing full Commercial composition for callers that have
+// not yet selected a distribution explicitly. New code should use NewCloud when
+// it needs Leamout Cloud's prepaid PAYG surface.
 func New(db *pgxpool.Pool) *Module {
+	return NewCloud(db)
+}
+
+// NewCloud builds the Commercial capabilities exposed by Leamout Cloud.
+func NewCloud(db *pgxpool.Pool) *Module {
 	catalogRepository := catalog.NewRepository(db)
 	catalogService := catalog.NewService(catalogRepository)
 	licensingRepository := licensing.NewRepository(db)

@@ -1,22 +1,23 @@
 ARG GO_VERSION=1.26.6
 
-FROM golang:${GO_VERSION}-alpine AS build
+FROM golang:${GO_VERSION}-alpine AS source
 
 WORKDIR /src
 
 RUN apk add --no-cache \
     ca-certificates \
     git \
-    nodejs \
-    npm \
     tzdata
-
-RUN go install github.com/a-h/templ/cmd/templ@v0.3.1020
 
 COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+FROM source AS cloud-build
+
+RUN apk add --no-cache nodejs npm \
+    && go install github.com/a-h/templ/cmd/templ@v0.3.1020
 
 RUN templ generate
 
@@ -28,19 +29,38 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/server \
-        ./cmd/server; \
+        ./cmd/cloud; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/worker \
-        ./cmd/worker; \
+        ./cmd/cloud-worker; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/backoffice \
         ./cmd/backoffice
 
-FROM alpine:3.22
+FROM source AS self-hosted-build
+
+RUN set -eux; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/selfhosted-server \
+        ./cmd/selfhosted; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/selfhosted-worker \
+        ./cmd/selfhosted-worker; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/leamout \
+        ./cmd/leamout
+
+FROM alpine:3.22 AS runtime
 
 WORKDIR /leamout
 
@@ -50,9 +70,20 @@ RUN apk add --no-cache \
     && addgroup -S leamout \
     && adduser -S -D -H -G leamout leamout
 
-COPY --from=build /out/server /leamout/server
-COPY --from=build /out/worker /leamout/worker
-COPY --from=build /out/backoffice /leamout/backoffice
 USER leamout
+
+FROM runtime AS cloud
+
+COPY --from=cloud-build /out/server /leamout/server
+COPY --from=cloud-build /out/worker /leamout/worker
+COPY --from=cloud-build /out/backoffice /leamout/backoffice
+
+CMD ["/leamout/server"]
+
+FROM runtime AS self-hosted
+
+COPY --from=self-hosted-build /out/selfhosted-server /leamout/server
+COPY --from=self-hosted-build /out/selfhosted-worker /leamout/worker
+COPY --from=self-hosted-build /out/leamout /leamout/leamout
 
 CMD ["/leamout/server"]

@@ -6,6 +6,7 @@ on:
     paths:
       - "server/**"
       - "deploy/**"
+      - "containers/**"
       - "tests/acceptance/webrtc-v1/**"
       - ".github/workflows/webrtc-v1-acceptance.yml"
 

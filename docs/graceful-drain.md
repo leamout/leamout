@@ -21,7 +21,7 @@ A drain preserves these invariants:
 
 ### OpenSIPS
 
-`deploy/opensips/drain.cfg` reserves global flag position `0` for admission drain state and exposes it through a local-only MI FIFO under `/run/opensips`.
+`containers/opensips/drain.cfg` reserves global flag position `0` for admission drain state and exposes it through a local-only MI FIFO under `/run/opensips`.
 
 The image installs `/usr/local/bin/leamout-opensips-drain` with these commands:
 
@@ -56,7 +56,7 @@ Run commands from the repository root.
 ### Drain and stop the telecom node
 
 ```sh
-./deploy/drain.sh
+./server/scripts/deploy/drain.sh
 ```
 
 The default deadline is 300 seconds and polling interval is 2 seconds. Override them when necessary:
@@ -64,7 +64,7 @@ The default deadline is 300 seconds and polling interval is 2 seconds. Override 
 ```sh
 LEAMOUT_DRAIN_TIMEOUT_SECONDS=900 \
 LEAMOUT_DRAIN_POLL_SECONDS=5 \
-./deploy/drain.sh
+./server/scripts/deploy/drain.sh
 ```
 
 The command performs this sequence:
@@ -81,7 +81,7 @@ If the deadline expires while calls remain, the command exits non-zero and delib
 ### Cancel a drain before shutdown
 
 ```sh
-./deploy/resume.sh
+./server/scripts/deploy/resume.sh
 ```
 
 Resume occurs in dependency-safe order:

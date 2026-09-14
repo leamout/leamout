@@ -1,11 +1,11 @@
 #!/bin/sh
 set -eu
 
-CERT_DIR="${CERT_DIR:-deploy/certs}"
+CERT_DIR="${CERT_DIR:-deploy/self-hosted/certs}"
 TLS_DOMAIN="${TLS_DOMAIN:-}"
 CERTBOT_BIN="${CERTBOT_BIN:-certbot}"
 CERTBOT_CONFIG_DIR="${CERTBOT_CONFIG_DIR:-/etc/letsencrypt}"
-COMPOSE_FILE="${COMPOSE_FILE:-deploy/compose.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/self-hosted/compose.yaml}"
 ENV_FILE="${ENV_FILE:-.env}"
 
 if [ -z "$TLS_DOMAIN" ]; then

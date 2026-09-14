@@ -2,18 +2,19 @@
 
 Leamout uses TLS certificates for SIP TLS in OpenSIPS.
 
-The deployment expects certificate material under:
+An installed Self-Hosted deployment expects certificate material under:
 
 ```text
-deploy/certs/
+/etc/leamout/certs/
 ├── fullchain.pem
 ├── privkey.pem
 └── carrier-ca.pem
 ```
 
-These files are mounted into the OpenSIPS container by `deploy/compose.yaml`.
+The production runtime mounts these files into OpenSIPS and coturn. Repository
+development Compose uses `deploy/self-hosted/certs/` instead.
 
-Do not commit certificate private keys or production certificate material to the repository. `deploy/certs/*.pem` is ignored by Git.
+Do not commit certificate private keys or production certificate material.
 
 ## Certificate roles
 
@@ -35,7 +36,7 @@ For local development and CI, generate a self-signed certificate:
 make certs
 ```
 
-This runs `server/scripts/certs/generate-self-signed.sh` and creates the required files under `deploy/certs/`.
+This runs `server/scripts/certs/generate-self-signed.sh` and creates the required files under `deploy/self-hosted/certs/`.
 
 The self-signed generator refuses to overwrite an existing certificate set unless replacement is explicitly requested with `CERT_FORCE=1`:
 
@@ -55,9 +56,29 @@ The validation checks that all required files exist, the server certificate and 
 
 Both `make up` and `make deploy` run the certificate validation before starting the stack.
 
-## Production with Let's Encrypt
+## Installed production deployment
 
-Leamout supports production certificate provisioning with Certbot and Let's Encrypt.
+Obtain a certificate from the operator's chosen CA, then import it through the
+installed CLI. For example, after Certbot has populated its lineage:
+
+```bash
+sudo leamout certs install \
+  --fullchain /etc/letsencrypt/live/sip.example.com/fullchain.pem \
+  --private-key /etc/letsencrypt/live/sip.example.com/privkey.pem \
+  --carrier-ca /etc/ssl/certs/ca-certificates.crt \
+  --hostname sip.example.com
+```
+
+The CLI verifies validity, hostname coverage, key matching, and carrier CA
+contents before atomically writing installation-owned copies. Verify them later
+with `sudo leamout certs verify --hostname sip.example.com`.
+
+Automated ACME provisioning and an installation-owned renewal hook remain future
+work. The repository `make certs-production` and `make certs-auto-renew` commands
+below are development/operator tooling and are not required by an installed
+runtime.
+
+## Repository deployment with Let's Encrypt
 
 ### 1. Choose a SIP TLS hostname
 
@@ -119,9 +140,9 @@ sudo TLS_DOMAIN=sip.example.com \
 
 `TLS_DOMAIN` is required and must be the public SIP hostname. `TLS_EMAIL` is required for the Let's Encrypt account registration and certificate notifications.
 
-The command runs `server/scripts/certs/provision-letsencrypt.sh`. The script verifies Certbot, requests a standalone-mode certificate when necessary, reads the Certbot-managed certificate from `/etc/letsencrypt/live/<domain>/`, copies `fullchain.pem` and `privkey.pem` into `deploy/certs/`, installs a carrier CA bundle when needed, and validates the resulting runtime certificate set.
+The command runs `server/scripts/certs/provision-letsencrypt.sh`. The script verifies Certbot, requests a standalone-mode certificate when necessary, reads the Certbot-managed certificate from `/etc/letsencrypt/live/<domain>/`, copies `fullchain.pem` and `privkey.pem` into `deploy/self-hosted/certs/`, installs a carrier CA bundle when needed, and validates the resulting runtime certificate set.
 
-Certbot remains the source of truth for the Let's Encrypt certificate. The files under `deploy/certs/` are runtime copies mounted into OpenSIPS.
+Certbot remains the source of truth for the Let's Encrypt certificate. The files under `deploy/self-hosted/certs/` are runtime copies mounted into OpenSIPS.
 
 ### 6. Install automatic renewal
 
@@ -145,7 +166,7 @@ After a successful renewal, the deploy hook:
 
 1. receives the renewed Certbot lineage;
 2. ignores renewals for unrelated domains;
-3. copies the renewed `fullchain.pem` and `privkey.pem` into `deploy/certs/`;
+3. copies the renewed `fullchain.pem` and `privkey.pem` into `deploy/self-hosted/certs/`;
 4. validates the complete Leamout certificate set; and
 5. restarts the OpenSIPS container so the new certificate is loaded.
 
@@ -166,7 +187,7 @@ After certificate provisioning and automatic renewal setup succeed:
 make deploy
 ```
 
-A typical first production deployment is:
+A repository-based deployment flow is:
 
 ```bash
 git clone https://github.com/leamout/leamout.git
@@ -192,7 +213,7 @@ make deploy
 Outbound SIP carrier TLS is configured to verify the carrier certificate against:
 
 ```text
-deploy/certs/carrier-ca.pem
+deploy/self-hosted/certs/carrier-ca.pem
 ```
 
 When `make certs-production` runs and `carrier-ca.pem` does not already exist, Leamout copies a supported system CA bundle from the VPS. This is appropriate when the SIP carrier presents a certificate issued by a normal publicly trusted CA.
@@ -204,13 +225,13 @@ sudo CARRIER_CA_FILE=/path/to/carrier-ca.pem \
   sh server/scripts/certs/install-system-ca.sh
 ```
 
-The installer does not overwrite an existing `deploy/certs/carrier-ca.pem`. Remove or replace that file deliberately when changing the carrier trust configuration.
+The installer does not overwrite an existing `deploy/self-hosted/certs/carrier-ca.pem`. Remove or replace that file deliberately when changing the carrier trust configuration.
 
 After changing carrier trust material:
 
 ```bash
 make check-certs
-docker compose --env-file .env -f deploy/compose.yaml restart opensips
+docker compose --env-file .env -f deploy/self-hosted/compose.yaml restart opensips
 ```
 
 ## Manual renewal
@@ -246,7 +267,7 @@ sudo ls -l /etc/letsencrypt/renewal-hooks/deploy/leamout-opensips
 The default runtime directory is:
 
 ```text
-deploy/certs
+deploy/self-hosted/certs
 ```
 
 The certificate scripts and Makefile support overriding it with `CERT_DIR`:
@@ -255,7 +276,7 @@ The certificate scripts and Makefile support overriding it with `CERT_DIR`:
 make CERT_DIR=/srv/leamout/certs check-certs
 ```
 
-If the Docker Compose mounts are not also changed to use the same directory, OpenSIPS will continue to mount `deploy/certs`. For the standard deployment, keep the default directory.
+If the Docker Compose mounts are not also changed to use the same directory, OpenSIPS will continue to mount `deploy/self-hosted/certs`. For the standard deployment, keep the default directory.
 
 ## Troubleshooting
 
@@ -278,7 +299,7 @@ Check that the hostname resolves to the correct VPS public IP, TCP port `80` is 
 Inspect:
 
 ```bash
-ls -la deploy/certs
+ls -la deploy/self-hosted/certs
 ```
 
 For development/CI:
@@ -324,7 +345,7 @@ sudo TLS_DOMAIN=sip.example.com make certs-auto-renew
 
 ### Carrier TLS verification fails
 
-Verify whether the carrier uses a publicly trusted CA or supplies a carrier-specific CA bundle. If a carrier-specific bundle is required, install the carrier-provided CA as `deploy/certs/carrier-ca.pem`, run `make check-certs`, and restart OpenSIPS.
+Verify whether the carrier uses a publicly trusted CA or supplies a carrier-specific CA bundle. If a carrier-specific bundle is required, install the carrier-provided CA as `deploy/self-hosted/certs/carrier-ca.pem`, run `make check-certs`, and restart OpenSIPS.
 
 ## Command reference
 
@@ -343,7 +364,7 @@ make certs-auto-renew
 
 make certs-renew
     Manually run Certbot renewal, synchronize the current certificate into
-    deploy/certs, validate it, and restart OpenSIPS. Requires TLS_DOMAIN and root.
+    deploy/self-hosted/certs, validate it, and restart OpenSIPS. Requires TLS_DOMAIN and root.
 
 make check-certs
     Validate the runtime certificate files.

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-CERT_DIR="${CERT_DIR:-deploy/certs}"
+CERT_DIR="${CERT_DIR:-deploy/self-hosted/certs}"
 CERT_CN="${CERT_CN:-localhost}"
 CERT_DAYS="${CERT_DAYS:-365}"
 CERT_FORCE="${CERT_FORCE:-0}"

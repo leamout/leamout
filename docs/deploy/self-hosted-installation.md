@@ -39,7 +39,7 @@ console.leamout.com/sign-up
         ↓
 create organization
         ↓
-choose a self-hosted plan / subscription
+choose a Self-Hosted software license
         ↓
 create a self-hosted deployment
         ↓
@@ -69,7 +69,7 @@ Leamout Cloud and the self-hosted runtime own different classes of state.
 `console.leamout.com` and its backing services are authoritative for commercial and fleet-management state such as:
 
 - organizations and users;
-- plans and subscriptions;
+- license products and agreements;
 - invoices and payments;
 - commercial licenses;
 - entitlements;
@@ -499,11 +499,19 @@ sudo leamout update
 
 An update is a controlled release transition, not `git pull && docker compose up`.
 
-The release-candidate command installs the runtime artifact already staged and
-verified by the bootstrap installer for the CLI's exact version, pulls its
-digest-pinned images, and converges the Compose deployment. Compatibility and disk
-space validation, automatic backup/drain, readiness waiting, and rollback still
-need to be added before general availability.
+The update command installs the runtime artifact already staged and verified by
+the bootstrap installer for the CLI's exact version and rejects manifests that
+require a newer CLI. Before mutation it creates a PostgreSQL/configuration backup.
+It then pulls immutable images, drains OpenSIPS and FreeSWITCH admission until
+active sessions reach zero, recreates services, waits for Compose health, and
+resumes admission. A failed candidate restores both the prior runtime definition
+and the pre-update backup. Disk-space preflight remains required before general
+availability.
+
+Update progress is recorded durably. If the CLI or host is interrupted after the
+runtime switch, a later `leamout update` refuses to overwrite the recovery point;
+the operator must run `sudo leamout update --rollback` to restore the previous
+runtime and pre-update database/configuration backup.
 
 ## Restart behavior
 
@@ -659,11 +667,12 @@ The hosted console can then show the registered deployment without becoming part
 ### Phase 2 — bootstrap installer and CLI foundation
 
 - [ ] Publish `https://get.leamout.com/install.sh`.
-- [ ] Implement OS/architecture detection and prerequisite validation.
-- [ ] Install and verify a pinned `leamout` CLI artifact.
-- [x] Add `leamout init`, `up`, `down`, `status`, `logs`, and `doctor`.
-- [ ] Wrap existing deployment primitives rather than duplicating their logic.
-
+- [x] Add repository-independent TLS installation and validation at the CLI boundary.
+- [ ] Integrate automated production TLS provisioning and renewal.
+- [x] Run packaged-runtime acceptance on a clean Ubuntu 24.04 runner with real Docker services.
+- [x] Install through a signed equivalent release fixture.
+- [x] Initialize and operate from installed assets without repository deployment files.
+- [x] Start the complete runtime-only production stack from digest-pinned images.
 ### Phase 3 — production configuration
 
 - [x] Generate deployment-owned secrets securely.
@@ -687,8 +696,11 @@ The hosted console can then show the registered deployment without becoming part
 
 ### Phase 5 — lifecycle operations
 
-- [ ] Add `leamout update` with release compatibility checks.
-- [ ] Integrate graceful drain into restart/update paths.
+- [x] Add `leamout update` with release compatibility checks.
+- [x] Integrate graceful drain into the update path.
+- [x] Preserve and restore the previous runtime and pre-update backup on failure.
+- [x] Exercise install, initialize, update, and safe uninstall from packaged release fixtures.
+- [x] Inject a candidate startup failure and verify automatic packaged-release rollback.
 - [x] Add `leamout backup` and `leamout restore`.
 - [ ] Add support-bundle generation and deterministic redaction.
 - [ ] Add non-interactive initialization.

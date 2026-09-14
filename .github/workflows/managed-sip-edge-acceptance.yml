@@ -6,6 +6,7 @@ on:
     paths:
       - "server/**"
       - "deploy/**"
+      - "containers/**"
       - "tests/acceptance/managed-sip-edge/**"
       - ".github/workflows/managed-sip-edge-acceptance.yml"
 
