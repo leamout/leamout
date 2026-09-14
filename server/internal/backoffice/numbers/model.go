@@ -6,7 +6,7 @@ type Number struct {
 	Organization   string
 	Number         string
 	CountryCode    string
-	Mode           string
+	Source         string
 	Provider       string
 	Voice          bool
 	SMS            bool
@@ -18,11 +18,13 @@ type PhoneNumber = Number
 
 type Detail struct {
 	PhoneNumber
-	CarrierConnectionID string
-	CarrierConnection   string
-	ProviderID          string
-	ProviderResourceID  string
-	ErrorCode           string
-	ErrorMessage        string
-	UpdatedAt           string
+	CarrierConnectionID  string
+	CarrierConnection    string
+	ProviderConnectionID string
+	ProviderConnection   string
+	ProviderID           string
+	ProviderResourceID   string
+	ErrorCode            string
+	ErrorMessage         string
+	UpdatedAt            string
 }
