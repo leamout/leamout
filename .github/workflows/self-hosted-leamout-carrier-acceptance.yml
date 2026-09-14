@@ -1,0 +1,33 @@
+name: Self-Hosted Leamout Carrier acceptance
+
+on:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "containers/**"
+      - "server/**"
+      - "tests/acceptance/self-hosted-leamout-carrier/**"
+      - ".github/workflows/self-hosted-leamout-carrier-acceptance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-hosted-leamout-carrier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    name: Ordinary BYOC carrier connection
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Validate acceptance scripts
+        run: |
+          sh -n tests/acceptance/self-hosted-leamout-carrier/run.sh
+          python3 -m py_compile tests/acceptance/self-hosted-leamout-carrier/acceptance.py
+      - name: Run Self-Hosted + Leamout Carrier acceptance
+        run: sh tests/acceptance/self-hosted-leamout-carrier/run.sh
