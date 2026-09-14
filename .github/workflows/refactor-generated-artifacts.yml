@@ -20,7 +20,7 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
 
-      - name: Apply large-file refactor substitutions
+      - name: Apply refactor substitutions
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -76,6 +76,14 @@ jobs:
                       raise SystemExit(f"expected at most one legacy phone-number routing query in {path}, found {len(legacy)}")
                   lines[legacy[0]] = replacement
                   path.write_text("\n".join(lines) + "\n")
+
+          calls = Path("server/internal/telecom/calls/repository.go")
+          text = calls.read_text()
+          text = text.replace(
+              "CarrierConnectionID: &event.CarrierConnectionID,",
+              "CarrierConnectionID: event.CarrierConnectionID,",
+          )
+          calls.write_text(text)
           PY
 
       - name: Set up Go
@@ -89,6 +97,7 @@ jobs:
             server/internal/telecom/numbers/*.go \
             server/internal/telecom/routing/*.go \
             server/internal/telecom/edge/*.go \
+            server/internal/telecom/calls/repository.go \
             server/internal/backoffice/numbers/*.go
 
       - name: Install sqlc
@@ -118,6 +127,10 @@ jobs:
             exit 1
           fi
 
+      - name: Run targeted tests
+        working-directory: server
+        run: go test ./internal/telecom/numbers ./internal/telecom/routing ./internal/telecom/calls
+
       - name: Commit deterministic outputs
         run: |
           git config user.name "github-actions[bot]"
@@ -128,6 +141,7 @@ jobs:
             server/internal/telecom/numbers \
             server/internal/telecom/routing \
             server/internal/telecom/edge \
+            server/internal/telecom/calls/repository.go \
             server/internal/backoffice/numbers \
             containers/opensips/cloud/opensips.cfg \
             containers/opensips/self-hosted/opensips.cfg \
@@ -135,6 +149,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No deterministic output changes"
           else
-            git commit -m "chore: regenerate phone number refactor artifacts"
+            git commit -m "chore: finalize phone number refactor artifacts"
             git push origin HEAD:${{ github.head_ref }}
           fi
