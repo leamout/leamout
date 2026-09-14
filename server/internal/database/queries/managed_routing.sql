@@ -72,7 +72,7 @@ WHERE pn.number = sqlc.arg(number)
       OR (
           cc.scope = 'platform'
           AND cc.organization_id IS NULL
-          AND pn.provider_connection_id = cc.id
+          AND pn.carrier_connection_id IS NULL
       )
   )
   AND o.status = 'active'

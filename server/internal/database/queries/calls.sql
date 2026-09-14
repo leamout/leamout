@@ -88,7 +88,7 @@ WHERE pn.id = sqlc.arg(phone_number_id)
       OR (
           cc.scope = 'platform'
           AND cc.organization_id IS NULL
-          AND pn.provider_connection_id = cc.id
+          AND pn.carrier_connection_id IS NULL
       )
   )
   AND va.id = sqlc.arg(application_id)

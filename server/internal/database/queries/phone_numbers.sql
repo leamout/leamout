@@ -4,7 +4,6 @@ INSERT INTO phone_numbers (
     number,
     country_code,
     carrier_connection_id,
-    provider_connection_id,
     provider_id,
     provider_resource_id,
     voice_enabled,
@@ -15,7 +14,6 @@ SELECT
     sqlc.arg(number) AS number,
     sqlc.arg(country_code) AS country_code,
     cc.id AS carrier_connection_id,
-    NULL::UUID AS provider_connection_id,
     NULL::UUID AS provider_id,
     NULL::TEXT AS provider_resource_id,
     COALESCE(sqlc.narg(voice_enabled), true) AS voice_enabled,
@@ -41,7 +39,6 @@ INSERT INTO phone_numbers (
     number,
     country_code,
     carrier_connection_id,
-    provider_connection_id,
     provider_id,
     provider_resource_id,
     voice_enabled,
@@ -53,7 +50,6 @@ SELECT
     sqlc.arg(number) AS number,
     sqlc.arg(country_code) AS country_code,
     customer_cc.id AS carrier_connection_id,
-    provider_cc.id AS provider_connection_id,
     cp.id AS provider_id,
     NULL::TEXT AS provider_resource_id,
     true AS voice_enabled,
@@ -63,12 +59,6 @@ FROM organizations AS o
 JOIN carrier_providers AS cp
   ON cp.id = sqlc.arg(provider_id)
  AND cp.status = 'active'
-JOIN carrier_connections AS provider_cc
-  ON provider_cc.id = sqlc.arg(provider_connection_id)
- AND provider_cc.scope = 'platform'
- AND provider_cc.organization_id IS NULL
- AND provider_cc.provider_id = cp.id
- AND provider_cc.status = 'active'
 LEFT JOIN carrier_connections AS customer_cc
   ON customer_cc.id = sqlc.narg(carrier_connection_id)::UUID
  AND customer_cc.scope = 'organization'
@@ -255,8 +245,6 @@ SELECT
     CASE WHEN pn.provider_id IS NULL THEN 'customer' ELSE 'leamout' END::TEXT AS source,
     CAST(COALESCE(pn.carrier_connection_id::TEXT, '—') AS TEXT) AS carrier_connection_id,
     COALESCE(cc.name, '—') AS carrier_connection_name,
-    CAST(COALESCE(pn.provider_connection_id::TEXT, '—') AS TEXT) AS provider_connection_id,
-    COALESCE(provider_cc.name, '—') AS provider_connection_name,
     CAST(COALESCE(pn.provider_id::TEXT, '—') AS TEXT) AS provider_id,
     COALESCE(cp.name, 'Customer') AS provider_name,
     COALESCE(pn.provider_resource_id, '—') AS provider_resource_id,
@@ -270,7 +258,6 @@ SELECT
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
 LEFT JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id
-LEFT JOIN carrier_connections AS provider_cc ON provider_cc.id = pn.provider_connection_id
 LEFT JOIN carrier_providers AS cp ON cp.id = pn.provider_id
 WHERE pn.id = sqlc.arg(id)
 LIMIT 1;
