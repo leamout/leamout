@@ -5,6 +5,7 @@ on:
     paths:
       - "server/**"
       - "containers/opensips/**"
+      - "tests/acceptance/**"
       - ".github/workflows/refactor-generated-artifacts.yml"
 
 permissions:
@@ -22,29 +23,50 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          def sub(path, old, new):
+          def sub(path, old, new, required=True):
               p=Path(path); s=p.read_text()
-              if old not in s: raise SystemExit(f"missing pattern in {path}")
+              if old not in s:
+                  if required: raise SystemExit(f"missing pattern in {path}")
+                  return
               p.write_text(s.replace(old,new))
 
-          sub("server/internal/telecom/numbers/repository.go", "\n\t\tProviderConnectionID: providerConnectionID,", "")
-          sub("server/internal/database/queries/managed_routing.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL")
-          sub("server/internal/database/queries/calls.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL")
-          sub("server/internal/telecom/routing/resolver.go", "connection.OrganizationID != nil ||\n\t\t\tphoneNumber.ProviderConnectionID == nil ||\n\t\t\t*phoneNumber.ProviderConnectionID != connection.ID", "connection.OrganizationID != nil || phoneNumber.CarrierConnectionID != nil")
-          sub("containers/opensips/cloud/opensips.cfg", "pn.provider_connection_id = cc.id", "pn.carrier_connection_id IS NULL")
+          # Phone numbers: remove old mode/second-connection state.
+          sub("server/internal/telecom/numbers/repository.go", "\n\t\tProviderConnectionID: providerConnectionID,", "", False)
+          sub("server/internal/database/queries/managed_routing.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL", False)
+          sub("server/internal/database/queries/calls.sql", "AND pn.provider_connection_id = cc.id", "AND pn.carrier_connection_id IS NULL", False)
+          sub("server/internal/telecom/routing/resolver.go", "connection.OrganizationID != nil ||\n\t\t\tphoneNumber.ProviderConnectionID == nil ||\n\t\t\t*phoneNumber.ProviderConnectionID != connection.ID", "connection.OrganizationID != nil || phoneNumber.CarrierConnectionID != nil", False)
+          sub("containers/opensips/cloud/opensips.cfg", "pn.provider_connection_id = cc.id", "pn.carrier_connection_id IS NULL", False)
 
           p=Path("server/internal/database/queries/phone_numbers.sql"); s=p.read_text()
           for old in ["    provider_connection_id,\n", "    NULL::UUID AS provider_connection_id,\n", "    provider_cc.id AS provider_connection_id,\n", "    CAST(COALESCE(pn.provider_connection_id::TEXT, '—') AS TEXT) AS provider_connection_id,\n", "    COALESCE(provider_cc.name, '—') AS provider_connection_name,\n", "LEFT JOIN carrier_connections AS provider_cc ON provider_cc.id = pn.provider_connection_id\n"]: s=s.replace(old,"")
           s=s.replace("JOIN carrier_connections AS provider_cc\n  ON provider_cc.id = sqlc.arg(provider_connection_id)\n AND provider_cc.scope = 'platform'\n AND provider_cc.organization_id IS NULL\n AND provider_cc.provider_id = cp.id\n AND provider_cc.status = 'active'\n","")
-          if "provider_connection_id" in s: raise SystemExit("provider_connection_id remains in phone_numbers.sql")
           p.write_text(s)
 
           p=Path("server/internal/backoffice/numbers/model.go"); s=p.read_text().replace("\tProviderConnectionID string\n","").replace("\tProviderConnection   string\n",""); p.write_text(s)
           p=Path("server/internal/backoffice/numbers/repository.go"); s=p.read_text().replace("\n\t\tProviderConnectionID: row.ProviderConnectionID,","").replace("\n\t\tProviderConnection:   row.ProviderConnectionName,",""); p.write_text(s)
           p=Path("server/internal/backoffice/numbers/pages.templ"); s=p.read_text().replace("\n\t\t\t\t@DetailField(\"Provider connection\", number.ProviderConnection)","").replace("\n\t\t\t\t@DetailField(\"Provider connection ID\", number.ProviderConnectionID)",""); p.write_text(s)
           p=Path("server/internal/telecom/routing/resolver_test.go"); s=p.read_text().replace("OrganizationID: organizationID, ProviderConnectionID: &connectionID,", "OrganizationID: organizationID,"); p.write_text(s)
+          sub("server/internal/telecom/calls/repository.go", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: &event.CarrierConnectionID,\n\t\tApplicationID:", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: event.CarrierConnectionID,\n\t\tApplicationID:", False)
 
-          sub("server/internal/telecom/calls/repository.go", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: &event.CarrierConnectionID,\n\t\tApplicationID:", "CalledNumber:        event.To,\n\t\tCarrierConnectionID: event.CarrierConnectionID,\n\t\tApplicationID:")
+          # Carrier source IPs: ownership comes only from carrier_connection_id.
+          p=Path("server/internal/database/queries/carrier_connections.sql"); s=p.read_text()
+          s=s.replace("INSERT INTO carrier_connection_source_ips (\n    organization_id,\n    carrier_connection_id,\n    cidr\n)\nSELECT\n    sqlc.arg(organization_id) AS organization_id,\n    sqlc.arg(carrier_connection_id) AS carrier_connection_id,\n    sqlc.arg(cidr) AS cidr", "INSERT INTO carrier_connection_source_ips (\n    carrier_connection_id,\n    cidr\n)\nSELECT\n    cc.id AS carrier_connection_id,\n    sqlc.arg(cidr) AS cidr")
+          s=s.replace("  ON cc.id = src.carrier_connection_id\n AND cc.organization_id = src.organization_id", "  ON cc.id = src.carrier_connection_id")
+          s=s.replace("  AND src.organization_id = sqlc.arg(organization_id)\n", "")
+          s=s.replace("  AND cc.organization_id = src.organization_id;", "  AND cc.organization_id = sqlc.arg(organization_id);")
+          p.write_text(s)
+
+          p=Path("server/internal/database/queries/managed_routing.sql"); s=p.read_text()
+          s=s.replace("INSERT INTO carrier_connection_source_ips (\n    organization_id,\n    carrier_connection_id,\n    cidr\n)\nSELECT\n    NULL::UUID AS organization_id,\n    cc.id AS carrier_connection_id,\n    sqlc.arg(cidr) AS cidr", "INSERT INTO carrier_connection_source_ips (\n    carrier_connection_id,\n    cidr\n)\nSELECT\n    cc.id AS carrier_connection_id,\n    sqlc.arg(cidr) AS cidr")
+          s=s.replace("  AND src.organization_id IS NULL\n", "")
+          s=s.replace("     AND cc.organization_id IS NOT DISTINCT FROM src.organization_id\n", "")
+          p.write_text(s)
+
+          for path in ["containers/opensips/cloud/opensips.cfg", "containers/opensips/self-hosted/opensips.cfg"]:
+              p=Path(path); s=p.read_text()
+              s=s.replace(" AND src.organization_id IS NOT DISTINCT FROM cc.organization_id", "")
+              s=s.replace(" AND src.organization_id = cc.organization_id", "")
+              p.write_text(s)
           PY
 
       - uses: actions/setup-go@v7
@@ -64,14 +86,15 @@ jobs:
       - name: Verify
         run: |
           ! grep -R -n "provider_connection_id" server/migrations/017_create_phone_numbers.sql server/internal/database/queries server/internal/telecom server/internal/backoffice/numbers containers/opensips
+          ! grep -R -nE "src\.organization_id|carrier_connection_source_ips \(organization_id|derive_carrier_source_ip_organization_id" server containers/opensips tests/acceptance
           cd server
-          go test ./internal/telecom/numbers ./internal/telecom/routing ./internal/telecom/calls ./internal/backoffice/numbers
+          go test ./internal/telecom/numbers ./internal/telecom/routing ./internal/telecom/calls ./internal/telecom/carriers ./internal/backoffice/numbers
           go build ./...
 
       - name: Commit cleanup
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add server containers/opensips/cloud/opensips.cfg
-          git commit -m "refactor: clean phone number carrier model" || exit 0
+          git add server containers/opensips tests/acceptance/self-hosted-leamout-carrier/bootstrap.sql
+          git commit -m "refactor: remove redundant carrier ownership state" || exit 0
           git push origin HEAD:${{ github.head_ref }}
