@@ -154,7 +154,7 @@ func runInitAt(stdout, stderr io.Writer, configDir, stateDir, logDir, version st
 	writeln(stdout, "✓ Production configuration written")
 	writeln(stdout, "✓ Production runtime installed and verified")
 	writef(stdout, "Deployment ID: %s\n", state.DeploymentID)
-	writeln(stdout, "TLS/network validation and activation remain pending Self-Hosted Production v0.1 work.")
+	writeln(stdout, "Install a valid license and TLS certificates before starting the runtime.")
 	writeln(stdout, "Run: sudo leamout doctor")
 	return 0
 }

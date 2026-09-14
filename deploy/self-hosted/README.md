@@ -11,3 +11,8 @@ For normal lifecycle operations, install and use the `leamout` CLI. The shell en
 ```
 
 Container image sources are shared under `containers/`. The Self-Hosted composition selects a static BYOC-only OpenSIPS configuration and the Self-Hosted server image target.
+Installed deployments do not depend on this repository. The CLI stores runtime
+assets under `/var/lib/leamout`, configuration and licenses under `/etc/leamout`,
+and validated TLS material under `/etc/leamout/certs`. Use `leamout certs install`
+to import the leaf chain, matching private key, and carrier CA before `leamout up`.
+

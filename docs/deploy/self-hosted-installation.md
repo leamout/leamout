@@ -667,11 +667,12 @@ The hosted console can then show the registered deployment without becoming part
 ### Phase 2 — bootstrap installer and CLI foundation
 
 - [ ] Publish `https://get.leamout.com/install.sh`.
-- [ ] Implement OS/architecture detection and prerequisite validation.
-- [ ] Install and verify a pinned `leamout` CLI artifact.
-- [x] Add `leamout init`, `up`, `down`, `status`, `logs`, and `doctor`.
-- [ ] Wrap existing deployment primitives rather than duplicating their logic.
-
+- [x] Add repository-independent TLS installation and validation at the CLI boundary.
+- [ ] Integrate automated production TLS provisioning and renewal.
+- [x] Run packaged-runtime acceptance on a clean Ubuntu 24.04 runner with real Docker services.
+- [x] Install through a signed equivalent release fixture.
+- [x] Initialize and operate from installed assets without repository deployment files.
+- [x] Start the complete runtime-only production stack from digest-pinned images.
 ### Phase 3 — production configuration
 
 - [x] Generate deployment-owned secrets securely.

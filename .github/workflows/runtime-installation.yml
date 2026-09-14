@@ -159,6 +159,16 @@ on:
           elif [ "$1" = compose ] && [ "$2" = version ]; then
             echo 2.32.4
           else
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -subj '/CN=sip.example.test' \
+            -addext 'subjectAltName=DNS:sip.example.test' \
+            -keyout /tmp/leamout-tls.key \
+            -out /tmp/leamout-tls.crt
+          sudo /usr/local/bin/leamout certs install \
+            --fullchain /tmp/leamout-tls.crt \
+            --private-key /tmp/leamout-tls.key \
+            --carrier-ca /tmp/leamout-tls.crt \
+            --hostname sip.example.test
             exit 1
           fi
           EOF

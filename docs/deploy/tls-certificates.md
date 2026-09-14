@@ -2,18 +2,19 @@
 
 Leamout uses TLS certificates for SIP TLS in OpenSIPS.
 
-The deployment expects certificate material under:
+An installed Self-Hosted deployment expects certificate material under:
 
 ```text
-deploy/self-hosted/certs/
+/etc/leamout/certs/
 ├── fullchain.pem
 ├── privkey.pem
 └── carrier-ca.pem
 ```
 
-These files are mounted into the OpenSIPS container by the selected `deploy/cloud/compose.yaml` or `deploy/self-hosted/compose.yaml`.
+The production runtime mounts these files into OpenSIPS and coturn. Repository
+development Compose uses `deploy/self-hosted/certs/` instead.
 
-Do not commit certificate private keys or production certificate material to the repository. `deploy/self-hosted/certs/*.pem` is ignored by Git.
+Do not commit certificate private keys or production certificate material.
 
 ## Certificate roles
 
@@ -55,9 +56,29 @@ The validation checks that all required files exist, the server certificate and 
 
 Both `make up` and `make deploy` run the certificate validation before starting the stack.
 
-## Production with Let's Encrypt
+## Installed production deployment
 
-Leamout supports production certificate provisioning with Certbot and Let's Encrypt.
+Obtain a certificate from the operator's chosen CA, then import it through the
+installed CLI. For example, after Certbot has populated its lineage:
+
+```bash
+sudo leamout certs install \
+  --fullchain /etc/letsencrypt/live/sip.example.com/fullchain.pem \
+  --private-key /etc/letsencrypt/live/sip.example.com/privkey.pem \
+  --carrier-ca /etc/ssl/certs/ca-certificates.crt \
+  --hostname sip.example.com
+```
+
+The CLI verifies validity, hostname coverage, key matching, and carrier CA
+contents before atomically writing installation-owned copies. Verify them later
+with `sudo leamout certs verify --hostname sip.example.com`.
+
+Automated ACME provisioning and an installation-owned renewal hook remain future
+work. The repository `make certs-production` and `make certs-auto-renew` commands
+below are development/operator tooling and are not required by an installed
+runtime.
+
+## Repository deployment with Let's Encrypt
 
 ### 1. Choose a SIP TLS hostname
 
@@ -166,7 +187,7 @@ After certificate provisioning and automatic renewal setup succeed:
 make deploy
 ```
 
-A typical first production deployment is:
+A repository-based deployment flow is:
 
 ```bash
 git clone https://github.com/leamout/leamout.git

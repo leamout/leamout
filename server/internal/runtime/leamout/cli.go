@@ -47,6 +47,8 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer, build Bui
 		return runDoctor(ctx, stdout, stderr)
 	case "license":
 		return runLicense(stdout, stderr, args[1:])
+	case "certs":
+		return runCerts(stdout, stderr, args[1:])
 	case "backup":
 		return runBackup(ctx, stdout, stderr, args[1:])
 	case "restore":
@@ -87,6 +89,10 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 		writef(stderr, "self-hosted license: %v\n", err)
 		return 1
 	}
+	if err := validateCertificates("/etc/leamout/certs", "", time.Now().UTC()); err != nil {
+		writef(stderr, "self-hosted TLS: %v\n", err)
+		return 1
+	}
 
 	cmd := exec.CommandContext(ctx, "docker", "compose", "--env-file", "/etc/leamout/leamout.env", "-f", "/var/lib/leamout/runtime/compose.yaml", "config", "--quiet")
 	cmd.Stdout = stdout
@@ -98,6 +104,7 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 	writeln(stdout, "✓ Supported host")
 	writeln(stdout, "✓ Deployment identity and secrets valid")
 	writeln(stdout, "✓ Self-Hosted license valid")
+	writeln(stdout, "✓ TLS certificates valid")
 	writeln(stdout, "✓ Production runtime installed")
 	writeln(stdout, "✓ Runtime configuration valid")
 	writeln(stdout, "Leamout doctor passed.")
@@ -107,6 +114,10 @@ func runDoctor(ctx context.Context, stdout, stderr io.Writer) int {
 func runLicensedInstalledCompose(ctx context.Context, stdout, stderr io.Writer, args ...string) int {
 	if _, err := validateInstalledLicense("/var/lib/leamout/deployment.json", "/etc/leamout/license", time.Now().UTC()); err != nil {
 		writef(stderr, "self-hosted license: %v\nInstall a valid license before starting Leamout.\n", err)
+		return 1
+	}
+	if err := validateCertificates("/etc/leamout/certs", "", time.Now().UTC()); err != nil {
+		writef(stderr, "self-hosted TLS: %v\nInstall valid certificates before starting Leamout.\n", err)
 		return 1
 	}
 	return runInstalledCompose(ctx, stdout, stderr, args...)
@@ -159,6 +170,7 @@ Commands:
   logs       Follow installed runtime logs
   doctor     Validate the local Leamout deployment
   license    Install or verify a signed offline license
+  certs      Install or verify TLS certificate material
   backup     Create a portable deployment backup
   restore    Restore a deployment backup
   update     Install the staged runtime, or recover with update --rollback

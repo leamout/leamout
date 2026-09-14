@@ -1,0 +1,128 @@
+name: Self-Hosted Packaged Runtime Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "deploy/self-hosted/**"
+      - "containers/**"
+      - "server/Dockerfile"
+      - "server/cmd/selfhosted/**"
+      - "server/cmd/selfhosted-worker/**"
+      - "server/cmd/leamout/**"
+      - "server/internal/runtime/leamout/**"
+      - "server/internal/runtime/selfhosted/**"
+      - "server/internal/runtime/selfhostedworker/**"
+      - "server/migrations/**"
+      - "server/scripts/release/**"
+      - "tests/acceptance/self-hosted-lifecycle/**"
+      - ".github/workflows/self-hosted-packaged-acceptance.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: self-hosted-packaged-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-host:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Install release verification tooling
+        run: sudo apt-get update && sudo apt-get install -y minisign
+
+      - name: Build and publish immutable fixture images
+        env:
+          VERSION: 1.0.0-acceptance.1
+        run: |
+          docker run -d --name leamout-fixture-registry -p 5000:5000 registry:2
+          docker build --target self-hosted -t localhost:5000/leamout/server:$VERSION server
+          docker build --build-arg DISTRIBUTION=self-hosted -t localhost:5000/leamout/opensips:$VERSION containers/opensips
+          docker build -t localhost:5000/leamout/freeswitch:$VERSION containers/freeswitch
+          docker build -t localhost:5000/leamout/rtpengine:$VERSION containers/rtpengine
+
+          publish() {
+            source=$1
+            target=$2
+            docker pull "$source"
+            docker tag "$source" "localhost:5000/leamout/$target:$VERSION"
+            docker push "localhost:5000/leamout/$target:$VERSION" >/dev/null
+            docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/leamout/$target:$VERSION"
+          }
+          for image in server opensips freeswitch rtpengine; do
+            docker push "localhost:5000/leamout/$image:$VERSION" >/dev/null
+          done
+          mkdir -p /tmp/leamout-image-digests
+          docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/leamout/server:$VERSION" > /tmp/leamout-image-digests/server
+          cp /tmp/leamout-image-digests/server /tmp/leamout-image-digests/worker
+          for image in opensips freeswitch rtpengine; do
+            docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/leamout/$image:$VERSION" > "/tmp/leamout-image-digests/$image"
+          done
+          publish postgres:18-alpine postgres > /tmp/leamout-image-digests/postgres
+          publish redis:8-alpine redis > /tmp/leamout-image-digests/redis
+          publish nats:2-alpine nats > /tmp/leamout-image-digests/nats
+          publish arigaio/atlas:1.3.0-alpine atlas > /tmp/leamout-image-digests/atlas
+          publish coturn/coturn:4.17.0-r0 coturn > /tmp/leamout-image-digests/coturn
+
+      - name: Build and sign packaged release
+        env:
+          VERSION: 1.0.0-acceptance.1
+        run: |
+          mkdir -p "/tmp/leamout-release/$VERSION"
+          (cd server && go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.commit=$GITHUB_SHA" -o /tmp/leamout ./cmd/leamout)
+          VERSION=$VERSION CLI_BINARY=/tmp/leamout OUT_DIR="/tmp/leamout-release/$VERSION" sh server/scripts/release/package-cli.sh >/dev/null
+          VERSION=$VERSION OUT_DIR="/tmp/leamout-release/$VERSION" sh server/scripts/release/package-runtime.sh >/dev/null
+          VERSION=$VERSION DIGEST_DIR=/tmp/leamout-image-digests OUTPUT="/tmp/leamout-release/$VERSION/release-manifest.json" python3 tests/acceptance/self-hosted-lifecycle/release_manifest.py
+          python3 server/scripts/release/validate-manifest.py "/tmp/leamout-release/$VERSION/release-manifest.json"
+          minisign -G -W -p /tmp/leamout-release.pub -s /tmp/leamout-release.key
+          minisign -S -s /tmp/leamout-release.key -m "/tmp/leamout-release/$VERSION/checksums.txt"
+          minisign -S -s /tmp/leamout-release.key -m "/tmp/leamout-release/$VERSION/release-manifest.json"
+
+      - name: Install and start packaged runtime
+        env:
+          VERSION: 1.0.0-acceptance.1
+        run: |
+          public_key=$(tail -n 1 /tmp/leamout-release.pub)
+          sudo env LEAMOUT_MINISIGN_PUBLIC_KEY="$public_key" LEAMOUT_RELEASE_BASE_URL=file:///tmp/leamout-release sh deploy/self-hosted/install.sh --version "$VERSION"
+          sudo /usr/local/bin/leamout init
+          (cd server && sudo env PATH="$PATH" go run ./internal/runtime/leamout/testdata/generate-license --deployment /var/lib/leamout/deployment.json --out /tmp/leamout-license)
+          sudo /usr/local/bin/leamout license install --artifact /tmp/leamout-license/license.json --keyring /tmp/leamout-license/keyring.json
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj '/CN=sip.example.test' -addext 'subjectAltName=DNS:sip.example.test' -keyout /tmp/leamout.key -out /tmp/leamout.crt
+          sudo /usr/local/bin/leamout certs install --fullchain /tmp/leamout.crt --private-key /tmp/leamout.key --carrier-ca /tmp/leamout.crt --hostname sip.example.test
+          sudo tee -a /etc/leamout/leamout.env >/dev/null <<'EOF'
+          TURN_PUBLIC_URLS=turn:127.0.0.1:3478?transport=udp
+          TURN_REALM=sip.example.test
+          TURN_EXTERNAL_IP=127.0.0.1
+          RTPENGINE_PUBLIC_IP=127.0.0.1
+          EOF
+          sudo /usr/local/bin/leamout up
+          curl --fail --retry 30 --retry-delay 2 http://127.0.0.1:8080/healthz
+          sudo /usr/local/bin/leamout doctor
+          sudo python3 tests/acceptance/self-hosted-lifecycle/acceptance.py initialized --version "$VERSION"
+
+      - name: Verify durable state and safe uninstall
+        run: |
+          marker=$(openssl rand -hex 16)
+          sudo docker compose --env-file /etc/leamout/leamout.env -f /var/lib/leamout/runtime/compose.yaml exec -T postgres psql -U leamout -d leamout -c "CREATE TABLE lifecycle_acceptance (value text primary key); INSERT INTO lifecycle_acceptance VALUES ('$marker');"
+          sudo /usr/local/bin/leamout down
+          sudo /usr/local/bin/leamout up
+          sudo docker compose --env-file /etc/leamout/leamout.env -f /var/lib/leamout/runtime/compose.yaml exec -T postgres psql -U leamout -d leamout -Atc "SELECT value FROM lifecycle_acceptance" | grep -qx "$marker"
+          sudo /usr/local/bin/leamout uninstall
+          sudo test -f /var/lib/docker/volumes/leamout-postgres-data/_data/PG_VERSION
+          sudo python3 tests/acceptance/self-hosted-lifecycle/acceptance.py uninstalled
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          sudo docker compose --env-file /etc/leamout/leamout.env -f /var/lib/leamout/runtime/compose.yaml ps || true
+          sudo docker compose --env-file /etc/leamout/leamout.env -f /var/lib/leamout/runtime/compose.yaml logs --no-color --tail=200 || true
