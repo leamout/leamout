@@ -46,7 +46,7 @@ WHERE o.id = $1
       $6::UUID IS NULL
       OR cc.id IS NOT NULL
   )
-RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
+RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
 `
 
 type CreateCustomerPhoneNumberParams struct {
@@ -74,7 +74,6 @@ func (q *Queries) CreateCustomerPhoneNumber(ctx context.Context, arg CreateCusto
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -134,7 +133,7 @@ WHERE o.id = $1
       $6::UUID IS NULL
       OR customer_cc.id IS NOT NULL
   )
-RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
+RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
 `
 
 type CreateProvisioningProviderPhoneNumberParams struct {
@@ -162,7 +161,6 @@ func (q *Queries) CreateProvisioningProviderPhoneNumber(ctx context.Context, arg
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -259,7 +257,7 @@ func (q *Queries) GetBackofficePhoneNumber(ctx context.Context, id uuid.UUID) (G
 }
 
 const getPhoneNumberByID = `-- name: GetPhoneNumberByID :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.id = $1
@@ -284,7 +282,6 @@ func (q *Queries) GetPhoneNumberByID(ctx context.Context, arg GetPhoneNumberByID
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -299,7 +296,7 @@ func (q *Queries) GetPhoneNumberByID(ctx context.Context, arg GetPhoneNumberByID
 }
 
 const getPhoneNumberByNumber = `-- name: GetPhoneNumberByNumber :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.number = $1
@@ -324,7 +321,6 @@ func (q *Queries) GetPhoneNumberByNumber(ctx context.Context, arg GetPhoneNumber
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -339,7 +335,7 @@ func (q *Queries) GetPhoneNumberByNumber(ctx context.Context, arg GetPhoneNumber
 }
 
 const getPhoneNumberForRelease = `-- name: GetPhoneNumberForRelease :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
 WHERE pn.id = $1
@@ -364,7 +360,6 @@ func (q *Queries) GetPhoneNumberForRelease(ctx context.Context, arg GetPhoneNumb
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -495,7 +490,7 @@ func (q *Queries) ListBackofficePhoneNumbers(ctx context.Context) ([]ListBackoff
 }
 
 const listPhoneNumbersByCountry = `-- name: ListPhoneNumbersByCountry :many
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 WHERE pn.organization_id = $1
   AND pn.country_code = $2
@@ -523,7 +518,6 @@ func (q *Queries) ListPhoneNumbersByCountry(ctx context.Context, arg ListPhoneNu
 			&i.Number,
 			&i.CountryCode,
 			&i.CarrierConnectionID,
-			&i.ProviderConnectionID,
 			&i.ProviderID,
 			&i.ProviderResourceID,
 			&i.VoiceEnabled,
@@ -545,7 +539,7 @@ func (q *Queries) ListPhoneNumbersByCountry(ctx context.Context, arg ListPhoneNu
 }
 
 const listPhoneNumbersByOrganizationID = `-- name: ListPhoneNumbersByOrganizationID :many
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 WHERE pn.organization_id = $1
   AND pn.status <> 'released'
@@ -567,7 +561,6 @@ func (q *Queries) ListPhoneNumbersByOrganizationID(ctx context.Context, organiza
 			&i.Number,
 			&i.CountryCode,
 			&i.CarrierConnectionID,
-			&i.ProviderConnectionID,
 			&i.ProviderID,
 			&i.ProviderResourceID,
 			&i.VoiceEnabled,
@@ -589,7 +582,7 @@ func (q *Queries) ListPhoneNumbersByOrganizationID(ctx context.Context, organiza
 }
 
 const lockProviderPhoneNumberForOperation = `-- name: LockProviderPhoneNumberForOperation :one
-SELECT id, organization_id, number, country_code, carrier_connection_id, provider_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
+SELECT id, organization_id, number, country_code, carrier_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
 FROM phone_numbers
 WHERE id = $1
   AND organization_id = $2
@@ -622,7 +615,6 @@ func (q *Queries) LockProviderPhoneNumberForOperation(ctx context.Context, arg L
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -647,7 +639,7 @@ WHERE id = $2
   AND organization_id = $3
   AND provider_id = $4
   AND status = 'provisioning'
-RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
+RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
 `
 
 type MarkProviderPhoneNumberActiveParams struct {
@@ -671,7 +663,6 @@ func (q *Queries) MarkProviderPhoneNumberActive(ctx context.Context, arg MarkPro
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -725,7 +716,7 @@ WHERE id = $1
   AND organization_id = $2
   AND provider_id IS NULL
   AND status IN ('active', 'disabled')
-RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
+RETURNING id, organization_id, number, country_code, carrier_connection_id, provider_id, provider_resource_id, voice_enabled, sms_enabled, status, error_code, error_message, created_at, updated_at
 `
 
 type ReleaseCustomerPhoneNumberParams struct {
@@ -742,7 +733,6 @@ func (q *Queries) ReleaseCustomerPhoneNumber(ctx context.Context, arg ReleaseCus
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -769,7 +759,7 @@ WHERE pn.id = $2
   AND cc.scope = 'organization'
   AND cc.organization_id = pn.organization_id
   AND cc.status = 'active'
-RETURNING pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+RETURNING pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 `
 
 type SetPhoneNumberCarrierConnectionParams struct {
@@ -787,7 +777,6 @@ func (q *Queries) SetPhoneNumberCarrierConnection(ctx context.Context, arg SetPh
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
@@ -810,7 +799,7 @@ SET
 WHERE pn.id = $3
   AND pn.organization_id = $4
   AND pn.status = 'active'
-RETURNING pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+RETURNING pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 `
 
 type UpdatePhoneNumberParams struct {
@@ -834,7 +823,6 @@ func (q *Queries) UpdatePhoneNumber(ctx context.Context, arg UpdatePhoneNumberPa
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,

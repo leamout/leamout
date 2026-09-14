@@ -381,21 +381,20 @@ type PaymentProviderEvent struct {
 }
 
 type PhoneNumber struct {
-	ID                   uuid.UUID          `db:"id" json:"id"`
-	OrganizationID       uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Number               string             `db:"number" json:"number"`
-	CountryCode          string             `db:"country_code" json:"country_code"`
-	CarrierConnectionID  *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
-	ProviderConnectionID *uuid.UUID         `db:"provider_connection_id" json:"provider_connection_id"`
-	ProviderID           *uuid.UUID         `db:"provider_id" json:"provider_id"`
-	ProviderResourceID   *string            `db:"provider_resource_id" json:"provider_resource_id"`
-	VoiceEnabled         bool               `db:"voice_enabled" json:"voice_enabled"`
-	SmsEnabled           bool               `db:"sms_enabled" json:"sms_enabled"`
-	Status               string             `db:"status" json:"status"`
-	ErrorCode            *string            `db:"error_code" json:"error_code"`
-	ErrorMessage         *string            `db:"error_message" json:"error_message"`
-	CreatedAt            pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt            pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                  uuid.UUID          `db:"id" json:"id"`
+	OrganizationID      uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Number              string             `db:"number" json:"number"`
+	CountryCode         string             `db:"country_code" json:"country_code"`
+	CarrierConnectionID *uuid.UUID         `db:"carrier_connection_id" json:"carrier_connection_id"`
+	ProviderID          *uuid.UUID         `db:"provider_id" json:"provider_id"`
+	ProviderResourceID  *string            `db:"provider_resource_id" json:"provider_resource_id"`
+	VoiceEnabled        bool               `db:"voice_enabled" json:"voice_enabled"`
+	SmsEnabled          bool               `db:"sms_enabled" json:"sms_enabled"`
+	Status              string             `db:"status" json:"status"`
+	ErrorCode           *string            `db:"error_code" json:"error_code"`
+	ErrorMessage        *string            `db:"error_message" json:"error_message"`
+	CreatedAt           pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Plan struct {

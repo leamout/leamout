@@ -144,7 +144,7 @@ func (q *Queries) ResolveCarrierConnectionBySourceIPAnyScope(ctx context.Context
 }
 
 const resolveInboundPhoneNumber = `-- name: ResolveInboundPhoneNumber :one
-SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
+SELECT pn.id, pn.organization_id, pn.number, pn.country_code, pn.carrier_connection_id, pn.provider_id, pn.provider_resource_id, pn.voice_enabled, pn.sms_enabled, pn.status, pn.error_code, pn.error_message, pn.created_at, pn.updated_at
 FROM phone_numbers AS pn
 JOIN carrier_connections AS cc ON cc.id = $1
 JOIN organizations AS o ON o.id = pn.organization_id
@@ -184,7 +184,6 @@ func (q *Queries) ResolveInboundPhoneNumber(ctx context.Context, arg ResolveInbo
 		&i.Number,
 		&i.CountryCode,
 		&i.CarrierConnectionID,
-		&i.ProviderConnectionID,
 		&i.ProviderID,
 		&i.ProviderResourceID,
 		&i.VoiceEnabled,
