@@ -11,10 +11,11 @@ import (
 )
 
 type fakeNumberRepository struct {
-	createdBYOC          CreateRequest
-	managedSelectionID   string
-	managedAuthorization ManagedNumberPurchaseAuthorization
-	managedCreateErr     error
+	createdCustomer      CreateRequest
+	providerRequest      CreateRequest
+	providerSelectionID  string
+	providerAuthorization ManagedNumberPurchaseAuthorization
+	providerCreateErr    error
 	getNumber            sqlc.PhoneNumber
 	getForRelease        sqlc.PhoneNumber
 	releaseCalls         int
@@ -23,18 +24,21 @@ type fakeNumberRepository struct {
 	selectionID          string
 }
 
-func (f *fakeNumberRepository) CreateBYOC(_ context.Context, _ uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
-	f.createdBYOC = req
-	return sqlc.PhoneNumber{Number: req.Number, CountryCode: req.CountryCode, ProvisioningMode: string(ProvisioningModeBYOC), Status: "active"}, nil
+func (f *fakeNumberRepository) CreateCustomer(_ context.Context, _ uuid.UUID, req CreateRequest) (sqlc.PhoneNumber, error) {
+	f.createdCustomer = req
+	return sqlc.PhoneNumber{Number: req.Number, CountryCode: req.CountryCode, CarrierConnectionID: req.CarrierConnectionID, Status: "active"}, nil
 }
-func (f *fakeNumberRepository) CreateManaged(_ context.Context, _ uuid.UUID, selectionID string, authorization ManagedNumberPurchaseAuthorization) (sqlc.PhoneNumber, error) {
-	f.managedSelectionID = selectionID
-	f.managedAuthorization = authorization
-	if f.managedCreateErr != nil {
-		return sqlc.PhoneNumber{}, f.managedCreateErr
+
+func (f *fakeNumberRepository) CreateProvider(_ context.Context, _ uuid.UUID, req CreateRequest, selectionID string, authorization ManagedNumberPurchaseAuthorization) (sqlc.PhoneNumber, error) {
+	f.providerRequest = req
+	f.providerSelectionID = selectionID
+	f.providerAuthorization = authorization
+	if f.providerCreateErr != nil {
+		return sqlc.PhoneNumber{}, f.providerCreateErr
 	}
-	return sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeManaged), Status: "provisioning"}, nil
+	return sqlc.PhoneNumber{CarrierConnectionID: req.CarrierConnectionID, Status: "provisioning"}, nil
 }
+
 func (f *fakeNumberRepository) List(context.Context, uuid.UUID) ([]sqlc.PhoneNumber, error) {
 	return nil, nil
 }
@@ -47,7 +51,7 @@ func (f *fakeNumberRepository) GetForRelease(context.Context, uuid.UUID, uuid.UU
 func (f *fakeNumberRepository) Update(context.Context, uuid.UUID, uuid.UUID, UpdateRequest) (sqlc.PhoneNumber, error) {
 	return f.getNumber, nil
 }
-func (f *fakeNumberRepository) ReleaseBYOC(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error) {
+func (f *fakeNumberRepository) ReleaseCustomer(context.Context, uuid.UUID, uuid.UUID) (sqlc.PhoneNumber, error) {
 	f.releaseCalls++
 	return f.getForRelease, nil
 }
@@ -112,21 +116,22 @@ func (f *fakeManagedPurchaseAuthority) ReleaseManagedNumberPurchase(context.Cont
 	return f.releaseErr
 }
 
-func TestCreateDispatchesBYOC(t *testing.T) {
+func TestCreateRegistersCustomerNumberWithoutType(t *testing.T) {
 	repo := &fakeNumberRepository{}
 	service := NewService(repo)
-	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{Type: ProvisioningModeBYOC, Number: " +233201234567 ", CountryCode: " gh "})
+	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{Number: " +233201234567 ", CountryCode: " gh "})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if repo.createdBYOC.Number != "+233201234567" || repo.createdBYOC.CountryCode != "GH" {
-		t.Fatalf("created=%+v", repo.createdBYOC)
+	if repo.createdCustomer.Number != "+233201234567" || repo.createdCustomer.CountryCode != "GH" {
+		t.Fatalf("created=%+v", repo.createdCustomer)
 	}
 }
 
-func TestCreateDispatchesManagedSelection(t *testing.T) {
+func TestCreateProvisionsSelectionWithoutType(t *testing.T) {
 	priceID := uuid.New()
 	reservationID := uuid.New()
+	carrierConnectionID := uuid.New()
 	repo := &fakeNumberRepository{
 		selectionID: "sel_test",
 		selectionCandidate: ManagedNumberCandidate{
@@ -138,15 +143,15 @@ func TestCreateDispatchesManagedSelection(t *testing.T) {
 	authority := &fakeManagedPurchaseAuthority{priceID: priceID, amountMinor: 2500, currency: "USD", reservationID: reservationID}
 	service := NewService(repo)
 	service.SetManagedPurchaseAuthority(authority)
-	result, err := service.Create(context.Background(), uuid.New(), CreateRequest{Type: ProvisioningModeManaged, SelectionID: " sel_test "})
+	result, err := service.Create(context.Background(), uuid.New(), CreateRequest{SelectionID: " sel_test ", CarrierConnectionID: &carrierConnectionID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if repo.managedSelectionID != "sel_test" {
-		t.Fatalf("selection=%q", repo.managedSelectionID)
+	if repo.providerSelectionID != "sel_test" || repo.providerRequest.CarrierConnectionID == nil || *repo.providerRequest.CarrierConnectionID != carrierConnectionID {
+		t.Fatalf("request=%+v selection=%q", repo.providerRequest, repo.providerSelectionID)
 	}
-	if repo.managedAuthorization.ReservationID != reservationID || repo.managedAuthorization.PriceID != priceID {
-		t.Fatalf("authorization=%+v", repo.managedAuthorization)
+	if repo.providerAuthorization.ReservationID != reservationID || repo.providerAuthorization.PriceID != priceID {
+		t.Fatalf("authorization=%+v", repo.providerAuthorization)
 	}
 	if authority.reserves != 1 || authority.releases != 0 {
 		t.Fatalf("reserve/release=%d/%d, want 1/0", authority.reserves, authority.releases)
@@ -156,7 +161,7 @@ func TestCreateDispatchesManagedSelection(t *testing.T) {
 	}
 }
 
-func TestManagedCreateReleasesReservationWhenPersistenceFails(t *testing.T) {
+func TestProviderCreateReleasesReservationWhenPersistenceFails(t *testing.T) {
 	priceID := uuid.New()
 	repo := &fakeNumberRepository{
 		selectionID: "sel_test",
@@ -165,12 +170,12 @@ func TestManagedCreateReleasesReservationWhenPersistenceFails(t *testing.T) {
 			Number: "+15551236001", CountryCode: "US", ChannelsIncludedCount: 2,
 			PriceID: priceID, PriceAmountMinor: 2500, PriceCurrency: "USD",
 		},
-		managedCreateErr: errors.New("database unavailable"),
+		providerCreateErr: errors.New("database unavailable"),
 	}
 	authority := &fakeManagedPurchaseAuthority{reservationID: uuid.New()}
 	service := NewService(repo)
 	service.SetManagedPurchaseAuthority(authority)
-	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{Type: ProvisioningModeManaged, SelectionID: "sel_test"})
+	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{SelectionID: "sel_test"})
 	if err == nil {
 		t.Fatal("Create() unexpectedly succeeded")
 	}
@@ -179,11 +184,11 @@ func TestManagedCreateReleasesReservationWhenPersistenceFails(t *testing.T) {
 	}
 }
 
-func TestManagedCreateRejectsBYOCFields(t *testing.T) {
+func TestSelectionCreateRejectsCustomerNumberFields(t *testing.T) {
 	service := NewService(&fakeNumberRepository{})
-	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{Type: ProvisioningModeManaged, SelectionID: "sel_test", Number: "+233201234567"})
+	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{SelectionID: "sel_test", Number: "+233201234567"})
 	if err == nil {
-		t.Fatal("managed create accepted caller-supplied number")
+		t.Fatal("selection create accepted caller-supplied number")
 	}
 }
 
@@ -210,28 +215,22 @@ func TestSearchAvailableReturnsOpaqueCustomerResponse(t *testing.T) {
 	}
 }
 
-func TestReleaseRejectsManagedNumber(t *testing.T) {
-	repo := &fakeNumberRepository{getForRelease: sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeManaged), Status: "active"}}
+func TestReleaseRejectsProviderOwnedNumber(t *testing.T) {
+	providerID := uuid.New()
+	repo := &fakeNumberRepository{getForRelease: sqlc.PhoneNumber{ProviderID: &providerID, Status: "active"}}
 	service := NewService(repo)
 	if err := service.Release(context.Background(), uuid.New(), uuid.New()); err == nil {
-		t.Fatal("release accepted managed number")
+		t.Fatal("release accepted provider-owned number")
 	}
 	if repo.releaseCalls != 0 {
 		t.Fatalf("release calls=%d", repo.releaseCalls)
 	}
 }
 
-func TestResponseUsesTypeAndHidesManagedCarrier(t *testing.T) {
+func TestResponseHasNoTypeAndExposesCustomerCarrier(t *testing.T) {
 	connectionID := uuid.New()
-	managed := response(sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeManaged), CarrierConnectionID: &connectionID})
-	if managed.Type != ProvisioningModeManaged {
-		t.Fatalf("type=%q", managed.Type)
-	}
-	if managed.CarrierConnectionID != nil {
-		t.Fatal("managed response exposed platform carrier")
-	}
-	byoc := response(sqlc.PhoneNumber{ProvisioningMode: string(ProvisioningModeBYOC), CarrierConnectionID: &connectionID})
-	if byoc.Type != ProvisioningModeBYOC || byoc.CarrierConnectionID == nil {
-		t.Fatalf("response=%+v", byoc)
+	got := response(sqlc.PhoneNumber{CarrierConnectionID: &connectionID})
+	if got.CarrierConnectionID == nil || *got.CarrierConnectionID != connectionID {
+		t.Fatalf("response=%+v", got)
 	}
 }
