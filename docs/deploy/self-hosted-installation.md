@@ -499,11 +499,12 @@ sudo leamout update
 
 An update is a controlled release transition, not `git pull && docker compose up`.
 
-The release-candidate command installs the runtime artifact already staged and
-verified by the bootstrap installer for the CLI's exact version, pulls its
-digest-pinned images, and converges the Compose deployment. Compatibility and disk
-space validation, automatic backup/drain, readiness waiting, and rollback still
-need to be added before general availability.
+The update command installs the runtime artifact already staged and verified by
+the bootstrap installer for the CLI's exact version and rejects manifests that
+require a newer CLI. It pulls immutable images, drains OpenSIPS and FreeSWITCH
+admission until active sessions reach zero, recreates services, and then resumes
+admission. Disk-space validation, automatic backup, readiness waiting, and
+process-level rollback remain before this is a zero-downtime orchestrator.
 
 ## Restart behavior
 
@@ -687,8 +688,8 @@ The hosted console can then show the registered deployment without becoming part
 
 ### Phase 5 — lifecycle operations
 
-- [ ] Add `leamout update` with release compatibility checks.
-- [ ] Integrate graceful drain into restart/update paths.
+- [x] Add `leamout update` with release compatibility checks.
+- [x] Integrate graceful drain into the update path.
 - [x] Add `leamout backup` and `leamout restore`.
 - [ ] Add support-bundle generation and deterministic redaction.
 - [ ] Add non-interactive initialization.

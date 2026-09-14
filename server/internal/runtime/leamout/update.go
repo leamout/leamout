@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"path/filepath"
+	"time"
 )
 
 func runUpdate(ctx context.Context, stdout, stderr io.Writer, args []string, version string) int {
@@ -31,8 +32,17 @@ func runUpdate(ctx context.Context, stdout, stderr io.Writer, args []string, ver
 	if code := runInstalledCompose(ctx, stdout, stderr, "pull"); code != 0 {
 		return code
 	}
+	if err := drainInstalledRuntime(ctx, stdout, stderr, 5*time.Minute, 2*time.Second); err != nil {
+		writef(stderr, "drain runtime before update: %v\n", err)
+		return 1
+	}
 	if code := runLicensedInstalledCompose(ctx, stdout, stderr, "up", "-d", "--remove-orphans"); code != 0 {
+		_ = resumeInstalledRuntime(ctx, stderr)
 		return code
+	}
+	if err := resumeInstalledRuntime(ctx, stderr); err != nil {
+		writeln(stderr, "runtime restarted but telecom admission could not be fully resumed")
+		return 1
 	}
 	writeln(stdout, "✓ Runtime update installed")
 	writeln(stdout, "Run: sudo leamout doctor")
