@@ -9,9 +9,9 @@ INSERT INTO carrier_connections (
     (SELECT id FROM carrier_providers WHERE slug = 'leamout'),
     'organization', 'Leamout Carrier', 'active', true, 'ip'
 );
-INSERT INTO carrier_connection_source_ips (organization_id, carrier_connection_id, cidr) VALUES
-('00000000-0000-0000-0000-000000005001', '00000000-0000-0000-0000-000000005020', '172.30.0.1/32'),
-('00000000-0000-0000-0000-000000005001', '00000000-0000-0000-0000-000000005020', '172.32.0.1/32');
+INSERT INTO carrier_connection_source_ips (carrier_connection_id, cidr) VALUES
+('00000000-0000-0000-0000-000000005020', '172.30.0.1/32'),
+('00000000-0000-0000-0000-000000005020', '172.32.0.1/32');
 
 INSERT INTO phone_numbers (
     id, organization_id, number, country_code,
