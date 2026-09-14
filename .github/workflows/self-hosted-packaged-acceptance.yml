@@ -57,16 +57,22 @@ jobs:
             docker pull "$source"
             docker tag "$source" "localhost:5000/leamout/$target:$VERSION"
             docker push "localhost:5000/leamout/$target:$VERSION" >/dev/null
-            docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/leamout/$target:$VERSION"
+            local_digest "localhost:5000/leamout/$target:$VERSION"
+          }
+          local_digest() {
+            docker inspect --format '{{json .RepoDigests}}' "$1" \
+              | jq -r '.[] | select(startswith("localhost:5000/"))' \
+              | head -n 1 \
+              | grep -E '^localhost:5000/.+@sha256:[0-9a-f]{64}$'
           }
           for image in server opensips freeswitch rtpengine; do
             docker push "localhost:5000/leamout/$image:$VERSION" >/dev/null
           done
           mkdir -p /tmp/leamout-image-digests
-          docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/leamout/server:$VERSION" > /tmp/leamout-image-digests/server
+          local_digest "localhost:5000/leamout/server:$VERSION" > /tmp/leamout-image-digests/server
           cp /tmp/leamout-image-digests/server /tmp/leamout-image-digests/worker
           for image in opensips freeswitch rtpengine; do
-            docker inspect --format '{{index .RepoDigests 0}}' "localhost:5000/leamout/$image:$VERSION" > "/tmp/leamout-image-digests/$image"
+            local_digest "localhost:5000/leamout/$image:$VERSION" > "/tmp/leamout-image-digests/$image"
           done
           publish postgres:18-alpine postgres > /tmp/leamout-image-digests/postgres
           publish redis:8-alpine redis > /tmp/leamout-image-digests/redis
