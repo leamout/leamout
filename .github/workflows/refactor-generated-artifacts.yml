@@ -3,8 +3,9 @@ name: Refactor generated artifacts
 on:
   pull_request:
     paths:
-      - "server/internal/database/queries/trunks.sql"
-      - "server/migrations/**"
+      - "server/**"
+      - "containers/opensips/**"
+      - "tests/acceptance/cloud-managed/**"
       - ".github/workflows/refactor-generated-artifacts.yml"
 
 permissions:
@@ -17,10 +18,75 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Apply large-file refactor substitutions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          cloud = Path("tests/acceptance/cloud-managed/acceptance.py")
+          text = cloud.read_text()
+          text = text.replace(
+              '{"type": "managed", "selection_id": selection}',
+              '{"selection_id": selection}',
+          )
+          text = text.replace(
+              'if number["status"] != "provisioning" or number["type"] != "managed":',
+              'if number["status"] != "provisioning":',
+          )
+          text = text.replace(
+              'raise Failure(f"managed purchase did not persist provisioning intent: {number}")',
+              'raise Failure(f"number purchase did not persist provisioning intent: {number}")',
+          )
+          cloud.write_text(text)
+
+          queries = {
+              Path("containers/opensips/self-hosted/opensips.cfg"): (
+                  "            \"SELECT pn.organization_id::text, pn.id::text, vb.id::text, va.id::text, va.ring_timeout_seconds::text "
+                  "FROM phone_numbers AS pn JOIN carrier_connections AS cc ON cc.id = pn.carrier_connection_id "
+                  "JOIN voice_bindings AS vb ON vb.phone_number_id = pn.id "
+                  "JOIN voice_applications AS va ON va.id = vb.voice_application_id "
+                  "JOIN organizations AS o ON o.id = pn.organization_id "
+                  "WHERE pn.number = '$rU' AND pn.carrier_connection_id = '$avp(carrier_connection_id)'::UUID "
+                  "AND pn.status = 'active' AND pn.voice_enabled = true AND cc.status = 'active' AND cc.inbound_enabled = true "
+                  "AND cc.scope = 'organization' AND cc.organization_id = pn.organization_id "
+                  "AND va.organization_id = pn.organization_id AND va.status = 'active' "
+                  "AND o.status = 'active' AND o.deleted_at IS NULL LIMIT 1\","
+              ),
+              Path("containers/opensips/cloud/opensips.cfg"): (
+                  "            \"SELECT pn.organization_id::text, pn.id::text, vb.id::text, va.id::text, va.ring_timeout_seconds::text "
+                  "FROM phone_numbers AS pn JOIN carrier_connections AS cc ON cc.id = '$avp(carrier_connection_id)'::UUID "
+                  "JOIN voice_bindings AS vb ON vb.phone_number_id = pn.id "
+                  "JOIN voice_applications AS va ON va.id = vb.voice_application_id "
+                  "JOIN organizations AS o ON o.id = pn.organization_id "
+                  "WHERE pn.number = '$rU' AND pn.status = 'active' AND pn.voice_enabled = true "
+                  "AND cc.status = 'active' AND cc.inbound_enabled = true "
+                  "AND ((cc.scope = 'organization' AND cc.organization_id = pn.organization_id AND pn.carrier_connection_id = cc.id) "
+                  "OR (cc.scope = 'platform' AND cc.organization_id IS NULL AND pn.provider_connection_id = cc.id)) "
+                  "AND va.organization_id = pn.organization_id AND va.status = 'active' "
+                  "AND o.status = 'active' AND o.deleted_at IS NULL LIMIT 1\","
+              ),
+          }
+          for path, replacement in queries.items():
+              lines = path.read_text().splitlines()
+              matches = [i for i, line in enumerate(lines) if "FROM phone_numbers AS pn JOIN carrier_connections AS cc" in line and "pn.provisioning_mode" in line]
+              if len(matches) != 1:
+                  raise SystemExit(f"expected one legacy phone-number routing query in {path}, found {len(matches)}")
+              lines[matches[0]] = replacement
+              path.write_text("\n".join(lines) + "\n")
+          PY
+
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
           go-version-file: server/go.mod
+
+      - name: Format Go
+        run: |
+          gofmt -w \
+            server/internal/telecom/numbers/*.go \
+            server/internal/telecom/routing/*.go \
+            server/internal/telecom/edge/*.go \
+            server/internal/backoffice/numbers/*.go
 
       - name: Install sqlc
         run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
@@ -36,10 +102,30 @@ jobs:
             arigaio/atlas:1.3.0-alpine \
             migrate hash --dir file:///migrations
 
+      - name: Check removed phone-number mode
+        run: |
+          if grep -R -nE 'pn\.provisioning_mode|PhoneNumber\{[^}]*ProvisioningMode|json:"type"' \
+            server/internal/telecom/numbers \
+            server/internal/telecom/routing \
+            server/internal/database/queries \
+            containers/opensips \
+            tests/acceptance/cloud-managed \
+            tests/acceptance/self-hosted-leamout-carrier; then
+            echo "stale phone-number mode reference found"
+            exit 1
+          fi
+
       - name: Upload generated artifacts
         uses: actions/upload-artifact@v4
         with:
           name: refactor-generated-artifacts
           path: |
-            server/internal/database/sqlc/trunks.sql.go
+            server/internal/database/sqlc/
             server/migrations/atlas.sum
+            server/internal/telecom/numbers/
+            server/internal/telecom/routing/
+            server/internal/telecom/edge/
+            server/internal/backoffice/numbers/
+            containers/opensips/cloud/opensips.cfg
+            containers/opensips/self-hosted/opensips.cfg
+            tests/acceptance/cloud-managed/acceptance.py
