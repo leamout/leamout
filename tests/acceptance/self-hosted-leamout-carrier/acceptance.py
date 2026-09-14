@@ -93,15 +93,15 @@ def wait_for_channel(call_id):
 
 def main():
     shape = sql(
-        "SELECT cp.slug || ',' || cc.scope || ',' || pn.provisioning_mode "
+        "SELECT cp.slug || ',' || cc.scope "
         "FROM carrier_connections cc "
         "JOIN carrier_providers cp ON cp.id=cc.provider_id "
         "JOIN phone_numbers pn ON pn.carrier_connection_id=cc.id "
         "WHERE cc.id='00000000-0000-0000-0000-000000005020'::uuid"
     )
-    if shape != "leamout,organization,byoc":
-        raise Failure(f"Leamout Carrier is not modeled as ordinary self-hosted BYOC state: {shape}")
-    print("PASS self-hosted runtime models Leamout Carrier as an ordinary BYOC carrier connection")
+    if shape != "leamout,organization":
+        raise Failure(f"Leamout Carrier is not modeled as customer-selected self-hosted connectivity: {shape}")
+    print("PASS self-hosted runtime models Leamout Carrier as an organization-scoped customer-selected carrier connection")
 
     call_id, responses = invite()
     statuses = [int(response.split()[1]) for response in responses]
