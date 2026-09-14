@@ -3,21 +3,21 @@ name: Telecom
 on:
   pull_request:
     paths:
-      - "deploy/**/opensips/**"
-      - "deploy/**/freeswitch/**"
-      - "deploy/**/rtpengine/**"
-      - "deploy/**/scripts/drain.sh"
-      - "deploy/**/scripts/resume.sh"
+      - "containers/opensips/**"
+      - "containers/freeswitch/**"
+      - "containers/rtpengine/**"
+      - "server/scripts/deploy/drain.sh"
+      - "server/scripts/deploy/resume.sh"
       - ".github/workflows/telecom.yml"
   push:
     branches:
       - main
     paths:
-      - "deploy/**/opensips/**"
-      - "deploy/**/freeswitch/**"
-      - "deploy/**/rtpengine/**"
-      - "deploy/**/scripts/drain.sh"
-      - "deploy/**/scripts/resume.sh"
+      - "containers/opensips/**"
+      - "containers/freeswitch/**"
+      - "containers/rtpengine/**"
+      - "server/scripts/deploy/drain.sh"
+      - "server/scripts/deploy/resume.sh"
       - ".github/workflows/telecom.yml"
   workflow_dispatch:
 
@@ -39,16 +39,16 @@ jobs:
 
       - name: Check shell syntax
         run: |
-          sh -n deploy/**/scripts/drain.sh
-          sh -n deploy/**/scripts/resume.sh
-          sh -n deploy/cloud/opensips/apply-drain-config.sh
-          sh -n deploy/cloud/opensips/drain-control.sh
-          sh -n deploy/cloud/freeswitch/drain-control.sh
+          sh -n server/scripts/deploy/drain.sh
+          sh -n server/scripts/deploy/resume.sh
+          sh -n containers/opensips/apply-drain-config.sh
+          sh -n containers/opensips/drain-control.sh
+          sh -n containers/freeswitch/drain-control.sh
 
       - name: Verify OpenSIPS drain route placement
         run: |
-          cp deploy/cloud/opensips/opensips.cfg /tmp/opensips.cfg
-          sh deploy/cloud/opensips/apply-drain-config.sh /tmp/opensips.cfg
+          cp containers/opensips/cloud/opensips.cfg /tmp/opensips.cfg
+          sh containers/opensips/apply-drain-config.sh /tmp/opensips.cfg
 
           options_line="$(grep -n 'if (is_method("OPTIONS")' /tmp/opensips.cfg | head -n1 | cut -d: -f1)"
           drain_line="$(grep -n 'route(LEAMOUT_DRAIN);' /tmp/opensips.cfg | head -n1 | cut -d: -f1)"
@@ -60,8 +60,7 @@ jobs:
       - name: Verify Self-Hosted OpenSIPS excludes managed admission
         run: |
           ! grep -E 'sip-edge/authorize|opensips_managed_trunk_credentials|MANAGED_SIP_ADMISSION' \
-            deploy/self-hosted/opensips/opensips.cfg \
-            deploy/self-hosted/opensips/entrypoint.sh
+            containers/opensips/self-hosted/opensips.cfg
 
   image:
     name: Build ${{ matrix.service }} image
@@ -69,9 +68,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        distribution:
-          - cloud
-          - self-hosted
         service:
           - opensips
           - freeswitch
@@ -84,9 +80,16 @@ jobs:
       - name: Build ${{ matrix.service }}
         run: |
           docker build \
-            --file "deploy/${{ matrix.distribution }}/${{ matrix.service }}/Dockerfile" \
-            --tag "leamout/${{ matrix.distribution }}-${{ matrix.service }}:ci" \
-            "deploy/${{ matrix.distribution }}/${{ matrix.service }}"
+            --file "containers/${{ matrix.service }}/Dockerfile" \
+            --tag "leamout/${{ matrix.service }}:ci" \
+            "containers/${{ matrix.service }}"
+          if [ "${{ matrix.service }}" = opensips ]; then
+            docker build \
+              --build-arg DISTRIBUTION=self-hosted \
+              --file containers/opensips/Dockerfile \
+              --tag leamout/self-hosted-opensips:ci \
+              containers/opensips
+          fi
 
   freeswitch-drain:
     name: FreeSWITCH drain helper
@@ -99,9 +102,9 @@ jobs:
       - name: Build FreeSWITCH
         run: |
           docker build \
-            --file deploy/cloud/freeswitch/Dockerfile \
+            --file containers/freeswitch/Dockerfile \
             --tag leamout/freeswitch:drain-test \
-            deploy/cloud/freeswitch
+            containers/freeswitch
 
       - name: Exercise drain helper
         run: |

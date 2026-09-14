@@ -77,7 +77,7 @@ services:
     restart: unless-stopped
     command: ["-c", "/etc/nats/nats-server.conf"]
     volumes:
-      - ./nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - ../../containers/nats/nats-server.conf:/etc/nats/nats-server.conf:ro
       - nats_data:/data
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
@@ -165,10 +165,11 @@ services:
   opensips:
     image: leamout/opensips:4.0.1
     build:
-      context: ./opensips
+      context: ../../containers/opensips
       dockerfile: Dockerfile
       args:
         OPENSIPS_VERSION: 4.0.1
+        DISTRIBUTION: cloud
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
@@ -207,7 +208,7 @@ services:
       - --cert=/etc/coturn/tls/fullchain.pem
       - --pkey=/etc/coturn/tls/privkey.pem
     volumes:
-      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ../../containers/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
       - ./certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
       - ./certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
     ports:
@@ -221,7 +222,7 @@ services:
   freeswitch:
     image: leamout/freeswitch:1.0.0
     build:
-      context: ./freeswitch
+      context: ../../containers/freeswitch
       dockerfile: Dockerfile
     restart: unless-stopped
     stop_grace_period: 60s
@@ -245,7 +246,7 @@ services:
   rtpengine:
     image: leamout/rtpengine:dev
     build:
-      context: ./rtpengine
+      context: ../../containers/rtpengine
       dockerfile: Dockerfile
       args:
         RTPENGINE_REF: mr26.2.1

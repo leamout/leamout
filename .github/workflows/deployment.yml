@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "deploy/self-hosted/compose.yaml"
+      - "deploy/self-hosted/.env.example"
+      - "containers/**"
       - "server/scripts/deploy/**"
       - "server/scripts/certs/**"
       - ".env.example"
@@ -14,6 +16,8 @@ on:
       - main
     paths:
       - "deploy/self-hosted/compose.yaml"
+      - "deploy/self-hosted/.env.example"
+      - "containers/**"
       - "server/scripts/deploy/**"
       - "server/scripts/certs/**"
       - ".env.example"
@@ -30,7 +34,7 @@ concurrency:
 
 env:
   CARRIER_CREDENTIAL_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-  ENV_FILE: .env.example
+  ENV_FILE: deploy/self-hosted/.env.example
   COMPOSE_FILE: deploy/self-hosted/compose.yaml
   COMPOSE_OVERRIDE_FILE: /tmp/compose.ci.yaml
 

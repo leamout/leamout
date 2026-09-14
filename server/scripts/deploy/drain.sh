@@ -1,7 +1,10 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
+COMPOSE_FILE=${COMPOSE_FILE:-deploy/self-hosted/compose.yaml}
+ENV_FILE=${ENV_FILE:-.env}
 timeout_seconds=${LEAMOUT_DRAIN_TIMEOUT_SECONDS:-300}
 poll_seconds=${LEAMOUT_DRAIN_POLL_SECONDS:-2}
 
@@ -14,7 +17,7 @@ esac
 [ "$poll_seconds" -gt 0 ] || { echo "LEAMOUT_DRAIN_POLL_SECONDS must be greater than zero" >&2; exit 2; }
 
 run_compose() {
-  (cd "$script_dir" && docker compose "$@")
+  (cd "$REPO_ROOT" && docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@")
 }
 
 opensips_control() {
@@ -50,7 +53,7 @@ while :; do
   elapsed=$((now - started_at))
   if [ "$elapsed" -ge "$timeout_seconds" ]; then
     echo "Drain deadline reached with active calls remaining." >&2
-    echo "The node remains drained. Run deploy/cloud/scripts/resume.sh to restore admission, or retry drain after calls finish." >&2
+    echo "The node remains drained. Run server/scripts/deploy/resume.sh to restore admission, or retry drain after calls finish." >&2
     exit 1
   fi
 

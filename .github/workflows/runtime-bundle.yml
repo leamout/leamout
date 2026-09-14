@@ -9,7 +9,7 @@ on:
       - "server/scripts/release/render-runtime.py"
       - "server/migrations/**"
       - "server/internal/runtime/leamout/**"
-      - "deploy/self-hosted/opensips/**"
+      - "containers/opensips/**"
       - "deploy/self-hosted/compose.yaml"
       - ".github/workflows/runtime-bundle.yml"
   push:
@@ -22,7 +22,7 @@ on:
       - "server/scripts/release/render-runtime.py"
       - "server/migrations/**"
       - "server/internal/runtime/leamout/**"
-      - "deploy/self-hosted/opensips/**"
+      - "containers/opensips/**"
       - "deploy/self-hosted/compose.yaml"
       - ".github/workflows/runtime-bundle.yml"
   workflow_dispatch:
@@ -45,7 +45,7 @@ jobs:
       - name: Check tooling syntax
         run: |
           sh -n server/scripts/release/package-runtime.sh
-          sh -n deploy/self-hosted/opensips/entrypoint.sh
+          sh -n containers/opensips/entrypoint.sh
           python3 -m py_compile server/scripts/release/render-runtime.py
 
       - name: Package runtime bundle

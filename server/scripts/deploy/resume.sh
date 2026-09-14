@@ -1,10 +1,13 @@
 #!/bin/sh
 set -eu
 
-script_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
+COMPOSE_FILE=${COMPOSE_FILE:-deploy/self-hosted/compose.yaml}
+ENV_FILE=${ENV_FILE:-.env}
 
 run_compose() {
-  (cd "$script_dir" && docker compose "$@")
+  (cd "$REPO_ROOT" && docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@")
 }
 
 echo "Resuming FreeSWITCH call admission..."

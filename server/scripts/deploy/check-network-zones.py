@@ -39,7 +39,7 @@ def ipv4(config: dict, service: str, network: str) -> str | None:
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--deploy-root", required=True, type=pathlib.Path)
+parser.add_argument("--containers-root", required=True, type=pathlib.Path)
 args = parser.parse_args()
 
 config = json.load(sys.stdin)
@@ -86,7 +86,7 @@ for (service, network), wanted in expected_addresses.items():
     if actual != wanted:
         fail(f"{service} on {network} has {actual!r}, expected {wanted!r}")
 
-acl_root = ET.parse(args.deploy_root / "freeswitch/autoload_configs/acl.conf.xml").getroot()
+acl_root = ET.parse(args.containers_root / "freeswitch/autoload_configs/acl.conf.xml").getroot()
 for list_name in ("leamout-esl", "leamout-sip"):
     acl_list = acl_root.find(f"./network-lists/list[@name='{list_name}']")
     if acl_list is None or acl_list.get("default") != "deny":
@@ -97,7 +97,7 @@ for list_name in ("leamout-esl", "leamout-sip"):
     if "172.30.0.0/24" in cidrs:
         fail(f"FreeSWITCH {list_name} ACL allows the public-signaling subnet")
 
-profile_root = ET.parse(args.deploy_root / "freeswitch/sip_profiles/internal.xml").getroot()
+profile_root = ET.parse(args.containers_root / "freeswitch/sip_profiles/internal.xml").getroot()
 settings = {
     param.get("name"): param.get("value")
     for param in profile_root.findall("./settings/param")

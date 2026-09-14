@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "containers/**"
+      - "server/scripts/deploy/check-network-zones.py"
       - "tests/acceptance/**/compose.yaml"
       - "tests/acceptance/**/carrier-sip-profile.xml"
       - "tests/acceptance/**/run.sh"
@@ -13,6 +15,8 @@ on:
       - main
     paths:
       - "deploy/**"
+      - "containers/**"
+      - "server/scripts/deploy/check-network-zones.py"
       - "tests/acceptance/**/compose.yaml"
       - "tests/acceptance/**/carrier-sip-profile.xml"
       - "tests/acceptance/**/run.sh"
@@ -44,9 +48,9 @@ jobs:
           TURN_REALM: example.test
         run: |
           docker compose -f deploy/cloud/compose.yaml config --format json \
-            | python3 server/scripts/deploy/check-network-zones.py --deploy-root deploy/cloud
+            | python3 server/scripts/deploy/check-network-zones.py --containers-root containers
           docker compose -f deploy/self-hosted/compose.yaml config --format json \
-            | python3 server/scripts/deploy/check-network-zones.py --deploy-root deploy/self-hosted
+            | python3 server/scripts/deploy/check-network-zones.py --containers-root containers
 
       - name: Validate acceptance overlays resolve the separated networks
         env:

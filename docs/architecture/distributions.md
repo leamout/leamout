@@ -146,15 +146,31 @@ server/
         ├── backoffice/
         └── leamout/
 
+containers/
+├── opensips/
+├── freeswitch/
+├── rtpengine/
+├── coturn/
+└── nats/
+
 deploy/
 ├── cloud/
+│   ├── compose.yaml
+│   └── README.md
 └── self-hosted/
+    ├── compose.yaml
+    ├── .env.example
+    ├── install.sh
+    ├── update.sh
+    ├── uninstall.sh
+    └── README.md
 ```
 
-Each deployment directory is self-contained. There is no generic root Compose file or shared
-OpenSIPS, FreeSWITCH, NATS, Coturn, or RTPengine configuration under `deploy/`, and neither
-distribution reaches into the other distribution's tree. Shared product behavior belongs in
-the server domain and platform packages rather than shared deployment assets.
+Each deployment directory owns its composition, environment contract, and operator documentation.
+Reusable container image sources live under `containers/`; neither distribution reaches into the
+other distribution's tree. Distribution-specific policy remains explicit—for example, OpenSIPS has
+separate Cloud and Self-Hosted configurations—while common image mechanics are maintained once.
+Shared product behavior continues to belong in the server domain and platform packages.
 
 ## Release rule
 
