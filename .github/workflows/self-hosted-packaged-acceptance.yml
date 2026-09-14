@@ -46,7 +46,7 @@ jobs:
           VERSION: 1.0.0-acceptance.1
         run: |
           docker run -d --name leamout-fixture-registry -p 5000:5000 registry:2
-          docker build --target self-hosted -t localhost:5000/leamout/server:$VERSION server
+          docker build --target self-hosted --label org.opencontainers.image.version=$VERSION -t localhost:5000/leamout/server:$VERSION server
           docker build --build-arg DISTRIBUTION=self-hosted -t localhost:5000/leamout/opensips:$VERSION containers/opensips
           docker build -t localhost:5000/leamout/freeswitch:$VERSION containers/freeswitch
           docker build -t localhost:5000/leamout/rtpengine:$VERSION containers/rtpengine
@@ -68,25 +68,36 @@ jobs:
           for image in server opensips freeswitch rtpengine; do
             docker push "localhost:5000/leamout/$image:$VERSION" >/dev/null
           done
-          mkdir -p /tmp/leamout-image-digests
-          local_digest "localhost:5000/leamout/server:$VERSION" > /tmp/leamout-image-digests/server
-          cp /tmp/leamout-image-digests/server /tmp/leamout-image-digests/worker
+          mkdir -p "/tmp/leamout-image-digests/$VERSION"
+          local_digest "localhost:5000/leamout/server:$VERSION" > "/tmp/leamout-image-digests/$VERSION/server"
+          cp "/tmp/leamout-image-digests/$VERSION/server" "/tmp/leamout-image-digests/$VERSION/worker"
           for image in opensips freeswitch rtpengine; do
-            local_digest "localhost:5000/leamout/$image:$VERSION" > "/tmp/leamout-image-digests/$image"
+            local_digest "localhost:5000/leamout/$image:$VERSION" > "/tmp/leamout-image-digests/$VERSION/$image"
           done
-          publish postgres:18-alpine postgres > /tmp/leamout-image-digests/postgres
-          publish redis:8-alpine redis > /tmp/leamout-image-digests/redis
-          publish nats:2-alpine nats > /tmp/leamout-image-digests/nats
-          publish arigaio/atlas:1.3.0-alpine atlas > /tmp/leamout-image-digests/atlas
-          publish coturn/coturn:4.17.0-r0 coturn > /tmp/leamout-image-digests/coturn
+          publish postgres:18-alpine postgres > "/tmp/leamout-image-digests/$VERSION/postgres"
+          publish redis:8-alpine redis > "/tmp/leamout-image-digests/$VERSION/redis"
+          publish nats:2-alpine nats > "/tmp/leamout-image-digests/$VERSION/nats"
+          publish arigaio/atlas:1.3.0-alpine atlas > "/tmp/leamout-image-digests/$VERSION/atlas"
+          publish coturn/coturn:4.17.0-r0 coturn > "/tmp/leamout-image-digests/$VERSION/coturn"
+
+          NEXT_VERSION=1.0.0-acceptance.2
+          cp -a "/tmp/leamout-image-digests/$VERSION" "/tmp/leamout-image-digests/$NEXT_VERSION"
+          docker build --target self-hosted --label org.opencontainers.image.version=$NEXT_VERSION -t localhost:5000/leamout/server:$NEXT_VERSION server
+          docker push "localhost:5000/leamout/server:$NEXT_VERSION" >/dev/null
+          local_digest "localhost:5000/leamout/server:$NEXT_VERSION" > "/tmp/leamout-image-digests/$NEXT_VERSION/server"
+          cp "/tmp/leamout-image-digests/$NEXT_VERSION/server" "/tmp/leamout-image-digests/$NEXT_VERSION/worker"
 
       - name: Build and sign packaged release
-        env:
+            VERSION=$VERSION DIGEST_DIR="/tmp/leamout-image-digests/$VERSION" OUTPUT="/tmp/leamout-release/$VERSION/release-manifest.json" python3 tests/acceptance/self-hosted-lifecycle/release_manifest.py
           VERSION: 1.0.0-acceptance.1
         run: |
-          mkdir -p "/tmp/leamout-release/$VERSION"
-          (cd server && go build -trimpath -ldflags "-s -w -X main.version=$VERSION -X main.commit=$GITHUB_SHA" -o /tmp/leamout ./cmd/leamout)
-          VERSION=$VERSION CLI_BINARY=/tmp/leamout OUT_DIR="/tmp/leamout-release/$VERSION" sh server/scripts/release/package-cli.sh >/dev/null
+          carrier_image=$(cat /tmp/leamout-image-digests/1.0.0-acceptance.1/freeswitch)
+          sudo docker inspect --format '{{.Config.Image}}' "$(sudo docker compose --env-file /etc/leamout/leamout.env -f /var/lib/leamout/runtime/compose.yaml ps -q server)" > /tmp/leamout-pre-upgrade-server-image
+          post_upgrade_image=$(sudo docker inspect --format '{{.Config.Image}}' "$(sudo docker compose --env-file /etc/leamout/leamout.env -f /var/lib/leamout/runtime/compose.yaml ps -q server)")
+          test "$post_upgrade_image" != "$(cat /tmp/leamout-pre-upgrade-server-image)"
+          test "$post_upgrade_image" = "$(cat /tmp/leamout-image-digests/$VERSION/server)"
+          carrier_image=$(cat /tmp/leamout-image-digests/1.0.0-acceptance.1/freeswitch)
+          carrier_image=$(cat /tmp/leamout-image-digests/1.0.0-acceptance.1/freeswitch)
           VERSION=$VERSION OUT_DIR="/tmp/leamout-release/$VERSION" sh server/scripts/release/package-runtime.sh >/dev/null
           VERSION=$VERSION DIGEST_DIR=/tmp/leamout-image-digests OUTPUT="/tmp/leamout-release/$VERSION/release-manifest.json" python3 tests/acceptance/self-hosted-lifecycle/release_manifest.py
           python3 server/scripts/release/validate-manifest.py "/tmp/leamout-release/$VERSION/release-manifest.json"
