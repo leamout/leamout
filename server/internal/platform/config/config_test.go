@@ -61,7 +61,7 @@ func TestDeploymentImportBoundaries(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := append([]string{"list", "-deps"}, tt.packages...)
-			output, err := exec.Command("go", args...).CombinedOutput()
+			output, err := exec.CommandContext(t.Context(), "go", args...).CombinedOutput()
 			if err != nil {
 				t.Fatalf("inspect deployment dependency graph: %v\n%s", err, output)
 			}
