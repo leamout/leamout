@@ -24,6 +24,17 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestVersionFlag(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"--version"}, &stdout, &stderr, BuildInfo{Version: "1.2.3"})
+	if code != 0 {
+		t.Fatalf("Run returned %d: %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "leamout 1.2.3") {
+		t.Fatalf("unexpected version output: %s", stdout.String())
+	}
+}
+
 func TestUnknownCommand(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 	code := Run(context.Background(), []string{"nope"}, &stdout, &stderr, BuildInfo{})
@@ -56,5 +67,16 @@ func TestHelpDoesNotExposeManagedCarrierProvisioning(t *testing.T) {
 		if strings.Contains(strings.ToLower(stdout.String()), forbidden) {
 			t.Fatalf("self-hosted help exposes managed-carrier provisioning %q: %s", forbidden, stdout.String())
 		}
+	}
+}
+
+func TestRestoreRequiresConfirmationOrForce(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	code := Run(context.Background(), []string{"restore", "backup.tar.gz"}, &stdout, &stderr, BuildInfo{})
+	if code != 1 {
+		t.Fatalf("Run returned %d, want 1", code)
+	}
+	if !strings.Contains(stderr.String(), "restore cancelled") {
+		t.Fatalf("unexpected stderr: %s", stderr.String())
 	}
 }
