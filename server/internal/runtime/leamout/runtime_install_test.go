@@ -183,6 +183,23 @@ func TestValidateMinimumCLIVersion(t *testing.T) {
 	}
 }
 
+func TestCompareReleaseVersions(t *testing.T) {
+	for _, test := range []struct {
+		left, right string
+		want        int
+	}{
+		{left: "1.2.0", right: "1.1.9", want: 1},
+		{left: "1.2.0", right: "1.2.0", want: 0},
+		{left: "1.2.0-preview.1", right: "1.2.0", want: -1},
+		{left: "1.2.0-preview.2", right: "1.2.0-preview.1", want: 1},
+	} {
+		got, err := compareReleaseVersions(test.left, test.right)
+		if err != nil || got != test.want {
+			t.Errorf("compareReleaseVersions(%q, %q) = %d, %v; want %d", test.left, test.right, got, err, test.want)
+		}
+	}
+}
+
 func TestInstallRuntimeBundleReplacesOlderVersion(t *testing.T) {
 	root := t.TempDir()
 	runtimeDir := filepath.Join(root, "runtime")
@@ -237,5 +254,55 @@ func TestInstallRuntimeBundlePreservesOlderVersionWhenStagingFails(t *testing.T)
 	}
 	if installed != oldVersion {
 		t.Fatalf("installed runtime = %q, want preserved %q", installed, oldVersion)
+	}
+}
+
+func TestRuntimeUpdateCanCommitOrRollback(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "runtime")
+	oldVersion := "1.0.0-preview.1"
+	newVersion := "1.0.0-preview.2"
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, oldVersion), runtimeDir, oldVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, newVersion), runtimeDir, newVersion); err != nil {
+		t.Fatal(err)
+	}
+	if previous, err := installedRuntimeVersion(runtimeDir + ".previous"); err != nil || previous != oldVersion {
+		t.Fatalf("previous runtime = %q, %v; want %q", previous, err, oldVersion)
+	}
+	if err := rollbackRuntimeUpdate(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	if current, err := installedRuntimeVersion(runtimeDir); err != nil || current != oldVersion {
+		t.Fatalf("rolled back runtime = %q, %v; want %q", current, err, oldVersion)
+	}
+
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, newVersion), runtimeDir, newVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitRuntimeUpdate(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(runtimeDir + ".previous"); !os.IsNotExist(err) {
+		t.Fatalf("previous runtime retained after commit: %v", err)
+	}
+}
+
+func TestRuntimeRollbackRecoversInterruptedFilesystemSwap(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "runtime")
+	version := "1.0.0"
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, version), runtimeDir, version); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(runtimeDir, runtimeDir+".previous"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rollbackRuntimeUpdate(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	if installed, err := installedRuntimeVersion(runtimeDir); err != nil || installed != version {
+		t.Fatalf("recovered runtime = %q, %v; want %q", installed, err, version)
 	}
 }

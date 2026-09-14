@@ -135,8 +135,11 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 		return fmt.Errorf("write installed runtime metadata: %w", err)
 	}
 
-	previousRuntime := filepath.Join(workdir, "previous-runtime")
+	previousRuntime := runtimeDir + ".previous"
 	if exists {
+		if err := os.RemoveAll(previousRuntime); err != nil {
+			return fmt.Errorf("remove stale previous runtime: %w", err)
+		}
 		if err := os.Rename(runtimeDir, previousRuntime); err != nil {
 			return fmt.Errorf("preserve previous runtime before installing %q: %w", manifest.ReleaseVersion, err)
 		}
@@ -156,6 +159,49 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 			return fmt.Errorf("validate installed runtime: %w; restore previous runtime: %w", err, removeErr)
 		}
 		return fmt.Errorf("validate installed runtime: %w", err)
+	}
+	return nil
+}
+
+func commitRuntimeUpdate(runtimeDir string) error {
+	if err := os.RemoveAll(runtimeDir + ".previous"); err != nil {
+		return fmt.Errorf("remove previous runtime after successful update: %w", err)
+	}
+	return nil
+}
+
+func rollbackRuntimeUpdate(runtimeDir string) error {
+	previousRuntime := runtimeDir + ".previous"
+	exists, err := pathExists(previousRuntime)
+	if err != nil {
+		return fmt.Errorf("inspect previous runtime: %w", err)
+	}
+	if !exists {
+		return errors.New("previous runtime is unavailable")
+	}
+	currentExists, err := pathExists(runtimeDir)
+	if err != nil {
+		return fmt.Errorf("inspect current runtime: %w", err)
+	}
+	if !currentExists {
+		if err := os.Rename(previousRuntime, runtimeDir); err != nil {
+			return fmt.Errorf("restore previous runtime: %w", err)
+		}
+		return nil
+	}
+	failedRuntime := runtimeDir + ".failed"
+	if err := os.RemoveAll(failedRuntime); err != nil {
+		return fmt.Errorf("remove stale failed runtime: %w", err)
+	}
+	if err := os.Rename(runtimeDir, failedRuntime); err != nil {
+		return fmt.Errorf("preserve failed runtime: %w", err)
+	}
+	if err := os.Rename(previousRuntime, runtimeDir); err != nil {
+		_ = os.Rename(failedRuntime, runtimeDir)
+		return fmt.Errorf("restore previous runtime: %w", err)
+	}
+	if err := os.RemoveAll(failedRuntime); err != nil {
+		return fmt.Errorf("remove failed runtime after rollback: %w", err)
 	}
 	return nil
 }
@@ -236,6 +282,35 @@ func validateMinimumCLIVersion(cliVersion, minimum string) error {
 		return nil
 	}
 	return fmt.Errorf("release requires leamout CLI %s or newer; installed CLI is %s", minimum, cliVersion)
+}
+
+func compareReleaseVersions(left, right string) (int, error) {
+	l, err := parseReleaseVersion(left)
+	if err != nil {
+		return 0, err
+	}
+	r, err := parseReleaseVersion(right)
+	if err != nil {
+		return 0, err
+	}
+	for i := range 3 {
+		if l.numbers[i] < r.numbers[i] {
+			return -1, nil
+		}
+		if l.numbers[i] > r.numbers[i] {
+			return 1, nil
+		}
+	}
+	if l.prerelease == r.prerelease {
+		return 0, nil
+	}
+	if l.prerelease == "" {
+		return 1, nil
+	}
+	if r.prerelease == "" {
+		return -1, nil
+	}
+	return comparePrerelease(l.prerelease, r.prerelease), nil
 }
 
 func comparePrerelease(left, right string) int {

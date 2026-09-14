@@ -501,10 +501,17 @@ An update is a controlled release transition, not `git pull && docker compose up
 
 The update command installs the runtime artifact already staged and verified by
 the bootstrap installer for the CLI's exact version and rejects manifests that
-require a newer CLI. It pulls immutable images, drains OpenSIPS and FreeSWITCH
-admission until active sessions reach zero, recreates services, and then resumes
-admission. Disk-space validation, automatic backup, readiness waiting, and
-process-level rollback remain before this is a zero-downtime orchestrator.
+require a newer CLI. Before mutation it creates a PostgreSQL/configuration backup.
+It then pulls immutable images, drains OpenSIPS and FreeSWITCH admission until
+active sessions reach zero, recreates services, waits for Compose health, and
+resumes admission. A failed candidate restores both the prior runtime definition
+and the pre-update backup. Disk-space preflight remains required before general
+availability.
+
+Update progress is recorded durably. If the CLI or host is interrupted after the
+runtime switch, a later `leamout update` refuses to overwrite the recovery point;
+the operator must run `sudo leamout update --rollback` to restore the previous
+runtime and pre-update database/configuration backup.
 
 ## Restart behavior
 
@@ -690,6 +697,9 @@ The hosted console can then show the registered deployment without becoming part
 
 - [x] Add `leamout update` with release compatibility checks.
 - [x] Integrate graceful drain into the update path.
+- [x] Preserve and restore the previous runtime and pre-update backup on failure.
+- [x] Exercise install, initialize, update, and safe uninstall from packaged release fixtures.
+- [x] Inject a candidate startup failure and verify automatic packaged-release rollback.
 - [x] Add `leamout backup` and `leamout restore`.
 - [ ] Add support-bundle generation and deterministic redaction.
 - [ ] Add non-interactive initialization.

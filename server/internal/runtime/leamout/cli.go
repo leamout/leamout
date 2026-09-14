@@ -161,7 +161,7 @@ Commands:
   license    Install or verify a signed offline license
   backup     Create a portable deployment backup
   restore    Restore a deployment backup
-  update     Install and start the runtime staged for this CLI version
+  update     Install the staged runtime, or recover with update --rollback
   version    Print CLI build information
   help       Show this help`)
 }
