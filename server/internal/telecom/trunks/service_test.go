@@ -9,29 +9,27 @@ import (
 	"github.com/leamout/leamout/pkg/hasher"
 )
 
-func TestCreateManagedTrunkRequiresDatabase(t *testing.T) {
+func TestCreateCustomerTrunkRejectsManagedMode(t *testing.T) {
 	service := NewService(nil)
 
 	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{
 		Type: ProvisioningModeManaged,
-		Name: "Leamout managed",
+		Name: "Leamout Carrier",
 	})
 	if err == nil {
-		t.Fatal("managed trunk creation succeeded without database")
+		t.Fatal("customer trunk accepted managed mode")
 	}
 }
 
-func TestCreateManagedTrunkRejectsCarrierConnection(t *testing.T) {
+func TestCreateCustomerTrunkRequiresCarrierConnection(t *testing.T) {
 	service := NewService(nil)
-	connectionID := uuid.New()
 
 	_, err := service.Create(context.Background(), uuid.New(), CreateRequest{
-		Type:                ProvisioningModeManaged,
-		CarrierConnectionID: &connectionID,
-		Name:                "Leamout managed",
+		Type: ProvisioningModeBYOC,
+		Name: "Customer carrier",
 	})
 	if err == nil {
-		t.Fatal("managed trunk accepted a customer carrier_connection_id")
+		t.Fatal("customer trunk accepted a missing carrier_connection_id")
 	}
 }
 
