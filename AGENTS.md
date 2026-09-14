@@ -9,8 +9,10 @@ Leamout is a programmable communications control plane for building and operatin
 Leamout must preserve these product principles:
 
 - BYOC is first-class. Customers must not be forced onto Leamout-managed carrier connectivity.
-- Self-hosted and Leamout Cloud should expose the same communications model.
-- Runtime placement and connectivity ownership are independent choices.
+- Self-hosted and Leamout Cloud should expose the same communications resource model.
+- Self-hosted connectivity is BYOC: the customer selects and configures the carrier, including Leamout Carrier if desired.
+- Leamout Cloud supports both customer-selected BYOC and Leamout-managed connectivity.
+- An organization-scoped Leamout Carrier connection is BYOC; provider brand must not determine connectivity mode.
 - Carrier and payment providers are adapters, not sources of Leamout domain truth.
 - PostgreSQL is the authoritative durable state store.
 - Redis is ephemeral coordination/cache state and must never become the monetary source of truth.
@@ -23,13 +25,15 @@ The product roadmap is:
 
 0. Control-plane primitives
 1. Self-Hosted + BYOC
-2. Self-Hosted + Managed Carrier
+2. Leamout Carrier as a supported BYOC provider
 3. Leamout Cloud + BYOC
-4. Leamout Cloud + Managed Carrier
+4. Leamout Cloud + Managed
 5. Multi-carrier orchestration
 6. Number provisioning + lifecycle
 7. Messaging + realtime media + AI
 8. Direct carrier connectivity / full CPaaS
+
+There is no separate Self-Hosted + Managed Carrier delivery mode. A self-hosted customer choosing Leamout Carrier remains Self-Hosted + BYOC; Leamout is acting as the telecom provider for that carrier connection.
 
 Do not introduce later-stage architecture merely because it may be useful someday. Build from the current stable primitives and implement only what the active task or current roadmap stage requires.
 
@@ -83,6 +87,7 @@ Commercial invariants:
 - A successful payment Settlement is interpreted by Checkout.
 - Wallet ledger entries are immutable. Corrections, refunds, and chargebacks are compensating entries.
 - Managed-provider obligations require prepaid authorization before Leamout incurs upstream cost.
+- Self-Hosted software licensing and Leamout Carrier telecom charging are separate commercial relationships even when the same customer uses both.
 - Customer-facing prices and upstream wholesale/provider cost are separate concepts.
 - `prices` is the customer-facing pricing primitive. Do not resurrect removed parallel customer-rate models without an explicit architecture decision.
 - Recording a usage event does not automatically make it billable.
@@ -95,10 +100,15 @@ Commercial invariants:
 - FreeSWITCH is an internal application-media worker for programmable media behavior.
 - Coturn provides STUN/TURN relay for browser/WebRTC clients.
 - Carrier-specific behavior belongs behind adapters.
-- A requested BYOC route must never silently fall back to managed routing.
-- Managed routing must never silently consume a customer's BYOC trunk.
+- Organization-scoped carrier connections are customer-selected/BYOC resources regardless of provider slug.
+- `provider = leamout` on an organization-scoped carrier connection must remain BYOC.
+- Platform-scoped carrier connections are internal Leamout upstream resources for Cloud Managed connectivity.
+- Trunk endpoints inherit ownership/connectivity semantics from their carrier connection; endpoints must not carry an independent BYOC/managed type.
+- Self-hosted customer telecom resources must not expose a managed connectivity mode.
+- A requested BYOC route must never silently fall back to Cloud-managed routing.
+- Cloud-managed routing must never silently consume a customer's BYOC trunk.
 - Managed-number provider and managed-termination provider are allowed to differ.
-- Do not add multi-carrier/LCR behavior until the single-carrier managed/BYOC contracts and acceptance gates remain reliable.
+- Do not add multi-carrier/LCR behavior until the single-carrier Cloud-managed/BYOC contracts and acceptance gates remain reliable.
 
 ## Persistence
 
@@ -153,7 +163,7 @@ Also run targeted package tests while iterating.
 
 When SQL/query sources change, regenerate SQLC and verify that regeneration is clean. When Templ sources change, regenerate Templ output. Check the repository workflows/Makefile for the exact current commands rather than inventing a different tool version.
 
-Security-sensitive or telecom-runtime changes should preserve the relevant acceptance gates, including BYOC, Voice, WebRTC, managed carrier, SIP edge, and graceful-drain behavior where applicable.
+Security-sensitive or telecom-runtime changes should preserve the relevant acceptance gates, including BYOC, Voice, WebRTC, Leamout Carrier, Cloud Managed, SIP edge, and graceful-drain behavior where applicable.
 
 ## Change discipline
 
