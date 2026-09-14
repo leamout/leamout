@@ -65,7 +65,7 @@ SELECT
     cc.max_daily_minutes
 FROM phone_numbers AS pn
 JOIN carrier_connections AS cc
-  ON cc.id = pn.carrier_connection_id
+  ON cc.id = sqlc.arg(carrier_connection_id)
 JOIN voice_bindings AS vb
   ON vb.phone_number_id = pn.id
 JOIN voice_applications AS va
@@ -75,7 +75,6 @@ JOIN organizations AS o
 WHERE pn.id = sqlc.arg(phone_number_id)
   AND pn.organization_id = sqlc.arg(organization_id)
   AND pn.number = sqlc.arg(called_number)
-  AND pn.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND pn.status = 'active'
   AND pn.voice_enabled = true
   AND cc.status = 'active'
@@ -84,12 +83,12 @@ WHERE pn.id = sqlc.arg(phone_number_id)
       (
           cc.scope = 'organization'
           AND cc.organization_id = pn.organization_id
-          AND pn.provisioning_mode = 'byoc'
+          AND pn.carrier_connection_id = cc.id
       )
       OR (
           cc.scope = 'platform'
           AND cc.organization_id IS NULL
-          AND pn.provisioning_mode = 'managed'
+          AND pn.provider_connection_id = cc.id
       )
   )
   AND va.id = sqlc.arg(application_id)
