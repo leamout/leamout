@@ -89,8 +89,9 @@ func TestResolveOutboundUsesExplicitBYOCTrunk(t *testing.T) {
 			Scope:          "organization",
 		},
 		phone: sqlc.PhoneNumber{
-			OrganizationID: organizationID,
-			Number:         "+233200000001", ProvisioningMode: "byoc", VoiceEnabled: true,
+			OrganizationID:      organizationID,
+			Number:              "+233200000001",
+			VoiceEnabled:        true,
 			CarrierConnectionID: &connectionID,
 		},
 		endpoints: []sqlc.TrunkEndpoint{{
@@ -172,7 +173,8 @@ func TestResolveExplicitCloudManagedTrunkUsesManagedRoute(t *testing.T) {
 		},
 		phone: sqlc.PhoneNumber{
 			OrganizationID: organizationID,
-			Number:         "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+			Number:         "+233200000001",
+			VoiceEnabled:   true,
 		},
 		managedRoutes: []managedRouteCandidate{{
 			CarrierConnectionID: managedConnectionID,
@@ -221,7 +223,9 @@ func TestResolveManagedOutboundWithoutTrunk(t *testing.T) {
 
 	store := &fakeRouteStore{
 		phone: sqlc.PhoneNumber{
-			OrganizationID: organizationID, Number: "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+			OrganizationID:      organizationID,
+			Number:              "+233200000001",
+			VoiceEnabled:        true,
 			CarrierConnectionID: &numberConnectionID,
 		},
 		managedRoutes: []managedRouteCandidate{{
@@ -265,10 +269,9 @@ func TestResolveManagedOutboundReturnsNoRouteWithoutDefault(t *testing.T) {
 	organizationID := uuid.New()
 	store := &fakeRouteStore{
 		phone: sqlc.PhoneNumber{
-			OrganizationID:   organizationID,
-			Number:           "+233200000001",
-			ProvisioningMode: "managed",
-			VoiceEnabled:     true,
+			OrganizationID: organizationID,
+			Number:         "+233200000001",
+			VoiceEnabled:   true,
 		},
 	}
 	resolver := &Resolver{repo: store}
@@ -280,7 +283,7 @@ func TestResolveManagedOutboundReturnsNoRouteWithoutDefault(t *testing.T) {
 	}
 }
 
-func TestResolveOutboundRejectsBYOCCallerIdentityFromAnotherCarrier(t *testing.T) {
+func TestResolveOutboundRejectsCallerIdentityFromAnotherCarrier(t *testing.T) {
 	organizationID, trunkID := uuid.New(), uuid.New()
 	connectionID, otherConnectionID := uuid.New(), uuid.New()
 	resolver := &Resolver{repo: &fakeRouteStore{
@@ -290,33 +293,10 @@ func TestResolveOutboundRejectsBYOCCallerIdentityFromAnotherCarrier(t *testing.T
 		},
 		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization"},
 		phone: sqlc.PhoneNumber{
-			OrganizationID: organizationID,
-			Number:         "+233200000001", ProvisioningMode: "byoc", VoiceEnabled: true,
+			OrganizationID:      organizationID,
+			Number:              "+233200000001",
+			VoiceEnabled:        true,
 			CarrierConnectionID: &otherConnectionID,
-		},
-	}}
-
-	_, err := resolver.resolveOutbound(context.Background(), OutboundRequest{
-		OrganizationID: organizationID, TrunkID: uuidPtr(trunkID), From: "+233200000001", To: "+14155550100",
-	})
-	if !errors.Is(err, ErrCallerIdentity) {
-		t.Fatalf("error = %v, want %v", err, ErrCallerIdentity)
-	}
-}
-
-func TestResolveOutboundRejectsManagedNumberOnBYOCTrunk(t *testing.T) {
-	organizationID, trunkID := uuid.New(), uuid.New()
-	connectionID := uuid.New()
-	resolver := &Resolver{repo: &fakeRouteStore{
-		trunk: sqlc.Trunk{
-			ID: trunkID, OrganizationID: uuidPtr(organizationID),
-			CarrierConnectionID: uuidPtr(connectionID), ProvisioningMode: "byoc",
-		},
-		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization"},
-		phone: sqlc.PhoneNumber{
-			OrganizationID: organizationID,
-			Number:         "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
-			CarrierConnectionID: &connectionID,
 		},
 	}}
 
@@ -382,7 +362,7 @@ func TestResolveInboundOrganizationConnection(t *testing.T) {
 		connection: sqlc.CarrierConnection{ID: connectionID, OrganizationID: uuidPtr(organizationID), Scope: "organization"},
 		inboundPhone: sqlc.PhoneNumber{
 			ID: phoneNumberID, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
-			Number: "+233200000001", ProvisioningMode: "byoc", VoiceEnabled: true,
+			Number: "+233200000001", VoiceEnabled: true,
 		},
 		binding: sqlc.GetVoiceBindingByNumberRow{
 			VoiceApplicationID: applicationID, PhoneNumberID: phoneNumberID,
@@ -408,8 +388,8 @@ func TestResolveInboundCloudManagedStaysOnLocalRuntimePath(t *testing.T) {
 	store := &fakeRouteStore{
 		connection: sqlc.CarrierConnection{ID: connectionID, Scope: "platform"},
 		inboundPhone: sqlc.PhoneNumber{
-			ID: phoneNumberID, OrganizationID: organizationID, CarrierConnectionID: &connectionID,
-			Number: "+233200000001", ProvisioningMode: "managed", VoiceEnabled: true,
+			ID: phoneNumberID, OrganizationID: organizationID, ProviderConnectionID: &connectionID,
+			Number: "+233200000001", VoiceEnabled: true,
 		},
 		binding: sqlc.GetVoiceBindingByNumberRow{
 			VoiceApplicationID: uuid.New(), PhoneNumberID: phoneNumberID,
@@ -429,14 +409,14 @@ func TestResolveInboundCloudManagedStaysOnLocalRuntimePath(t *testing.T) {
 	}
 }
 
-func TestResolveInboundRejectsBYOCNumberOnPlatformConnection(t *testing.T) {
+func TestResolveInboundRejectsCustomerBindingOnPlatformConnection(t *testing.T) {
 	organizationID := uuid.New()
 	connectionID := uuid.New()
 	resolver := &Resolver{repo: &fakeRouteStore{
 		connection: sqlc.CarrierConnection{ID: connectionID, Scope: "platform"},
 		inboundPhone: sqlc.PhoneNumber{
 			ID: uuid.New(), OrganizationID: organizationID, CarrierConnectionID: &connectionID,
-			Number: "+233200000001", ProvisioningMode: "byoc", VoiceEnabled: true,
+			Number: "+233200000001", VoiceEnabled: true,
 		},
 	}}
 
