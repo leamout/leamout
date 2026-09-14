@@ -125,7 +125,7 @@ func (r *Repository) ResolveInboundPhoneNumber(
 	number string,
 ) (sqlc.PhoneNumber, error) {
 	return r.queries.ResolveInboundPhoneNumber(ctx, sqlc.ResolveInboundPhoneNumberParams{
-		CarrierConnectionID: &carrierConnectionID,
+		CarrierConnectionID: carrierConnectionID,
 		Number:              number,
 	})
 }
