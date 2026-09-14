@@ -162,10 +162,11 @@ END;
 $$;
 
 CREATE TRIGGER derive_trunk_organization_id
-BEFORE INSERT OR UPDATE OF carrier_connection_id ON trunks
+BEFORE INSERT OR UPDATE OF organization_id, carrier_connection_id ON trunks
 FOR EACH ROW
 EXECUTE FUNCTION derive_trunk_organization_id();
 
+-- Endpoint organization ownership always follows its parent trunk.
 CREATE FUNCTION derive_trunk_endpoint_organization_id()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -180,7 +181,7 @@ END;
 $$;
 
 CREATE TRIGGER derive_trunk_endpoint_organization_id
-BEFORE INSERT OR UPDATE OF trunk_id ON trunk_endpoints
+BEFORE INSERT OR UPDATE OF organization_id, trunk_id ON trunk_endpoints
 FOR EACH ROW
 EXECUTE FUNCTION derive_trunk_endpoint_organization_id();
 
