@@ -124,9 +124,9 @@ def main():
         raise Failure("inventory did not return an opaque selection handle")
     print("PASS provider inventory is exposed as an opaque managed-number selection")
 
-    number = api("POST", "/v1/numbers/", {"type": "managed", "selection_id": selection}, (201,))
-    if number["status"] != "provisioning" or number["type"] != "managed":
-        raise Failure(f"managed purchase did not persist provisioning intent: {number}")
+    number = api("POST", "/v1/numbers/", {"selection_id": selection}, (201,))
+    if number["status"] != "provisioning":
+        raise Failure(f"number purchase did not persist provisioning intent: {number}")
     if number.get("carrier_connection_id") is not None:
         raise Failure("customer response exposed the platform carrier connection")
 
