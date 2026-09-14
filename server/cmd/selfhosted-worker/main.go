@@ -24,7 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	worker, err := selfhostedworkerruntime.NewSelfHosted(ctx, cfg)
+	worker, err := selfhostedworkerruntime.New(ctx, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

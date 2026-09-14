@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-CERT_DIR="${CERT_DIR:-deploy/certs}"
+CERT_DIR="${CERT_DIR:-deploy/self-hosted/certs}"
 TLS_DOMAIN="${TLS_DOMAIN:-}"
 TLS_EMAIL="${TLS_EMAIL:-}"
 CERTBOT_BIN="${CERTBOT_BIN:-certbot}"

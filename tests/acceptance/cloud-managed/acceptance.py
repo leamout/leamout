@@ -15,7 +15,7 @@ TOKEN_B = os.getenv("CLOUD_MANAGED_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghij
 EDGE_SECRET = os.environ["MANAGED_SIP_ADMISSION_SECRET"]
 ESL_PASSWORD = os.environ["FREESWITCH_ESL_PASSWORD"]
 DID = "+15551236001"
-COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
+COMPOSE = ["docker", "compose", "-f", "deploy/cloud/compose.yaml", "-f", "tests/acceptance/cloud-managed/compose.yaml"]
 
 
 class Failure(RuntimeError):

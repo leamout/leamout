@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "containers/**"
       - "server/**"
       - "tests/acceptance/self-hosted-managed/**"
       - ".github/workflows/self-hosted-managed-acceptance.yml"

@@ -19,7 +19,7 @@ The repository must share product behavior while keeping deployment and commerci
              │                                   │
        prepaid PAYG                      enterprise license
              │                                   │
-      BYOC + Managed                  BYOC + optional Managed
+      BYOC + Managed                       BYOC core
 ```
 
 Cloud and Self-Hosted are not forks and must not duplicate telecom, identity, tenancy, or shared platform code.
@@ -48,7 +48,7 @@ Cloud is prepaid PAYG.
 
 Self-Hosted BYOC is governed by the enterprise software license and must not require wallet balance for customer-owned carrier usage.
 
-Self-Hosted Managed combines the enterprise software license with prepaid authorization for Leamout-managed provider obligations.
+A future Self-Hosted Managed composition may combine the enterprise software license with prepaid authorization for Leamout-managed provider obligations, but it is not part of the current Self-Hosted BYOC runtime.
 
 ```text
 Cloud
@@ -86,6 +86,17 @@ There is no generic `internal/app`, `runtime/server`, or `runtime/worker` layer.
 Shared behavior belongs in the existing reusable domain and platform packages such as `identity`, `tenancy`, `telecom`, `commercial`, `integrations`, and `platform`.
 
 Runtime packages may contain executable-specific wiring, routes, health checks, and worker orchestration. That composition glue may differ between Cloud and Self-Hosted while the actual product capabilities remain shared.
+
+Worker runtime composition uses the same four-file contract in both distributions:
+
+```text
+consumers.go  asynchronous inputs and consumer construction
+health.go     liveness, readiness, and component health state
+modules.go    runtime dependency and background-module composition
+worker.go     worker lifecycle, component registry, and shutdown
+```
+
+Do not split individual jobs into one-file wrappers inside a runtime package. Job behavior remains in the domain package that owns it; runtime worker files only compose and run those jobs.
 
 ## Dependency rule
 
@@ -135,10 +146,31 @@ server/
         ├── backoffice/
         └── leamout/
 
+containers/
+├── opensips/
+├── freeswitch/
+├── rtpengine/
+├── coturn/
+└── nats/
+
 deploy/
 ├── cloud/
+│   ├── compose.yaml
+│   └── README.md
 └── self-hosted/
+    ├── compose.yaml
+    ├── .env.example
+    ├── install.sh
+    ├── update.sh
+    ├── uninstall.sh
+    └── README.md
 ```
+
+Each deployment directory owns its composition, environment contract, and operator documentation.
+Reusable container image sources live under `containers/`; neither distribution reaches into the
+other distribution's tree. Distribution-specific policy remains explicit—for example, OpenSIPS has
+separate Cloud and Self-Hosted configurations—while common image mechanics are maintained once.
+Shared product behavior continues to belong in the server domain and platform packages.
 
 ## Release rule
 
@@ -157,3 +189,19 @@ Self-Hosted release artifacts must contain only what is required to operate Leam
 5. Attach wallet authorization only to managed-provider paths.
 6. Split Cloud and Self-Hosted release composition where needed.
 7. Keep acceptance coverage proving Cloud, Self-Hosted BYOC, and Self-Hosted Managed independently.
+
+## Deployment compositions
+
+The source tree exposes independent Compose entry points:
+
+```text
+deploy/cloud/compose.yaml         Cloud API, Cloud worker, Backoffice, managed providers, and PAYG
+deploy/self-hosted/compose.yaml   Self-Hosted API and worker with customer-owned BYOC connectivity
+```
+
+`make` defaults to the Self-Hosted composition. Operators and CI can select Cloud explicitly with
+`COMPOSE_FILE=deploy/cloud/compose.yaml`. The Self-Hosted image contains the runtime server, worker,
+and `leamout` lifecycle CLI; it does not contain Backoffice. Its API and worker dependency graphs
+exclude Commercial, payment adapters, managed-provider jobs, provider diagnostics, and managed SIP/CDR
+internal handlers. Offline software-license validation remains in the `leamout` lifecycle boundary and
+does not introduce wallet authorization into the communications runtime.

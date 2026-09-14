@@ -22,7 +22,7 @@ CALLER = os.getenv("VOICE_V1_CALLER", "+15557654321")
 ORG_ID = "00000000-0000-0000-0000-000000001001"
 COMPOSE = [
     "docker", "compose",
-    "-f", "deploy/compose.yaml",
+    "-f", "deploy/self-hosted/compose.yaml",
     "-f", "tests/acceptance/voice-v1/compose.yaml",
 ]
 

@@ -21,7 +21,7 @@ COMPOSE = [
     "docker",
     "compose",
     "-f",
-    "deploy/compose.yaml",
+    "deploy/self-hosted/compose.yaml",
     "-f",
     "tests/acceptance/graceful-drain/compose.yaml",
 ]

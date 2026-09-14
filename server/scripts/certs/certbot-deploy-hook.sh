@@ -1,10 +1,10 @@
 #!/bin/sh
 set -eu
 
-CERT_DIR="${CERT_DIR:-deploy/certs}"
+CERT_DIR="${CERT_DIR:-deploy/self-hosted/certs}"
 TLS_DOMAIN="${TLS_DOMAIN:-}"
 ENV_FILE="${ENV_FILE:-.env}"
-COMPOSE_FILE="${COMPOSE_FILE:-deploy/compose.yaml}"
+COMPOSE_FILE="${COMPOSE_FILE:-deploy/self-hosted/compose.yaml}"
 RESTART_OPENSIPS="${RESTART_OPENSIPS:-1}"
 lineage="${RENEWED_LINEAGE:-}"
 renewed_domains="${RENEWED_DOMAINS:-}"

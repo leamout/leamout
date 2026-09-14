@@ -14,7 +14,7 @@ export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export TURN_REALM="${TURN_REALM:-managed-edge.local}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
-COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/managed-sip-edge/compose.yaml"
+COMPOSE="docker compose -f deploy/cloud/compose.yaml -f tests/acceptance/managed-sip-edge/compose.yaml"
 
 cleanup() {
     status=$?; trap - EXIT INT TERM

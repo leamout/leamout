@@ -7,7 +7,7 @@ TOKEN_B = os.getenv("BYOC_V1_TOKEN_B", "lm_org_v1smoke1_v1smoke1abcdefghijklmnop
 ESL_PASSWORD = os.getenv("FREESWITCH_ESL_PASSWORD", "byoc-v1-esl-secret")
 SUITE_DIR = os.getenv("BYOC_V1_SUITE_DIR", os.path.dirname(os.path.abspath(__file__)))
 DID, CALLER = "+15551234567", "+15557654321"
-COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/byoc-v1/compose.yaml"]
+COMPOSE = ["docker", "compose", "-f", "deploy/self-hosted/compose.yaml", "-f", "tests/acceptance/byoc-v1/compose.yaml"]
 S, RESULTS = {}, []
 
 class Failure(RuntimeError): pass

@@ -9,14 +9,13 @@ export VOICE_V1_SUITE_DIR="$SCRIPT_DIR"
 export VOICE_V1_CERT_DIR="$CERT_DIR"
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-voice-v1-esl-secret}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
-export MANAGED_SIP_ADMISSION_SECRET="${MANAGED_SIP_ADMISSION_SECRET:-$(openssl rand -hex 32)}"
 export TURN_REALM="${TURN_REALM:-voice-v1.local}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-voice-v1-turn-secret-0123456789abcdef}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 
-COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/voice-v1/compose.yaml"
+COMPOSE="docker compose -f deploy/self-hosted/compose.yaml -f tests/acceptance/voice-v1/compose.yaml"
 
 cleanup() {
     status=$?

@@ -8,7 +8,6 @@ CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-webrtc-v1.XXXXXX")
 export WEBRTC_V1_CERT_DIR="$CERT_DIR"
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-webrtc-v1-esl-secret}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
-export MANAGED_SIP_ADMISSION_SECRET="${MANAGED_SIP_ADMISSION_SECRET:-$(openssl rand -hex 32)}"
 export TURN_REALM="${TURN_REALM:-webrtc-v1.local}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-webrtc-v1-turn-secret-0123456789abcdef}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
@@ -18,7 +17,7 @@ export LEAMOUT_API_URL="${LEAMOUT_API_URL:-http://127.0.0.1:8080}"
 export LEAMOUT_API_TOKEN="${LEAMOUT_API_TOKEN:-lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx}"
 export LEAMOUT_WSS_URL="${LEAMOUT_WSS_URL:-wss://127.0.0.1:5062}"
 
-COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/webrtc-v1/compose.yaml"
+COMPOSE="docker compose -f deploy/self-hosted/compose.yaml -f tests/acceptance/webrtc-v1/compose.yaml"
 
 cleanup() {
     status=$?

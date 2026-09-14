@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import hashlib, json, os, random, re, socket, subprocess, sys, time, urllib.request
 
-COMPOSE = ["docker", "compose", "-f", "deploy/compose.yaml", "-f", "tests/acceptance/managed-sip-edge/compose.yaml"]
+COMPOSE = ["docker", "compose", "-f", "deploy/cloud/compose.yaml", "-f", "tests/acceptance/managed-sip-edge/compose.yaml"]
 REALM, USER, PASSWORD = "sip.leamout.com", "edge-user", "edge-password"
 CALLER, FOREIGN, DESTINATION = "+15551234001", "+15551234999", "+15551234002"
 ORG, TRUNK = "00000000-0000-0000-0000-000000004001", "00000000-0000-0000-0000-000000004030"

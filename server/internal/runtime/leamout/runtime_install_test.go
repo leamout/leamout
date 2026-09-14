@@ -135,6 +135,71 @@ func TestInstallRuntimeBundleRejectsTamperedArchive(t *testing.T) {
 	}
 }
 
+func TestInstallRuntimeBundleRejectsNewerMinimumCLI(t *testing.T) {
+	root := t.TempDir()
+	version := "1.0.0-preview.1"
+	releaseDir := stageRuntimeRelease(t, root, version)
+	manifestPath := filepath.Join(releaseDir, "release-manifest.json")
+	content, err := os.ReadFile(manifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]any
+	if err := json.Unmarshal(content, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest["minimum_cli_version"] = "1.1.0"
+	content, err = json.MarshalIndent(manifest, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, append(content, '\n'), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	err = installRuntimeBundle(releaseDir, filepath.Join(root, "runtime"), version)
+	if err == nil || !strings.Contains(err.Error(), "requires leamout CLI 1.1.0 or newer") {
+		t.Fatalf("expected minimum CLI rejection, got %v", err)
+	}
+}
+
+func TestValidateMinimumCLIVersion(t *testing.T) {
+	for _, test := range []struct {
+		cli, minimum string
+		wantError    bool
+	}{
+		{cli: "1.2.0", minimum: "1.1.9"},
+		{cli: "1.2.0", minimum: "1.2.0"},
+		{cli: "1.2.0", minimum: "1.2.0-preview.2"},
+		{cli: "1.2.0-preview.2", minimum: "1.2.0-preview.1"},
+		{cli: "1.2.0-preview.1", minimum: "1.2.0", wantError: true},
+		{cli: "1.2.0-preview.1", minimum: "1.2.0-preview.2", wantError: true},
+		{cli: "1.1.9", minimum: "1.2.0", wantError: true},
+	} {
+		err := validateMinimumCLIVersion(test.cli, test.minimum)
+		if (err != nil) != test.wantError {
+			t.Errorf("validateMinimumCLIVersion(%q, %q) error = %v, wantError %v", test.cli, test.minimum, err, test.wantError)
+		}
+	}
+}
+
+func TestCompareReleaseVersions(t *testing.T) {
+	for _, test := range []struct {
+		left, right string
+		want        int
+	}{
+		{left: "1.2.0", right: "1.1.9", want: 1},
+		{left: "1.2.0", right: "1.2.0", want: 0},
+		{left: "1.2.0-preview.1", right: "1.2.0", want: -1},
+		{left: "1.2.0-preview.2", right: "1.2.0-preview.1", want: 1},
+	} {
+		got, err := compareReleaseVersions(test.left, test.right)
+		if err != nil || got != test.want {
+			t.Errorf("compareReleaseVersions(%q, %q) = %d, %v; want %d", test.left, test.right, got, err, test.want)
+		}
+	}
+}
+
 func TestInstallRuntimeBundleReplacesOlderVersion(t *testing.T) {
 	root := t.TempDir()
 	runtimeDir := filepath.Join(root, "runtime")
@@ -164,5 +229,80 @@ func TestInstallRuntimeBundleReplacesOlderVersion(t *testing.T) {
 	}
 	if installed.ReleaseVersion != newVersion {
 		t.Fatalf("installed runtime version = %q, want %q", installed.ReleaseVersion, newVersion)
+	}
+}
+
+func TestInstallRuntimeBundlePreservesOlderVersionWhenStagingFails(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "runtime")
+	oldVersion := "1.0.0-preview.1"
+	newVersion := "1.0.0-preview.2"
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, oldVersion), runtimeDir, oldVersion); err != nil {
+		t.Fatal(err)
+	}
+	newRelease := stageRuntimeRelease(t, root, newVersion)
+	archive := filepath.Join(newRelease, "leamout_runtime_"+newVersion+"_linux_amd64.tar.gz")
+	if err := os.WriteFile(archive, []byte("tampered"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := installRuntimeBundle(newRelease, runtimeDir, newVersion); err == nil {
+		t.Fatal("expected failed update")
+	}
+	installed, err := installedRuntimeVersion(runtimeDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if installed != oldVersion {
+		t.Fatalf("installed runtime = %q, want preserved %q", installed, oldVersion)
+	}
+}
+
+func TestRuntimeUpdateCanCommitOrRollback(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "runtime")
+	oldVersion := "1.0.0-preview.1"
+	newVersion := "1.0.0-preview.2"
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, oldVersion), runtimeDir, oldVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, newVersion), runtimeDir, newVersion); err != nil {
+		t.Fatal(err)
+	}
+	if previous, err := installedRuntimeVersion(runtimeDir + ".previous"); err != nil || previous != oldVersion {
+		t.Fatalf("previous runtime = %q, %v; want %q", previous, err, oldVersion)
+	}
+	if err := rollbackRuntimeUpdate(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	if current, err := installedRuntimeVersion(runtimeDir); err != nil || current != oldVersion {
+		t.Fatalf("rolled back runtime = %q, %v; want %q", current, err, oldVersion)
+	}
+
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, newVersion), runtimeDir, newVersion); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitRuntimeUpdate(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(runtimeDir + ".previous"); !os.IsNotExist(err) {
+		t.Fatalf("previous runtime retained after commit: %v", err)
+	}
+}
+
+func TestRuntimeRollbackRecoversInterruptedFilesystemSwap(t *testing.T) {
+	root := t.TempDir()
+	runtimeDir := filepath.Join(root, "runtime")
+	version := "1.0.0"
+	if err := installRuntimeBundle(stageRuntimeRelease(t, root, version), runtimeDir, version); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(runtimeDir, runtimeDir+".previous"); err != nil {
+		t.Fatal(err)
+	}
+	if err := rollbackRuntimeUpdate(runtimeDir); err != nil {
+		t.Fatal(err)
+	}
+	if installed, err := installedRuntimeVersion(runtimeDir); err != nil || installed != version {
+		t.Fatalf("recovered runtime = %q, %v; want %q", installed, err, version)
 	}
 }

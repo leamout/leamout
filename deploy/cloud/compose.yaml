@@ -1,0 +1,288 @@
+x-leamout-environment: &leamout-environment
+  APP_ENV: ${APP_ENV:-development}
+  DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable
+  REDIS_URL: redis://redis:6379
+  NATS_URL: nats://nats:4222
+  NATS_STREAM_REPLICAS: ${NATS_STREAM_REPLICAS:-1}
+  FREESWITCH_ESL_ADDRESS: freeswitch:8021
+  FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+  CARRIER_CREDENTIAL_ENCRYPTION_KEY: ${CARRIER_CREDENTIAL_ENCRYPTION_KEY:?CARRIER_CREDENTIAL_ENCRYPTION_KEY is required}
+  LEAMOUT_DEPLOYMENT_ID: ${LEAMOUT_DEPLOYMENT_ID:-}
+  DIDWW_API_KEY: ${DIDWW_API_KEY:-}
+  DIDWW_API_BASE_URL: ${DIDWW_API_BASE_URL:-https://api.didww.com/v3}
+  COMMPEAK_API_AUTHORIZATION: ${COMMPEAK_API_AUTHORIZATION:-}
+  COMMPEAK_API_BASE_URL: ${COMMPEAK_API_BASE_URL:-https://api.commpeak.com}
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  STRIPE_API_BASE_URL: ${STRIPE_API_BASE_URL:-https://api.stripe.com/v1}
+  PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+  PAYSTACK_API_BASE_URL: ${PAYSTACK_API_BASE_URL:-https://api.paystack.co}
+  OPERATOR_API_SECRET: ${OPERATOR_API_SECRET:-}
+  TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+  TURN_PUBLIC_URLS: ${TURN_PUBLIC_URLS:?TURN_PUBLIC_URLS is required}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+  MANAGED_SIP_ADMISSION_ENABLED: "true"
+  MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?MANAGED_SIP_ADMISSION_SECRET is required}
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leamout
+      POSTGRES_USER: leamout
+      POSTGRES_PASSWORD: leamout
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leamout -d leamout"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - private-control
+
+  migrate:
+    image: arigaio/atlas:1.3.0-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - exec /atlas migrate apply --dir file:///migrations --url "$$DATABASE_URL"
+    environment:
+      DATABASE_URL: postgres://leamout:leamout@postgres:5432/leamout?sslmode=disable&search_path=public
+    volumes:
+      - ../../server/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - private-control
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - private-control
+
+  nats:
+    image: nats:2-alpine
+    restart: unless-stopped
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    volumes:
+      - ../../containers/nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - private-control
+
+  server:
+    image: leamout/cloud:1.0.0
+    build:
+      context: ../../server
+      dockerfile: Dockerfile
+      target: cloud
+    restart: unless-stopped
+    environment: *leamout-environment
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      freeswitch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - private-control
+
+  # Operator UI. It reads the same database and validates the same
+  # leamout-session cookie as the customer API; it has no separate login.
+  backoffice:
+    image: leamout/cloud:1.0.0
+    build:
+      context: ../../server
+      dockerfile: Dockerfile
+      target: cloud
+    command: ["/leamout/backoffice"]
+    restart: unless-stopped
+    environment: *leamout-environment
+    ports:
+      - "8081:8081"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - private-control
+
+  worker:
+    image: leamout/cloud:1.0.0
+    build:
+      context: ../../server
+      dockerfile: Dockerfile
+      target: cloud
+    command: ["/leamout/worker"]
+    restart: unless-stopped
+    environment: *leamout-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - private-control
+
+  opensips:
+    image: leamout/opensips:4.0.1
+    build:
+      context: ../../containers/opensips
+      dockerfile: Dockerfile
+      args:
+        OPENSIPS_VERSION: 4.0.1
+        DISTRIBUTION: cloud
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      OPENSIPS_DATABASE_PASSWORD: leamout
+      MANAGED_SIP_ADMISSION_SECRET: ${MANAGED_SIP_ADMISSION_SECRET:?MANAGED_SIP_ADMISSION_SECRET is required}
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/tcp"
+      - "5062:5062/tcp"
+    volumes:
+      - ./certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - ./certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+      - ./certs/carrier-ca.pem:/etc/opensips/tls/carrier-ca.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rtpengine:
+        condition: service_started
+      freeswitch:
+        condition: service_started
+    networks:
+      private-control: {}
+      public-signaling:
+        ipv4_address: 172.30.0.10
+
+  coturn:
+    image: coturn/coturn:4.17.0-r0
+    restart: unless-stopped
+    command:
+      - --config
+      - /etc/coturn/turnserver.conf
+      - --realm=${TURN_REALM:?TURN_REALM is required}
+      - --static-auth-secret=${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+      - --external-ip=${TURN_EXTERNAL_IP:?TURN_EXTERNAL_IP is required}
+      - --cert=/etc/coturn/tls/fullchain.pem
+      - --pkey=/etc/coturn/tls/privkey.pem
+    volumes:
+      - ../../containers/coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+      - ./certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - ./certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    networks:
+      - public-media
+
+  freeswitch:
+    image: leamout/freeswitch:1.0.0
+    build:
+      context: ../../containers/freeswitch
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+    volumes:
+      - freeswitch_recordings:/var/lib/freeswitch/recordings
+    expose:
+      - "5060/udp"
+      - "5060/tcp"
+      - "8021/tcp"
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -H 127.0.0.1 -P 8021 -p \"$$FREESWITCH_ESL_PASSWORD\" -x status >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+    networks:
+      private-control:
+        ipv4_address: 172.32.0.20
+
+  rtpengine:
+    image: leamout/rtpengine:dev
+    build:
+      context: ../../containers/rtpengine
+      dockerfile: Dockerfile
+      args:
+        RTPENGINE_REF: mr26.2.1
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      RTPENGINE_PUBLIC_IP: ${RTPENGINE_PUBLIC_IP}
+    ports:
+      - "23000-32768:23000-32768/udp"
+    expose:
+      - "22222/udp"
+    networks:
+      private-control:
+        ipv4_address: 172.32.0.10
+      public-media:
+        ipv4_address: 172.31.0.10
+
+volumes:
+  postgres_data:
+  redis_data:
+  nats_data:
+  freeswitch_recordings:
+
+networks:
+  private-control:
+    name: leamout-private-control
+    ipam:
+      config:
+        - subnet: 172.32.0.0/24
+  public-media:
+    name: leamout-public-media
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+  public-signaling:
+    name: leamout-public-signaling
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

@@ -5,6 +5,7 @@ on:
   pull_request:
     paths:
       - "deploy/**"
+      - "containers/**"
       - "server/**"
       - "tests/acceptance/graceful-drain/**"
       - ".github/workflows/graceful-drain-acceptance.yml"

@@ -7,14 +7,13 @@ REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
 export GRACEFUL_DRAIN_SUITE_DIR="$SCRIPT_DIR"
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-graceful-drain-esl-secret}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
-export MANAGED_SIP_ADMISSION_SECRET="${MANAGED_SIP_ADMISSION_SECRET:-$(openssl rand -hex 32)}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-graceful-drain-turn-secret-0123456789abcdef}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export TURN_REALM="${TURN_REALM:-graceful-drain.local}"
 
-COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml"
+COMPOSE="docker compose -f deploy/self-hosted/compose.yaml -f tests/acceptance/graceful-drain/compose.yaml"
 COMPOSE_CONFIG_TMP=""
 
 fs_diag() {

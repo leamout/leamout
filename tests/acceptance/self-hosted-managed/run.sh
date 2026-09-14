@@ -5,7 +5,6 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../../.." && pwd)
 CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-self-hosted-managed.XXXXXX")
 export SELF_HOSTED_MANAGED_CERT_DIR="$CERT_DIR"
-export MANAGED_SIP_ADMISSION_SECRET="${MANAGED_SIP_ADMISSION_SECRET:-$(openssl rand -hex 32)}"
 export FREESWITCH_ESL_PASSWORD="${FREESWITCH_ESL_PASSWORD:-self-hosted-managed-esl}"
 export CARRIER_CREDENTIAL_ENCRYPTION_KEY="${CARRIER_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA}"
 export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-$(openssl rand -hex 32)}"
@@ -13,7 +12,7 @@ export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export TURN_REALM="${TURN_REALM:-self-hosted-managed.local}"
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
-COMPOSE="docker compose -f deploy/compose.yaml -f tests/acceptance/self-hosted-managed/compose.yaml"
+COMPOSE="docker compose -f deploy/self-hosted/compose.yaml -f tests/acceptance/self-hosted-managed/compose.yaml"
 
 freeswitch_sip_ready() {
     $COMPOSE exec -T freeswitch sh -c '

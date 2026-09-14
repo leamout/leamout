@@ -42,19 +42,6 @@ type Worker struct {
 	componentNames          []string
 }
 
-const workerHealthAddress = ":8081"
-
-var componentNames = []string{
-	"freeswitch-events",
-	"call-reconciliation",
-	"carrier-endpoint-health",
-	"recording-reconciliation",
-	"outbox-publisher",
-	"webhook-consumer",
-	"webhook-delivery",
-	"idempotency-cleanup",
-}
-
 func New(ctx context.Context, cfg config.Config) (*Worker, error) {
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {

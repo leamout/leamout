@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -93,9 +94,6 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 		if installedVersion == manifest.ReleaseVersion {
 			return validateInstalledRuntime(runtimeDir, manifest, expectedSHA, manifestSHA)
 		}
-		if err := os.RemoveAll(runtimeDir); err != nil {
-			return fmt.Errorf("remove runtime version %q before installing %q: %w", installedVersion, manifest.ReleaseVersion, err)
-		}
 	}
 
 	if err := os.MkdirAll(filepath.Dir(runtimeDir), 0o750); err != nil {
@@ -137,14 +135,73 @@ func installRuntimeBundle(releaseDir, runtimeDir, version string) error {
 		return fmt.Errorf("write installed runtime metadata: %w", err)
 	}
 
+	previousRuntime := runtimeDir + ".previous"
+	if exists {
+		if err := os.RemoveAll(previousRuntime); err != nil {
+			return fmt.Errorf("remove stale previous runtime: %w", err)
+		}
+		if err := os.Rename(runtimeDir, previousRuntime); err != nil {
+			return fmt.Errorf("preserve previous runtime before installing %q: %w", manifest.ReleaseVersion, err)
+		}
+	}
 	if err := os.Rename(stagedRuntime, runtimeDir); err != nil {
+		if exists {
+			_ = os.Rename(previousRuntime, runtimeDir)
+		}
 		return fmt.Errorf("install production runtime: %w", err)
 	}
 	if err := validateInstalledRuntime(runtimeDir, manifest, expectedSHA, manifestSHA); err != nil {
-		if removeErr := os.RemoveAll(runtimeDir); removeErr != nil {
-			return fmt.Errorf("validate installed runtime: %w; rollback runtime: %w", err, removeErr)
+		removeErr := os.RemoveAll(runtimeDir)
+		if removeErr == nil && exists {
+			removeErr = os.Rename(previousRuntime, runtimeDir)
+		}
+		if removeErr != nil {
+			return fmt.Errorf("validate installed runtime: %w; restore previous runtime: %w", err, removeErr)
 		}
 		return fmt.Errorf("validate installed runtime: %w", err)
+	}
+	return nil
+}
+
+func commitRuntimeUpdate(runtimeDir string) error {
+	if err := os.RemoveAll(runtimeDir + ".previous"); err != nil {
+		return fmt.Errorf("remove previous runtime after successful update: %w", err)
+	}
+	return nil
+}
+
+func rollbackRuntimeUpdate(runtimeDir string) error {
+	previousRuntime := runtimeDir + ".previous"
+	exists, err := pathExists(previousRuntime)
+	if err != nil {
+		return fmt.Errorf("inspect previous runtime: %w", err)
+	}
+	if !exists {
+		return errors.New("previous runtime is unavailable")
+	}
+	currentExists, err := pathExists(runtimeDir)
+	if err != nil {
+		return fmt.Errorf("inspect current runtime: %w", err)
+	}
+	if !currentExists {
+		if err := os.Rename(previousRuntime, runtimeDir); err != nil {
+			return fmt.Errorf("restore previous runtime: %w", err)
+		}
+		return nil
+	}
+	failedRuntime := runtimeDir + ".failed"
+	if err := os.RemoveAll(failedRuntime); err != nil {
+		return fmt.Errorf("remove stale failed runtime: %w", err)
+	}
+	if err := os.Rename(runtimeDir, failedRuntime); err != nil {
+		return fmt.Errorf("preserve failed runtime: %w", err)
+	}
+	if err := os.Rename(previousRuntime, runtimeDir); err != nil {
+		_ = os.Rename(failedRuntime, runtimeDir)
+		return fmt.Errorf("restore previous runtime: %w", err)
+	}
+	if err := os.RemoveAll(failedRuntime); err != nil {
+		return fmt.Errorf("remove failed runtime after rollback: %w", err)
 	}
 	return nil
 }
@@ -183,6 +240,9 @@ func loadReleaseManifest(path, version string) (releaseManifest, string, error) 
 	if manifest.ReleaseVersion != version {
 		return releaseManifest{}, "", fmt.Errorf("release manifest version %q does not match installed CLI %q", manifest.ReleaseVersion, version)
 	}
+	if err := validateMinimumCLIVersion(version, manifest.MinimumCLIVersion); err != nil {
+		return releaseManifest{}, "", err
+	}
 	if !hex40Pattern.MatchString(manifest.SourceCommit) {
 		return releaseManifest{}, "", errors.New("release manifest source commit is invalid")
 	}
@@ -193,6 +253,124 @@ func loadReleaseManifest(path, version string) (releaseManifest, string, error) 
 		return releaseManifest{}, "", err
 	}
 	return manifest, hex.EncodeToString(manifestSHA[:]), nil
+}
+
+func validateMinimumCLIVersion(cliVersion, minimum string) error {
+	cli, err := parseReleaseVersion(cliVersion)
+	if err != nil {
+		return fmt.Errorf("installed CLI version is invalid: %w", err)
+	}
+	min, err := parseReleaseVersion(minimum)
+	if err != nil {
+		return fmt.Errorf("release manifest minimum CLI version is invalid: %w", err)
+	}
+	for i := range 3 {
+		if cli.numbers[i] > min.numbers[i] {
+			return nil
+		}
+		if cli.numbers[i] < min.numbers[i] {
+			return fmt.Errorf("release requires leamout CLI %s or newer; installed CLI is %s", minimum, cliVersion)
+		}
+	}
+	if min.prerelease == "" {
+		if cli.prerelease == "" {
+			return nil
+		}
+		return fmt.Errorf("release requires leamout CLI %s or newer; installed CLI is %s", minimum, cliVersion)
+	}
+	if cli.prerelease == "" || comparePrerelease(cli.prerelease, min.prerelease) >= 0 {
+		return nil
+	}
+	return fmt.Errorf("release requires leamout CLI %s or newer; installed CLI is %s", minimum, cliVersion)
+}
+
+func compareReleaseVersions(left, right string) (int, error) {
+	l, err := parseReleaseVersion(left)
+	if err != nil {
+		return 0, err
+	}
+	r, err := parseReleaseVersion(right)
+	if err != nil {
+		return 0, err
+	}
+	for i := range 3 {
+		if l.numbers[i] < r.numbers[i] {
+			return -1, nil
+		}
+		if l.numbers[i] > r.numbers[i] {
+			return 1, nil
+		}
+	}
+	if l.prerelease == r.prerelease {
+		return 0, nil
+	}
+	if l.prerelease == "" {
+		return 1, nil
+	}
+	if r.prerelease == "" {
+		return -1, nil
+	}
+	return comparePrerelease(l.prerelease, r.prerelease), nil
+}
+
+func comparePrerelease(left, right string) int {
+	lparts, rparts := strings.Split(left, "."), strings.Split(right, ".")
+	for i := 0; i < len(lparts) && i < len(rparts); i++ {
+		ln, lerr := strconv.Atoi(lparts[i])
+		rn, rerr := strconv.Atoi(rparts[i])
+		switch {
+		case lerr == nil && rerr == nil && ln != rn:
+			if ln < rn {
+				return -1
+			}
+			return 1
+		case lerr == nil && rerr != nil:
+			return -1
+		case lerr != nil && rerr == nil:
+			return 1
+		case lparts[i] < rparts[i]:
+			return -1
+		case lparts[i] > rparts[i]:
+			return 1
+		}
+	}
+	if len(lparts) < len(rparts) {
+		return -1
+	}
+	if len(lparts) > len(rparts) {
+		return 1
+	}
+	return 0
+}
+
+type releaseVersion struct {
+	numbers    [3]int
+	prerelease string
+}
+
+func parseReleaseVersion(value string) (releaseVersion, error) {
+	value = strings.TrimPrefix(value, "v")
+	value = strings.SplitN(value, "+", 2)[0]
+	parts := strings.SplitN(value, "-", 2)
+	core := strings.Split(parts[0], ".")
+	if len(core) != 3 {
+		return releaseVersion{}, fmt.Errorf("%q is not semantic version", value)
+	}
+	parsed := releaseVersion{}
+	for i, component := range core {
+		n, err := strconv.Atoi(component)
+		if err != nil || n < 0 {
+			return releaseVersion{}, fmt.Errorf("%q is not semantic version", value)
+		}
+		parsed.numbers[i] = n
+	}
+	if len(parts) == 2 {
+		if parts[1] == "" {
+			return releaseVersion{}, fmt.Errorf("%q is not semantic version", value)
+		}
+		parsed.prerelease = parts[1]
+	}
+	return parsed, nil
 }
 
 func validateManifestImages(images map[string]string) error {

@@ -7,19 +7,9 @@ import (
 
 	"github.com/leamout/leamout/internal/commercial"
 	"github.com/leamout/leamout/internal/identity"
-	"github.com/leamout/leamout/internal/modules/audit"
-	"github.com/leamout/leamout/internal/modules/webhooks"
+	sharedmodules "github.com/leamout/leamout/internal/modules"
 	providerdiagnostics "github.com/leamout/leamout/internal/platform/provider_diagnostics"
-	"github.com/leamout/leamout/internal/telecom/calls"
-	"github.com/leamout/leamout/internal/telecom/carriers"
-	"github.com/leamout/leamout/internal/telecom/conferences"
-	"github.com/leamout/leamout/internal/telecom/numbers"
-	"github.com/leamout/leamout/internal/telecom/realtime"
-	"github.com/leamout/leamout/internal/telecom/recordings"
-	"github.com/leamout/leamout/internal/telecom/sip_domains"
-	"github.com/leamout/leamout/internal/telecom/subscribers"
-	"github.com/leamout/leamout/internal/telecom/trunks"
-	"github.com/leamout/leamout/internal/telecom/voice"
+	"github.com/leamout/leamout/internal/telecom"
 	"github.com/leamout/leamout/internal/tenancy"
 )
 
@@ -61,7 +51,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 				modules.Commercial,
 				modules.Authn.RequireSession,
 				organizationAccess,
-				modules.Idempotency.Middleware.Handle,
+				modules.Shared.Idempotency.Middleware.Handle,
 			)
 		}
 		identity.RegisterRoutes(r, modules.Identity, modules.Authn.RequireSession)
@@ -72,22 +62,7 @@ func RegisterRoutes(r *chi.Mux, modules Modules) {
 			organizationContextAccess,
 			sessionOrganizationAccess,
 		)
-		voice.RegisterRoutes(r, modules.Voice.Handler, organizationAccess("voice-applications"))
-		calls.RegisterRoutes(r, modules.Calls.Handler, organizationAccess("calls"))
-		recordings.RegisterRoutes(r, modules.Recordings.Handler, organizationAccess("recordings"))
-		subscribers.RegisterRoutes(r, modules.Subscribers.Handler, organizationAccess("subscribers"))
-		numbers.RegisterRoutes(
-			r,
-			modules.Numbers.Handler,
-			organizationAccess("numbers"),
-			modules.Idempotency.Middleware.Handle,
-		)
-		sip_domains.RegisterRoutes(r, modules.SIPDomains.Handler, organizationAccess("sip-domains"))
-		trunks.RegisterRoutes(r, modules.Trunks.Handler, organizationAccess("trunks"))
-		carriers.RegisterRoutes(r, modules.Carriers.Handler, organizationAccess("carriers"))
-		webhooks.RegisterRoutes(r, modules.Webhooks.Handler, organizationAccess("webhooks"))
-		audit.RegisterRoutes(r, modules.Audit.Handler, organizationAccess("audit"))
-		conferences.RegisterRoutes(r, modules.Conferences.Handler, organizationAccess("conferences"))
-		realtime.RegisterRoutes(r, modules.Realtime.Handler, organizationAccess("realtime"))
+		telecom.RegisterRoutes(r, modules.Telecom, organizationAccess, modules.Shared.Idempotency.Middleware.Handle)
+		sharedmodules.RegisterRoutes(r, modules.Shared, organizationAccess)
 	})
 }
