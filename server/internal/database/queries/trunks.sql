@@ -17,15 +17,11 @@ SELECT
     COALESCE(sqlc.narg(status), 'active') AS status,
     false AS managed_default
 FROM carrier_connections AS cc
-JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE cc.id = sqlc.arg(carrier_connection_id)
   AND cc.scope = 'organization'
   AND cc.organization_id = sqlc.arg(organization_id)
   AND cc.status = 'active'
-  AND (
-      (sqlc.arg(provisioning_mode)::TEXT = 'byoc' AND cp.slug <> 'leamout')
-      OR (sqlc.arg(provisioning_mode)::TEXT = 'managed' AND cp.slug = 'leamout')
-  )
+  AND sqlc.arg(provisioning_mode)::TEXT = 'byoc'
 RETURNING *;
 
 -- name: CreatePlatformTrunk :one
@@ -91,15 +87,11 @@ ORDER BY t.created_at DESC;
 SELECT t.*
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
-JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.carrier_connection_id = sqlc.arg(carrier_connection_id)
   AND t.organization_id = sqlc.arg(organization_id)
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
-  AND (
-      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
-      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
-  )
 ORDER BY t.created_at DESC;
 
 -- name: UpdateTrunk :one
@@ -173,15 +165,11 @@ SELECT
     COALESCE(sqlc.narg(enabled), true) AS enabled
 FROM trunks AS t
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
-JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
-  AND (
-      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
-      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
-  )
 RETURNING *;
 
 -- name: CreatePlatformTrunkEndpoint :one
@@ -301,21 +289,17 @@ SELECT te.*
 FROM trunk_endpoints AS te
 JOIN trunks AS t ON t.id = te.trunk_id
 JOIN carrier_connections AS cc ON cc.id = t.carrier_connection_id
-JOIN carrier_providers AS cp ON cp.id = cc.provider_id
 WHERE t.id = sqlc.arg(trunk_id)
   AND t.organization_id = sqlc.arg(organization_id)
   AND t.status = 'active'
   AND t.direction IN ('outbound', 'bidirectional')
+  AND t.provisioning_mode = 'byoc'
   AND cc.scope = 'organization'
   AND cc.organization_id = t.organization_id
   AND cc.status = 'active'
   AND te.organization_id = t.organization_id
   AND te.enabled = true
   AND te.direction IN ('outbound', 'bidirectional')
-  AND (
-      (t.provisioning_mode = 'byoc' AND cp.slug <> 'leamout')
-      OR (t.provisioning_mode = 'managed' AND cp.slug = 'leamout')
-  )
 ORDER BY te.priority ASC, te.weight DESC, te.created_at ASC;
 
 -- name: ResolveManagedOutboundRoute :many
