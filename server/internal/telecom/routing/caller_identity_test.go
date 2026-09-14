@@ -15,7 +15,6 @@ func TestAuthorizeBYOCCallerIdentityRequiresSameCarrier(t *testing.T) {
 
 	caller := sqlc.PhoneNumber{
 		OrganizationID:      organizationID,
-		ProvisioningMode:    provisioningModeBYOC,
 		CarrierConnectionID: &otherCarrierConnectionID,
 		VoiceEnabled:        true,
 		Status:              phoneNumberStatusActive,
@@ -31,50 +30,40 @@ func TestAuthorizeBYOCCallerIdentityRequiresSameCarrier(t *testing.T) {
 	}
 }
 
-func TestAuthorizeManagedCallerIdentityAllowsDifferentTerminationProvider(t *testing.T) {
+func TestAuthorizeManagedCallerIdentityAllowsProviderOwnedNumber(t *testing.T) {
 	organizationID := uuid.New()
-	didwwProviderID := uuid.New()
-	commpeakProviderID := uuid.New()
-
+	providerID := uuid.New()
 	caller := sqlc.PhoneNumber{
-		OrganizationID:   organizationID,
-		ProvisioningMode: provisioningModeManaged,
-		ProviderID:       &didwwProviderID,
-		VoiceEnabled:     true,
-		Status:           phoneNumberStatusActive,
+		OrganizationID: organizationID,
+		ProviderID:     &providerID,
+		VoiceEnabled:   true,
+		Status:         phoneNumberStatusActive,
 	}
 
-	// The termination provider is intentionally different from the numbering
-	// provider. Managed caller authorization does not receive or compare it.
-	if didwwProviderID == commpeakProviderID {
-		t.Fatal("test requires distinct numbering and termination providers")
-	}
 	if err := authorizeManagedCallerIdentity(caller, organizationID); err != nil {
-		t.Fatalf("authorize DIDWW caller for CommPeak termination: %v", err)
+		t.Fatalf("authorize provider-owned caller: %v", err)
 	}
 }
 
-func TestAuthorizeManagedCallerIdentityRejectsBYOCNumber(t *testing.T) {
+func TestAuthorizeManagedCallerIdentityAllowsCustomerNumber(t *testing.T) {
 	organizationID := uuid.New()
 	caller := sqlc.PhoneNumber{
-		OrganizationID:   organizationID,
-		ProvisioningMode: provisioningModeBYOC,
-		VoiceEnabled:     true,
-		Status:           phoneNumberStatusActive,
+		OrganizationID: organizationID,
+		VoiceEnabled:   true,
+		Status:         phoneNumberStatusActive,
 	}
 
-	if err := authorizeManagedCallerIdentity(caller, organizationID); !errors.Is(err, ErrCallerIdentity) {
-		t.Fatalf("error = %v, want %v", err, ErrCallerIdentity)
+	if err := authorizeManagedCallerIdentity(caller, organizationID); err != nil {
+		t.Fatalf("authorize customer caller: %v", err)
 	}
 }
 
 func TestAuthorizeManagedCallerIdentityRejectsDisabledNumber(t *testing.T) {
 	organizationID := uuid.New()
 	caller := sqlc.PhoneNumber{
-		OrganizationID:   organizationID,
-		ProvisioningMode: provisioningModeManaged,
-		VoiceEnabled:     true,
-		Status:           "disabled",
+		OrganizationID: organizationID,
+		VoiceEnabled:   true,
+		Status:         "disabled",
 	}
 
 	if err := authorizeManagedCallerIdentity(caller, organizationID); !errors.Is(err, ErrCallerIdentity) {
@@ -84,10 +73,9 @@ func TestAuthorizeManagedCallerIdentityRejectsDisabledNumber(t *testing.T) {
 
 func TestAuthorizeManagedCallerIdentityRejectsOtherOrganization(t *testing.T) {
 	caller := sqlc.PhoneNumber{
-		OrganizationID:   uuid.New(),
-		ProvisioningMode: provisioningModeManaged,
-		VoiceEnabled:     true,
-		Status:           phoneNumberStatusActive,
+		OrganizationID: uuid.New(),
+		VoiceEnabled:   true,
+		Status:         phoneNumberStatusActive,
 	}
 
 	if err := authorizeManagedCallerIdentity(caller, uuid.New()); !errors.Is(err, ErrCallerIdentity) {
