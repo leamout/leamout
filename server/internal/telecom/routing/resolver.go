@@ -66,9 +66,9 @@ func (r *Resolver) resolveExplicitOutbound(
 	}
 
 	switch trunk.ProvisioningMode {
-	case provisioningModeBYOC:
+	case "byoc":
 		return r.resolveExplicitTenantTrunk(ctx, req, trunk, false)
-	case provisioningModeManaged:
+	case "managed":
 		if trunk.CarrierConnectionID == nil {
 			return r.resolveCloudManagedTrunk(ctx, req, trunk)
 		}
