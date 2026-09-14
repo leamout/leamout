@@ -45,7 +45,6 @@ WHERE pn.id = sqlc.arg(phone_number_id)
   AND pn.organization_id = sqlc.arg(organization_id)
   AND pn.provider_id = sqlc.arg(carrier_provider_id)
   AND pn.provider_resource_id = sqlc.arg(provider_resource_id)
-  AND pn.provisioning_mode = 'managed'
   AND pn.status IN ('active', 'disabled')
 ON CONFLICT (organization_id, carrier_provider_id, idempotency_key)
 DO UPDATE SET idempotency_key = provider_operations.idempotency_key
