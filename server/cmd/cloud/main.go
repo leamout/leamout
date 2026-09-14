@@ -22,7 +22,7 @@ func main() {
 	)
 	defer stop()
 
-	cfg, err := config.Load()
+	cfg, err := config.LoadCloud()
 	if err != nil {
 		log.Fatal(err)
 	}

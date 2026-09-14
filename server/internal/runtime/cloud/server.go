@@ -45,7 +45,7 @@ type Server struct {
 	Metrics    *metrics.Registry
 }
 
-func New(ctx context.Context, cfg config.Config) (*Server, error) {
+func New(ctx context.Context, cfg config.CloudConfig) (*Server, error) {
 	if cfg.DatabaseURL == "" {
 		return nil, fmt.Errorf("database URL is required")
 	}
@@ -219,7 +219,7 @@ func NewModules(
 	}, nil
 }
 
-func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Service) error {
+func configureManagedNumberAcquisition(cfg config.CloudConfig, service *numbers.Service) error {
 	if strings.TrimSpace(cfg.DIDWW.APIKey) == "" {
 		return nil
 	}
@@ -234,7 +234,7 @@ func configureManagedNumberAcquisition(cfg config.Config, service *numbers.Servi
 	return nil
 }
 
-func configurePaymentProviders(cfg config.Config, providers *payments.ProviderRegistry) error {
+func configurePaymentProviders(cfg config.CloudConfig, providers *payments.ProviderRegistry) error {
 	if cfg.Stripe.SecretKey != "" {
 		if cfg.Stripe.WebhookSecret == "" {
 			return fmt.Errorf("stripe webhook secret is required when Stripe is enabled")

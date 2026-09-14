@@ -368,8 +368,7 @@ func (r *Resolver) resolveInboundOwnership(
 		}
 	case "platform":
 		if connection.OrganizationID != nil ||
-			phoneNumber.ProviderConnectionID == nil ||
-			*phoneNumber.ProviderConnectionID != connection.ID {
+			phoneNumber.CarrierConnectionID != nil {
 			return sqlc.CarrierConnection{}, sqlc.PhoneNumber{}, ErrTenantMismatch
 		}
 	default:

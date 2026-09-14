@@ -32,7 +32,7 @@ type dependencies struct {
 	queries    *sqlc.Queries
 }
 
-func newDependencies(ctx context.Context, cfg config.Config) (*dependencies, error) {
+func newDependencies(ctx context.Context, cfg config.CloudConfig) (*dependencies, error) {
 	db, err := pgxpool.New(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, wrapWorkerError("connect worker database", err)
@@ -177,7 +177,7 @@ func newOutboxJob(deps *dependencies) (*outbox.PublisherJob, error) {
 func newManagedJobs(
 	db *pgxpool.Pool,
 	redisClient *redisintegration.Client,
-	cfg config.Config,
+	cfg config.CloudConfig,
 ) (*numbers.ProviderOperationJob, *wholesale.CDRPollJob, error) {
 	commercialModule := commercial.NewCloud(db)
 	numbersRepository := numbers.NewRepository(db, redisClient)
