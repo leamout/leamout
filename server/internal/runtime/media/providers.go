@@ -1,18 +1,20 @@
 package media
 
 import (
-	"github.com/coffeyvidzro/monogo/internal/integrations/cartesia"
-	"github.com/coffeyvidzro/monogo/internal/integrations/deepgram"
-	"github.com/coffeyvidzro/monogo/internal/integrations/groq"
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/integrations/openai"
 	providersdk "github.com/coffeyvidzro/monogo/internal/providers"
 )
 
-func builtInProviderRegistry(cfg Config) (*providersdk.Registry, error) {
+func builtInProviderCatalog() (*aicatalog.Catalog, error) {
+	return aicatalog.Builtins()
+}
+
+// builtInRealtimeProviderRegistry keeps the existing integrated OpenAI path
+// isolated while the composable engine moves to the external provider modules.
+// It can be removed when realtime adapters move to github.com/leamout/ai-providers.
+func builtInRealtimeProviderRegistry(cfg Config) (*providersdk.Registry, error) {
 	return providersdk.NewRegistry(
-		deepgram.Provider{},
-		groq.Provider{},
-		cartesia.Provider{},
 		openai.Provider{
 			Config: openai.Config{
 				Endpoint: cfg.OpenAIEndpoint,
