@@ -10,12 +10,13 @@ import (
 	"sync"
 	"time"
 
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/media/session"
-	providersdk "github.com/coffeyvidzro/monogo/internal/providers"
+	"github.com/leamout/contracts/ai"
 )
 
 type Engine struct {
-	Registry           *providersdk.Registry
+	Catalog            *aicatalog.Catalog
 	DefaultSTTProvider string
 	DefaultLLMProvider string
 	DefaultTTSProvider string
@@ -28,28 +29,32 @@ func (e Engine) Start(ctx context.Context, cfg session.Config) (session.Stream, 
 	if cfg.Engine != session.EngineComposable {
 		return nil, fmt.Errorf("composable engine cannot start session engine %q", cfg.Engine)
 	}
-	if e.Registry == nil {
-		return nil, fmt.Errorf("provider registry is required")
+	if e.Catalog == nil {
+		return nil, fmt.Errorf("AI provider catalog is required")
 	}
 
 	sttID, sttRuntime := providerRuntime(cfg, "stt", e.DefaultSTTProvider, "deepgram")
 	llmID, llmRuntime := providerRuntime(cfg, "llm", e.DefaultLLMProvider, "groq")
 	ttsID, ttsRuntime := providerRuntime(cfg, "tts", e.DefaultTTSProvider, "cartesia")
 
-	stt, ok := e.Registry.STT(sttID)
+	stt, ok := e.Catalog.STT(sttID)
 	if !ok {
 		return nil, fmt.Errorf("STT provider %q is not registered", sttID)
 	}
-	llm, ok := e.Registry.LLM(llmID)
+	llm, ok := e.Catalog.LLM(llmID)
 	if !ok {
 		return nil, fmt.Errorf("LLM provider %q is not registered", llmID)
 	}
-	tts, ok := e.Registry.TTS(ttsID)
+	tts, ok := e.Catalog.TTS(ttsID)
 	if !ok {
 		return nil, fmt.Errorf("TTS provider %q is not registered", ttsID)
 	}
 
-	transcriber, err := stt.StartSTT(ctx, sttRuntime, cfg.InputFormat, cfg.Language)
+	transcriber, err := stt.StartSTT(ctx, ai.STTRequest{
+		Runtime:  sttRuntime,
+		Format:   providerAudioFormat(cfg.InputFormat),
+		Language: cfg.Language,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("start transcription: %w", err)
 	}
@@ -73,7 +78,7 @@ func (e Engine) Start(ctx context.Context, cfg session.Config) (session.Stream, 
 		pendingToolCalls: make(map[string]string),
 	}
 	if instructions := strings.TrimSpace(cfg.Instructions); instructions != "" {
-		s.messages = append(s.messages, providersdk.Message{Role: "system", Content: instructions})
+		s.messages = append(s.messages, ai.Message{Role: ai.RoleSystem, Content: instructions})
 	}
 	go s.run()
 	return s, nil
@@ -84,29 +89,29 @@ func providerRuntime(
 	role string,
 	configuredDefault string,
 	fallback string,
-) (string, providersdk.Runtime) {
+) (string, ai.Runtime) {
 	providerID := strings.TrimSpace(configuredDefault)
 	if providerID == "" {
 		providerID = fallback
 	}
 	if configured, ok := cfg.Provider(role); ok {
 		providerID = strings.TrimSpace(configured.Provider)
-		return providerID, providersdk.Runtime{
-			APIKey: configured.APIKey,
-			Config: append([]byte(nil), configured.Config...),
+		return providerID, ai.Runtime{
+			Credential: configured.APIKey,
+			Config:     append(json.RawMessage(nil), configured.Config...),
 		}
 	}
-	return providerID, providersdk.Runtime{}
+	return providerID, ai.Runtime{}
 }
 
 type stream struct {
 	ctx         context.Context
 	cancel      context.CancelFunc
-	transcriber providersdk.STTStream
-	llm         providersdk.LLM
-	tts         providersdk.TTS
-	llmRuntime  providersdk.Runtime
-	ttsRuntime  providersdk.Runtime
+	transcriber ai.STTStream
+	llm         ai.LLM
+	tts         ai.TTS
+	llmRuntime  ai.Runtime
+	ttsRuntime  ai.Runtime
 
 	sttProviderID string
 	llmProviderID string
@@ -116,7 +121,7 @@ type stream struct {
 	events        chan session.Event
 
 	mu               sync.Mutex
-	messages         []providersdk.Message
+	messages         []ai.Message
 	generation       uint64
 	responseCancel   context.CancelFunc
 	responseActive   bool
@@ -127,7 +132,7 @@ type stream struct {
 }
 
 func (s *stream) SendAudio(ctx context.Context, frame session.AudioFrame) error {
-	return s.transcriber.SendAudio(ctx, frame)
+	return s.transcriber.SendAudio(ctx, providerAudioFrame(frame))
 }
 
 func (s *stream) Interrupt(context.Context) error {
@@ -150,8 +155,8 @@ func (s *stream) SubmitToolResult(ctx context.Context, result session.ToolResult
 		return fmt.Errorf("tool result name does not match pending call")
 	}
 	delete(s.pendingToolCalls, result.ToolCallID)
-	s.messages = append(s.messages, providersdk.Message{
-		Role:       "tool",
+	s.messages = append(s.messages, ai.Message{
+		Role:       ai.RoleTool,
 		Content:    result.Content,
 		ToolCallID: result.ToolCallID,
 	})
@@ -164,7 +169,7 @@ func (s *stream) SubmitToolResult(ctx context.Context, result session.ToolResult
 	responseCtx, cancel := context.WithCancel(s.ctx)
 	s.responseCancel = cancel
 	s.responseActive = true
-	messages := append([]providersdk.Message(nil), s.messages...)
+	messages := append([]ai.Message(nil), s.messages...)
 	s.responses.Add(1)
 	s.mu.Unlock()
 	s.emit(session.Event{Type: session.EventResponseStarted, OccurredAt: time.Now().UTC()})
@@ -200,7 +205,7 @@ func (s *stream) run() {
 				s.responses.Wait()
 				return
 			}
-			if event.Err != nil || event.Type == providersdk.STTEventError {
+			if event.Err != nil || event.Type == ai.STTEventError {
 				message := "speech-to-text provider failed"
 				if event.Err != nil {
 					message = event.Err.Error()
@@ -225,9 +230,9 @@ func (s *stream) run() {
 	}
 }
 
-func (s *stream) handleTurn(event providersdk.STTEvent) {
+func (s *stream) handleTurn(event ai.STTEvent) {
 	switch event.Type {
-	case providersdk.STTEventSpeechStarted:
+	case ai.STTEventSpeechStarted:
 		s.emit(session.Event{
 			Type:       session.EventSpeechStarted,
 			ProviderID: event.ProviderID,
@@ -236,7 +241,7 @@ func (s *stream) handleTurn(event providersdk.STTEvent) {
 		// Publish speech first so the transport clears already-buffered playback;
 		// generation cancellation below fences all subsequent provider audio.
 		s.cancelResponse()
-	case providersdk.STTEventSpeechStopped:
+	case ai.STTEventSpeechStopped:
 		text := strings.TrimSpace(event.Text)
 		s.emit(session.Event{
 			Type:       session.EventSpeechStopped,
@@ -266,8 +271,8 @@ func (s *stream) startResponse(text string) {
 	responseCtx, cancel := context.WithCancel(s.ctx)
 	s.responseCancel = cancel
 	s.responseActive = true
-	s.messages = append(s.messages, providersdk.Message{Role: "user", Content: text})
-	messages := append([]providersdk.Message(nil), s.messages...)
+	s.messages = append(s.messages, ai.Message{Role: ai.RoleUser, Content: text})
+	messages := append([]ai.Message(nil), s.messages...)
 	s.responses.Add(1)
 	s.mu.Unlock()
 	s.emit(session.Event{Type: session.EventResponseStarted, OccurredAt: time.Now().UTC()})
@@ -277,13 +282,13 @@ func (s *stream) startResponse(text string) {
 func (s *stream) generate(
 	ctx context.Context,
 	generation uint64,
-	messages []providersdk.Message,
+	messages []ai.Message,
 ) {
 	defer s.responses.Done()
-	completion, err := s.llm.Generate(ctx, providersdk.LLMRequest{
+	completion, err := s.llm.Generate(ctx, ai.LLMRequest{
 		Runtime:      s.llmRuntime,
 		Messages:     messages,
-		Tools:        s.config.Tools,
+		Tools:        providerTools(s.config.Tools),
 		Instructions: s.config.Instructions,
 	})
 	if err != nil {
@@ -292,9 +297,9 @@ func (s *stream) generate(
 	}
 	defer func() { _ = completion.Close() }()
 
-	voice, err := s.tts.StartTTS(ctx, providersdk.TTSRequest{
+	voice, err := s.tts.StartTTS(ctx, ai.TTSRequest{
 		Runtime:  s.ttsRuntime,
-		Format:   s.config.OutputFormat,
+		Format:   providerAudioFormat(s.config.OutputFormat),
 		Voice:    s.config.Voice,
 		Language: s.config.Language,
 	})
@@ -342,21 +347,21 @@ func (s *stream) generate(
 				finalChunk := strings.TrimSpace(pending.String())
 				switch {
 				case heldChunk != "" && finalChunk != "":
-					if err := voice.SendText(ctx, heldChunk, true); err != nil {
+					if err := voice.SendText(ctx, ai.TextChunk{Text: heldChunk}); err != nil {
 						s.failResponse(ctx, generation, err)
 						return
 					}
-					if err := voice.SendText(ctx, finalChunk, false); err != nil {
+					if err := voice.SendText(ctx, ai.TextChunk{Text: finalChunk, Final: true}); err != nil {
 						s.failResponse(ctx, generation, err)
 						return
 					}
 				case heldChunk != "":
-					if err := voice.SendText(ctx, heldChunk, false); err != nil {
+					if err := voice.SendText(ctx, ai.TextChunk{Text: heldChunk, Final: true}); err != nil {
 						s.failResponse(ctx, generation, err)
 						return
 					}
 				case finalChunk != "":
-					if err := voice.SendText(ctx, finalChunk, false); err != nil {
+					if err := voice.SendText(ctx, ai.TextChunk{Text: finalChunk, Final: true}); err != nil {
 						s.failResponse(ctx, generation, err)
 						return
 					}
@@ -398,7 +403,7 @@ func (s *stream) generate(
 					chunk := strings.TrimSpace(pending.String())
 					pending.Reset()
 					if heldChunk != "" {
-						if err := voice.SendText(ctx, heldChunk, true); err != nil {
+						if err := voice.SendText(ctx, ai.TextChunk{Text: heldChunk}); err != nil {
 							s.failResponse(ctx, generation, err)
 							return
 						}
@@ -433,8 +438,13 @@ func (s *stream) generate(
 				return
 			}
 			if len(event.Audio.Data) != 0 && s.isCurrent(generation) {
+				frame, err := sessionAudioFrame(event.Audio)
+				if err != nil {
+					s.failResponse(ctx, generation, err)
+					return
+				}
 				select {
-				case s.audio <- event.Audio:
+				case s.audio <- frame:
 				case <-ctx.Done():
 					return
 				case <-s.ctx.Done():
@@ -453,12 +463,12 @@ func (s *stream) awaitToolResults(generation uint64, calls []*session.ToolCallEv
 	}
 	s.responseActive = false
 	s.responseCancel = nil
-	message := providersdk.Message{Role: "assistant"}
+	message := ai.Message{Role: ai.RoleAssistant}
 	for _, call := range calls {
-		message.ToolCalls = append(message.ToolCalls, providersdk.ToolCall{
+		message.ToolCalls = append(message.ToolCalls, ai.ToolCall{
 			ID:        call.ID,
 			Name:      call.Name,
-			Arguments: append([]byte(nil), call.Arguments...),
+			Arguments: append(json.RawMessage(nil), call.Arguments...),
 		})
 		s.pendingToolCalls[call.ID] = call.Name
 	}
@@ -491,7 +501,7 @@ func (s *stream) stopResponse(generation uint64, assistantText string) {
 	s.responseActive = false
 	s.responseCancel = nil
 	if assistantText != "" {
-		s.messages = append(s.messages, providersdk.Message{Role: "assistant", Content: assistantText})
+		s.messages = append(s.messages, ai.Message{Role: ai.RoleAssistant, Content: assistantText})
 	}
 	s.mu.Unlock()
 	s.emit(session.Event{Type: session.EventResponseStopped, OccurredAt: time.Now().UTC()})
@@ -532,6 +542,55 @@ func (s *stream) emit(event session.Event) {
 	case s.events <- event:
 	case <-s.ctx.Done():
 	}
+}
+
+func providerAudioFormat(format session.AudioFormat) ai.AudioFormat {
+	return ai.AudioFormat{
+		Encoding:     ai.AudioEncodingPCM16LE,
+		SampleRateHz: format.SampleRateHz,
+		Channels:     format.Channels,
+	}
+}
+
+func providerAudioFrame(frame session.AudioFrame) ai.AudioFrame {
+	return ai.AudioFrame{
+		Data:       frame.Data,
+		Format:     providerAudioFormat(frame.Format),
+		CapturedAt: frame.CapturedAt,
+	}
+}
+
+func sessionAudioFrame(frame ai.AudioFrame) (session.AudioFrame, error) {
+	if frame.Format.Encoding != ai.AudioEncodingPCM16LE {
+		return session.AudioFrame{}, fmt.Errorf(
+			"composable engine received unsupported provider audio encoding %q",
+			frame.Format.Encoding,
+		)
+	}
+	return session.AudioFrame{
+		Data: frame.Data,
+		Format: session.AudioFormat{
+			SampleRateHz: frame.Format.SampleRateHz,
+			Channels:     frame.Format.Channels,
+		},
+		CapturedAt: frame.CapturedAt,
+	}, nil
+}
+
+func providerTools(tools []session.ToolDefinition) []ai.ToolDefinition {
+	if len(tools) == 0 {
+		return nil
+	}
+	result := make([]ai.ToolDefinition, 0, len(tools))
+	for _, tool := range tools {
+		result = append(result, ai.ToolDefinition{
+			ID:          tool.ID.String(),
+			Name:        tool.Name,
+			Description: tool.Description,
+			Parameters:  append(json.RawMessage(nil), tool.Parameters...),
+		})
+	}
+	return result
 }
 
 func shouldFlushSpeechChunk(text string) bool {
