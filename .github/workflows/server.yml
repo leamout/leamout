@@ -59,8 +59,10 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
-      - name: Download dependencies
-        run: go mod download
+      - name: Check modules
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
 
       - name: Verify dependencies
         run: go mod verify
