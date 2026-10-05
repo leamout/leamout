@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	ProviderOpenAI    = "openai"
-	ProviderDeepgram  = "deepgram"
+	ProviderOpenAI     = "openai"
+	ProviderDeepgram   = "deepgram"
 	ProviderAssemblyAI = "assemblyai"
-	ProviderGroq      = "groq"
-	ProviderCartesia  = "cartesia"
+	ProviderGroq       = "groq"
+	ProviderCartesia   = "cartesia"
 	ProviderElevenLabs = "elevenlabs"
 
 	RoleRealtime = "realtime"
