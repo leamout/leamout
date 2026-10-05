@@ -1,0 +1,283 @@
+name: leamout-cloud
+
+x-app-environment: &app-environment
+  APP_ENV: production
+  DOMAIN: ${DOMAIN:?DOMAIN is required}
+  DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/leamout?sslmode=disable
+  REDIS_URL: redis://redis:6379/0
+  NATS_URL: nats://nats:4222
+  FREESWITCH_ESL_ADDRESS: freeswitch:8021
+  FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+  TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+  TURN_PUBLIC_URLS: "stun:turn.${DOMAIN:?DOMAIN is required}:3478,turn:turn.${DOMAIN:?DOMAIN is required}:3478?transport=udp,turn:turn.${DOMAIN:?DOMAIN is required}:3478?transport=tcp"
+  CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+  TRUSTED_PROXY_CIDRS: ${TRUSTED_PROXY_CIDRS:-}
+  MINIO_APP_ACCESS_KEY: ${MINIO_APP_ACCESS_KEY:?MINIO_APP_ACCESS_KEY is required}
+  MINIO_APP_SECRET_KEY: ${MINIO_APP_SECRET_KEY:?MINIO_APP_SECRET_KEY is required}
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: leamout
+      POSTGRES_USER: leamout
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leamout -d leamout"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [control]
+
+  migrate:
+    image: arigaio/atlas:1.3.0-alpine
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'exec /atlas migrate apply --dir file:///migrations --url "$$DATABASE_URL"'
+    environment:
+      DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/leamout?sslmode=disable&search_path=public
+    volumes:
+      - ../server/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [control]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [control]
+
+  nats:
+    image: nats:2.11-alpine
+    restart: unless-stopped
+    command: ["-c", "/etc/nats/nats-server.conf"]
+    volumes:
+      - ../containers/nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - nats-data:/data
+    networks: [control]
+
+  minio:
+    image: quay.io/minio/minio
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [edge, control]
+
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    command: ["/leamout/server"]
+    environment: *app-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      freeswitch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks: [edge, control]
+
+  worker:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    command: ["/leamout/worker"]
+    environment:
+      <<: *app-environment
+      MEDIA_CONTROL_URL: "http://media:8090"
+      MEDIA_CONTROL_TOKEN: ${MEDIA_CONTROL_TOKEN:?MEDIA_CONTROL_TOKEN is required}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      freeswitch:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - recordings-data:/var/lib/freeswitch/recordings
+    networks: [control]
+
+  media:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    command: ["/leamout/media"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      MEDIA_LISTEN_ADDRESS: ":8090"
+      MEDIA_PUBLIC_WS_URL: "ws://media:8090/v1/audio-forks"
+      MEDIA_TOKEN_SECRET: ${MEDIA_TOKEN_SECRET:?MEDIA_TOKEN_SECRET is required}
+      MEDIA_CONTROL_TOKEN: ${MEDIA_CONTROL_TOKEN:?MEDIA_CONTROL_TOKEN is required}
+      MEDIA_MAX_SESSIONS: ${MEDIA_MAX_SESSIONS:-100}
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/readyz"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks: [control]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?DOMAIN is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /var/lib/leamout/acme:/srv/leamout-acme:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      server:
+        condition: service_started
+    networks: [edge]
+
+  freeswitch:
+    build:
+      context: ../containers/freeswitch
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 60s
+    environment:
+      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?FREESWITCH_ESL_PASSWORD is required}
+    depends_on:
+      media:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "fs_cli -H 127.0.0.1 -P 8021 -p \"$FREESWITCH_ESL_PASSWORD\" -x status | grep -q '^UP '"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 15s
+    volumes:
+      - recordings-data:/var/lib/freeswitch/recordings
+    networks:
+      control:
+        ipv4_address: 172.32.0.20
+
+  rtpengine:
+    build:
+      context: ../containers/rtpengine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      RTPENGINE_PUBLIC_IP: ${PUBLIC_IP:?PUBLIC_IP is required}
+    ports:
+      - "23000-32768:23000-32768/udp"
+    networks:
+      control:
+        ipv4_address: 172.32.0.10
+      media:
+        ipv4_address: 172.31.0.10
+
+  opensips:
+    build:
+      context: ../containers/opensips
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      OPENSIPS_DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/leamout
+    volumes:
+      - /etc/leamout/certs/fullchain.pem:/etc/opensips/tls/fullchain.pem:ro
+      - /etc/leamout/certs/privkey.pem:/etc/opensips/tls/privkey.pem:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rtpengine:
+        condition: service_started
+      freeswitch:
+        condition: service_healthy
+      server:
+        condition: service_started
+    ports:
+      - "5060:5060/udp"
+      - "5060:5060/tcp"
+      - "5061:5061/tcp"
+      - "5062:5062/tcp"
+    networks: [control, signaling]
+
+  coturn:
+    build:
+      context: ../containers/coturn
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:?TURN_AUTH_SECRET is required}
+      TURN_REALM: turn.${DOMAIN:?DOMAIN is required}
+      TURN_EXTERNAL_IP: ${PUBLIC_IP:?PUBLIC_IP is required}
+      TURN_MIN_PORT: "49152"
+      TURN_MAX_PORT: "65535"
+    volumes:
+      - /etc/leamout/certs/fullchain.pem:/etc/coturn/tls/fullchain.pem:ro
+      - /etc/leamout/certs/privkey.pem:/etc/coturn/tls/privkey.pem:ro
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/udp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    networks: [media]
+
+volumes:
+  postgres-data:
+  redis-data:
+  nats-data:
+  recordings-data:
+  minio-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  control:
+    ipam:
+      config:
+        - subnet: 172.32.0.0/24
+  media:
+    ipam:
+      config:
+        - subnet: 172.31.0.0/24
+  signaling:
+  edge:

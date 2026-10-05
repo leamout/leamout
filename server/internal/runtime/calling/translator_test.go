@@ -1,0 +1,210 @@
+package calling
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/coffeyvidzro/monogo/internal/integrations/freeswitch"
+	"github.com/google/uuid"
+)
+
+func TestTranslateFreeSWITCHEventKeepsCallAndChannelIdentitySeparate(t *testing.T) {
+	callID := uuid.New()
+	event, err := TranslateFreeSWITCHEvent(freeswitch.Event{
+		Name: "CHANNEL_ANSWER",
+		Headers: map[string]string{
+			"Unique-ID":                "fs-channel-1",
+			"variable_leamout_call_id": callID.String(),
+			"Event-Date-Timestamp":     "1787990400000000",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.CallID != callID {
+		t.Fatalf("call id = %s, want %s", event.CallID, callID)
+	}
+	if event.ChannelID != "fs-channel-1" {
+		t.Fatalf("channel id = %q, want fs-channel-1", event.ChannelID)
+	}
+	if event.Type != LifecycleAnswered {
+		t.Fatalf("type = %q, want %q", event.Type, LifecycleAnswered)
+	}
+	wantTime := time.Date(2026, time.August, 29, 8, 0, 0, 0, time.UTC)
+	if !event.OccurredAt.Equal(wantTime) {
+		t.Fatalf("occurred at = %s, want %s", event.OccurredAt, wantTime)
+	}
+}
+
+func TestTranslateFreeSWITCHEventCapturesOutboundSIPDialog(t *testing.T) {
+	callID := uuid.New()
+	for _, eventName := range []string{"CHANNEL_PROGRESS", "CHANNEL_PROGRESS_MEDIA", "CHANNEL_ANSWER", "CHANNEL_HANGUP_COMPLETE"} {
+		t.Run(eventName, func(t *testing.T) {
+			event, err := TranslateFreeSWITCHEvent(freeswitch.Event{
+				Name: eventName,
+				Headers: map[string]string{
+					"Unique-ID":                "outbound-channel-1",
+					"variable_leamout_call_id": callID.String(),
+					"variable_sip_call_id":     "real-sip-dialog-id",
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if event.CallID != callID || event.ChannelID != "outbound-channel-1" || event.SIPCallID != "real-sip-dialog-id" {
+				t.Fatalf("outbound identifiers were not preserved: %+v", event)
+			}
+		})
+	}
+}
+
+func TestTranslateFreeSWITCHEventDoesNotInventSIPDialog(t *testing.T) {
+	callID := uuid.New()
+	event, err := TranslateFreeSWITCHEvent(freeswitch.Event{
+		Name: "CHANNEL_CREATE",
+		Headers: map[string]string{
+			"Unique-ID":                "outbound-channel-1",
+			"variable_leamout_call_id": callID.String(),
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.SIPCallID != "" {
+		t.Fatalf("a queued origination cannot be assigned a fabricated SIP Call-ID: %q", event.SIPCallID)
+	}
+}
+
+func TestTranslateFreeSWITCHEventRequiresLeamoutCallID(t *testing.T) {
+	_, err := TranslateFreeSWITCHEvent(freeswitch.Event{
+		Name:    "CHANNEL_ANSWER",
+		Headers: map[string]string{"Unique-ID": "fs-channel-1"},
+	})
+	if !errors.Is(err, ErrUncorrelatedEvent) {
+		t.Fatalf("error = %v, want ErrUncorrelatedEvent", err)
+	}
+}
+
+func TestTranslateFreeSWITCHHangupKeepsCauseAsReason(t *testing.T) {
+	callID := uuid.New()
+	event, err := TranslateFreeSWITCHEvent(freeswitch.Event{
+		Name: "CHANNEL_HANGUP_COMPLETE",
+		Headers: map[string]string{
+			"Unique-ID":                "fs-channel-1",
+			"variable_leamout_call_id": callID.String(),
+			"Hangup-Cause":             "USER_BUSY",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.Type != LifecycleFailed {
+		t.Fatalf("type = %q, want %q", event.Type, LifecycleFailed)
+	}
+	if event.HangupReason == nil || *event.HangupReason != "USER_BUSY" {
+		t.Fatalf("hangup reason = %v, want USER_BUSY", event.HangupReason)
+	}
+}
+
+func TestTranslateFreeSWITCHHangupOutcome(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		cause    string
+		answered bool
+		want     LifecycleType
+	}{
+		{
+			name:  "unanswered normal clearing",
+			cause: "NORMAL_CLEARING",
+			want:  LifecycleCancelled,
+		},
+		{
+			name:  "originator cancellation",
+			cause: "ORIGINATOR_CANCEL",
+			want:  LifecycleCancelled,
+		},
+		{
+			name:     "answered normal clearing",
+			cause:    "NORMAL_CLEARING",
+			answered: true,
+			want:     LifecycleCompleted,
+		},
+		{
+			name:  "unanswered busy",
+			cause: "USER_BUSY",
+			want:  LifecycleFailed,
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			headers := map[string]string{
+				"Unique-ID":                uuid.NewString(),
+				"variable_leamout_call_id": uuid.NewString(),
+				"variable_hangup_cause":    test.cause,
+			}
+			if test.answered {
+				headers["variable_answer_epoch"] = "1"
+			}
+			event, err := TranslateFreeSWITCHEvent(freeswitch.Event{
+				Name:    "CHANNEL_HANGUP_COMPLETE",
+				Headers: headers,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if event.Type != test.want {
+				t.Fatalf("type = %q, want %q", event.Type, test.want)
+			}
+			if event.HangupReason == nil || *event.HangupReason != test.cause {
+				t.Fatalf("hangup reason = %v, want %q", event.HangupReason, test.cause)
+			}
+		})
+	}
+}
+
+func TestTranslateInboundFreeSWITCHEvent(t *testing.T) {
+	organizationID := uuid.New()
+	voiceAgentID := uuid.New()
+	phoneNumberID := uuid.New()
+	bindingID := uuid.New()
+	trunkID := uuid.New()
+
+	event, err := TranslateInboundFreeSWITCHEvent(freeswitch.Event{
+		Name: "CHANNEL_CREATE",
+		Headers: map[string]string{
+			"Unique-ID":            "fs-inbound-1",
+			"variable_sip_call_id": "sip-call-123",
+			"variable_sip_h_X-Leamout-Organization-ID":        organizationID.String(),
+			"variable_sip_h_X-Leamout-Trunk-ID":               trunkID.String(),
+			"variable_sip_h_X-Leamout-Phone-Number-ID":        phoneNumberID.String(),
+			"variable_sip_h_X-Leamout-Voice-Agent-Binding-ID": bindingID.String(),
+			"variable_sip_h_X-Leamout-Voice-Agent-ID":         voiceAgentID.String(),
+			"Caller-Caller-ID-Number":                         "+14155550100",
+			"Caller-Destination-Number":                       "+14155550199",
+			"Event-Date-Timestamp":                            "1787990400000000",
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if event.ChannelID != "fs-inbound-1" || event.SIPCallID != "sip-call-123" {
+		t.Fatalf("unexpected inbound identity: %+v", event)
+	}
+	if event.OrganizationID != organizationID ||
+		event.VoiceAgentID != voiceAgentID ||
+		event.PhoneNumberID != phoneNumberID ||
+		event.VoiceAgentBindingID != bindingID ||
+		event.TrunkID != trunkID {
+		t.Fatalf("unexpected inbound admission identity: %+v", event)
+	}
+}
+
+func TestTranslateInboundFreeSWITCHEventIgnoresUnrelatedChannel(t *testing.T) {
+	_, err := TranslateInboundFreeSWITCHEvent(freeswitch.Event{
+		Name:    "CHANNEL_CREATE",
+		Headers: map[string]string{"Unique-ID": "unrelated-channel"},
+	})
+	if !errors.Is(err, ErrNotInboundAdmission) {
+		t.Fatalf("error = %v, want ErrNotInboundAdmission", err)
+	}
+}

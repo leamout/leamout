@@ -1,0 +1,51 @@
+package helper
+
+import (
+	"encoding/json"
+	"net/http"
+
+	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
+	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+func FormatTime(value pgtype.Timestamptz) string {
+	if !value.Valid {
+		return ""
+	}
+
+	t := pgconv.TimestamptzToTime(value)
+	if t.IsZero() {
+		return ""
+	}
+
+	return t.Format(http.TimeFormat)
+}
+
+func DecodeJSON[T any](r *http.Request) (T, error) {
+	var value T
+
+	if err := json.NewDecoder(r.Body).Decode(&value); err != nil {
+		return value, apperror.NewBadRequest("invalid request body")
+	}
+
+	return value, nil
+}
+
+func ClientIP(r *http.Request) *string {
+	value := r.RemoteAddr
+	if value == "" {
+		return nil
+	}
+
+	return &value
+}
+
+func UserAgent(r *http.Request) *string {
+	value := r.Header.Get("User-Agent")
+	if value == "" {
+		return nil
+	}
+
+	return &value
+}
