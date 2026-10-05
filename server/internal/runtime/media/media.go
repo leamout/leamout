@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/media/engine/composable"
 	"github.com/coffeyvidzro/monogo/internal/media/engine/echo"
 	"github.com/coffeyvidzro/monogo/internal/media/engine/integrated"
@@ -37,14 +38,18 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		return err
 	}
 	logger := logging.New().With("process", "media")
-	registry, err := builtInProviderRegistry(cfg)
+	catalog, err := builtInProviderCatalog()
 	if err != nil {
-		return fmt.Errorf("initialize provider registry: %w", err)
+		return fmt.Errorf("initialize AI provider catalog: %w", err)
+	}
+	realtimeRegistry, err := builtInRealtimeProviderRegistry(cfg)
+	if err != nil {
+		return fmt.Errorf("initialize realtime provider registry: %w", err)
 	}
 	manager, err := session.NewManager(
 		cfg.MaxSessions,
 		cfg.AttachTimeout,
-		mediaEngines(registry),
+		mediaEngines(catalog, realtimeRegistry),
 	)
 	if err != nil {
 		return fmt.Errorf("initialize media session manager: %w", err)
@@ -108,15 +113,18 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 	return result
 }
 
-func mediaEngines(registry *providersdk.Registry) map[session.Engine]session.Starter {
+func mediaEngines(
+	catalog *aicatalog.Catalog,
+	realtimeRegistry *providersdk.Registry,
+) map[session.Engine]session.Starter {
 	return map[session.Engine]session.Starter{
 		session.EngineEcho: echo.Engine{},
 		session.EngineIntegrated: integrated.Engine{
-			Registry:        registry,
+			Registry:        realtimeRegistry,
 			DefaultProvider: "openai",
 		},
 		session.EngineComposable: composable.Engine{
-			Registry:           registry,
+			Catalog:            catalog,
 			DefaultSTTProvider: "deepgram",
 			DefaultLLMProvider: "groq",
 			DefaultTTSProvider: "cartesia",
