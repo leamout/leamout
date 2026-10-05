@@ -8,10 +8,12 @@ import (
 )
 
 const (
-	ProviderOpenAI   = "openai"
-	ProviderDeepgram = "deepgram"
-	ProviderGroq     = "groq"
-	ProviderCartesia = "cartesia"
+	ProviderOpenAI    = "openai"
+	ProviderDeepgram  = "deepgram"
+	ProviderAssemblyAI = "assemblyai"
+	ProviderGroq      = "groq"
+	ProviderCartesia  = "cartesia"
+	ProviderElevenLabs = "elevenlabs"
 
 	RoleRealtime = "realtime"
 	RoleSTT      = "stt"
@@ -100,23 +102,6 @@ type ResolvedBinding struct {
 	Provider string
 	APIKey   string
 	Config   json.RawMessage
-}
-
-func credentialResponse(value Credential, voiceAgentIDs []uuid.UUID) CredentialResponse {
-	return CredentialResponse{
-		ID:              value.ID,
-		OrganizationID:  value.OrganizationID,
-		Provider:        value.Provider,
-		Name:            value.Name,
-		ConnectionState: value.ConnectionState,
-		VerifiedAt:      value.VerifiedAt,
-		FailureCode:     value.FailureCode,
-		Capabilities:    providerCapabilities(value.Provider),
-		VoiceAgentIDs:   voiceAgentIDs,
-		CreatedAt:       value.CreatedAt,
-		RotatedAt:       value.RotatedAt,
-		UpdatedAt:       value.UpdatedAt,
-	}
 }
 
 type Integration struct {
