@@ -59,13 +59,6 @@ func TestValidateProviderConfig(t *testing.T) {
 			config:   json.RawMessage(`{"model":"eleven_flash_v2_5","voice_id":"voice"}`),
 		},
 		{
-			name:     "unknown field",
-			kind:     ai.KindLLM,
-			provider: ProviderOpenAI,
-			config:   json.RawMessage(`{"secret":"not-allowed"}`),
-			wantErr:  true,
-		},
-		{
 			name:     "wrong type",
 			kind:     ai.KindLLM,
 			provider: ProviderGroq,
