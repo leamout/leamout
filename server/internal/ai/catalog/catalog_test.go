@@ -35,6 +35,27 @@ func TestBuiltins(t *testing.T) {
 	if _, ok := catalog.TTS("elevenlabs"); !ok {
 		t.Fatal("elevenlabs TTS provider is not registered")
 	}
+
+	if !catalog.Has("assemblyai") || !catalog.Has("elevenlabs") {
+		t.Fatal("catalog Has() does not include all built-in providers")
+	}
+	if catalog.Has("missing") {
+		t.Fatal("catalog Has() accepted an unknown provider")
+	}
+	if _, ok := catalog.ConfigValidator(ai.KindLLM, "openai"); !ok {
+		t.Fatal("OpenAI config validator is unavailable")
+	}
+	if _, ok := catalog.CredentialVerifier("openai"); !ok {
+		t.Fatal("OpenAI credential verifier is unavailable")
+	}
+	capabilities := catalog.Capabilities("openai")
+	if len(capabilities) == 0 {
+		t.Fatal("OpenAI capabilities are empty")
+	}
+	capabilities[0] = "changed"
+	if catalog.Capabilities("openai")[0] == "changed" {
+		t.Fatal("Capabilities() reused mutable storage")
+	}
 }
 
 func assertProviderIDs(t *testing.T, descriptors []ai.Descriptor, want []string) {
