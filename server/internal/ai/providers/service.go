@@ -7,33 +7,45 @@ import (
 	"fmt"
 	"strings"
 
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/security/encryption"
 	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/leamout/contracts/ai"
 )
 
 type Service struct {
 	repo     *Repository
 	cipher   *encryption.Cipher
+	catalog  *aicatalog.Catalog
 	verifier *Verifier
 }
 
 func NewService(
 	repo *Repository,
 	cipher *encryption.Cipher,
-	verifiers ...*Verifier,
+	catalogs ...*aicatalog.Catalog,
 ) *Service {
-	verifier := NewVerifier(nil)
-	if len(verifiers) > 0 && verifiers[0] != nil {
-		verifier = verifiers[0]
-	}
+	providerCatalog := firstCatalog(catalogs)
 	return &Service{
 		repo:     repo,
 		cipher:   cipher,
-		verifier: verifier,
+		catalog:  providerCatalog,
+		verifier: NewVerifier(providerCatalog),
 	}
+}
+
+func firstCatalog(catalogs []*aicatalog.Catalog) *aicatalog.Catalog {
+	if len(catalogs) > 0 && catalogs[0] != nil {
+		return catalogs[0]
+	}
+	catalog, err := aicatalog.Builtins()
+	if err != nil {
+		return nil
+	}
+	return catalog
 }
 
 func (s *Service) CreateCredential(
@@ -49,7 +61,7 @@ func (s *Service) CreateCredential(
 	req.Name = strings.TrimSpace(req.Name)
 	req.Secret = strings.TrimSpace(req.Secret)
 
-	if !validProvider(req.Provider) {
+	if s.catalog == nil || !s.catalog.Has(req.Provider) {
 		return Credential{}, apperror.NewBadRequest("unsupported AI provider")
 	}
 	if req.Name == "" || len(req.Name) > 128 {
@@ -292,7 +304,13 @@ func (s *Service) UpsertBinding(
 			"organization and voice agent ids are required",
 		)
 	}
-	if !validRole(role) || !roleProviderCompatible(role, req.Provider) {
+	kind, ok := roleKind(role)
+	if !ok || s.catalog == nil {
+		return Binding{}, apperror.NewBadRequest(
+			"provider is not compatible with Voice Agent role",
+		)
+	}
+	if _, ok := s.catalog.Get(kind, req.Provider); !ok {
 		return Binding{}, apperror.NewBadRequest(
 			"provider is not compatible with Voice Agent role",
 		)
@@ -304,8 +322,7 @@ func (s *Service) UpsertBinding(
 	if len(req.Config) == 0 {
 		req.Config = json.RawMessage(`{}`)
 	}
-
-	if err := validateProviderConfig(req.Provider, req.Config); err != nil {
+	if err := s.validateProviderConfig(kind, req.Provider, req.Config); err != nil {
 		return Binding{}, err
 	}
 
@@ -368,51 +385,21 @@ func (s *Service) BindingStatuses(
 	return result, nil
 }
 
-func validateProviderConfig(provider string, value json.RawMessage) error {
+func (s *Service) validateProviderConfig(
+	kind ai.Kind,
+	provider string,
+	value json.RawMessage,
+) error {
 	var object map[string]json.RawMessage
 	if err := json.Unmarshal(value, &object); err != nil || object == nil {
 		return apperror.NewBadRequest("provider config must be a JSON object")
 	}
-	var allowed map[string]string
-	switch provider {
-	case ProviderDeepgram:
-		allowed = map[string]string{
-			"model":    "string",
-			"language": "string",
-		}
-	case ProviderGroq:
-		allowed = map[string]string{
-			"model":       "string",
-			"temperature": "number",
-		}
-	case ProviderCartesia:
-		allowed = map[string]string{
-			"model":    "string",
-			"voice_id": "string",
-			"language": "string",
-		}
-	case ProviderOpenAI:
-		allowed = map[string]string{
-			"model": "string",
-			"voice": "string",
-		}
-	default:
-		return apperror.NewBadRequest("unsupported AI provider")
+	validator, ok := s.catalog.ConfigValidator(kind, provider)
+	if !ok {
+		return nil
 	}
-	for key, raw := range object {
-		kind, ok := allowed[key]
-		if !ok {
-			return apperror.NewBadRequest("unsupported provider config field: " + key)
-		}
-		var target any
-		if kind == "string" {
-			target = new(string)
-		} else {
-			target = new(float64)
-		}
-		if err := json.Unmarshal(raw, target); err != nil {
-			return apperror.NewBadRequest("invalid provider config field: " + key)
-		}
+	if err := validator.ValidateConfig(value); err != nil {
+		return apperror.NewBadRequest("invalid provider config: " + err.Error())
 	}
 	return nil
 }
@@ -439,7 +426,7 @@ func (s *Service) DeleteBinding(
 	agentID uuid.UUID,
 	role string,
 ) error {
-	if !validRole(role) {
+	if _, ok := roleKind(strings.TrimSpace(role)); !ok {
 		return apperror.NewBadRequest("invalid provider role")
 	}
 
@@ -554,6 +541,32 @@ func (s *Service) ResolveSnapshot(
 	return result, nil
 }
 
+func (s *Service) credentialResponse(
+	value Credential,
+	voiceAgentIDs []uuid.UUID,
+) CredentialResponse {
+	capabilities := make([]string, 0)
+	if s.catalog != nil {
+		for _, capability := range s.catalog.Capabilities(value.Provider) {
+			capabilities = append(capabilities, string(capability))
+		}
+	}
+	return CredentialResponse{
+		ID:              value.ID,
+		OrganizationID:  value.OrganizationID,
+		Provider:        value.Provider,
+		Name:            value.Name,
+		ConnectionState: value.ConnectionState,
+		VerifiedAt:      value.VerifiedAt,
+		FailureCode:     value.FailureCode,
+		Capabilities:    capabilities,
+		VoiceAgentIDs:   voiceAgentIDs,
+		CreatedAt:       value.CreatedAt,
+		RotatedAt:       value.RotatedAt,
+		UpdatedAt:       value.UpdatedAt,
+	}
+}
+
 func credentialScope(
 	organizationID uuid.UUID,
 	credentialID uuid.UUID,
@@ -565,42 +578,18 @@ func credentialScope(
 	)
 }
 
-func validProvider(value string) bool {
-	switch value {
-	case ProviderOpenAI,
-		ProviderDeepgram,
-		ProviderGroq,
-		ProviderCartesia:
-		return true
-	default:
-		return false
-	}
-}
-
-func validRole(value string) bool {
-	switch value {
-	case RoleRealtime,
-		RoleSTT,
-		RoleLLM,
-		RoleTTS:
-		return true
-	default:
-		return false
-	}
-}
-
-func roleProviderCompatible(role string, provider string) bool {
+func roleKind(role string) (ai.Kind, bool) {
 	switch role {
 	case RoleRealtime:
-		return provider == ProviderOpenAI
+		return ai.KindRealtime, true
 	case RoleSTT:
-		return provider == ProviderDeepgram
+		return ai.KindSTT, true
 	case RoleLLM:
-		return provider == ProviderGroq
+		return ai.KindLLM, true
 	case RoleTTS:
-		return provider == ProviderCartesia
+		return ai.KindTTS, true
 	default:
-		return false
+		return "", false
 	}
 }
 
