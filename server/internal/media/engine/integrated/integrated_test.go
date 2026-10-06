@@ -109,11 +109,11 @@ func newFakeRealtimeStream() *fakeRealtimeStream {
 	}
 }
 
-func (*fakeRealtimeStream) SendAudio(context.Context, ai.AudioFrame) error { return nil }
-func (*fakeRealtimeStream) Interrupt(context.Context) error { return nil }
+func (*fakeRealtimeStream) SendAudio(context.Context, ai.AudioFrame) error        { return nil }
+func (*fakeRealtimeStream) Interrupt(context.Context) error                       { return nil }
 func (*fakeRealtimeStream) SubmitToolResult(context.Context, ai.ToolResult) error { return nil }
-func (s *fakeRealtimeStream) Audio() <-chan ai.AudioFrame { return s.audio }
-func (s *fakeRealtimeStream) Events() <-chan ai.RealtimeEvent { return s.events }
+func (s *fakeRealtimeStream) Audio() <-chan ai.AudioFrame                         { return s.audio }
+func (s *fakeRealtimeStream) Events() <-chan ai.RealtimeEvent                     { return s.events }
 func (s *fakeRealtimeStream) Close(context.Context) error {
 	close(s.audio)
 	close(s.events)

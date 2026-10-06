@@ -122,7 +122,7 @@ func (s *stream) SubmitToolResult(ctx context.Context, result session.ToolResult
 }
 
 func (s *stream) Audio() <-chan session.AudioFrame { return s.audio }
-func (s *stream) Events() <-chan session.Event { return s.events }
+func (s *stream) Events() <-chan session.Event     { return s.events }
 
 func (s *stream) Close(ctx context.Context) error {
 	s.cancel()
