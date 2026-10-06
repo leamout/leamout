@@ -101,7 +101,7 @@ type EmailDelivery struct {
 	Recipient         string             `db:"recipient" json:"recipient"`
 	Template          string             `db:"template" json:"template"`
 	EncryptedData     *string            `db:"encrypted_data" json:"encrypted_data"`
-	ChallengeID       *uuid.UUID         `db:"challenge_id" json:"challenge_id"`
+	CancellationKey   *string            `db:"cancellation_key" json:"cancellation_key"`
 	Status            string             `db:"status" json:"status"`
 	Attempts          int32              `db:"attempts" json:"attempts"`
 	AvailableAt       pgtype.Timestamptz `db:"available_at" json:"available_at"`

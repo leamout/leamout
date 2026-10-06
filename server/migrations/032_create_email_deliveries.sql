@@ -3,8 +3,8 @@ CREATE TABLE email_deliveries (
     recipient TEXT NOT NULL,
     template TEXT NOT NULL CHECK (template IN ('otp', 'invitation')),
     encrypted_data TEXT,
-    challenge_id UUID REFERENCES auth_challenges(id) ON DELETE SET NULL,
-    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'expired')),
+    cancellation_key TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'expired', 'cancelled')),
     attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
     available_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     locked_at TIMESTAMPTZ,
@@ -16,5 +16,5 @@ CREATE TABLE email_deliveries (
     sent_at TIMESTAMPTZ
 );
 CREATE INDEX email_deliveries_pending_idx ON email_deliveries (available_at) WHERE status IN ('pending', 'sending');
-CREATE INDEX email_deliveries_challenge_idx ON email_deliveries (challenge_id);
-CREATE INDEX email_deliveries_recipient_idx ON email_deliveries (recipient, created_at) WHERE template='otp';
+CREATE INDEX email_deliveries_cancellation_idx ON email_deliveries (cancellation_key) WHERE status IN ('pending', 'sending');
+CREATE INDEX email_deliveries_recipient_idx ON email_deliveries (recipient, template, created_at);

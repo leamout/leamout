@@ -70,7 +70,7 @@ func queuedCode(t *testing.T, pool *pgxpool.Pool, cipher *encryption.Cipher, tra
 	t.Helper()
 	var id uuid.UUID
 	var payload string
-	if err := pool.QueryRow(context.Background(), `SELECT d.id,d.encrypted_data FROM email_deliveries d JOIN auth_challenges c ON c.id=d.challenge_id WHERE c.auth_transaction_id=$1 AND d.status='pending' ORDER BY d.created_at DESC LIMIT 1`, transactionID).Scan(&id, &payload); err != nil {
+	if err := pool.QueryRow(context.Background(), `SELECT id,encrypted_data FROM email_deliveries WHERE cancellation_key=$1 AND status='pending' ORDER BY created_at DESC LIMIT 1`, otpEmailCancellationKey(transactionID)).Scan(&id, &payload); err != nil {
 		t.Fatal(err)
 	}
 	plain, err := cipher.DecryptForScope("email:"+id.String(), payload)
@@ -133,7 +133,7 @@ func TestOTPEmailTransactionAndReplay(t *testing.T) {
 		t.Fatal("claimed consumed OTP")
 	}
 	var payload *string
-	if err := pool.QueryRow(ctx, `SELECT encrypted_data FROM email_deliveries WHERE challenge_id IN (SELECT id FROM auth_challenges WHERE auth_transaction_id=$1)`, transaction.ID).Scan(&payload); err != nil || payload != nil {
+	if err := pool.QueryRow(ctx, `SELECT encrypted_data FROM email_deliveries WHERE cancellation_key=$1`, otpEmailCancellationKey(transaction.ID)).Scan(&payload); err != nil || payload != nil {
 		t.Fatal("expired payload not scrubbed")
 	}
 }
@@ -154,7 +154,7 @@ func TestOTPResendInvalidatesPreviousCode(t *testing.T) {
 	if _, err := pool.Exec(ctx, `UPDATE auth_challenges SET created_at=created_at-interval '61 seconds' WHERE auth_transaction_id=$1`, transaction.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `UPDATE email_deliveries SET created_at=created_at-interval '61 seconds' WHERE challenge_id IN (SELECT id FROM auth_challenges WHERE auth_transaction_id=$1)`, transaction.ID); err != nil {
+	if _, err := pool.Exec(ctx, `UPDATE email_deliveries SET created_at=created_at-interval '61 seconds' WHERE cancellation_key=$1`, otpEmailCancellationKey(transaction.ID)); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := service.SendOTP(ctx, transaction.ID); err != nil {
@@ -322,5 +322,139 @@ func TestEmailRetryAndTerminalFailure(t *testing.T) {
 	}
 	if err := pool.QueryRow(ctx, `SELECT status,encrypted_data FROM email_deliveries WHERE id=$1`, id).Scan(&status, &payload); err != nil || status != "failed" || payload != nil {
 		t.Fatal("terminal failure retained payload")
+	}
+}
+
+func TestGenericEmailCancellationIsIsolatedAndTransactional(t *testing.T) {
+	pool, cipher := testEmailDatabase(t)
+	ctx := context.Background()
+	service := email.NewService(cipher)
+	// The delivery outbox must work without any authentication tables.
+	if _, err := pool.Exec(ctx, `DROP TABLE auth_challenges, auth_transactions, users CASCADE`); err != nil {
+		t.Fatal(err)
+	}
+	keyA, keyB := "invoice:one", "invitation:two"
+	queue := func(key *string) uuid.UUID {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		id, err := service.QueueTx(ctx, tx, email.Request{To: "generic@example.com", Template: "invitation", CancellationKey: key, Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	idA := queue(&keyA)
+	idB := queue(&keyB)
+	idC := queue(nil)
+	repo := email.NewRepository(pool)
+	lease := uuid.New()
+	delivery, err := repo.Claim(ctx, lease)
+	if err != nil || delivery.ID != idA {
+		t.Fatalf("claim: %v", err)
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CancelTx(ctx, tx, keyA); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ready, err := repo.Ready(ctx, idA, lease)
+	if err != nil || !ready {
+		t.Fatal("rolled-back cancellation persisted")
+	}
+	tx, err = pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.CancelTx(ctx, tx, keyA); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ready, err = repo.Ready(ctx, idA, lease)
+	if err != nil || ready {
+		t.Fatal("cancelled delivery remains ready")
+	}
+	// A provider response arriving after cancellation cannot restore the delivery.
+	if err := repo.Complete(ctx, idA, lease, email.Result{MessageID: "late-response"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Fail(ctx, delivery, lease, "late-failure", false); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	var payload *string
+	if err := pool.QueryRow(ctx, `SELECT status,encrypted_data FROM email_deliveries WHERE id=$1`, idA).Scan(&status, &payload); err != nil || status != "cancelled" || payload != nil {
+		t.Fatal("cancelled job revived or retained secrets")
+	}
+	for _, id := range []uuid.UUID{idB, idC} {
+		if err := pool.QueryRow(ctx, `SELECT status FROM email_deliveries WHERE id=$1`, id).Scan(&status); err != nil || status != "pending" {
+			t.Fatal("unrelated job cancelled")
+		}
+	}
+}
+
+func TestExhaustedOTPAttemptsCancelQueuedDelivery(t *testing.T) {
+	pool, cipher := testEmailDatabase(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(sqlc.New(pool)))
+	service.ConfigureEmail(pool, email.NewService(cipher))
+	transaction, err := service.Start(ctx, "exhausted@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SendOTP(ctx, transaction.ID); err != nil {
+		t.Fatal(err)
+	}
+	for range 5 {
+		if _, err := service.VerifyOTP(ctx, transaction.ID, "invalid"); err == nil {
+			t.Fatal("invalid code accepted")
+		}
+	}
+	var status string
+	var payload *string
+	if err := pool.QueryRow(ctx, `SELECT status,encrypted_data FROM email_deliveries WHERE cancellation_key=$1`, otpEmailCancellationKey(transaction.ID)).Scan(&status, &payload); err != nil || status != "cancelled" || payload != nil {
+		t.Fatal("exhausted challenge delivery not cancelled")
+	}
+}
+
+func TestPasswordLoginCancelsQueuedOTP(t *testing.T) {
+	pool, cipher := testEmailDatabase(t)
+	ctx := context.Background()
+	queries := sqlc.New(pool)
+	user, err := queries.CreateUser(ctx, sqlc.CreateUserParams{Email: "password@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(NewRepository(queries))
+	service.ConfigureEmail(pool, email.NewService(cipher))
+	if _, err := service.SetPassword(ctx, user.ID, "strong-test-password-123"); err != nil {
+		t.Fatal(err)
+	}
+	transaction, err := service.Start(ctx, user.Email)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.SendOTP(ctx, transaction.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.LoginWithPassword(ctx, transaction.ID, "strong-test-password-123"); err != nil {
+		t.Fatal(err)
+	}
+	var status string
+	var payload *string
+	if err := pool.QueryRow(ctx, `SELECT status,encrypted_data FROM email_deliveries WHERE cancellation_key=$1`, otpEmailCancellationKey(transaction.ID)).Scan(&status, &payload); err != nil || status != "cancelled" || payload != nil {
+		t.Fatal("password login left OTP queued")
 	}
 }

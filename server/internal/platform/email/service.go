@@ -7,6 +7,8 @@ import (
 	"net/mail"
 	"time"
 
+	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
+	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/coffeyvidzro/monogo/internal/security/encryption"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -25,9 +27,6 @@ func NewService(cipher *encryption.Cipher) *Service {
 func (s *Service) QueueTx(ctx context.Context, tx pgx.Tx, req Request) (uuid.UUID, error) {
 	if s == nil || s.cipher == nil || tx == nil {
 		return uuid.Nil, fmt.Errorf("email delivery is not configured")
-	}
-	if req.Template == "otp" && (req.ChallengeID == nil || *req.ChallengeID == uuid.Nil) {
-		return uuid.Nil, fmt.Errorf("OTP challenge is required")
 	}
 	address, err := mail.ParseAddress(req.To)
 	if err != nil || address.Address != req.To {
@@ -48,6 +47,11 @@ func (s *Service) QueueTx(ctx context.Context, tx pgx.Tx, req Request) (uuid.UUI
 	if err != nil {
 		return uuid.Nil, err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO email_deliveries (id, recipient, template, encrypted_data, challenge_id, expires_at) VALUES ($1,$2,$3,$4,$5,$6)`, id, req.To, req.Template, payload, req.ChallengeID, req.Data.ExpiresAt)
+	err = sqlc.New(tx).CreateEmailDelivery(ctx, sqlc.CreateEmailDeliveryParams{ID: id, Recipient: req.To, Template: req.Template, EncryptedData: &payload, CancellationKey: req.CancellationKey, ExpiresAt: pgconv.NullableTimestamptz(&req.Data.ExpiresAt)})
 	return id, err
+}
+
+// CancelTx cancels jobs belonging to the caller's opaque business reference.
+func (s *Service) CancelTx(ctx context.Context, tx pgx.Tx, key string) error {
+	return sqlc.New(tx).CancelEmailDeliveries(ctx, &key)
 }

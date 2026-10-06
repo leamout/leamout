@@ -31,10 +31,10 @@ type Data struct {
 	AcceptURL    string    `json:"accept_url,omitempty"`
 }
 type Request struct {
-	To          string
-	Template    string
-	Data        Data
-	ChallengeID *uuid.UUID
+	To              string
+	Template        string
+	Data            Data
+	CancellationKey *string
 }
 type Delivery struct {
 	ID                    uuid.UUID

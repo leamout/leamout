@@ -28,7 +28,9 @@ Queue an email using `email.Service.QueueTx` with the business operation's `pgx.
 
 - Workers claim one job at a time using `FOR UPDATE SKIP LOCKED`, a 60-second lease, and a unique lease token.
 - Each provider request has a 15-second timeout and SDK automatic retries are disabled. The queue retries temporary errors, up to five attempts, with exponential delays.
-- OTP jobs are checked against challenge and transaction state before sending. Resend invalidates earlier codes and pending jobs. Expiry follows the authentication transaction's original ten-minute deadline.
+- Deliveries have an optional opaque `cancellation_key`, with no foreign key to authentication or other business tables. The queue worker checks only delivery status, lease ownership, and expiry.
+- Auth owns OTP lifecycle rules. Resend invalidates earlier challenges and cancels matching email jobs in the same transaction. Successful OTP/password login and exhausted OTP attempts cancel queued jobs and erase their payloads. Expiry follows the authentication transaction's original ten-minute deadline.
+- All delivery persistence queries live in `internal/database/queries/email_deliveries.sql`; repositories use generated sqlc methods. Queueing and cancellation use the caller's transaction.
 - Resend cooldown is 60 seconds; each recipient can request five codes per hour. Public auth endpoints have a shared Redis limit of 30 requests/minute per socket peer. Configure per-client limits at your reverse proxy too; forwarded headers are not trusted for this budget.
 - SES message IDs record provider acceptance, not inbox delivery. A crash or uncertain timeout can produce duplicate emails. Revocation concurrent with an in-flight provider request cannot retract that email; its code is invalidated.
 - Raw provider errors and email bodies are never stored in error fields. Only classified error codes are persisted.

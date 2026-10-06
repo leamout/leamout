@@ -85,3 +85,9 @@ WHERE id = sqlc.arg(id)
 -- name: DeleteExpiredAuthTransactions :exec
 DELETE FROM auth_transactions
 WHERE expires_at <= NOW();
+
+-- name: LockAuthTransaction :one
+SELECT * FROM auth_transactions WHERE id=sqlc.arg(id) FOR UPDATE;
+
+-- name: LockAuthRecipient :exec
+SELECT pg_advisory_xact_lock(hashtextextended(sqlc.arg(identifier)::text,0));
