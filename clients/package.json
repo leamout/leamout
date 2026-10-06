@@ -5,7 +5,10 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "emails:dev": "bun run --filter @leamout/emails dev",
+    "emails:export": "bun run --filter @leamout/emails export",
+    "emails:check": "bun run --filter @leamout/emails check"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.11",

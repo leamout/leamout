@@ -1,0 +1,22 @@
+{
+  "name": "@leamout/emails",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "email dev --dir emails --port 3002",
+    "export": "bun scripts/export.tsx",
+    "check": "bun scripts/export.tsx --check",
+    "lint": "biome check .",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-email": "6.11.1"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/react": "^19.2.18"
+  }
+}

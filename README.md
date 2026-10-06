@@ -329,6 +329,16 @@ To validate examples without creating deployment files, run
 `APP_ENV_FILE=../server/.env.example docker compose --env-file .env.example -f deploy/compose.yaml config --quiet`.
 Keep both environment files private. No `.env` file is copied into the image.
 
+## Email templates
+
+HTML email layouts are authored with React Email in `clients/packages/emails`.
+From `clients/`, use `bun run emails:dev` to preview and `bun run emails:export`
+to update the HTML embedded by Go. Commit generated HTML with the React sources;
+`bun run emails:check` verifies they match. The Go worker renders dynamic data
+and sends through SES without needing Node or Bun in the runtime image.
+
+See [email package instructions](clients/packages/emails/README.md).
+
 ## License
 
 The software in this repository is licensed under the [Apache License 2.0](LICENSE).

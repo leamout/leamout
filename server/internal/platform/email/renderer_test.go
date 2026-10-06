@@ -36,3 +36,29 @@ func TestRendererRejectsInvalidData(t *testing.T) {
 		}
 	}
 }
+
+func TestRendererPreservesInvitationURL(t *testing.T) {
+	url := "https://app.example.com/invitation?token=a%2Bb&organization=acme"
+	m, err := NewRenderer().Render("invitation", Data{
+		Organization: "Acme & Partners",
+		Inviter:      "Alice <admin>",
+		Role:         "member",
+		AcceptURL:    url,
+		ExpiresAt:    time.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(m.HTML, `href="https://app.example.com/invitation?token=a%2Bb&amp;organization=acme"`) {
+		t.Fatal("invitation link was not preserved with HTML attribute escaping")
+	}
+	if !strings.Contains(m.HTML, "Acme &amp; Partners") || !strings.Contains(m.HTML, "Alice &lt;admin&gt;") {
+		t.Fatal("invitation fields were not escaped")
+	}
+	if !strings.Contains(m.Text, url) {
+		t.Fatal("plain-text invitation URL changed")
+	}
+	if strings.Contains(m.HTML, "LEAMOUT_") || strings.Contains(m.HTML, "{{.") {
+		t.Fatal("unresolved template placeholders")
+	}
+}
