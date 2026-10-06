@@ -39,7 +39,7 @@ type ReadinessReport struct {
 	ConfigurationRevision int32               `json:"configuration_revision"`
 	Engine                string              `json:"engine"`
 	Bindings              []BindingDiagnostic `json:"bindings"`
-	Issues                 []ReadinessIssue    `json:"issues"`
+	Issues                []ReadinessIssue    `json:"issues"`
 }
 
 type BindingDiagnostic struct {
