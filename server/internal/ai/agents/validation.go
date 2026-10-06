@@ -30,6 +30,10 @@ func normalizeCreate(req CreateRequest) (CreateRequest, error) {
 	if err != nil {
 		return CreateRequest{}, err
 	}
+	if language == nil {
+		value := "en"
+		language = &value
+	}
 	if len(req.EngineConfig) == 0 {
 		req.EngineConfig = json.RawMessage(`{}`)
 	}
