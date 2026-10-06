@@ -13,8 +13,15 @@ import (
 )
 
 const cancelEmailDeliveries = `-- name: CancelEmailDeliveries :exec
-UPDATE email_deliveries SET status='cancelled', encrypted_data=NULL, locked_at=NULL, lock_token=NULL
-WHERE cancellation_key=$1 AND status IN ('pending','sending')
+UPDATE email_deliveries
+SET
+    status = 'cancelled',
+    encrypted_data = NULL,
+    locked_at = NULL,
+    lock_token = NULL
+WHERE
+    cancellation_key = $1
+    AND status IN ('pending', 'sending')
 `
 
 func (q *Queries) CancelEmailDeliveries(ctx context.Context, cancellationKey *string) error {
@@ -24,12 +31,31 @@ func (q *Queries) CancelEmailDeliveries(ctx context.Context, cancellationKey *st
 
 const claimEmailDelivery = `-- name: ClaimEmailDelivery :one
 WITH candidate AS (
- SELECT id FROM email_deliveries WHERE expires_at>now() AND attempts<5 AND
- ((status='pending' AND available_at<=now()) OR (status='sending' AND locked_at<now()-interval '60 seconds'))
- ORDER BY available_at FOR UPDATE SKIP LOCKED LIMIT 1
+    SELECT id
+    FROM email_deliveries
+    WHERE
+        expires_at > now()
+        AND attempts < 5
+        AND (
+            (status = 'pending' AND available_at <= now())
+            OR (
+                status = 'sending'
+                AND locked_at < now() - interval '60 seconds'
+            )
+        )
+    ORDER BY available_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT 1
 )
-UPDATE email_deliveries d SET status='sending', attempts=d.attempts+1, locked_at=now(), lock_token=$1
-FROM candidate WHERE d.id=candidate.id RETURNING d.id, d.recipient, d.template, d.encrypted_data, d.cancellation_key, d.status, d.attempts, d.available_at, d.locked_at, d.lock_token, d.expires_at, d.provider_message_id, d.last_error_code, d.created_at, d.sent_at
+UPDATE email_deliveries d
+SET
+    status = 'sending',
+    attempts = d.attempts + 1,
+    locked_at = now(),
+    lock_token = $1
+FROM candidate
+WHERE d.id = candidate.id
+RETURNING d.id, d.recipient, d.template, d.encrypted_data, d.cancellation_key, d.status, d.attempts, d.available_at, d.locked_at, d.lock_token, d.expires_at, d.provider_message_id, d.last_error_code, d.created_at, d.sent_at
 `
 
 func (q *Queries) ClaimEmailDelivery(ctx context.Context, lockToken *uuid.UUID) (EmailDelivery, error) {
@@ -56,8 +82,18 @@ func (q *Queries) ClaimEmailDelivery(ctx context.Context, lockToken *uuid.UUID) 
 }
 
 const completeEmailDelivery = `-- name: CompleteEmailDelivery :exec
-UPDATE email_deliveries SET status='sent', encrypted_data=NULL, provider_message_id=$1, sent_at=now(), locked_at=NULL, lock_token=NULL
-WHERE id=$2 AND lock_token=$3 AND status='sending'
+UPDATE email_deliveries
+SET
+    status = 'sent',
+    encrypted_data = NULL,
+    provider_message_id = $1,
+    sent_at = now(),
+    locked_at = NULL,
+    lock_token = NULL
+WHERE
+    id = $2
+    AND lock_token = $3
+    AND status = 'sending'
 `
 
 type CompleteEmailDeliveryParams struct {
@@ -72,8 +108,12 @@ func (q *Queries) CompleteEmailDelivery(ctx context.Context, arg CompleteEmailDe
 }
 
 const countEmailDeliveriesSince = `-- name: CountEmailDeliveriesSince :one
-SELECT count(*) FROM email_deliveries
-WHERE recipient=$1 AND template=$2 AND created_at>$3::timestamptz
+SELECT count(*)
+FROM email_deliveries
+WHERE
+    recipient = $1
+    AND template = $2
+    AND created_at > $3::timestamptz
 `
 
 type CountEmailDeliveriesSinceParams struct {
@@ -90,8 +130,22 @@ func (q *Queries) CountEmailDeliveriesSince(ctx context.Context, arg CountEmailD
 }
 
 const createEmailDelivery = `-- name: CreateEmailDelivery :exec
-INSERT INTO email_deliveries (id, recipient, template, encrypted_data, cancellation_key, expires_at)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO email_deliveries (
+    id,
+    recipient,
+    template,
+    encrypted_data,
+    cancellation_key,
+    expires_at
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
 `
 
 type CreateEmailDeliveryParams struct {
@@ -116,8 +170,15 @@ func (q *Queries) CreateEmailDelivery(ctx context.Context, arg CreateEmailDelive
 }
 
 const expireEmailDeliveries = `-- name: ExpireEmailDeliveries :exec
-UPDATE email_deliveries SET status='expired', encrypted_data=NULL, locked_at=NULL, lock_token=NULL
-WHERE status IN ('pending','sending') AND expires_at <= now()
+UPDATE email_deliveries
+SET
+    status = 'expired',
+    encrypted_data = NULL,
+    locked_at = NULL,
+    lock_token = NULL
+WHERE
+    status IN ('pending', 'sending')
+    AND expires_at <= now()
 `
 
 func (q *Queries) ExpireEmailDeliveries(ctx context.Context) error {
@@ -126,10 +187,24 @@ func (q *Queries) ExpireEmailDeliveries(ctx context.Context) error {
 }
 
 const failEmailDelivery = `-- name: FailEmailDelivery :exec
-UPDATE email_deliveries SET status=CASE WHEN $1::boolean THEN 'failed' ELSE 'pending' END,
- encrypted_data=CASE WHEN $1::boolean THEN NULL ELSE encrypted_data END,
- last_error_code=$2, available_at=now()+$3::integer*interval '1 second', locked_at=NULL, lock_token=NULL
-WHERE id=$4 AND lock_token=$5 AND status='sending'
+UPDATE email_deliveries
+SET
+    status = CASE
+        WHEN $1::boolean THEN 'failed'
+        ELSE 'pending'
+    END,
+    encrypted_data = CASE
+        WHEN $1::boolean THEN NULL
+        ELSE encrypted_data
+    END,
+    last_error_code = $2,
+    available_at = now() + $3::integer * interval '1 second',
+    locked_at = NULL,
+    lock_token = NULL
+WHERE
+    id = $4
+    AND lock_token = $5
+    AND status = 'sending'
 `
 
 type FailEmailDeliveryParams struct {
@@ -152,8 +227,22 @@ func (q *Queries) FailEmailDelivery(ctx context.Context, arg FailEmailDeliveryPa
 }
 
 const failExhaustedEmailDeliveries = `-- name: FailExhaustedEmailDeliveries :exec
-UPDATE email_deliveries SET status='failed', encrypted_data=NULL, lock_token=NULL, locked_at=NULL, last_error_code='attempts_exhausted'
-WHERE attempts>=5 AND (status='pending' OR (status='sending' AND locked_at<now()-interval '60 seconds'))
+UPDATE email_deliveries
+SET
+    status = 'failed',
+    encrypted_data = NULL,
+    lock_token = NULL,
+    locked_at = NULL,
+    last_error_code = 'attempts_exhausted'
+WHERE
+    attempts >= 5
+    AND (
+        status = 'pending'
+        OR (
+            status = 'sending'
+            AND locked_at < now() - interval '60 seconds'
+        )
+    )
 `
 
 func (q *Queries) FailExhaustedEmailDeliveries(ctx context.Context) error {
@@ -162,7 +251,15 @@ func (q *Queries) FailExhaustedEmailDeliveries(ctx context.Context) error {
 }
 
 const isEmailDeliveryReady = `-- name: IsEmailDeliveryReady :one
-SELECT EXISTS(SELECT 1 FROM email_deliveries WHERE id=$1 AND lock_token=$2 AND status='sending' AND expires_at>now())
+SELECT EXISTS (
+    SELECT 1
+    FROM email_deliveries
+    WHERE
+        id = $1
+        AND lock_token = $2
+        AND status = 'sending'
+        AND expires_at > now()
+)
 `
 
 type IsEmailDeliveryReadyParams struct {
