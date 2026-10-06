@@ -45,6 +45,29 @@ CREATE TABLE IF NOT EXISTS voice_agents (
 CREATE INDEX IF NOT EXISTS idx_voice_agents_organization
     ON voice_agents (organization_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS voice_agent_bindings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    voice_agent_id UUID NOT NULL,
+    phone_number_id UUID NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT fk_voice_agent_bindings_agent_scope
+        FOREIGN KEY (voice_agent_id, organization_id)
+        REFERENCES voice_agents(id, organization_id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_voice_agent_bindings_phone_number_scope
+        FOREIGN KEY (phone_number_id, organization_id)
+        REFERENCES phone_numbers(id, organization_id)
+        ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_voice_agent_bindings_phone_number
+    ON voice_agent_bindings (phone_number_id);
+
+CREATE INDEX IF NOT EXISTS idx_voice_agent_bindings_agent
+    ON voice_agent_bindings (organization_id, voice_agent_id, created_at DESC);
+
 CREATE TRIGGER set_voice_agents_updated_at
 BEFORE UPDATE ON voice_agents
 FOR EACH ROW
