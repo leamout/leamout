@@ -78,7 +78,7 @@ services:
     restart: unless-stopped
     command: ["/leamout/server"]
     env_file:
-      - ../server/.env
+      - ${APP_ENV_FILE:-../server/.env}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -100,7 +100,7 @@ services:
     restart: unless-stopped
     command: ["/leamout/worker"]
     env_file:
-      - ../server/.env
+      - ${APP_ENV_FILE:-../server/.env}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -124,7 +124,7 @@ services:
     restart: unless-stopped
     command: ["/leamout/media"]
     env_file:
-      - ../server/.env
+      - ${APP_ENV_FILE:-../server/.env}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/readyz"]
       interval: 3s
@@ -136,7 +136,7 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     env_file:
-      - ../server/.env
+      - ${APP_ENV_FILE:-../server/.env}
     ports:
       - "80:80"
       - "443:443"
@@ -158,7 +158,7 @@ services:
     restart: unless-stopped
     stop_grace_period: 60s
     env_file:
-      - ../server/.env
+      - ${APP_ENV_FILE:-../server/.env}
     depends_on:
       media:
         condition: service_healthy
@@ -223,7 +223,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - ../server/.env
+      - ${APP_ENV_FILE:-../server/.env}
     environment:
       TURN_REALM: ${TURN_REALM:?TURN_REALM is required}
       TURN_EXTERNAL_IP: ${PUBLIC_IP:?PUBLIC_IP is required}

@@ -324,6 +324,9 @@ Keep the password in `server/.env`'s `DATABASE_URL` consistent with the root
 `POSTGRES_PASSWORD`. Set `DOMAIN`, `CORS_ORIGINS`, `TURN_PUBLIC_URLS`, and the root
 `TURN_REALM` for your domain. Container hostnames in the application example are
 for Compose; replace them with reachable addresses when running Go directly.
+Acceptance suites generate their own temporary application environment files.
+To validate examples without creating deployment files, run
+`APP_ENV_FILE=../server/.env.example docker compose --env-file .env.example -f deploy/compose.yaml config --quiet`.
 Keep both environment files private. No `.env` file is copied into the image.
 
 ## License

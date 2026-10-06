@@ -34,6 +34,11 @@ export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 export LEAMOUT_API_URL="${LEAMOUT_API_URL:-http://127.0.0.1:8080}"
 export LEAMOUT_API_TOKEN="${LEAMOUT_API_TOKEN:-lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx}"
 
+# Generate an isolated application env file; never require or overwrite server/.env.
+APP_ENV_FILE=$(mktemp)
+export APP_ENV_FILE
+python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
+
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/webrtc-v1/compose.yaml -f tests/acceptance-minio.yaml"
 
 cleanup() {
@@ -57,6 +62,7 @@ cleanup() {
     else
         printf '%s\n' "WebRTC v1 stack retained; certificates: $CERT_DIR"
     fi
+    rm -f "$APP_ENV_FILE"
     exit "$status"
 }
 trap cleanup EXIT INT TERM

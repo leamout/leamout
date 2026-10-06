@@ -28,6 +28,11 @@ CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-voice-agent-v1.XXXXXX")
 export VOICE_AGENT_V1_SUITE_DIR="$SCRIPT_DIR"
 export VOICE_AGENT_V1_CERT_DIR="$CERT_DIR"
 
+# Generate an isolated application env file; never require or overwrite server/.env.
+APP_ENV_FILE=$(mktemp)
+export APP_ENV_FILE
+python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
+
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/voice-agent-v1/compose.yaml -f tests/acceptance-minio.yaml"
 
 cleanup() {
@@ -53,6 +58,7 @@ cleanup() {
     else
         printf '%s\n' "Voice Agent v1 stack retained; certificates: $CERT_DIR"
     fi
+    rm -f "$APP_ENV_FILE"
     exit "$status"
 }
 trap cleanup EXIT INT TERM
