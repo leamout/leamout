@@ -305,12 +305,7 @@ func (s *Service) UpsertBinding(
 		)
 	}
 	kind, ok := roleKind(role)
-	if !ok || s.catalog == nil {
-		return Binding{}, apperror.NewBadRequest(
-			"provider is not compatible with Voice Agent role",
-		)
-	}
-	if _, ok := s.catalog.Get(kind, req.Provider); !ok {
+	if !ok || !s.supportsBinding(kind, req.Provider) {
 		return Binding{}, apperror.NewBadRequest(
 			"provider is not compatible with Voice Agent role",
 		)
@@ -576,6 +571,19 @@ func credentialScope(
 		organizationID,
 		credentialID,
 	)
+}
+
+func (s *Service) supportsBinding(kind ai.Kind, provider string) bool {
+	if s.catalog != nil {
+		if _, ok := s.catalog.Get(kind, provider); ok {
+			return true
+		}
+	}
+
+	// The integrated engine still uses the in-tree OpenAI realtime adapter.
+	// Keep this compatibility path until realtime is externalized; it is
+	// intentionally not registered as one of the six composable built-ins.
+	return kind == ai.KindRealtime && provider == ProviderOpenAI
 }
 
 func roleKind(role string) (ai.Kind, bool) {
