@@ -12,7 +12,14 @@ EMAIL_FROM=Leamout <notifications@your-domain.com>
 SES_CONFIGURATION_SET=leamout-transactional
 ```
 
-`SES_CONFIGURATION_SET` is optional. The worker needs AWS credentials from the SDK default credential chain; prefer an IAM role. The API only queues jobs and does not need AWS permissions. Both processes must share the existing `ENCRYPTION_KEY`. Email delivery is always enabled. Startup requires a non-empty `AWS_REGION` and a valid `EMAIL_FROM` address.
+`SES_CONFIGURATION_SET` is optional. For deployment outside AWS, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in your deployment environment. Compose passes these credentials only to the worker, and the AWS SDK reads them automatically. Use an IAM user with SES sending permissions. The API only queues jobs and does not need AWS permissions. Both processes must share the existing `ENCRYPTION_KEY`. Email delivery is always enabled. Startup requires a non-empty `AWS_REGION` and a valid `EMAIL_FROM` address.
+
+Worker credentials for deployment outside AWS:
+
+```env
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+```
 
 Verify the sending domain and DKIM in the configured SES region, configure MAIL FROM/SPF and DMARC, and request production access when leaving the sandbox. Give the worker `ses:SendEmail` scoped to the verified identity. If a configuration set is specified, create it in the same region. Live AWS setup and sending are separate from local tests.
 

@@ -119,6 +119,8 @@ services:
     command: ["/leamout/worker"]
     environment:
       <<: *app-environment
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}
       MEDIA_CONTROL_URL: "http://media:8090"
       MEDIA_CONTROL_TOKEN: ${MEDIA_CONTROL_TOKEN:?MEDIA_CONTROL_TOKEN is required}
     depends_on:
