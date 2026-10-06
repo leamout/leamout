@@ -16,6 +16,7 @@ func Builtins() (*Catalog, error) {
 		assemblyai.Provider{},
 		groq.Provider{},
 		openai.Provider{},
+		openai.RealtimeProvider{},
 		cartesia.Provider{},
 		elevenlabs.Provider{},
 	)

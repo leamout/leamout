@@ -24,7 +24,6 @@ type Config struct {
 	ReadLimit        int64         `env:"MEDIA_MAX_FRAME_BYTES" envDefault:"65536"`
 	HandshakeTimeout time.Duration `env:"MEDIA_HANDSHAKE_TIMEOUT" envDefault:"5s"`
 	DrainTimeout     time.Duration `env:"MEDIA_DRAIN_TIMEOUT" envDefault:"30s"`
-	OpenAIEndpoint   string        `env:"OPENAI_REALTIME_ENDPOINT"`
 }
 
 func loadConfig() (Config, error) {
@@ -51,7 +50,6 @@ func loadConfig() (Config, error) {
 	}
 	cfg.TokenSecret = strings.TrimSpace(cfg.TokenSecret)
 	cfg.ControlToken = strings.TrimSpace(cfg.ControlToken)
-	cfg.OpenAIEndpoint = strings.TrimSpace(cfg.OpenAIEndpoint)
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -80,12 +78,6 @@ func (c Config) Validate() error {
 	}
 	if len(c.ControlToken) < 32 {
 		return fmt.Errorf("media control token must contain at least 32 bytes")
-	}
-	if c.OpenAIEndpoint != "" {
-		endpoint, endpointErr := url.Parse(c.OpenAIEndpoint)
-		if endpointErr != nil || endpoint.Scheme != "wss" || endpoint.Host == "" {
-			return fmt.Errorf("OpenAI Realtime endpoint must be an absolute wss URL")
-		}
 	}
 	if c.TokenTTL <= 0 || c.AttachTimeout <= 0 || c.HandshakeTimeout <= 0 || c.DrainTimeout <= 0 {
 		return fmt.Errorf("media timeouts must be positive")

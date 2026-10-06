@@ -3,53 +3,23 @@ package integrated
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
-	"github.com/coder/websocket"
-	"github.com/coffeyvidzro/monogo/internal/integrations/openai"
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/media/session"
-	providersdk "github.com/coffeyvidzro/monogo/internal/providers"
 	"github.com/google/uuid"
+	"github.com/leamout/contracts/ai"
 )
 
-func TestEngineStartsOpenAIRealtimeWithSessionVoice(t *testing.T) {
-	updateReceived := make(chan openai.ClientEvent, 1)
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ws, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer func() { _ = ws.CloseNow() }()
-
-		_, payload, err := ws.Read(r.Context())
-		if err != nil {
-			return
-		}
-		var update openai.ClientEvent
-		if err := json.Unmarshal(payload, &update); err != nil {
-			return
-		}
-		updateReceived <- update
-		<-r.Context().Done()
-	}))
-	defer server.Close()
-
-	registry, err := providersdk.NewRegistry(openai.Provider{
-		Client: openai.NewClient(server.Client()),
-		Config: openai.Config{
-			Endpoint: "wss" + strings.TrimPrefix(server.URL, "https"),
-			Voice:    "cedar",
-		},
-	})
+func TestEngineStartsRealtimeProviderWithSessionConfig(t *testing.T) {
+	provider := &fakeRealtimeProvider{}
+	catalog, err := aicatalog.New(provider)
 	if err != nil {
-		t.Fatalf("NewRegistry() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 
 	format := session.AudioFormat{SampleRateHz: 24000, Channels: 1}
+	toolID := uuid.New()
 	cfg := session.Config{
 		ID:             uuid.New(),
 		OrganizationID: uuid.New(),
@@ -60,37 +30,41 @@ func TestEngineStartsOpenAIRealtimeWithSessionVoice(t *testing.T) {
 		OutputFormat:   format,
 		Instructions:   "Be concise.",
 		Voice:          "marin",
-		Providers: []session.ProviderRuntime{
-			{
-				Role:     "realtime",
-				Provider: "openai",
-				APIKey:   "secret",
-			},
-		},
+		Tools: []session.ToolDefinition{{
+			ID:         toolID,
+			Name:       "lookup",
+			Parameters: json.RawMessage(`{"type":"object"}`),
+		}},
+		Providers: []session.ProviderRuntime{{
+			Role:     "realtime",
+			Provider: "openai",
+			APIKey:   "secret",
+			Config:   json.RawMessage(`{"model":"gpt-realtime-2.1"}`),
+		}},
 	}
-	engine := Engine{Registry: registry, DefaultProvider: "openai"}
+	engine := Engine{Catalog: catalog, DefaultProvider: "openai"}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	stream, err := engine.Start(ctx, cfg)
+	stream, err := engine.Start(context.Background(), cfg)
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
 	defer func() { _ = stream.Close(context.Background()) }()
 
-	select {
-	case update := <-updateReceived:
-		if update.Session == nil {
-			t.Fatal("session update = nil")
-		}
-		if update.Session.Instructions != cfg.Instructions {
-			t.Fatalf("instructions = %q", update.Session.Instructions)
-		}
-		if update.Session.Audio.Output.Voice != cfg.Voice {
-			t.Fatalf("voice = %q", update.Session.Audio.Output.Voice)
-		}
-	case <-ctx.Done():
-		t.Fatal("timed out waiting for session update")
+	request := provider.request
+	if request.Runtime.Credential != "secret" {
+		t.Fatalf("credential = %q", request.Runtime.Credential)
+	}
+	if request.Instructions != cfg.Instructions {
+		t.Fatalf("instructions = %q", request.Instructions)
+	}
+	if request.Voice != cfg.Voice {
+		t.Fatalf("voice = %q", request.Voice)
+	}
+	if request.InputFormat.Encoding != ai.AudioEncodingPCM16LE || request.InputFormat.SampleRateHz != 24000 {
+		t.Fatalf("input format = %+v", request.InputFormat)
+	}
+	if len(request.Tools) != 1 || request.Tools[0].ID != toolID.String() {
+		t.Fatalf("tools = %+v", request.Tools)
 	}
 }
 
@@ -109,3 +83,42 @@ func TestEngineRejectsNonIntegratedSession(t *testing.T) {
 		t.Fatal("Start() error = nil")
 	}
 }
+
+type fakeRealtimeProvider struct {
+	request ai.RealtimeRequest
+}
+
+func (*fakeRealtimeProvider) Descriptor() ai.Descriptor {
+	return ai.Descriptor{ID: "openai", Name: "OpenAI", Kind: ai.KindRealtime}
+}
+
+func (p *fakeRealtimeProvider) StartRealtime(_ context.Context, request ai.RealtimeRequest) (ai.RealtimeStream, error) {
+	p.request = request
+	return newFakeRealtimeStream(), nil
+}
+
+type fakeRealtimeStream struct {
+	audio  chan ai.AudioFrame
+	events chan ai.RealtimeEvent
+}
+
+func newFakeRealtimeStream() *fakeRealtimeStream {
+	return &fakeRealtimeStream{
+		audio:  make(chan ai.AudioFrame),
+		events: make(chan ai.RealtimeEvent),
+	}
+}
+
+func (*fakeRealtimeStream) SendAudio(context.Context, ai.AudioFrame) error        { return nil }
+func (*fakeRealtimeStream) Interrupt(context.Context) error                       { return nil }
+func (*fakeRealtimeStream) SubmitToolResult(context.Context, ai.ToolResult) error { return nil }
+func (s *fakeRealtimeStream) Audio() <-chan ai.AudioFrame                         { return s.audio }
+func (s *fakeRealtimeStream) Events() <-chan ai.RealtimeEvent                     { return s.events }
+func (s *fakeRealtimeStream) Close(context.Context) error {
+	close(s.audio)
+	close(s.events)
+	return nil
+}
+
+var _ ai.Realtime = (*fakeRealtimeProvider)(nil)
+var _ ai.RealtimeStream = (*fakeRealtimeStream)(nil)
