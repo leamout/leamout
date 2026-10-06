@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/caarlos0/env/v11"
 	"testing"
+
+	"github.com/caarlos0/env/v11"
 )
 
 func TestEmailEnvironment(t *testing.T) {

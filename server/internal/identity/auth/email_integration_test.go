@@ -4,11 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/platform/email"
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,6 +11,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
+	"github.com/coffeyvidzro/monogo/internal/platform/email"
+	"github.com/coffeyvidzro/monogo/internal/security/encryption"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func testEmailDatabase(t *testing.T) (*pgxpool.Pool, *encryption.Cipher) {
@@ -34,7 +35,12 @@ func testEmailDatabase(t *testing.T) (*pgxpool.Pool, *encryption.Cipher) {
 		admin.Close()
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { admin.Exec(context.Background(), "DROP SCHEMA "+schema+" CASCADE"); admin.Close() })
+	t.Cleanup(func() {
+		defer admin.Close()
+		if _, err := admin.Exec(context.Background(), "DROP SCHEMA "+schema+" CASCADE"); err != nil {
+			t.Errorf("drop test schema: %v", err)
+		}
+	})
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
 		t.Fatal(err)
@@ -104,7 +110,9 @@ func TestOTPEmailTransactionAndReplay(t *testing.T) {
 		t.Fatal("accepted invalid code")
 	}
 	var attempts int
-	pool.QueryRow(ctx, `SELECT attempts FROM auth_challenges WHERE auth_transaction_id=$1`, transaction.ID).Scan(&attempts)
+	if err := pool.QueryRow(ctx, `SELECT attempts FROM auth_challenges WHERE auth_transaction_id=$1`, transaction.ID).Scan(&attempts); err != nil {
+		t.Fatal(err)
+	}
 	if attempts != 1 {
 		t.Fatal("failed-code attempt not committed")
 	}
@@ -174,9 +182,13 @@ func TestEmailQueueRollbackAndLeaseOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tx.Rollback(ctx)
+	if err := tx.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 	var count int
-	pool.QueryRow(ctx, `SELECT count(*) FROM email_deliveries`).Scan(&count)
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM email_deliveries`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
 	if count != 0 {
 		t.Fatal("rolled-back email persisted")
 	}

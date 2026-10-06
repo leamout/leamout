@@ -123,7 +123,7 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 	if err != nil {
 		return "", err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	// Serialize resend and verification for this authentication transaction.
 	if _, err = tx.Exec(ctx, `SELECT id FROM auth_transactions WHERE id=$1 FOR UPDATE`, transactionID); err != nil {
 		return "", err
@@ -183,7 +183,7 @@ func (s *Service) VerifyOTP(ctx context.Context, transactionID uuid.UUID, code s
 	if err != nil {
 		return sqlc.User{}, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() { _ = tx.Rollback(ctx) }()
 	if _, err = tx.Exec(ctx, `SELECT id FROM auth_transactions WHERE id=$1 FOR UPDATE`, transactionID); err != nil {
 		return sqlc.User{}, err
 	}
