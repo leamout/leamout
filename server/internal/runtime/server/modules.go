@@ -14,6 +14,7 @@ import (
 	redisintegration "github.com/coffeyvidzro/monogo/internal/integrations/redis"
 	"github.com/coffeyvidzro/monogo/internal/platform"
 	"github.com/coffeyvidzro/monogo/internal/platform/config"
+	"github.com/coffeyvidzro/monogo/internal/platform/email"
 	"github.com/coffeyvidzro/monogo/internal/platform/logging"
 	"github.com/coffeyvidzro/monogo/internal/platform/metrics"
 	"github.com/coffeyvidzro/monogo/internal/platform/middleware"
@@ -110,6 +111,9 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		cfg.IsDevelopment(),
 		cfg.Domain,
 	)
+	if cfg.Email.Enabled {
+		identityModule.Auth.Service.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher))
+	}
 	tenancyModule := tenancy.New(queries)
 	trustedProxies, err := cfg.TrustedProxyPrefixes()
 	if err != nil {

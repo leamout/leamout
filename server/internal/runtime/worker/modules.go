@@ -12,7 +12,9 @@ import (
 	natsintegration "github.com/coffeyvidzro/monogo/internal/integrations/nats"
 	"github.com/coffeyvidzro/monogo/internal/integrations/postgres"
 	redisintegration "github.com/coffeyvidzro/monogo/internal/integrations/redis"
+	"github.com/coffeyvidzro/monogo/internal/integrations/ses"
 	"github.com/coffeyvidzro/monogo/internal/platform/config"
+	"github.com/coffeyvidzro/monogo/internal/platform/email"
 	"github.com/coffeyvidzro/monogo/internal/platform/idempotency"
 	"github.com/coffeyvidzro/monogo/internal/platform/logging"
 	"github.com/coffeyvidzro/monogo/internal/platform/metrics"
@@ -31,6 +33,7 @@ import (
 )
 
 type modules struct {
+	emailDelivery           *email.Worker
 	postgres                *postgres.Client
 	redis                   *redisintegration.Client
 	nats                    *natsintegration.Client
@@ -232,7 +235,17 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize webhook delivery worker: %w", err)
 	}
 
+	var emailDelivery *email.Worker
+	if cfg.Email.Enabled {
+		sender, err := ses.New(ctx, ses.Config{Region: cfg.Email.Region, From: cfg.Email.From, ReplyTo: cfg.Email.ReplyTo, ConfigurationSet: cfg.Email.ConfigurationSet})
+		if err != nil {
+			closeDependencies()
+			return nil, fmt.Errorf("initialize SES: %w", err)
+		}
+		emailDelivery = email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
+	}
 	return &modules{
+		emailDelivery:           emailDelivery,
 		postgres:                postgresClient,
 		redis:                   redisClient,
 		nats:                    natsClient,

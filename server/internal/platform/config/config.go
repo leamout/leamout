@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"net/mail"
 	"net/netip"
 	"os"
 	"strings"
@@ -16,7 +17,17 @@ type MinIOConfig struct {
 	SecretKey string `env:"APP_SECRET_KEY,required"`
 }
 
+type EmailConfig struct {
+	Enabled          bool   `env:"EMAIL_ENABLED" envDefault:"false"`
+	Region           string `env:"AWS_REGION"`
+	From             string `env:"EMAIL_FROM"`
+	ReplyTo          string `env:"EMAIL_REPLY_TO"`
+	ConfigurationSet string `env:"SES_CONFIGURATION_SET"`
+}
+
 type Config struct {
+	Email EmailConfig
+
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	Domain                string      `env:"DOMAIN"`
 	DatabaseURL           string      `env:"DATABASE_URL,required"`
@@ -45,6 +56,19 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
+	if cfg.Email.Enabled {
+		if cfg.Email.Region == "" {
+			return Config{}, fmt.Errorf("AWS_REGION is required when EMAIL_ENABLED=true")
+		}
+		if _, err := mail.ParseAddress(cfg.Email.From); err != nil {
+			return Config{}, fmt.Errorf("EMAIL_FROM must be a valid address when EMAIL_ENABLED=true")
+		}
+		if cfg.Email.ReplyTo != "" {
+			if _, err := mail.ParseAddress(cfg.Email.ReplyTo); err != nil {
+				return Config{}, fmt.Errorf("EMAIL_REPLY_TO must be a valid address")
+			}
+		}
+	}
 
 	return cfg, nil
 }
@@ -54,6 +78,10 @@ func (c Config) IsDevelopment() bool {
 }
 
 func (c *Config) normalize() {
+	c.Email.Region = strings.TrimSpace(c.Email.Region)
+	c.Email.From = strings.TrimSpace(c.Email.From)
+	c.Email.ReplyTo = strings.TrimSpace(c.Email.ReplyTo)
+	c.Email.ConfigurationSet = strings.TrimSpace(c.Email.ConfigurationSet)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)
