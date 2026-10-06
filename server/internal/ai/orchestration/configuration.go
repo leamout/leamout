@@ -11,7 +11,7 @@ type configurationSnapshot struct {
 	Engine             session.Engine  `json:"engine"`
 	Instructions       string          `json:"instructions"`
 	Voice              *string         `json:"voice"`
-	Language           *string         `json:"language"`
+	Language           string          `json:"language"`
 	EngineConfig       json.RawMessage `json:"engine_config"`
 	InterruptionPolicy string          `json:"interruption_policy"`
 	RecordingPolicy    string          `json:"recording_policy"`
@@ -26,9 +26,7 @@ func MediaConfig(agent sqlc.VoiceAgent, config session.Config) session.Config {
 	if agent.Voice != nil {
 		config.Voice = *agent.Voice
 	}
-	if agent.Language != nil {
-		config.Language = *agent.Language
-	}
+	config.Language = agent.Language
 	return config
 }
 
@@ -45,9 +43,7 @@ func MediaConfigFromSession(record sqlc.VoiceAgentSession, config session.Config
 	if snapshot.Voice != nil {
 		config.Voice = *snapshot.Voice
 	}
-	if snapshot.Language != nil {
-		config.Language = *snapshot.Language
-	}
+	config.Language = snapshot.Language
 	return config
 }
 
