@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/mail"
 	"net/netip"
 	"os"
 	"strings"
@@ -17,14 +16,16 @@ type MinIOConfig struct {
 	SecretKey string `env:"APP_SECRET_KEY,required"`
 }
 
-type EmailConfig struct {
-	Region           string `env:"AWS_REGION"`
-	From             string `env:"EMAIL_FROM"`
-	ConfigurationSet string `env:"SES_CONFIGURATION_SET"`
+type AWSConfig struct {
+	FromEmail        string `env:"FROM_EMAIL" envDefault:"noreply@leamout.com"`
+	Region           string `env:"AWS_REGION" envDefault:"us-east-1"`
+	AccessKey        string `env:"AWS_ACCESS_KEY_ID"`
+	SecretKey        string `env:"AWS_SECRET_ACCESS_KEY"`
+	ConfigurationSet string `env:"SES_CONFIGURATION_SET" envDefault:"leamout-transactional"`
 }
 
 type Config struct {
-	Email EmailConfig
+	AWS AWSConfig
 
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	Domain                string      `env:"DOMAIN"`
@@ -54,12 +55,6 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
-	if cfg.Email.Region == "" {
-		return Config{}, fmt.Errorf("AWS_REGION is required")
-	}
-	if _, err := mail.ParseAddress(cfg.Email.From); err != nil {
-		return Config{}, fmt.Errorf("EMAIL_FROM must be a valid address")
-	}
 
 	return cfg, nil
 }
@@ -69,9 +64,9 @@ func (c Config) IsDevelopment() bool {
 }
 
 func (c *Config) normalize() {
-	c.Email.Region = strings.TrimSpace(c.Email.Region)
-	c.Email.From = strings.TrimSpace(c.Email.From)
-	c.Email.ConfigurationSet = strings.TrimSpace(c.Email.ConfigurationSet)
+	c.AWS.Region = strings.TrimSpace(c.AWS.Region)
+	c.AWS.FromEmail = strings.TrimSpace(c.AWS.FromEmail)
+	c.AWS.ConfigurationSet = strings.TrimSpace(c.AWS.ConfigurationSet)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)

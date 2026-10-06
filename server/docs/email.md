@@ -7,12 +7,12 @@ The API persists authentication challenges and encrypted email jobs in one Postg
 Apply migration `032_create_email_deliveries.sql` before starting the API server and worker. Set these variables on the API server and worker:
 
 ```env
-AWS_REGION=eu-west-1
-EMAIL_FROM=Leamout <notifications@your-domain.com>
+AWS_REGION=us-east-1
+FROM_EMAIL=Leamout <notifications@your-domain.com>
 SES_CONFIGURATION_SET=leamout-transactional
 ```
 
-`SES_CONFIGURATION_SET` is optional. For deployment outside AWS, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in your deployment environment. Compose passes these credentials only to the worker, and the AWS SDK reads them automatically. Use an IAM user with SES sending permissions. The API only queues jobs and does not need AWS permissions. Both processes must share the existing `ENCRYPTION_KEY`. Email delivery is always enabled. Startup requires a non-empty `AWS_REGION` and a valid `EMAIL_FROM` address.
+`SES_CONFIGURATION_SET` is optional. For deployment outside AWS, set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` in your deployment environment. Compose passes these credentials only to the worker, and the SES client uses them. Use an IAM user with SES sending permissions. The API only queues jobs and does not need AWS permissions. Both processes must share the existing `ENCRYPTION_KEY`. Email delivery is always enabled. Defaults are `AWS_REGION=us-east-1`, `FROM_EMAIL=noreply@leamout.com`, and `SES_CONFIGURATION_SET=leamout-transactional`.
 
 Worker credentials for deployment outside AWS:
 

@@ -236,9 +236,11 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 
 	sender, err := ses.New(ctx, ses.Config{
-		Region:           cfg.Email.Region,
-		From:             cfg.Email.From,
-		ConfigurationSet: cfg.Email.ConfigurationSet,
+		Region:           cfg.AWS.Region,
+		From:             cfg.AWS.FromEmail,
+		AccessKey:        cfg.AWS.AccessKey,
+		SecretKey:        cfg.AWS.SecretKey,
+		ConfigurationSet: cfg.AWS.ConfigurationSet,
 	})
 	if err != nil {
 		closeDependencies()
