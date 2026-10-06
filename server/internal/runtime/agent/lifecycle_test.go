@@ -53,7 +53,6 @@ func TestLifecycleDuplicateChannelAnswerAttachesOnce(t *testing.T) {
 	if err := runtime.HandleLifecycle(context.Background(), call, event); err != nil {
 		t.Fatalf("duplicate HandleLifecycle() error = %v", err)
 	}
-
 	if got := db.createCount(); got != 1 {
 		t.Fatalf("durable session creates = %d, want 1", got)
 	}
@@ -99,7 +98,6 @@ func TestLifecycleAudioForkFailureCleansUpAttachment(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "start Voice Agent audio fork") {
 		t.Fatalf("HandleLifecycle() error = %v", err)
 	}
-
 	if got := media.createCount(); got != 1 {
 		t.Fatalf("media session creates = %d, want 1", got)
 	}
@@ -170,36 +168,24 @@ type lifecycleDB struct {
 func newLifecycleDB() *lifecycleDB {
 	now := pgTimestamp(time.Now().UTC())
 	organizationID := uuid.New()
-	activeRevision := int32(1)
-	activeEngine := "echo"
-	activeInstructions := "Help the caller."
-	activeInterruptionPolicy := "allow"
-	activeRecordingPolicy := "none"
 	return &lifecycleDB{
 		organizationID: organizationID,
 		callID:         uuid.New(),
 		sessionID:      uuid.New(),
 		agent: sqlc.VoiceAgent{
-			ID:                       uuid.New(),
-			OrganizationID:           organizationID,
-			Name:                     "support",
-			Engine:                   "echo",
-			Instructions:             "Help the caller.",
-			Status:                   "active",
-			EngineConfig:             []byte(`{}`),
-			InterruptionPolicy:       "allow",
-			RecordingPolicy:          "none",
-			ConfigurationRevision:    1,
-			ActiveRevision:           &activeRevision,
-			ActiveEngine:             &activeEngine,
-			ActiveInstructions:       &activeInstructions,
-			ActiveEngineConfig:       []byte(`{}`),
-			ActiveInterruptionPolicy: &activeInterruptionPolicy,
-			ActiveRecordingPolicy:    &activeRecordingPolicy,
-			ActiveProviderBindings:   []byte(`[]`),
-			ActiveTools:              []byte(`[]`),
-			CreatedAt:                now,
-			UpdatedAt:                now,
+			ID:                    uuid.New(),
+			OrganizationID:        organizationID,
+			Name:                  "support",
+			Engine:                "echo",
+			Instructions:          "Help the caller.",
+			Language:              "en",
+			Status:                "active",
+			EngineConfig:          []byte(`{}`),
+			InterruptionPolicy:    "allow",
+			RecordingPolicy:       "none",
+			ConfigurationRevision: 1,
+			CreatedAt:             now,
+			UpdatedAt:             now,
 		},
 	}
 }
@@ -208,26 +194,9 @@ func (db *lifecycleDB) Exec(context.Context, string, ...interface{}) (pgconn.Com
 	return pgconn.CommandTag{}, errors.New("unexpected lifecycle test Exec")
 }
 
-func (db *lifecycleDB) Query(_ context.Context, query string, _ ...interface{}) (pgx.Rows, error) {
-	if strings.Contains(query, "-- name: ListVoiceAgentToolsByAgentID") ||
-		strings.Contains(query, "-- name: ResolveVoiceAgentProviderBindings") {
-		return emptyLifecycleRows{}, nil
-	}
+func (db *lifecycleDB) Query(context.Context, string, ...interface{}) (pgx.Rows, error) {
 	return nil, errors.New("unexpected lifecycle test Query")
 }
-
-type emptyLifecycleRows struct{}
-
-func (emptyLifecycleRows) Close()                                       {}
-func (emptyLifecycleRows) Err() error                                   { return nil }
-func (emptyLifecycleRows) CommandTag() pgconn.CommandTag                { return pgconn.CommandTag{} }
-func (emptyLifecycleRows) FieldDescriptions() []pgconn.FieldDescription { return nil }
-func (emptyLifecycleRows) Next() bool                                   { return false }
-func (emptyLifecycleRows) Scan(...interface{}) error                    { return pgx.ErrNoRows }
-func (emptyLifecycleRows) Values() ([]interface{}, error)               { return nil, nil }
-func (emptyLifecycleRows) RawValues() [][]byte                          { return nil }
-func (emptyLifecycleRows) Conn() *pgx.Conn                              { return nil }
-func (emptyLifecycleRows) TypeMap() *pgtype.Map                         { return pgtype.NewMap() }
 
 func (db *lifecycleDB) QueryRow(_ context.Context, query string, args ...interface{}) pgx.Row {
 	db.mu.Lock()
@@ -244,25 +213,31 @@ func (db *lifecycleDB) QueryRow(_ context.Context, query string, args ...interfa
 	case strings.Contains(query, "-- name: CreateVoiceAgentSession"):
 		db.creates++
 		now := pgTimestamp(time.Now().UTC())
+		snapshot, err := json.Marshal(map[string]any{
+			"engine":              db.agent.Engine,
+			"instructions":        db.agent.Instructions,
+			"voice":               db.agent.Voice,
+			"language":            db.agent.Language,
+			"engine_config":       json.RawMessage(db.agent.EngineConfig),
+			"interruption_policy": db.agent.InterruptionPolicy,
+			"recording_policy":    db.agent.RecordingPolicy,
+			"providers":           []any{},
+			"tools":               []any{},
+		})
+		if err != nil {
+			return lifecycleRow{err: err}
+		}
 		db.session = &sqlc.VoiceAgentSession{
-			ID:                       db.sessionID,
-			OrganizationID:           db.organizationID,
-			CallID:                   db.callID,
-			VoiceAgentID:             db.agent.ID,
-			Engine:                   db.agent.Engine,
-			InstructionsSnapshot:     db.agent.Instructions,
-			EngineConfigSnapshot:     append([]byte(nil), db.agent.EngineConfig...),
-			Voice:                    db.agent.Voice,
-			Language:                 db.agent.Language,
-			ConfigurationRevision:    *db.agent.ActiveRevision,
-			InterruptionPolicy:       db.agent.InterruptionPolicy,
-			RecordingPolicy:          db.agent.RecordingPolicy,
-			ProviderBindingsSnapshot: append([]byte(nil), db.agent.ActiveProviderBindings...),
-			ToolsSnapshot:            append([]byte(nil), db.agent.ActiveTools...),
-			State:                    "active",
-			StartedAt:                now,
-			CreatedAt:                now,
-			UpdatedAt:                now,
+			ID:                    db.sessionID,
+			OrganizationID:        db.organizationID,
+			CallID:                db.callID,
+			VoiceAgentID:          db.agent.ID,
+			ConfigurationRevision: db.agent.ConfigurationRevision,
+			ConfigurationSnapshot: snapshot,
+			State:                 "active",
+			StartedAt:             now,
+			CreatedAt:             now,
+			UpdatedAt:             now,
 		}
 		return lifecycleRow{values: voiceAgentSessionValues(*db.session)}
 	case strings.Contains(query, "-- name: CompleteVoiceAgentSession"):
@@ -348,25 +323,13 @@ func voiceAgentValues(agent sqlc.VoiceAgent) []interface{} {
 		agent.Instructions,
 		agent.Voice,
 		agent.Language,
-		agent.Status,
 		agent.EngineConfig,
-		agent.CreatedAt,
-		agent.UpdatedAt,
-		agent.Preset,
-		agent.PresetVersion,
 		agent.InterruptionPolicy,
 		agent.RecordingPolicy,
 		agent.ConfigurationRevision,
-		agent.ActiveRevision,
-		agent.ActiveEngine,
-		agent.ActiveInstructions,
-		agent.ActiveVoice,
-		agent.ActiveLanguage,
-		agent.ActiveEngineConfig,
-		agent.ActiveInterruptionPolicy,
-		agent.ActiveRecordingPolicy,
-		agent.ActiveProviderBindings,
-		agent.ActiveTools,
+		agent.Status,
+		agent.CreatedAt,
+		agent.UpdatedAt,
 	}
 }
 
@@ -376,11 +339,8 @@ func voiceAgentSessionValues(record sqlc.VoiceAgentSession) []interface{} {
 		record.OrganizationID,
 		record.CallID,
 		record.VoiceAgentID,
-		record.Engine,
-		record.InstructionsSnapshot,
-		record.EngineConfigSnapshot,
-		record.Voice,
-		record.Language,
+		record.ConfigurationRevision,
+		record.ConfigurationSnapshot,
 		record.State,
 		record.TurnCount,
 		record.InterruptionCount,
@@ -390,11 +350,6 @@ func voiceAgentSessionValues(record sqlc.VoiceAgentSession) []interface{} {
 		record.EndedAt,
 		record.CreatedAt,
 		record.UpdatedAt,
-		record.ConfigurationRevision,
-		record.InterruptionPolicy,
-		record.RecordingPolicy,
-		record.ProviderBindingsSnapshot,
-		record.ToolsSnapshot,
 	}
 }
 
