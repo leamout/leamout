@@ -36,6 +36,10 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
+      - name: Tidy modules
+        working-directory: server
+        run: go mod tidy
+
       - name: Format Go sources
         working-directory: server
         run: find . -type f -name '*.go' -print0 | xargs -0 gofmt -w
