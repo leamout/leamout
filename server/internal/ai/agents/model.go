@@ -82,7 +82,7 @@ type Response struct {
 	Engine                string          `json:"engine"`
 	Instructions          string          `json:"instructions"`
 	Voice                 *string         `json:"voice,omitempty"`
-	Language              *string         `json:"language,omitempty"`
+	Language              string          `json:"language"`
 	Status                string          `json:"status"`
 	EngineConfig          json.RawMessage `json:"engine_config"`
 	InterruptionPolicy    string          `json:"interruption_policy"`
