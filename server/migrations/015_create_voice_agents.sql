@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS voice_agents (
     CONSTRAINT chk_voice_agents_name
         CHECK (length(btrim(name)) BETWEEN 1 AND 128),
     CONSTRAINT chk_voice_agents_engine
-        CHECK (engine IN ('composable', 'integrated')),
+        CHECK (engine IN ('composable', 'realtime')),
     CONSTRAINT chk_voice_agents_instructions
         CHECK (length(btrim(instructions)) BETWEEN 1 AND 20000),
     CONSTRAINT chk_voice_agents_voice
