@@ -15,7 +15,7 @@ func TestBuiltins(t *testing.T) {
 	assertProviderIDs(t, catalog.List(ai.KindSTT), []string{"assemblyai", "deepgram"})
 	assertProviderIDs(t, catalog.List(ai.KindLLM), []string{"groq", "openai"})
 	assertProviderIDs(t, catalog.List(ai.KindTTS), []string{"cartesia", "elevenlabs"})
-	assertProviderIDs(t, catalog.List(ai.KindRealtime), nil)
+	assertProviderIDs(t, catalog.List(ai.KindRealtime), []string{"openai"})
 
 	if _, ok := catalog.STT("deepgram"); !ok {
 		t.Fatal("deepgram STT provider is not registered")
@@ -34,6 +34,9 @@ func TestBuiltins(t *testing.T) {
 	}
 	if _, ok := catalog.TTS("elevenlabs"); !ok {
 		t.Fatal("elevenlabs TTS provider is not registered")
+	}
+	if _, ok := catalog.Realtime("openai"); !ok {
+		t.Fatal("openai realtime provider is not registered")
 	}
 
 	if !catalog.Has("assemblyai") || !catalog.Has("elevenlabs") {
