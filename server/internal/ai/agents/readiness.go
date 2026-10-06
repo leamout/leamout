@@ -92,7 +92,7 @@ func (s *Service) Readiness(
 }
 
 func expectedRoles(engine string) map[string]struct{} {
-	if engine == EngineIntegrated {
+	if canonicalEngine(engine) == EngineRealtime {
 		return map[string]struct{}{
 			providers.RoleRealtime: {},
 		}

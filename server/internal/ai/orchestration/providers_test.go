@@ -16,7 +16,7 @@ func TestValidateProviderTopologyReportsMissingBinding(t *testing.T) {
 	}{
 		{
 			name:   "realtime",
-			engine: session.EngineIntegrated,
+			engine: session.EngineRealtime,
 			want:   "Voice Agent requires a realtime provider binding",
 		},
 		{
@@ -70,7 +70,7 @@ func TestValidateProviderTopologyAcceptsCompleteBindings(t *testing.T) {
 	}{
 		{
 			name:   "realtime",
-			engine: session.EngineIntegrated,
+			engine: session.EngineRealtime,
 			providers: []session.ProviderRuntime{
 				{
 					Role:     "realtime",

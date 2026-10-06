@@ -95,7 +95,7 @@ FreeSWITCH
 Deepgram Flux provides turn detection for the default composable path. There is
 no separate local VAD stage.
 
-### Integrated
+### Realtime
 
 ```text
 FreeSWITCH
@@ -105,7 +105,7 @@ OpenAI Realtime
 FreeSWITCH
 ```
 
-Integrated providers are alternatives to the composable pipeline, not
+Realtime providers are alternatives to the composable pipeline, not
 additional stages inside it.
 
 ## Barge-in
@@ -238,7 +238,7 @@ The Media Runtime exposes `GET /metrics` with process-local runtime metrics:
 
 Turn latency is measured from the normalized end-of-user-speech event to the
 first playback frame sent toward FreeSWITCH. This captures the effective
-realtime STT/LLM/TTS path for both composable and integrated engines without
+realtime STT/LLM/TTS path for both composable and realtime engines without
 putting PostgreSQL in the hot path.
 
 ## Runtime lifecycle

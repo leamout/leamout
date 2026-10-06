@@ -5,7 +5,7 @@ This suite is the mandatory end-to-end release gate for the single-node Leamout 
 It runs PostgreSQL, Redis, NATS, the API, worker, Media Runtime, OpenSIPS,
 FreeSWITCH, RTPengine, a synthetic SIP carrier, and a local TLS WebSocket
 fixture that implements the minimum OpenAI Realtime protocol needed by the
-integrated engine. CI never depends on a live AI provider credential.
+realtime engine. CI never depends on a live AI provider credential.
 
 ## Release contract
 

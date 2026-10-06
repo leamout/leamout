@@ -55,11 +55,11 @@ func TestManagerBargeInInterruptsAndClearsPlayback(t *testing.T) {
 	format := session.AudioFormat{SampleRateHz: 24000, Channels: 1}
 	cfg := session.Config{
 		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
-		Engine: session.EngineIntegrated, InputFormat: format, OutputFormat: format,
+		Engine: session.EngineRealtime, InputFormat: format, OutputFormat: format,
 	}
 	stream := newFakeStream()
 	manager, err := session.NewManager(1, time.Minute, map[session.Engine]session.Starter{
-		session.EngineIntegrated: fakeStarter{stream: stream},
+		session.EngineRealtime: fakeStarter{stream: stream},
 	})
 	if err != nil {
 		t.Fatalf("NewManager() error = %v", err)
@@ -281,11 +281,11 @@ func TestManagerReturnsTerminalProviderFailure(t *testing.T) {
 	format := session.AudioFormat{SampleRateHz: 24000, Channels: 1}
 	cfg := session.Config{
 		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
-		Engine: session.EngineIntegrated, InputFormat: format, OutputFormat: format,
+		Engine: session.EngineRealtime, InputFormat: format, OutputFormat: format,
 	}
 	stream := newFakeStream()
 	manager, err := session.NewManager(1, time.Minute, map[session.Engine]session.Starter{
-		session.EngineIntegrated: fakeStarter{stream: stream},
+		session.EngineRealtime: fakeStarter{stream: stream},
 	})
 	if err != nil {
 		t.Fatalf("NewManager() error = %v", err)
@@ -316,11 +316,11 @@ func TestControlAttachmentForwardsToolResult(t *testing.T) {
 	format := session.AudioFormat{SampleRateHz: 24000, Channels: 1}
 	cfg := session.Config{
 		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
-		Engine: session.EngineIntegrated, InputFormat: format, OutputFormat: format,
+		Engine: session.EngineRealtime, InputFormat: format, OutputFormat: format,
 	}
 	stream := newFakeStream()
 	manager, err := session.NewManager(1, time.Minute, map[session.Engine]session.Starter{
-		session.EngineIntegrated: fakeStarter{stream: stream},
+		session.EngineRealtime: fakeStarter{stream: stream},
 	})
 	if err != nil {
 		t.Fatalf("NewManager() error = %v", err)
