@@ -17,7 +17,7 @@ type Engine string
 const (
 	EngineEcho       Engine = "echo"
 	EngineComposable Engine = "composable"
-	EngineRealtime Engine = "realtime"
+	EngineRealtime   Engine = "realtime"
 )
 
 // AudioFormat describes an uncompressed PCM stream.
