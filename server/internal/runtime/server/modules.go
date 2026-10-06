@@ -111,9 +111,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		cfg.IsDevelopment(),
 		cfg.Domain,
 	)
-	if cfg.Email.Enabled {
-		identityModule.Auth.Service.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher))
-	}
+	identityModule.Auth.Service.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher))
 	tenancyModule := tenancy.New(queries)
 	trustedProxies, err := cfg.TrustedProxyPrefixes()
 	if err != nil {

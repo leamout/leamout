@@ -25,13 +25,13 @@ func (f *fakeAPI) SendEmail(ctx context.Context, in *sesv2.SendEmailInput, _ ...
 }
 func TestSenderMapsMessage(t *testing.T) {
 	api := &fakeAPI{}
-	sender := NewSender(api, Config{From: "Leamout <sender@example.com>", ReplyTo: "support@example.com", ConfigurationSet: "transactional"})
+	sender := NewSender(api, Config{From: "Leamout <sender@example.com>", ConfigurationSet: "transactional"})
 	result, err := sender.Send(context.Background(), email.Message{To: "user@example.com", Subject: "Sign in", HTML: "<p>code</p>", Text: "code"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	in := api.input
-	if result.MessageID != "ses-id" || aws.ToString(in.FromEmailAddress) != "Leamout <sender@example.com>" || in.Destination.ToAddresses[0] != "user@example.com" || aws.ToString(in.Content.Simple.Body.Text.Data) != "code" || aws.ToString(in.Content.Simple.Body.Html.Data) != "<p>code</p>" || aws.ToString(in.Content.Simple.Subject.Charset) != "UTF-8" || aws.ToString(in.ConfigurationSetName) != "transactional" || in.ReplyToAddresses[0] != "support@example.com" {
+	if result.MessageID != "ses-id" || aws.ToString(in.FromEmailAddress) != "Leamout <sender@example.com>" || in.Destination.ToAddresses[0] != "user@example.com" || aws.ToString(in.Content.Simple.Body.Text.Data) != "code" || aws.ToString(in.Content.Simple.Body.Html.Data) != "<p>code</p>" || aws.ToString(in.Content.Simple.Subject.Charset) != "UTF-8" || aws.ToString(in.ConfigurationSetName) != "transactional" || len(in.ReplyToAddresses) != 0 {
 		t.Fatal("incorrect SES request")
 	}
 }

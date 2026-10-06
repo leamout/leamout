@@ -44,9 +44,6 @@ func (s *Sender) Send(ctx context.Context, message email.Message) (email.Result,
 		},
 	}
 
-	if s.config.ReplyTo != "" {
-		input.ReplyToAddresses = []string{s.config.ReplyTo}
-	}
 	if s.config.ConfigurationSet != "" {
 		input.ConfigurationSetName = aws.String(s.config.ConfigurationSet)
 	}

@@ -11,7 +11,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 )
 
-type Config struct{ Region, From, ReplyTo, ConfigurationSet string }
+type Config struct {
+	Region           string
+	From             string
+	ConfigurationSet string
+}
 
 func New(ctx context.Context, cfg Config) (*Sender, error) {
 	if strings.TrimSpace(cfg.Region) == "" {
@@ -19,11 +23,6 @@ func New(ctx context.Context, cfg Config) (*Sender, error) {
 	}
 	if _, err := mail.ParseAddress(cfg.From); err != nil {
 		return nil, fmt.Errorf("EMAIL_FROM must be a valid sender")
-	}
-	if cfg.ReplyTo != "" {
-		if _, err := mail.ParseAddress(cfg.ReplyTo); err != nil {
-			return nil, fmt.Errorf("EMAIL_REPLY_TO must be a valid address")
-		}
 	}
 	awsConfig, err := config.LoadDefaultConfig(ctx, config.WithRegion(cfg.Region), config.WithRetryMaxAttempts(1))
 	if err != nil {

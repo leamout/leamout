@@ -4,17 +4,15 @@ The API persists authentication challenges and encrypted email jobs in one Postg
 
 ## Configuration
 
-Apply migration `032_create_email_deliveries.sql` before enabling email. Set these variables on the API server and worker:
+Apply migration `032_create_email_deliveries.sql` before starting the API server and worker. Set these variables on the API server and worker:
 
 ```env
-EMAIL_ENABLED=true
 AWS_REGION=eu-west-1
 EMAIL_FROM=Leamout <notifications@your-domain.com>
-EMAIL_REPLY_TO=support@your-domain.com
 SES_CONFIGURATION_SET=leamout-transactional
 ```
 
-`EMAIL_REPLY_TO` and `SES_CONFIGURATION_SET` are optional. The worker needs AWS credentials from the SDK default credential chain; prefer an IAM role. The API only queues jobs and does not need AWS permissions. Both processes must share the existing `ENCRYPTION_KEY`. Email is disabled by default; requesting an OTP then returns a configuration error and does not create a challenge.
+`SES_CONFIGURATION_SET` is optional. The worker needs AWS credentials from the SDK default credential chain; prefer an IAM role. The API only queues jobs and does not need AWS permissions. Both processes must share the existing `ENCRYPTION_KEY`. Email delivery is always enabled. Startup requires a non-empty `AWS_REGION` and a valid `EMAIL_FROM` address.
 
 Verify the sending domain and DKIM in the configured SES region, configure MAIL FROM/SPF and DMARC, and request production access when leaving the sandbox. Give the worker `ses:SendEmail` scoped to the verified identity. If a configuration set is specified, create it in the same region. Live AWS setup and sending are separate from local tests.
 

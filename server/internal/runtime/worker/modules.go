@@ -235,15 +235,17 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize webhook delivery worker: %w", err)
 	}
 
-	var emailDelivery *email.Worker
-	if cfg.Email.Enabled {
-		sender, err := ses.New(ctx, ses.Config{Region: cfg.Email.Region, From: cfg.Email.From, ReplyTo: cfg.Email.ReplyTo, ConfigurationSet: cfg.Email.ConfigurationSet})
-		if err != nil {
-			closeDependencies()
-			return nil, fmt.Errorf("initialize SES: %w", err)
-		}
-		emailDelivery = email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
+	sender, err := ses.New(ctx, ses.Config{
+		Region:           cfg.Email.Region,
+		From:             cfg.Email.From,
+		ConfigurationSet: cfg.Email.ConfigurationSet,
+	})
+	if err != nil {
+		closeDependencies()
+		return nil, fmt.Errorf("initialize SES: %w", err)
 	}
+	emailDelivery := email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
+
 	return &modules{
 		emailDelivery:           emailDelivery,
 		postgres:                postgresClient,
