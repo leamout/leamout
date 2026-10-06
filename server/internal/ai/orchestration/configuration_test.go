@@ -8,16 +8,19 @@ import (
 )
 
 func TestMediaConfigFromSessionUsesDurableSnapshot(t *testing.T) {
-	voice := "voice-a"
-	language := "en"
 	record := sqlc.VoiceAgentSession{
-		EngineConfigSnapshot:     []byte(`{"model":"realtime-test"}`),
-		ConfigurationRevision:    7,
-		ProviderBindingsSnapshot: []byte(`[{"role":"realtime","provider":"openai"}]`),
-		Engine:                   "integrated",
-		InstructionsSnapshot:     "snapshot instructions",
-		Voice:                    &voice,
-		Language:                 &language,
+		ConfigurationRevision: 7,
+		ConfigurationSnapshot: []byte(`{
+			"engine":"integrated",
+			"instructions":"snapshot instructions",
+			"voice":"voice-a",
+			"language":"en",
+			"engine_config":{"model":"realtime-test"},
+			"interruption_policy":"allow",
+			"recording_policy":"none",
+			"providers":[{"role":"realtime","provider":"openai"}],
+			"tools":[]
+		}`),
 	}
 	got := MediaConfigFromSession(record, session.Config{
 		Engine:       session.EngineEcho,
@@ -29,16 +32,16 @@ func TestMediaConfigFromSessionUsesDurableSnapshot(t *testing.T) {
 	if got.Engine != session.EngineIntegrated {
 		t.Fatalf("engine = %q", got.Engine)
 	}
-	if string(got.EngineConfig) != string(record.EngineConfigSnapshot) {
+	if string(got.EngineConfig) != `{"model":"realtime-test"}` {
 		t.Fatalf("engine config = %s", got.EngineConfig)
 	}
-	if got.Instructions != record.InstructionsSnapshot {
+	if got.Instructions != "snapshot instructions" {
 		t.Fatalf("instructions = %q", got.Instructions)
 	}
-	if got.Voice != voice {
+	if got.Voice != "voice-a" {
 		t.Fatalf("voice = %q", got.Voice)
 	}
-	if got.Language != language {
+	if got.Language != "en" {
 		t.Fatalf("language = %q", got.Language)
 	}
 }
