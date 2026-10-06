@@ -17,12 +17,12 @@ func TestValidateProviderTopologyReportsMissingBinding(t *testing.T) {
 		{
 			name:   "realtime",
 			engine: session.EngineIntegrated,
-			want:   "Voice Agent requires an OpenAI realtime provider binding",
+			want:   "Voice Agent requires a realtime provider binding",
 		},
 		{
 			name:   "stt",
 			engine: session.EngineComposable,
-			want:   "Voice Agent requires a Deepgram STT provider binding",
+			want:   "Voice Agent requires an stt provider binding",
 		},
 		{
 			name:   "llm",
@@ -33,7 +33,7 @@ func TestValidateProviderTopologyReportsMissingBinding(t *testing.T) {
 					Provider: "deepgram",
 				},
 			},
-			want: "Voice Agent requires a Groq LLM provider binding",
+			want: "Voice Agent requires an llm provider binding",
 		},
 		{
 			name:   "tts",
@@ -41,14 +41,14 @@ func TestValidateProviderTopologyReportsMissingBinding(t *testing.T) {
 			providers: []session.ProviderRuntime{
 				{
 					Role:     "stt",
-					Provider: "deepgram",
+					Provider: "assemblyai",
 				},
 				{
 					Role:     "llm",
-					Provider: "groq",
+					Provider: "openai",
 				},
 			},
-			want: "Voice Agent requires a Cartesia TTS provider binding",
+			want: "Voice Agent requires an tts provider binding",
 		},
 	}
 
@@ -84,15 +84,15 @@ func TestValidateProviderTopologyAcceptsCompleteBindings(t *testing.T) {
 			providers: []session.ProviderRuntime{
 				{
 					Role:     "stt",
-					Provider: "deepgram",
+					Provider: "assemblyai",
 				},
 				{
 					Role:     "llm",
-					Provider: "groq",
+					Provider: "openai",
 				},
 				{
 					Role:     "tts",
-					Provider: "cartesia",
+					Provider: "elevenlabs",
 				},
 			},
 		},

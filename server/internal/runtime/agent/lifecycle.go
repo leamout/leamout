@@ -72,38 +72,37 @@ func (r *Runtime) attach(ctx context.Context, call sqlc.Call, channelID string) 
 		return fmt.Errorf("FreeSWITCH channel is already attached to Voice Agent session %s", existing)
 	}
 
-	profile, err := session.ProfileForEngine(session.Engine(record.Engine))
-	if err != nil {
-		_ = r.failSession(ctx, call, time.Now().UTC())
-		return err
-	}
 	cfg := orchestration.MediaConfigFromSession(record, session.Config{
 		ID:             record.ID,
 		OrganizationID: call.OrganizationID,
 		CallID:         call.ID,
 		ChannelID:      channelUUID,
-		InputFormat:    profile.InputFormat,
-		OutputFormat:   profile.OutputFormat,
 	})
-	toolDefinitions, err := orchestration.ToolDefinitionsFromSnapshot(record.ToolsSnapshot)
+	profile, err := session.ProfileForEngine(cfg.Engine)
+	if err != nil {
+		_ = r.failSession(ctx, call, time.Now().UTC())
+		return err
+	}
+	cfg.InputFormat = profile.InputFormat
+	cfg.OutputFormat = profile.OutputFormat
+
+	toolDefinitions, err := orchestration.ToolDefinitionsFromSnapshot(record.ConfigurationSnapshot)
 	if err != nil {
 		_ = r.failSession(ctx, call, time.Now().UTC())
 		return fmt.Errorf("resolve Voice Agent tools: %w", err)
 	}
 	cfg.Tools = toolDefinitions
+
 	providerRuntimes, err := r.orchestrator.ProviderRuntimesFromSnapshot(
 		ctx,
 		call.OrganizationID,
-		record.ProviderBindingsSnapshot,
+		record.ConfigurationSnapshot,
 	)
 	if err != nil {
 		_ = r.failSession(ctx, call, time.Now().UTC())
 		return fmt.Errorf("resolve Voice Agent providers: %w", err)
 	}
-	if err := orchestration.ValidateProviderRuntimeTopology(
-		providerRuntimes,
-		session.Engine(record.Engine),
-	); err != nil {
+	if err := orchestration.ValidateProviderRuntimeTopology(providerRuntimes, cfg.Engine); err != nil {
 		_ = r.failSession(ctx, call, time.Now().UTC())
 		return fmt.Errorf("validate Voice Agent provider topology: %w", err)
 	}

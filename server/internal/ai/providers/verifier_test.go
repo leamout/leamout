@@ -3,73 +3,54 @@ package providers
 import (
 	"context"
 	"errors"
-	"net/http"
-	"net/http/httptest"
 	"testing"
+
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
+	"github.com/leamout/contracts/ai"
 )
 
-func TestVerifierUsesProviderAuthenticationAndNormalizesResults(t *testing.T) {
+func TestVerifierUsesCatalogCredentialVerifier(t *testing.T) {
 	tests := []struct {
-		name              string
-		provider          string
-		status            int
-		wantState         string
-		wantFailureCode   string
-		wantAuthorization string
-		wantAPIKey        string
+		name            string
+		verifyErr       error
+		wantState       string
+		wantFailureCode string
 	}{
 		{
-			name:              "Deepgram ready",
-			provider:          ProviderDeepgram,
-			status:            http.StatusOK,
-			wantState:         ConnectionReady,
-			wantAuthorization: "Token test-secret",
+			name:      "ready",
+			wantState: ConnectionReady,
 		},
 		{
-			name:            "Cartesia invalid",
-			provider:        ProviderCartesia,
-			status:          http.StatusUnauthorized,
+			name:            "invalid",
+			verifyErr:       errors.New("verify credential: HTTP 401"),
 			wantState:       ConnectionInvalid,
 			wantFailureCode: "authentication_failed",
-			wantAPIKey:      "test-secret",
 		},
 		{
-			name:              "Groq rate limited",
-			provider:          ProviderGroq,
-			status:            http.StatusTooManyRequests,
-			wantState:         ConnectionUnavailable,
-			wantFailureCode:   "provider_rate_limited",
-			wantAuthorization: "Bearer test-secret",
+			name:            "rate limited",
+			verifyErr:       errors.New("verify credential: HTTP 429"),
+			wantState:       ConnectionUnavailable,
+			wantFailureCode: "provider_rate_limited",
 		},
 		{
-			name:              "OpenAI unavailable",
-			provider:          ProviderOpenAI,
-			status:            http.StatusServiceUnavailable,
-			wantState:         ConnectionUnavailable,
-			wantFailureCode:   "provider_unavailable",
-			wantAuthorization: "Bearer test-secret",
+			name:            "unavailable",
+			verifyErr:       errors.New("verify credential: HTTP 503"),
+			wantState:       ConnectionUnavailable,
+			wantFailureCode: "provider_unavailable",
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if got := r.Header.Get("Authorization"); got != test.wantAuthorization {
-					t.Errorf("Authorization = %q, want %q", got, test.wantAuthorization)
-				}
-				if got := r.Header.Get("X-API-Key"); got != test.wantAPIKey {
-					t.Errorf("X-API-Key = %q, want %q", got, test.wantAPIKey)
-				}
-				if test.provider == ProviderCartesia && r.Header.Get("Cartesia-Version") == "" {
-					t.Error("Cartesia-Version is empty")
-				}
-				w.WriteHeader(test.status)
-			}))
-			defer server.Close()
-
-			verifier := NewVerifier(server.Client())
-			verifier.endpoints[test.provider] = server.URL
-			result, err := verifier.Verify(context.Background(), test.provider, "test-secret")
+			catalog, err := aicatalog.New(testCredentialProvider{verifyErr: test.verifyErr})
+			if err != nil {
+				t.Fatal(err)
+			}
+			result, err := NewVerifier(catalog).Verify(
+				context.Background(),
+				"test",
+				"test-secret",
+			)
 			if err != nil {
 				t.Fatalf("Verify() error = %v", err)
 			}
@@ -84,25 +65,41 @@ func TestVerifierUsesProviderAuthenticationAndNormalizesResults(t *testing.T) {
 }
 
 func TestVerifierPreservesContextCancellation(t *testing.T) {
+	catalog, err := aicatalog.New(testCredentialProvider{})
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	verifier := NewVerifier(nil)
-	_, err := verifier.Verify(ctx, ProviderOpenAI, "test-secret")
+	_, err = NewVerifier(catalog).Verify(ctx, "test", "test-secret")
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Verify() error = %v, want context.Canceled", err)
 	}
 }
 
-func TestProviderCapabilitiesReturnsDefensiveValues(t *testing.T) {
-	capabilities := providerCapabilities(ProviderOpenAI)
-	if len(capabilities) == 0 {
-		t.Fatal("OpenAI capabilities are empty")
+type testCredentialProvider struct {
+	verifyErr error
+}
+
+func (testCredentialProvider) Descriptor() ai.Descriptor {
+	return ai.Descriptor{
+		ID:           "test",
+		Name:         "Test",
+		Kind:         ai.KindLLM,
+		Capabilities: []ai.Capability{ai.CapabilityStreaming},
 	}
-	capabilities[0] = "changed"
-	if providerCapabilities(ProviderOpenAI)[0] == "changed" {
-		t.Fatal("providerCapabilities() reused mutable storage")
+}
+
+func (p testCredentialProvider) VerifyCredential(ctx context.Context, _ string) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	if got := providerCapabilities("unknown"); len(got) != 0 {
-		t.Fatalf("unknown capabilities = %v", got)
-	}
+	return p.verifyErr
+}
+
+func (testCredentialProvider) Generate(
+	context.Context,
+	ai.LLMRequest,
+) (ai.LLMStream, error) {
+	return nil, errors.New("unused")
 }

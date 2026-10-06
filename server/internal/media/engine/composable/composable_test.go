@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/media/session"
-	providersdk "github.com/coffeyvidzro/monogo/internal/providers"
 	"github.com/google/uuid"
+	"github.com/leamout/contracts/ai"
 )
 
 func TestComposableRunsTurnThroughRegisteredProviders(t *testing.T) {
@@ -24,12 +25,12 @@ func TestComposableRunsTurnThroughRegisteredProviders(t *testing.T) {
 	if got := <-transcriber.audio; string(got.Data) != string(input.Data) {
 		t.Fatalf("transcriber audio = %v", got.Data)
 	}
-	transcriber.events <- providersdk.STTEvent{
-		Type:       providersdk.STTEventSpeechStarted,
+	transcriber.events <- ai.STTEvent{
+		Type:       ai.STTEventSpeechStarted,
 		ProviderID: "stt-1",
 	}
-	transcriber.events <- providersdk.STTEvent{
-		Type:       providersdk.STTEventSpeechStopped,
+	transcriber.events <- ai.STTEvent{
+		Type:       ai.STTEventSpeechStopped,
 		ProviderID: "stt-1",
 		Text:       "hi",
 	}
@@ -48,8 +49,8 @@ func TestComposableRunsTurnThroughRegisteredProviders(t *testing.T) {
 	if synthesizer.lastText() != "hello.caller" {
 		t.Fatalf("TTS text = %q", synthesizer.lastText())
 	}
-	if got := synthesizer.continuations(); len(got) != 2 || !got[0] || got[1] {
-		t.Fatalf("TTS continuation flags = %v", got)
+	if got := synthesizer.finalFlags(); len(got) != 2 || got[0] || !got[1] {
+		t.Fatalf("TTS final flags = %v", got)
 	}
 
 	foundResponseDelta := false
@@ -73,8 +74,8 @@ func TestComposableBargeInCancelsResponseAndDropsStaleAudio(t *testing.T) {
 	transcriber := newFakeTranscriber()
 	synthesizer := &fakeSynthesizer{audio: []byte{7, 0}, waitForCancel: true}
 	stream := startTestStream(t, transcriber, &fakeGenerator{deltas: []string{"first response"}}, synthesizer)
-	transcriber.events <- providersdk.STTEvent{
-		Type: providersdk.STTEventSpeechStopped,
+	transcriber.events <- ai.STTEvent{
+		Type: ai.STTEventSpeechStopped,
 		Text: "first",
 	}
 
@@ -83,7 +84,7 @@ func TestComposableBargeInCancelsResponseAndDropsStaleAudio(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("TTS did not start")
 	}
-	transcriber.events <- providersdk.STTEvent{Type: providersdk.STTEventSpeechStarted}
+	transcriber.events <- ai.STTEvent{Type: ai.STTEventSpeechStarted}
 	select {
 	case <-synthesizer.cancelled:
 	case <-time.After(time.Second):
@@ -98,15 +99,15 @@ func TestComposableBargeInCancelsResponseAndDropsStaleAudio(t *testing.T) {
 }
 
 func TestComposableRejectsUnregisteredProvider(t *testing.T) {
-	registry, err := providersdk.NewRegistry(newFakeTranscriber(), &fakeGenerator{}, &fakeSynthesizer{})
+	catalog, err := aicatalog.New(newFakeTranscriber(), &fakeGenerator{}, &fakeSynthesizer{})
 	if err != nil {
-		t.Fatalf("NewRegistry() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
 	cfg := testSessionConfig()
 	cfg.Providers = []session.ProviderRuntime{{
 		Role: "llm", Provider: "missing", APIKey: "secret",
 	}}
-	_, err = (Engine{Registry: registry}).Start(context.Background(), cfg)
+	_, err = (Engine{Catalog: catalog}).Start(context.Background(), cfg)
 	if err == nil {
 		t.Fatal("Start() error = nil")
 	}
@@ -125,11 +126,11 @@ func startTestStream(
 	if synthesizer.cancelled == nil {
 		synthesizer.cancelled = make(chan struct{})
 	}
-	registry, err := providersdk.NewRegistry(transcriber, generator, synthesizer)
+	catalog, err := aicatalog.New(transcriber, generator, synthesizer)
 	if err != nil {
-		t.Fatalf("NewRegistry() error = %v", err)
+		t.Fatalf("New() error = %v", err)
 	}
-	got, err := (Engine{Registry: registry}).Start(context.Background(), testSessionConfig())
+	got, err := (Engine{Catalog: catalog}).Start(context.Background(), testSessionConfig())
 	if err != nil {
 		t.Fatalf("Start() error = %v", err)
 	}
@@ -164,32 +165,30 @@ func testFormat() session.AudioFormat {
 }
 
 type fakeTranscriber struct {
-	audio     chan session.AudioFrame
-	events    chan providersdk.STTEvent
+	audio     chan ai.AudioFrame
+	events    chan ai.STTEvent
 	closeOnce sync.Once
 }
 
 func newFakeTranscriber() *fakeTranscriber {
 	return &fakeTranscriber{
-		audio:  make(chan session.AudioFrame, 1),
-		events: make(chan providersdk.STTEvent, 8),
+		audio:  make(chan ai.AudioFrame, 1),
+		events: make(chan ai.STTEvent, 8),
 	}
 }
 
-func (f *fakeTranscriber) Descriptor() providersdk.Descriptor {
-	return providersdk.Descriptor{ID: "deepgram", Kind: providersdk.KindSTT}
+func (f *fakeTranscriber) Descriptor() ai.Descriptor {
+	return ai.Descriptor{ID: "deepgram", Name: "Deepgram", Kind: ai.KindSTT}
 }
 
 func (f *fakeTranscriber) StartSTT(
 	context.Context,
-	providersdk.Runtime,
-	session.AudioFormat,
-	string,
-) (providersdk.STTStream, error) {
+	ai.STTRequest,
+) (ai.STTStream, error) {
 	return f, nil
 }
 
-func (f *fakeTranscriber) SendAudio(ctx context.Context, frame session.AudioFrame) error {
+func (f *fakeTranscriber) SendAudio(ctx context.Context, frame ai.AudioFrame) error {
 	select {
 	case f.audio <- frame:
 		return nil
@@ -198,8 +197,8 @@ func (f *fakeTranscriber) SendAudio(ctx context.Context, frame session.AudioFram
 	}
 }
 
-func (f *fakeTranscriber) Finalize(context.Context) error      { return nil }
-func (f *fakeTranscriber) Events() <-chan providersdk.STTEvent { return f.events }
+func (f *fakeTranscriber) Finalize(context.Context) error { return nil }
+func (f *fakeTranscriber) Events() <-chan ai.STTEvent     { return f.events }
 func (f *fakeTranscriber) Close(context.Context) error {
 	f.closeOnce.Do(func() { close(f.events) })
 	return nil
@@ -208,25 +207,25 @@ func (f *fakeTranscriber) Close(context.Context) error {
 type fakeGenerator struct {
 	deltas   []string
 	mu       sync.Mutex
-	messages []providersdk.Message
+	messages []ai.Message
 }
 
-func (f *fakeGenerator) Descriptor() providersdk.Descriptor {
-	return providersdk.Descriptor{ID: "groq", Kind: providersdk.KindLLM}
+func (f *fakeGenerator) Descriptor() ai.Descriptor {
+	return ai.Descriptor{ID: "groq", Name: "Groq", Kind: ai.KindLLM}
 }
 
 func (f *fakeGenerator) Generate(
 	_ context.Context,
-	req providersdk.LLMRequest,
-) (providersdk.LLMStream, error) {
+	req ai.LLMRequest,
+) (ai.LLMStream, error) {
 	f.mu.Lock()
-	f.messages = append([]providersdk.Message(nil), req.Messages...)
+	f.messages = append([]ai.Message(nil), req.Messages...)
 	f.mu.Unlock()
-	events := make(chan providersdk.LLMEvent, len(f.deltas)+1)
+	events := make(chan ai.LLMEvent, len(f.deltas)+1)
 	for _, delta := range f.deltas {
-		events <- providersdk.LLMEvent{ResponseID: "llm-1", TextDelta: delta}
+		events <- ai.LLMEvent{ResponseID: "llm-1", TextDelta: delta}
 	}
-	events <- providersdk.LLMEvent{Done: true}
+	events <- ai.LLMEvent{Done: true}
 	close(events)
 	return &fakeLLMStream{events: events}, nil
 }
@@ -235,7 +234,7 @@ func (f *fakeGenerator) lastUser() string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	for i := len(f.messages) - 1; i >= 0; i-- {
-		if f.messages[i].Role == "user" {
+		if f.messages[i].Role == ai.RoleUser {
 			return f.messages[i].Content
 		}
 	}
@@ -243,11 +242,11 @@ func (f *fakeGenerator) lastUser() string {
 }
 
 type fakeLLMStream struct {
-	events chan providersdk.LLMEvent
+	events chan ai.LLMEvent
 }
 
-func (f *fakeLLMStream) Events() <-chan providersdk.LLMEvent { return f.events }
-func (f *fakeLLMStream) Close() error                        { return nil }
+func (f *fakeLLMStream) Events() <-chan ai.LLMEvent { return f.events }
+func (f *fakeLLMStream) Close() error               { return nil }
 
 type fakeSynthesizer struct {
 	audio         []byte
@@ -256,17 +255,17 @@ type fakeSynthesizer struct {
 	cancelled     chan struct{}
 	mu            sync.Mutex
 	text          string
-	more          []bool
+	final         []bool
 }
 
-func (f *fakeSynthesizer) Descriptor() providersdk.Descriptor {
-	return providersdk.Descriptor{ID: "cartesia", Kind: providersdk.KindTTS}
+func (f *fakeSynthesizer) Descriptor() ai.Descriptor {
+	return ai.Descriptor{ID: "cartesia", Name: "Cartesia", Kind: ai.KindTTS}
 }
 
 func (f *fakeSynthesizer) StartTTS(
 	ctx context.Context,
-	req providersdk.TTSRequest,
-) (providersdk.TTSStream, error) {
+	req ai.TTSRequest,
+) (ai.TTSStream, error) {
 	f.mu.Lock()
 	if f.started == nil {
 		f.started = make(chan struct{})
@@ -276,19 +275,19 @@ func (f *fakeSynthesizer) StartTTS(
 	}
 	started, cancelled := f.started, f.cancelled
 	f.mu.Unlock()
-	events := make(chan providersdk.TTSEvent, 2)
+	events := make(chan ai.TTSEvent, 2)
 	close(started)
 	result := &fakeTTSStream{events: events}
-	result.onText = func(text string, more bool) {
+	result.onText = func(chunk ai.TextChunk) {
 		f.mu.Lock()
-		f.text += text
-		f.more = append(f.more, more)
+		f.text += chunk.Text
+		f.final = append(f.final, chunk.Final)
 		f.mu.Unlock()
-		if !more && !f.waitForCancel {
-			events <- providersdk.TTSEvent{
-				Audio: session.AudioFrame{Data: f.audio, Format: req.Format},
+		if chunk.Final && !f.waitForCancel {
+			events <- ai.TTSEvent{
+				Audio: ai.AudioFrame{Data: f.audio, Format: req.Format},
 			}
-			events <- providersdk.TTSEvent{Done: true}
+			events <- ai.TTSEvent{Done: true}
 			close(events)
 		}
 	}
@@ -297,8 +296,8 @@ func (f *fakeSynthesizer) StartTTS(
 			<-ctx.Done()
 			close(cancelled)
 			// Deliberately publish after cancellation to verify generation fencing.
-			events <- providersdk.TTSEvent{
-				Audio: session.AudioFrame{Data: f.audio, Format: req.Format},
+			events <- ai.TTSEvent{
+				Audio: ai.AudioFrame{Data: f.audio, Format: req.Format},
 			}
 			close(events)
 		}()
@@ -306,10 +305,10 @@ func (f *fakeSynthesizer) StartTTS(
 	return result, nil
 }
 
-func (f *fakeSynthesizer) continuations() []bool {
+func (f *fakeSynthesizer) finalFlags() []bool {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return append([]bool(nil), f.more...)
+	return append([]bool(nil), f.final...)
 }
 
 func (f *fakeSynthesizer) lastText() string {
@@ -319,13 +318,13 @@ func (f *fakeSynthesizer) lastText() string {
 }
 
 type fakeTTSStream struct {
-	events chan providersdk.TTSEvent
-	onText func(string, bool)
+	events chan ai.TTSEvent
+	onText func(ai.TextChunk)
 }
 
-func (f *fakeTTSStream) Events() <-chan providersdk.TTSEvent { return f.events }
-func (f *fakeTTSStream) Close() error                        { return nil }
-func (f *fakeTTSStream) SendText(_ context.Context, text string, more bool) error {
-	f.onText(text, more)
+func (f *fakeTTSStream) Events() <-chan ai.TTSEvent { return f.events }
+func (f *fakeTTSStream) Close() error               { return nil }
+func (f *fakeTTSStream) SendText(_ context.Context, chunk ai.TextChunk) error {
+	f.onText(chunk)
 	return nil
 }

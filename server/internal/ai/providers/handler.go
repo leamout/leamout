@@ -31,7 +31,7 @@ func (h *Handler) CreateCredential(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	httputil.Created(w, credentialResponse(value, []uuid.UUID{}))
+	httputil.Created(w, h.service.credentialResponse(value, []uuid.UUID{}))
 }
 
 func (h *Handler) ListCredentials(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +59,7 @@ func (h *Handler) listIntegrations(
 	}
 	out := make([]CredentialResponse, 0, len(values))
 	for _, value := range values {
-		out = append(out, credentialResponse(value.Credential, value.VoiceAgentIDs))
+		out = append(out, h.service.credentialResponse(value.Credential, value.VoiceAgentIDs))
 	}
 	httputil.OK(w, map[string]any{
 		responseKey: out,
@@ -87,7 +87,7 @@ func (h *Handler) RotateCredential(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	httputil.OK(w, credentialResponse(value, []uuid.UUID{}))
+	httputil.OK(w, h.service.credentialResponse(value, []uuid.UUID{}))
 }
 
 func (h *Handler) VerifyIntegration(w http.ResponseWriter, r *http.Request) {

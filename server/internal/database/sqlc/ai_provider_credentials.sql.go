@@ -19,7 +19,7 @@ INSERT INTO ai_provider_credentials (
     $1, $2, $3,
     $4, $5
 )
-RETURNING id, organization_id, provider, name, secret_ciphertext, created_at, rotated_at, updated_at, connection_state, verified_at, failure_code
+RETURNING id, organization_id, provider, name, secret_ciphertext, connection_state, verified_at, failure_code, created_at, rotated_at, updated_at
 `
 
 type CreateAIProviderCredentialParams struct {
@@ -45,12 +45,12 @@ func (q *Queries) CreateAIProviderCredential(ctx context.Context, arg CreateAIPr
 		&i.Provider,
 		&i.Name,
 		&i.SecretCiphertext,
-		&i.CreatedAt,
-		&i.RotatedAt,
-		&i.UpdatedAt,
 		&i.ConnectionState,
 		&i.VerifiedAt,
 		&i.FailureCode,
+		&i.CreatedAt,
+		&i.RotatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -90,7 +90,7 @@ func (q *Queries) DeleteVoiceAgentProviderBinding(ctx context.Context, arg Delet
 }
 
 const getAIProviderCredential = `-- name: GetAIProviderCredential :one
-SELECT id, organization_id, provider, name, secret_ciphertext, created_at, rotated_at, updated_at, connection_state, verified_at, failure_code
+SELECT id, organization_id, provider, name, secret_ciphertext, connection_state, verified_at, failure_code, created_at, rotated_at, updated_at
 FROM ai_provider_credentials
 WHERE id = $1
   AND organization_id = $2
@@ -110,18 +110,18 @@ func (q *Queries) GetAIProviderCredential(ctx context.Context, arg GetAIProvider
 		&i.Provider,
 		&i.Name,
 		&i.SecretCiphertext,
-		&i.CreatedAt,
-		&i.RotatedAt,
-		&i.UpdatedAt,
 		&i.ConnectionState,
 		&i.VerifiedAt,
 		&i.FailureCode,
+		&i.CreatedAt,
+		&i.RotatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listAIProviderCredentials = `-- name: ListAIProviderCredentials :many
-SELECT id, organization_id, provider, name, secret_ciphertext, created_at, rotated_at, updated_at, connection_state, verified_at, failure_code
+SELECT id, organization_id, provider, name, secret_ciphertext, connection_state, verified_at, failure_code, created_at, rotated_at, updated_at
 FROM ai_provider_credentials
 WHERE organization_id = $1
 ORDER BY provider ASC, name ASC, created_at ASC
@@ -142,12 +142,12 @@ func (q *Queries) ListAIProviderCredentials(ctx context.Context, organizationID 
 			&i.Provider,
 			&i.Name,
 			&i.SecretCiphertext,
-			&i.CreatedAt,
-			&i.RotatedAt,
-			&i.UpdatedAt,
 			&i.ConnectionState,
 			&i.VerifiedAt,
 			&i.FailureCode,
+			&i.CreatedAt,
+			&i.RotatedAt,
+			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -314,7 +314,7 @@ SET secret_ciphertext = $1,
     failure_code = NULL
 WHERE id = $2
   AND organization_id = $3
-RETURNING id, organization_id, provider, name, secret_ciphertext, created_at, rotated_at, updated_at, connection_state, verified_at, failure_code
+RETURNING id, organization_id, provider, name, secret_ciphertext, connection_state, verified_at, failure_code, created_at, rotated_at, updated_at
 `
 
 type RotateAIProviderCredentialParams struct {
@@ -332,12 +332,12 @@ func (q *Queries) RotateAIProviderCredential(ctx context.Context, arg RotateAIPr
 		&i.Provider,
 		&i.Name,
 		&i.SecretCiphertext,
-		&i.CreatedAt,
-		&i.RotatedAt,
-		&i.UpdatedAt,
 		&i.ConnectionState,
 		&i.VerifiedAt,
 		&i.FailureCode,
+		&i.CreatedAt,
+		&i.RotatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -349,7 +349,7 @@ SET connection_state = $1,
     failure_code = $2
 WHERE id = $3
   AND organization_id = $4
-RETURNING id, organization_id, provider, name, secret_ciphertext, created_at, rotated_at, updated_at, connection_state, verified_at, failure_code
+RETURNING id, organization_id, provider, name, secret_ciphertext, connection_state, verified_at, failure_code, created_at, rotated_at, updated_at
 `
 
 type UpdateAIProviderCredentialVerificationParams struct {
@@ -373,12 +373,12 @@ func (q *Queries) UpdateAIProviderCredentialVerification(ctx context.Context, ar
 		&i.Provider,
 		&i.Name,
 		&i.SecretCiphertext,
-		&i.CreatedAt,
-		&i.RotatedAt,
-		&i.UpdatedAt,
 		&i.ConnectionState,
 		&i.VerifiedAt,
 		&i.FailureCode,
+		&i.CreatedAt,
+		&i.RotatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

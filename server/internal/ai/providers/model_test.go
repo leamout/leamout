@@ -5,11 +5,17 @@ import (
 	"strings"
 	"testing"
 
+	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/google/uuid"
 )
 
 func TestCredentialResponseNeverSerializesSecretMaterial(t *testing.T) {
-	response := credentialResponse(
+	catalog, err := aicatalog.Builtins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(nil, nil, catalog)
+	response := service.credentialResponse(
 		Credential{
 			ID:              uuid.New(),
 			OrganizationID:  uuid.New(),
@@ -38,5 +44,8 @@ func TestCredentialResponseNeverSerializesSecretMaterial(t *testing.T) {
 	if !strings.Contains(serialized, `"capabilities"`) ||
 		!strings.Contains(serialized, `"voice_agent_ids"`) {
 		t.Fatalf("response is missing integration metadata: %s", serialized)
+	}
+	if !strings.Contains(serialized, `"turn_detection"`) {
+		t.Fatalf("response is missing catalog capabilities: %s", serialized)
 	}
 }

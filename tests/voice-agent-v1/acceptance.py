@@ -309,15 +309,12 @@ def setup_voice_agent():
         raise AcceptanceError(
             f"Voice Agent readiness failed: {json.dumps(readiness.get('issues') or [])}"
         )
-
-    activated = api(
-        "POST",
-        f"/v1/voice-agents/{agent['id']}/activate",
-        expected={200},
-    )[1]
-    if activated.get("active_revision") is None:
-        raise AcceptanceError("Voice Agent activation did not persist an active revision")
-    STATE["active_revision"] = activated["active_revision"]
+    revision = readiness.get("configuration_revision")
+    if not isinstance(revision, int) or revision < 1:
+        raise AcceptanceError(
+            f"Voice Agent configuration revision is invalid: {revision!r}"
+        )
+    STATE["configuration_revision"] = revision
 
     binding = api(
         "POST",
@@ -377,16 +374,17 @@ def originate_call():
 def wait_voice_agent_session():
     def probe():
         row = psql(
-            "SELECT id::text || '|' || state || '|' || engine || '|' || instructions_snapshot "
+            "SELECT id::text || '|' || state || '|' || configuration_revision::text || '|' || configuration_snapshot::text "
             f"FROM voice_agent_sessions WHERE call_id='{STATE['call_id']}'"
         )
         return row if row else False
 
     row = wait_for("durable Voice Agent session", probe)
-    session_id, state, engine, instructions = row.split("|", 3)
-    if state != "active" or engine != "integrated":
+    session_id, state, revision, snapshot_raw = row.split("|", 3)
+    snapshot = json.loads(snapshot_raw)
+    if state != "active" or snapshot.get("engine") != "integrated":
         raise AcceptanceError(f"unexpected Voice Agent session: {row}")
-    if instructions != INITIAL_INSTRUCTIONS:
+    if snapshot.get("instructions") != INITIAL_INSTRUCTIONS:
         raise AcceptanceError("durable session instructions snapshot is incorrect")
     STATE["session_id"] = session_id
 
@@ -396,13 +394,9 @@ def wait_voice_agent_session():
     if count != "1":
         raise AcceptanceError(f"Voice Agent session count = {count}, want 1")
 
-    revision = psql(
-        "SELECT configuration_revision::text FROM voice_agent_sessions "
-        f"WHERE id='{session_id}'"
-    )
-    if revision != str(STATE["active_revision"]):
+    if revision != str(STATE["configuration_revision"]):
         raise AcceptanceError(
-            f"session revision = {revision!r}, want active revision {STATE['active_revision']}"
+            f"session revision = {revision!r}, want configuration revision {STATE['configuration_revision']}"
         )
 
     marker = fs_cli(
@@ -479,12 +473,12 @@ def verify_provider_credential_isolation():
     if not ciphertext or ciphertext == "tenant-provider-test-token":
         raise AcceptanceError("provider credential was not encrypted at rest")
 
-    engine_snapshot = psql(
-        "SELECT engine_config_snapshot::text FROM voice_agent_sessions "
+    configuration_snapshot = psql(
+        "SELECT configuration_snapshot::text FROM voice_agent_sessions "
         f"WHERE id='{STATE['session_id']}'"
     )
-    if "tenant-provider-test-token" in engine_snapshot:
-        raise AcceptanceError("provider credential leaked into engine snapshot")
+    if "tenant-provider-test-token" in configuration_snapshot:
+        raise AcceptanceError("provider credential leaked into configuration snapshot")
 
 
 def verify_snapshot_immutability():
@@ -495,7 +489,7 @@ def verify_snapshot_immutability():
         expected={200},
     )
     snapshot = psql(
-        "SELECT instructions_snapshot FROM voice_agent_sessions "
+        "SELECT configuration_snapshot->>'instructions' FROM voice_agent_sessions "
         f"WHERE id='{STATE['session_id']}'"
     )
     if snapshot != INITIAL_INSTRUCTIONS:
@@ -715,11 +709,11 @@ def main():
     setup_numbers()
     print("PASS 02 BYOC DID and caller identity configured")
     setup_voice_agent()
-    print("PASS 03 provider verified, Voice Agent activated, DID bound, and tool secrets verified")
+    print("PASS 03 provider verified, Voice Agent ready, DID bound, and tool secrets verified")
     originate_call()
     print("PASS 04 outbound Voice Agent call reached answered state")
     wait_voice_agent_session()
-    print("PASS 05 active Voice Agent revision attached as one durable session")
+    print("PASS 05 Voice Agent configuration revision attached as one durable session")
     verify_media_placement()
     print("PASS 06 Redis placement assigned session ownership to a healthy media node")
     verify_provider_session()

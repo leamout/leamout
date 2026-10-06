@@ -18,6 +18,9 @@ func TestNormalizeCreate(t *testing.T) {
 	if req.Name != "Support Agent" || req.Instructions != "Help the caller." {
 		t.Fatalf("normalized request = %+v", req)
 	}
+	if req.Language == nil || *req.Language != "en" {
+		t.Fatalf("language = %v, want en", req.Language)
+	}
 }
 
 func TestNormalizeCreateRejectsInvalidEngine(t *testing.T) {
