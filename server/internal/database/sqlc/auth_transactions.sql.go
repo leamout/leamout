@@ -122,6 +122,35 @@ func (q *Queries) GetAuthTransactionByIDAnyState(ctx context.Context, id uuid.UU
 	return i, err
 }
 
+const lockAuthRecipient = `-- name: LockAuthRecipient :exec
+SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
+`
+
+func (q *Queries) LockAuthRecipient(ctx context.Context, identifier string) error {
+	_, err := q.db.Exec(ctx, lockAuthRecipient, identifier)
+	return err
+}
+
+const lockAuthTransaction = `-- name: LockAuthTransaction :one
+SELECT id, identifier, user_id, state, selected_method, expires_at, created_at, updated_at FROM auth_transactions WHERE id=$1 FOR UPDATE
+`
+
+func (q *Queries) LockAuthTransaction(ctx context.Context, id uuid.UUID) (AuthTransaction, error) {
+	row := q.db.QueryRow(ctx, lockAuthTransaction, id)
+	var i AuthTransaction
+	err := row.Scan(
+		&i.ID,
+		&i.Identifier,
+		&i.UserID,
+		&i.State,
+		&i.SelectedMethod,
+		&i.ExpiresAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const markAuthTransactionAuthenticated = `-- name: MarkAuthTransactionAuthenticated :one
 UPDATE auth_transactions
 SET

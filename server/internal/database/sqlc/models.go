@@ -96,6 +96,24 @@ type CallParticipant struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type EmailDelivery struct {
+	ID                uuid.UUID          `db:"id" json:"id"`
+	Recipient         string             `db:"recipient" json:"recipient"`
+	Template          string             `db:"template" json:"template"`
+	EncryptedData     *string            `db:"encrypted_data" json:"encrypted_data"`
+	CancellationKey   *string            `db:"cancellation_key" json:"cancellation_key"`
+	Status            string             `db:"status" json:"status"`
+	Attempts          int32              `db:"attempts" json:"attempts"`
+	AvailableAt       pgtype.Timestamptz `db:"available_at" json:"available_at"`
+	LockedAt          pgtype.Timestamptz `db:"locked_at" json:"locked_at"`
+	LockToken         *uuid.UUID         `db:"lock_token" json:"lock_token"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	ProviderMessageID *string            `db:"provider_message_id" json:"provider_message_id"`
+	LastErrorCode     *string            `db:"last_error_code" json:"last_error_code"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	SentAt            pgtype.Timestamptz `db:"sent_at" json:"sent_at"`
+}
+
 type Entitlement struct {
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 	Capability     string             `db:"capability" json:"capability"`

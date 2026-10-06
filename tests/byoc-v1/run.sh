@@ -34,6 +34,11 @@ export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-byoc-v1-turn-secret-0123456789abcde
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
+# Generate an isolated application env file; never require or overwrite server/.env.
+APP_ENV_FILE=$(mktemp)
+export APP_ENV_FILE
+python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
+
 COMPOSE="docker compose -f deploy/compose.yaml -f tests/byoc-v1/compose.yaml -f tests/acceptance-minio.yaml"
 
 cleanup() {
@@ -49,6 +54,7 @@ cleanup() {
     else
         printf '%s\n' "BYOC v1 stack retained; runtime fixtures and certificates: $CERT_DIR"
     fi
+    rm -f "$APP_ENV_FILE"
     exit "$status"
 }
 trap cleanup EXIT INT TERM

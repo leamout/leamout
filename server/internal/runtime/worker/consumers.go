@@ -168,6 +168,7 @@ func runWorkloads(ctx context.Context, logger *logging.Logger, modules *modules)
 		})
 	}
 
+	run("email delivery", modules.emailDelivery.Run)
 	run("outbox publisher", modules.outbox.Run)
 	run("webhook consumer", modules.webhookConsumer.Run)
 	run("webhook delivery worker", modules.webhookDelivery.Run)

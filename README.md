@@ -303,16 +303,31 @@ go vet ./...
 go build ./...
 ```
 
-Validate the deployment configuration:
+Configure and validate the deployment from the repository root:
 
 ```sh
-cd ..
-
-docker compose --env-file .env.example -f deploy/compose.yaml config --quiet
+cp .env.example .env
+cp server/.env.example server/.env
+# Replace example secrets and addresses in both files before deploying.
+docker compose --env-file .env -f deploy/compose.yaml config --quiet
+docker compose --env-file .env -f deploy/compose.yaml up -d
 ```
 
-Copy `.env.example` to a protected environment file and replace every example
-secret before starting a deployment.
+The root `.env` supplies infrastructure settings for Compose, such as
+`POSTGRES_PASSWORD` and `PUBLIC_IP`. `server/.env` supplies application settings
+through `env_file`; Go owns their defaults and validation. The server, worker,
+media runtime, Caddy, FreeSWITCH, and Coturn load the same application file so
+shared domains and secrets stay consistent. This also makes AWS credentials
+available inside those containers; only the worker uses them for SES.
+
+Keep the password in `server/.env`'s `DATABASE_URL` consistent with the root
+`POSTGRES_PASSWORD`. Set `DOMAIN`, `CORS_ORIGINS`, `TURN_PUBLIC_URLS`, and the root
+`TURN_REALM` for your domain. Container hostnames in the application example are
+for Compose; replace them with reachable addresses when running Go directly.
+Acceptance suites generate their own temporary application environment files.
+To validate examples without creating deployment files, run
+`APP_ENV_FILE=../server/.env.example docker compose --env-file .env.example -f deploy/compose.yaml config --quiet`.
+Keep both environment files private. No `.env` file is copied into the image.
 
 ## License
 

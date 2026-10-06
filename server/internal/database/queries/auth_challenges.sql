@@ -63,3 +63,7 @@ RETURNING *;
 DELETE FROM auth_challenges
 WHERE expires_at <= NOW()
    OR consumed_at IS NOT NULL;
+
+-- name: InvalidateAuthOTPChallenges :exec
+UPDATE auth_challenges SET consumed_at=now()
+WHERE auth_transaction_id=sqlc.arg(auth_transaction_id) AND purpose='email_otp' AND consumed_at IS NULL;
