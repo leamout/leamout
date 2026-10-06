@@ -8,15 +8,17 @@ import (
 
 func TestEmailEnvironment(t *testing.T) {
 	t.Setenv("AWS_REGION", "eu-west-1")
-	t.Setenv("FROM_EMAIL", "Leamout <sender@example.com>")
-	t.Setenv("SES_CONFIGURATION_SET", "transactional")
+	t.Setenv("AWS_FROM_EMAIL", "Leamout <sender@example.com>")
+	t.Setenv("AWS_CONFIGURATION_SET", "transactional")
 	t.Setenv("AWS_ACCESS_KEY_ID", "test-access-key")
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "test-secret-key")
-	cfg, err := env.ParseAs[AWSConfig]()
+	cfg, err := env.ParseAs[struct {
+		AWS AWSConfig `envPrefix:"AWS_"`
+	}]()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Region != "eu-west-1" || cfg.FromEmail != "Leamout <sender@example.com>" || cfg.ConfigurationSet != "transactional" || cfg.AccessKey != "test-access-key" || cfg.SecretKey != "test-secret-key" {
+	if cfg.AWS.Region != "eu-west-1" || cfg.AWS.FromEmail != "Leamout <sender@example.com>" || cfg.AWS.ConfigurationSet != "transactional" || cfg.AWS.AccessKey != "test-access-key" || cfg.AWS.SecretKey != "test-secret-key" {
 		t.Fatal("email environment not parsed")
 	}
 }

@@ -18,14 +18,14 @@ type MinIOConfig struct {
 
 type AWSConfig struct {
 	FromEmail        string `env:"FROM_EMAIL" envDefault:"noreply@leamout.com"`
-	Region           string `env:"AWS_REGION" envDefault:"us-east-1"`
-	AccessKey        string `env:"AWS_ACCESS_KEY_ID"`
-	SecretKey        string `env:"AWS_SECRET_ACCESS_KEY"`
-	ConfigurationSet string `env:"SES_CONFIGURATION_SET" envDefault:"leamout-transactional"`
+	Region           string `env:"REGION" envDefault:"us-east-1"`
+	AccessKey        string `env:"ACCESS_KEY_ID"`
+	SecretKey        string `env:"SECRET_ACCESS_KEY"`
+	ConfigurationSet string `env:"CONFIGURATION_SET" envDefault:"leamout-transactional"`
 }
 
 type Config struct {
-	AWS AWSConfig
+	AWS AWSConfig `envPrefix:"AWS_"`
 
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	Domain                string      `env:"DOMAIN"`

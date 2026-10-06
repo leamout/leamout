@@ -25,7 +25,7 @@ func New(ctx context.Context, cfg Config) (*Sender, error) {
 		return nil, fmt.Errorf("AWS_REGION is required for SES")
 	}
 	if _, err := mail.ParseAddress(cfg.From); err != nil {
-		return nil, fmt.Errorf("FROM_EMAIL must be a valid sender")
+		return nil, fmt.Errorf("AWS_FROM_EMAIL must be a valid sender")
 	}
 	options := []func(*config.LoadOptions) error{
 		config.WithRegion(cfg.Region),
