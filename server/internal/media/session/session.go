@@ -17,7 +17,7 @@ type Engine string
 const (
 	EngineEcho       Engine = "echo"
 	EngineComposable Engine = "composable"
-	EngineIntegrated Engine = "integrated"
+	EngineRealtime   Engine = "realtime"
 )
 
 // AudioFormat describes an uncompressed PCM stream.
@@ -50,7 +50,7 @@ func ProfileForEngine(engine Engine) (EngineProfile, error) {
 	case EngineEcho, EngineComposable:
 		format := AudioFormat{SampleRateHz: 16000, Channels: 1}
 		return EngineProfile{InputFormat: format, OutputFormat: format}, nil
-	case EngineIntegrated:
+	case EngineRealtime:
 		format := AudioFormat{SampleRateHz: 24000, Channels: 1}
 		return EngineProfile{InputFormat: format, OutputFormat: format}, nil
 	default:

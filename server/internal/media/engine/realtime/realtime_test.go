@@ -1,4 +1,4 @@
-package integrated
+package realtime
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func TestEngineStartsRealtimeProviderWithSessionConfig(t *testing.T) {
 		OrganizationID: uuid.New(),
 		CallID:         uuid.New(),
 		ChannelID:      uuid.New(),
-		Engine:         session.EngineIntegrated,
+		Engine:         session.EngineRealtime,
 		InputFormat:    format,
 		OutputFormat:   format,
 		Instructions:   "Be concise.",
@@ -68,7 +68,7 @@ func TestEngineStartsRealtimeProviderWithSessionConfig(t *testing.T) {
 	}
 }
 
-func TestEngineRejectsNonIntegratedSession(t *testing.T) {
+func TestEngineRejectsNonRealtimeSession(t *testing.T) {
 	format := session.AudioFormat{SampleRateHz: 24000, Channels: 1}
 	_, err := (Engine{}).Start(context.Background(), session.Config{
 		ID:             uuid.New(),

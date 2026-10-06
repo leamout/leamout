@@ -1,5 +1,5 @@
-// Package integrated implements end-to-end realtime voice engines.
-package integrated
+// Package realtime implements end-to-end realtime voice engines.
+package realtime
 
 import (
 	"context"
@@ -18,10 +18,10 @@ type Engine struct {
 
 func (e Engine) Start(ctx context.Context, cfg session.Config) (session.Stream, error) {
 	if ctx == nil {
-		return nil, fmt.Errorf("integrated engine context is required")
+		return nil, fmt.Errorf("realtime engine context is required")
 	}
-	if cfg.Engine != session.EngineIntegrated {
-		return nil, fmt.Errorf("integrated engine cannot start session engine %q", cfg.Engine)
+	if cfg.Engine != session.EngineRealtime {
+		return nil, fmt.Errorf("realtime engine cannot start session engine %q", cfg.Engine)
 	}
 	if e.Catalog == nil {
 		return nil, fmt.Errorf("provider catalog is required")

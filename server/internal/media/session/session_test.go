@@ -47,7 +47,7 @@ func TestProfileForEngine(t *testing.T) {
 	}{
 		{engine: EngineEcho, rate: 16000},
 		{engine: EngineComposable, rate: 16000},
-		{engine: EngineIntegrated, rate: 24000},
+		{engine: EngineRealtime, rate: 24000},
 	}
 	for _, tt := range tests {
 		t.Run(string(tt.engine), func(t *testing.T) {
@@ -63,13 +63,13 @@ func TestProfileForEngine(t *testing.T) {
 }
 
 func TestConfigRejectsInvalidEngineConfigAndProfile(t *testing.T) {
-	profile, err := ProfileForEngine(EngineIntegrated)
+	profile, err := ProfileForEngine(EngineRealtime)
 	if err != nil {
 		t.Fatal(err)
 	}
 	cfg := Config{
 		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
-		Engine: EngineIntegrated, InputFormat: profile.InputFormat, OutputFormat: profile.OutputFormat,
+		Engine: EngineRealtime, InputFormat: profile.InputFormat, OutputFormat: profile.OutputFormat,
 		EngineConfig: json.RawMessage(`[]`),
 	}
 	if err := cfg.Validate(); err == nil {

@@ -12,7 +12,7 @@ import (
 	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/coffeyvidzro/monogo/internal/media/engine/composable"
 	"github.com/coffeyvidzro/monogo/internal/media/engine/echo"
-	"github.com/coffeyvidzro/monogo/internal/media/engine/integrated"
+	"github.com/coffeyvidzro/monogo/internal/media/engine/realtime"
 	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/coffeyvidzro/monogo/internal/media/transport"
 	"github.com/coffeyvidzro/monogo/internal/platform/logging"
@@ -111,7 +111,7 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 func mediaEngines(catalog *aicatalog.Catalog) map[session.Engine]session.Starter {
 	return map[session.Engine]session.Starter{
 		session.EngineEcho: echo.Engine{},
-		session.EngineIntegrated: integrated.Engine{
+		session.EngineRealtime: realtime.Engine{
 			Catalog:         catalog,
 			DefaultProvider: "openai",
 		},

@@ -80,7 +80,7 @@ func validateProviderTopology(values []session.ProviderRuntime, engine session.E
 		roles[value.Role] = struct{}{}
 	}
 	switch engine {
-	case session.EngineIntegrated:
+	case session.EngineRealtime:
 		if _, ok := roles["realtime"]; !ok {
 			return apperror.NewBadRequest(
 				"Voice Agent requires a realtime provider binding",

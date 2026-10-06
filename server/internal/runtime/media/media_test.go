@@ -41,7 +41,7 @@ func TestMediaEnginesAlwaysRegisterTenantCapableEngines(t *testing.T) {
 
 	for _, engine := range []session.Engine{
 		session.EngineEcho,
-		session.EngineIntegrated,
+		session.EngineRealtime,
 		session.EngineComposable,
 	} {
 		if _, exists := engines[engine]; !exists {

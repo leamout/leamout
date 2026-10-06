@@ -198,7 +198,7 @@ def setup_voice_agent():
         "POST", "/v1/voice-agents/",
         {
             "name": "voice-agent-v1",
-            "engine": "integrated",
+            "engine": "realtime",
             "instructions": INITIAL_INSTRUCTIONS,
             "voice": "alloy",
             "language": "en",
@@ -382,7 +382,7 @@ def wait_voice_agent_session():
     row = wait_for("durable Voice Agent session", probe)
     session_id, state, revision, snapshot_raw = row.split("|", 3)
     snapshot = json.loads(snapshot_raw)
-    if state != "active" or snapshot.get("engine") != "integrated":
+    if state != "active" or snapshot.get("engine") != "realtime":
         raise AcceptanceError(f"unexpected Voice Agent session: {row}")
     if snapshot.get("instructions") != INITIAL_INSTRUCTIONS:
         raise AcceptanceError("durable session instructions snapshot is incorrect")

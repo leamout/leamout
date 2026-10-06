@@ -35,3 +35,17 @@ func TestCreateBindingRequiresApplication(t *testing.T) {
 		t.Fatal("unexpected uuid zero value")
 	}
 }
+
+func TestNormalizeCreateMapsLegacyIntegratedEngine(t *testing.T) {
+	req, err := normalizeCreate(CreateRequest{
+		Name:         "Legacy Realtime Agent",
+		Engine:       legacyEngineIntegrated,
+		Instructions: "Help the caller.",
+	})
+	if err != nil {
+		t.Fatalf("normalizeCreate() error = %v", err)
+	}
+	if req.Engine != EngineRealtime {
+		t.Fatalf("engine = %q, want %q", req.Engine, EngineRealtime)
+	}
+}

@@ -12,7 +12,7 @@ import (
 
 const (
 	EngineComposable = "composable"
-	EngineIntegrated = "integrated"
+	EngineRealtime   = "realtime"
 
 	InterruptionAllow    = "allow"
 	InterruptionDisabled = "disabled"
@@ -97,7 +97,7 @@ func response(agent sqlc.VoiceAgent) Response {
 		ID:                    agent.ID,
 		OrganizationID:        agent.OrganizationID,
 		Name:                  agent.Name,
-		Engine:                agent.Engine,
+		Engine:                canonicalEngine(agent.Engine),
 		Instructions:          agent.Instructions,
 		Voice:                 agent.Voice,
 		Language:              agent.Language,

@@ -140,12 +140,21 @@ func validateIDs(organizationID, agentID uuid.UUID) error {
 	return nil
 }
 
+const legacyEngineIntegrated = "integrated"
+
 func normalizeEngine(value string) (string, error) {
-	value = strings.TrimSpace(value)
-	if value != EngineComposable && value != EngineIntegrated {
-		return "", apperror.NewBadRequest("engine must be composable or integrated")
+	value = canonicalEngine(strings.TrimSpace(value))
+	if value != EngineComposable && value != EngineRealtime {
+		return "", apperror.NewBadRequest("engine must be composable or realtime")
 	}
 	return value, nil
+}
+
+func canonicalEngine(value string) string {
+	if value == legacyEngineIntegrated {
+		return EngineRealtime
+	}
+	return value
 }
 
 func normalizeRequired(value, field string, max int) (string, error) {

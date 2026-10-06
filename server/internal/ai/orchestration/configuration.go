@@ -7,6 +7,8 @@ import (
 	"github.com/coffeyvidzro/monogo/internal/media/session"
 )
 
+const legacySnapshotEngineIntegrated session.Engine = "integrated"
+
 type configurationSnapshot struct {
 	Engine             session.Engine  `json:"engine"`
 	Instructions       string          `json:"instructions"`
@@ -20,7 +22,7 @@ type configurationSnapshot struct {
 }
 
 func MediaConfig(agent sqlc.VoiceAgent, config session.Config) session.Config {
-	config.Engine = session.Engine(agent.Engine)
+	config.Engine = normalizeSessionEngine(session.Engine(agent.Engine))
 	config.Instructions = agent.Instructions
 	config.EngineConfig = json.RawMessage(append([]byte(nil), agent.EngineConfig...))
 	if agent.Voice != nil {
@@ -37,7 +39,7 @@ func MediaConfigFromSession(record sqlc.VoiceAgentSession, config session.Config
 	if err := json.Unmarshal(record.ConfigurationSnapshot, &snapshot); err != nil {
 		return config
 	}
-	config.Engine = snapshot.Engine
+	config.Engine = normalizeSessionEngine(snapshot.Engine)
 	config.Instructions = snapshot.Instructions
 	config.EngineConfig = append(json.RawMessage(nil), snapshot.EngineConfig...)
 	if snapshot.Voice != nil {
@@ -49,6 +51,16 @@ func MediaConfigFromSession(record sqlc.VoiceAgentSession, config session.Config
 
 func decodeConfigurationSnapshot(value []byte) (configurationSnapshot, error) {
 	var snapshot configurationSnapshot
-	err := json.Unmarshal(value, &snapshot)
-	return snapshot, err
+	if err := json.Unmarshal(value, &snapshot); err != nil {
+		return configurationSnapshot{}, err
+	}
+	snapshot.Engine = normalizeSessionEngine(snapshot.Engine)
+	return snapshot, nil
+}
+
+func normalizeSessionEngine(engine session.Engine) session.Engine {
+	if engine == legacySnapshotEngineIntegrated {
+		return session.EngineRealtime
+	}
+	return engine
 }
