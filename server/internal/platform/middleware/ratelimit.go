@@ -2,8 +2,10 @@ package middleware
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -119,4 +121,29 @@ func writeRateLimitHeaders(w http.ResponseWriter, limit limiter.Context) {
 	w.Header().Set("X-RateLimit-Limit", strconv.FormatInt(limit.Limit, 10))
 	w.Header().Set("X-RateLimit-Remaining", strconv.FormatInt(limit.Remaining, 10))
 	w.Header().Set("X-RateLimit-Reset", strconv.FormatInt(limit.Reset, 10))
+}
+
+// HandleAuth limits public authentication endpoints before a principal exists.
+// Use the socket peer; deployments behind a proxy should enforce per-client limits there too.
+func (m *RateLimitMiddleware) HandleAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/v1/auth/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		host, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			host = r.RemoteAddr
+		}
+		budget, err := limiter.New(m.store, limiter.Rate{Period: time.Minute, Limit: 30}).Get(r.Context(), "http:auth:peer:"+host)
+		if err != nil {
+			httputil.Error(w, apperror.NewServiceUnavailable("rate limit service unavailable", err))
+			return
+		}
+		if budget.Reached {
+			writeRateLimitResponse(w, budget, "authentication rate limit exceeded")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
