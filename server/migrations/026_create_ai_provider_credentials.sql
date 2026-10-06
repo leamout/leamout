@@ -77,3 +77,8 @@ CREATE TRIGGER set_voice_agent_provider_bindings_updated_at
 BEFORE UPDATE ON voice_agent_provider_bindings
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER bump_voice_agent_revision_on_provider_binding
+AFTER INSERT OR UPDATE OR DELETE ON voice_agent_provider_bindings
+FOR EACH ROW
+EXECUTE FUNCTION bump_voice_agent_configuration_revision();

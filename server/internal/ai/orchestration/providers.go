@@ -39,7 +39,11 @@ func (s *Service) ProviderRuntimesFromSnapshot(
 	if s.providers == nil {
 		return nil, nil
 	}
-	values, err := s.providers.ResolveSnapshot(ctx, organizationID, snapshot)
+	configuration, err := decodeConfigurationSnapshot(snapshot)
+	if err != nil {
+		return nil, apperror.NewInternal("decode Voice Agent configuration snapshot", err)
+	}
+	values, err := s.providers.ResolveSnapshot(ctx, organizationID, configuration.Providers)
 	if err != nil {
 		return nil, err
 	}
@@ -71,32 +75,24 @@ func (s *Service) ValidateProviderTopology(
 }
 
 func validateProviderTopology(values []session.ProviderRuntime, engine session.Engine) error {
-	roles := make(map[string]string, len(values))
+	roles := make(map[string]struct{}, len(values))
 	for _, value := range values {
-		roles[value.Role] = value.Provider
+		roles[value.Role] = struct{}{}
 	}
 	switch engine {
 	case session.EngineIntegrated:
-		if roles["realtime"] != "openai" {
+		if _, ok := roles["realtime"]; !ok {
 			return apperror.NewBadRequest(
-				"Voice Agent requires an OpenAI realtime provider binding",
+				"Voice Agent requires a realtime provider binding",
 			)
 		}
 	case session.EngineComposable:
-		if roles["stt"] != "deepgram" {
-			return apperror.NewBadRequest(
-				"Voice Agent requires a Deepgram STT provider binding",
-			)
-		}
-		if roles["llm"] != "groq" {
-			return apperror.NewBadRequest(
-				"Voice Agent requires a Groq LLM provider binding",
-			)
-		}
-		if roles["tts"] != "cartesia" {
-			return apperror.NewBadRequest(
-				"Voice Agent requires a Cartesia TTS provider binding",
-			)
+		for _, role := range []string{"stt", "llm", "tts"} {
+			if _, ok := roles[role]; !ok {
+				return apperror.NewBadRequest(
+					"Voice Agent requires an " + role + " provider binding",
+				)
+			}
 		}
 	}
 	return nil

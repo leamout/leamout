@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/coffeyvidzro/monogo/internal/ai/providers"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 )
 
@@ -21,10 +19,7 @@ func (s *Service) Readiness(
 	}
 	report := ReadinessReport{
 		ConfigurationRevision: agent.ConfigurationRevision,
-		ActiveRevision:        agent.ActiveRevision,
 		Engine:                agent.Engine,
-		Preset:                agent.Preset,
-		PresetVersion:         agent.PresetVersion,
 		Bindings:              []BindingDiagnostic{},
 		Issues:                []ReadinessIssue{},
 	}
@@ -33,7 +28,7 @@ func (s *Service) Readiness(
 			"provider_service_unavailable",
 			"bindings",
 			"AI provider readiness is unavailable.",
-			"Restore the AI provider service before activating the agent.",
+			"Restore the AI provider service before starting the agent.",
 		))
 		return report, nil
 	}
@@ -53,7 +48,7 @@ func (s *Service) Readiness(
 			Config:          append([]byte(nil), status.Config...),
 		})
 	}
-	expected := expectedProviders(agent.Engine)
+	expected := expectedRoles(agent.Engine)
 	for _, status := range statuses {
 		if _, ok := expected[status.Role]; !ok {
 			report.Issues = append(report.Issues, readinessIssue(
@@ -70,17 +65,16 @@ func (s *Service) Readiness(
 		providers.RoleLLM,
 		providers.RoleTTS,
 	} {
-		provider, expectedRole := expected[role]
-		if !expectedRole {
+		if _, expectedRole := expected[role]; !expectedRole {
 			continue
 		}
 		status, ok := byRole[role]
-		if !ok || status.Provider != provider {
+		if !ok {
 			report.Issues = append(report.Issues, readinessIssue(
 				"missing_provider_binding",
 				"bindings."+role,
-				fmt.Sprintf("The %s role requires a %s integration.", role, provider),
-				fmt.Sprintf("Connect a ready %s integration to the %s role.", provider, role),
+				fmt.Sprintf("The %s role requires a provider binding.", role),
+				fmt.Sprintf("Connect a ready provider integration to the %s role.", role),
 			))
 			continue
 		}
@@ -88,7 +82,7 @@ func (s *Service) Readiness(
 			report.Issues = append(report.Issues, readinessIssue(
 				"integration_not_ready",
 				"bindings."+role+".integration_id",
-				fmt.Sprintf("The %s integration is not ready.", provider),
+				fmt.Sprintf("The %s integration is not ready.", status.Provider),
 				"Verify or rotate the integration, then run readiness again.",
 			))
 		}
@@ -97,41 +91,16 @@ func (s *Service) Readiness(
 	return report, nil
 }
 
-func (s *Service) Activate(
-	ctx context.Context,
-	organizationID uuid.UUID,
-	agentID uuid.UUID,
-) (sqlc.VoiceAgent, ReadinessReport, error) {
-	report, err := s.Readiness(ctx, organizationID, agentID)
-	if err != nil {
-		return sqlc.VoiceAgent{}, ReadinessReport{}, err
-	}
-	if !report.Ready {
-		return sqlc.VoiceAgent{}, report, apperror.NewConflict(
-			"Voice Agent is not ready for activation",
-		)
-	}
-	agent, err := s.repo.Activate(ctx, organizationID, agentID)
-	if err != nil {
-		return sqlc.VoiceAgent{}, report, writeError(
-			err,
-			"Voice Agent readiness changed during activation",
-		)
-	}
-	report.ActiveRevision = agent.ActiveRevision
-	return agent, report, nil
-}
-
-func expectedProviders(engine string) map[string]string {
+func expectedRoles(engine string) map[string]struct{} {
 	if engine == EngineIntegrated {
-		return map[string]string{
-			providers.RoleRealtime: providers.ProviderOpenAI,
+		return map[string]struct{}{
+			providers.RoleRealtime: {},
 		}
 	}
-	return map[string]string{
-		providers.RoleSTT: providers.ProviderDeepgram,
-		providers.RoleLLM: providers.ProviderGroq,
-		providers.RoleTTS: providers.ProviderCartesia,
+	return map[string]struct{}{
+		providers.RoleSTT: {},
+		providers.RoleLLM: {},
+		providers.RoleTTS: {},
 	}
 }
 

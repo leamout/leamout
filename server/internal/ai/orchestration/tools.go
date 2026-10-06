@@ -41,8 +41,12 @@ func (s *Service) ToolDefinitions(
 }
 
 func ToolDefinitionsFromSnapshot(value []byte) ([]session.ToolDefinition, error) {
+	snapshot, err := decodeConfigurationSnapshot(value)
+	if err != nil {
+		return nil, err
+	}
 	var definitions []session.ToolDefinition
-	if err := json.Unmarshal(value, &definitions); err != nil {
+	if err := json.Unmarshal(snapshot.Tools, &definitions); err != nil {
 		return nil, err
 	}
 	return definitions, nil

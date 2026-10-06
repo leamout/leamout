@@ -49,3 +49,15 @@ CREATE TRIGGER set_voice_agents_updated_at
 BEFORE UPDATE ON voice_agents
 FOR EACH ROW
 EXECUTE FUNCTION set_updated_at();
+
+CREATE FUNCTION bump_voice_agent_configuration_revision()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE voice_agents
+    SET configuration_revision = configuration_revision + 1,
+        updated_at = now()
+    WHERE id = COALESCE(NEW.voice_agent_id, OLD.voice_agent_id)
+      AND organization_id = COALESCE(NEW.organization_id, OLD.organization_id);
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
