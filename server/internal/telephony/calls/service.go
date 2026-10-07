@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
-	"github.com/coffeyvidzro/monogo/internal/telephony/routing"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/telephony/routing"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {

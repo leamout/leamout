@@ -3,16 +3,16 @@ package telephony
 import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/platform/metrics"
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
-	"github.com/coffeyvidzro/monogo/internal/telephony/calls"
-	"github.com/coffeyvidzro/monogo/internal/telephony/numbers"
-	"github.com/coffeyvidzro/monogo/internal/telephony/recordings"
-	"github.com/coffeyvidzro/monogo/internal/telephony/routing"
-	"github.com/coffeyvidzro/monogo/internal/telephony/trunks"
-	"github.com/coffeyvidzro/monogo/internal/telephony/webrtc"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/metrics"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/security/encryption"
+	"github.com/leamout/leamout/server/internal/telephony/calls"
+	"github.com/leamout/leamout/server/internal/telephony/numbers"
+	"github.com/leamout/leamout/server/internal/telephony/recordings"
+	"github.com/leamout/leamout/server/internal/telephony/routing"
+	"github.com/leamout/leamout/server/internal/telephony/trunks"
+	"github.com/leamout/leamout/server/internal/telephony/webrtc"
 )
 
 type Dependencies struct {

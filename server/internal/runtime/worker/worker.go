@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/coffeyvidzro/monogo/internal/platform/config"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/platform/config"
+	"github.com/leamout/leamout/server/internal/platform/logging"
 )
 
 func Run(ctx context.Context) error {

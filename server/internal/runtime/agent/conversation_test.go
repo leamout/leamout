@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestConversationStatePersistsFinalTurnsAndSummary(t *testing.T) {

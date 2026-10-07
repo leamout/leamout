@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/security/encryption"
 )
 
 type deliveryRepository interface {

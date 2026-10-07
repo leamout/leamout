@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 const maxResponseBody = 4096

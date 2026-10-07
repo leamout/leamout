@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/runtime/medianodes"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/runtime/medianodes"
 )
 
 func (r *Runtime) createMediaSession(

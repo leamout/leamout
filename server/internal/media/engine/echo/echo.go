@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 type Engine struct {

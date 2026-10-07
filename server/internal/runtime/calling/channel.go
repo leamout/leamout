@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	redisintegration "github.com/coffeyvidzro/monogo/internal/integrations/redis"
-	"github.com/coffeyvidzro/monogo/internal/telephony/routing"
 	"github.com/google/uuid"
+	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
+	"github.com/leamout/leamout/server/internal/telephony/routing"
 	redisv9 "github.com/redis/go-redis/v9"
 )
 

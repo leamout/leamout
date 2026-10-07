@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestMediaClientCreatesAndStopsSession(t *testing.T) {

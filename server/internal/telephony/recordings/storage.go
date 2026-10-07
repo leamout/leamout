@@ -7,11 +7,11 @@ import (
 	"io"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	s3integration "github.com/coffeyvidzro/monogo/internal/integrations/s3"
-	platformstorage "github.com/coffeyvidzro/monogo/internal/platform/storage"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	s3integration "github.com/leamout/leamout/server/internal/integrations/s3"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 )
 
 type ObjectStore interface {

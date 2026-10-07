@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	agentcontract "github.com/leamout/contracts/agent"
 	"github.com/leamout/contracts/ai"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 )
 
 type Package struct {

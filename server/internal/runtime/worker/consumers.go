@@ -8,9 +8,9 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/coffeyvidzro/monogo/internal/integrations/freeswitch"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
+	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
 )
 
 var freeSWITCHLifecycleEvents = append(

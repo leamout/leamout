@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 type HealthCheckConfig struct {

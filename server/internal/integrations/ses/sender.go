@@ -7,7 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
-	"github.com/coffeyvidzro/monogo/internal/platform/email"
+	"github.com/leamout/leamout/server/internal/platform/email"
 )
 
 type API interface {

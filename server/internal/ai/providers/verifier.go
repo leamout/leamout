@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 )
 
 type Verifier struct {

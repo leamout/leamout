@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
-	"github.com/coffeyvidzro/monogo/pkg/httputil"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
 type principalKey struct{}

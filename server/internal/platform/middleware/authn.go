@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/internal/security/authn"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
-	"github.com/coffeyvidzro/monogo/pkg/httputil"
+	"github.com/leamout/leamout/server/internal/security/authn"
+	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
 type AuthnMiddleware struct {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestEngineCopiesAudio(t *testing.T) {

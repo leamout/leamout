@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 // DefaultStagingPath is the shared FreeSWITCH/worker recording volume.

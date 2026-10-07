@@ -1,4 +1,4 @@
-module github.com/coffeyvidzro/monogo
+module github.com/leamout/leamout/server
 
 go 1.26.6
 

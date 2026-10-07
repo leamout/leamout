@@ -5,11 +5,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/coffeyvidzro/monogo/internal/telephony/calls"
-	"github.com/coffeyvidzro/monogo/internal/telephony/numbers"
-	"github.com/coffeyvidzro/monogo/internal/telephony/recordings"
-	"github.com/coffeyvidzro/monogo/internal/telephony/trunks"
-	"github.com/coffeyvidzro/monogo/internal/telephony/webrtc"
+	"github.com/leamout/leamout/server/internal/telephony/calls"
+	"github.com/leamout/leamout/server/internal/telephony/numbers"
+	"github.com/leamout/leamout/server/internal/telephony/recordings"
+	"github.com/leamout/leamout/server/internal/telephony/trunks"
+	"github.com/leamout/leamout/server/internal/telephony/webrtc"
 )
 
 func RegisterRoutes(

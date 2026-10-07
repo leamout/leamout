@@ -1,6 +1,6 @@
 package retention
 
-import "github.com/coffeyvidzro/monogo/pkg/apperror"
+import "github.com/leamout/leamout/server/pkg/apperror"
 
 func validateResource(resource string) error {
 	switch resource {

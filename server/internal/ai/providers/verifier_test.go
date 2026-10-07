@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/leamout/contracts/ai"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 )
 
 func TestVerifierUsesCatalogCredentialVerifier(t *testing.T) {

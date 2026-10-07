@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/integrations/freeswitch"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 )
 
 func TestTranslateFreeSWITCHEventKeepsCallAndChannelIdentitySeparate(t *testing.T) {

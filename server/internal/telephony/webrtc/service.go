@@ -8,8 +8,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/integrations/coturn"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/integrations/coturn"
 )
 
 // ErrIssueRateLimited indicates that an organization exhausted its shared

@@ -10,8 +10,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 const maxMediaControlResponse = 64 << 10

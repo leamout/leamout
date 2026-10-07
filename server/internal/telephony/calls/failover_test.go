@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
-	"github.com/coffeyvidzro/monogo/internal/telephony/routing"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/telephony/routing"
 )
 
 func TestSIPFailoverAcceptancePrimarySecondaryTertiary(t *testing.T) {

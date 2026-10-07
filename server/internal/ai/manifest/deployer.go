@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/agents"
-	"github.com/coffeyvidzro/monogo/internal/ai/tools"
 	"github.com/google/uuid"
 	agentcontract "github.com/leamout/contracts/agent"
+	"github.com/leamout/leamout/server/internal/ai/agents"
+	"github.com/leamout/leamout/server/internal/ai/tools"
 )
 
 type DeploymentInput struct {

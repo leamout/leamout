@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {

@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
-	runtimemedia "github.com/coffeyvidzro/monogo/internal/runtime/media"
+	"github.com/leamout/leamout/server/internal/platform/logging"
+	runtimemedia "github.com/leamout/leamout/server/internal/runtime/media"
 )
 
 func main() {

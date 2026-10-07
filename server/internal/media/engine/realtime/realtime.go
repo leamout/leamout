@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/leamout/contracts/ai"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 type Engine struct {

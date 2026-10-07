@@ -16,14 +16,14 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coffeyvidzro/monogo/internal/ai"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/integrations/freeswitch"
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/leamout/leamout/server/internal/ai"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
 )
 
 const testMediaControlToken = "0123456789abcdef0123456789abcdef"

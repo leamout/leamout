@@ -3,7 +3,7 @@ package entitlements
 import (
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func (c Capability) IsValid() bool {

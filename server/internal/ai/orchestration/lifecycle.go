@@ -5,10 +5,10 @@ import (
 	"errors"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/conversations"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 // AttachCall resolves the Voice Agent attached to a call and creates the durable AI session snapshot. Replays return the

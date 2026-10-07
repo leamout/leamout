@@ -5,10 +5,10 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) error {

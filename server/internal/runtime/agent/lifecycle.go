@@ -8,13 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/conversations"
-	"github.com/coffeyvidzro/monogo/internal/ai/orchestration"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/integrations/freeswitch"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/ai/orchestration"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
 )
 
 const voiceAgentSessionVariable = "leamout_voice_agent_session_id"

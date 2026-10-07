@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/platform/email"
-	"github.com/coffeyvidzro/monogo/internal/security/otp"
-	"github.com/coffeyvidzro/monogo/internal/security/password"
-	"github.com/coffeyvidzro/monogo/internal/security/token"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/email"
+	"github.com/leamout/leamout/server/internal/security/otp"
+	"github.com/leamout/leamout/server/internal/security/password"
+	"github.com/leamout/leamout/server/internal/security/token"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/integrations/coturn"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/integrations/coturn"
 )
 
 type fakeIssueLimiter struct {

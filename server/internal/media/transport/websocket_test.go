@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coffeyvidzro/monogo/internal/media/engine/echo"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/engine/echo"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestWebSocketConnectionReceivesAudioForkGoodbye(t *testing.T) {
