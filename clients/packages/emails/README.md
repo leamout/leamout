@@ -46,6 +46,6 @@ credentials, transcripts, or API key secrets.
 `Data.ExpiresAt` is the expiry shown only by OTP and invitation templates. API key expiry uses `Data.KeyExpiresAt`, and
 security/failure notifications use `Data.OccurredAt` for the event timestamp.
 
-Invitation links use `https://DOMAIN/invitations/accept`; host the console at
-that domain and expose the Go API at `https://api.DOMAIN`. Local console
-development uses the API at `http://localhost:8080`.
+Invitation emails currently target `https://DOMAIN/invitations/accept`. The
+backend acceptance endpoint is implemented; the frontend acceptance page is
+deferred, so the emailed link does not yet provide a complete user flow.

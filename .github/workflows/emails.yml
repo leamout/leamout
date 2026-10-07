@@ -11,7 +11,6 @@ on:
       - "server/internal/platform/email/**"
       - "server/internal/identity/auth/**"
       - "server/internal/tenancy/invitations/**"
-      - "clients/apps/console/app/invitations/**"
       - ".github/workflows/emails.yml"
   push:
     branches: [main]
@@ -23,7 +22,6 @@ on:
       - "server/internal/platform/email/**"
       - "server/internal/identity/auth/**"
       - "server/internal/tenancy/invitations/**"
-      - "clients/apps/console/app/invitations/**"
       - ".github/workflows/emails.yml"
 
 permissions:
@@ -61,9 +59,6 @@ jobs:
       - name: Typecheck email sources
         working-directory: clients
         run: bun run --filter @leamout/emails typecheck
-      - name: Typecheck invitation page
-        working-directory: clients
-        run: bun x tsc --noEmit -p apps/console/tsconfig.json
       - name: Check generated templates
         working-directory: clients
         run: bun run emails:check
