@@ -15,7 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
-	github.com/leamout/ai-providers v0.0.0-20261007002951-dc91b2b86004
+	github.com/leamout/ai-providers v0.0.0-20261007050358-aa07dfa62a41
 	github.com/leamout/contracts v0.0.0-20261007002923-0c7d2569490f
 	github.com/minio/minio-go/v7 v7.3.0
 	github.com/nats-io/nats.go v1.54.0
