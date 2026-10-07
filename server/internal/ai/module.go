@@ -1,14 +1,14 @@
 package ai
 
 import (
-	"github.com/coffeyvidzro/monogo/internal/ai/agents"
-	"github.com/coffeyvidzro/monogo/internal/ai/conversations"
-	"github.com/coffeyvidzro/monogo/internal/ai/orchestration"
-	"github.com/coffeyvidzro/monogo/internal/ai/providers"
-	"github.com/coffeyvidzro/monogo/internal/ai/tools"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
-	"github.com/coffeyvidzro/monogo/internal/telephony/calls"
+	"github.com/leamout/leamout/server/internal/ai/agents"
+	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/ai/orchestration"
+	"github.com/leamout/leamout/server/internal/ai/providers"
+	"github.com/leamout/leamout/server/internal/ai/tools"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/security/encryption"
+	"github.com/leamout/leamout/server/internal/telephony/calls"
 )
 
 type Dependencies struct {

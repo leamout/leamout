@@ -3,10 +3,10 @@ package ai
 import (
 	"net/http"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/agents"
-	"github.com/coffeyvidzro/monogo/internal/ai/providers"
-	"github.com/coffeyvidzro/monogo/internal/ai/tools"
 	"github.com/go-chi/chi/v5"
+	"github.com/leamout/leamout/server/internal/ai/agents"
+	"github.com/leamout/leamout/server/internal/ai/providers"
+	"github.com/leamout/leamout/server/internal/ai/tools"
 )
 
 func RegisterRoutes(router chi.Router, module *Module, organizationAccess func(string) func(http.Handler) http.Handler) {

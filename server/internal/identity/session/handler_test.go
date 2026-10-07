@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/security/authn"
+	"github.com/leamout/leamout/server/internal/security/authn"
 )
 
 func TestSetCookieIsHostOnlyInDevelopment(t *testing.T) {

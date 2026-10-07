@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/platform/email"
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/email"
+	"github.com/leamout/leamout/server/internal/security/encryption"
 )
 
 func testEmailDatabase(t *testing.T) (*pgxpool.Pool, *encryption.Cipher) {

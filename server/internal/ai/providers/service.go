@@ -7,13 +7,13 @@ import (
 	"fmt"
 	"strings"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/leamout/contracts/ai"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
+	"github.com/leamout/leamout/server/internal/security/encryption"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {

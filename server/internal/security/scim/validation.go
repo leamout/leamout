@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func normalizeCreateToken(req CreateTokenRequest, now time.Time) (CreateTokenRequest, error) {

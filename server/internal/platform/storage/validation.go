@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func normalizeCreate(req *CreateRequest) error {

@@ -5,7 +5,7 @@ package transport
 import (
 	"context"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 // Acceptor accepts authenticated media connections from FreeSWITCH.

@@ -3,10 +3,10 @@ package organization
 import (
 	"context"
 
-	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 const (

@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"time"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
-	"github.com/coffeyvidzro/monogo/internal/media/engine/composable"
-	"github.com/coffeyvidzro/monogo/internal/media/engine/echo"
-	"github.com/coffeyvidzro/monogo/internal/media/engine/realtime"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/media/transport"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
+	"github.com/leamout/leamout/server/internal/media/engine/composable"
+	"github.com/leamout/leamout/server/internal/media/engine/echo"
+	"github.com/leamout/leamout/server/internal/media/engine/realtime"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/transport"
+	"github.com/leamout/leamout/server/internal/platform/logging"
 )
 
 func Run(ctx context.Context) error {

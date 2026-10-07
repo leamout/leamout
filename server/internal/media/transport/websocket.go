@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/platform/logging"
 )
 
 type Attacher interface {

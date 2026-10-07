@@ -3,8 +3,8 @@ package orchestration
 import (
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestMediaConfigFromSessionNormalizesLegacyEngineSnapshot(t *testing.T) {

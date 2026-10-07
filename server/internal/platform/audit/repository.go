@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 type Repository struct {

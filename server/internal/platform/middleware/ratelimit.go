@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/ulule/limiter/v3"
 
-	"github.com/coffeyvidzro/monogo/internal/security/authn"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
-	"github.com/coffeyvidzro/monogo/pkg/httputil"
+	"github.com/leamout/leamout/server/internal/security/authn"
+	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
 // RateLimitMiddleware enforces shared organization and credential request

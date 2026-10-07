@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Principal struct {

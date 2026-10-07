@@ -5,6 +5,7 @@ import (
 	"github.com/leamout/ai-providers/cartesia"
 	"github.com/leamout/ai-providers/deepgram"
 	"github.com/leamout/ai-providers/elevenlabs"
+	"github.com/leamout/ai-providers/gemini"
 	"github.com/leamout/ai-providers/groq"
 	"github.com/leamout/ai-providers/openai"
 )
@@ -19,5 +20,6 @@ func Builtins() (*Catalog, error) {
 		openai.RealtimeProvider{},
 		cartesia.Provider{},
 		elevenlabs.Provider{},
+		gemini.RealtimeProvider{},
 	)
 }

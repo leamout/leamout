@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/coffeyvidzro/monogo/internal/database/pgconv"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func FormatTime(value pgtype.Timestamptz) string {

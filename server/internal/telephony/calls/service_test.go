@@ -3,9 +3,9 @@ package calls
 import (
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
 )
 
 func TestAdmissionFailureReason(t *testing.T) {

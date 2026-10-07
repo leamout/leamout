@@ -8,9 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/coffeyvidzro/monogo/internal/security/authn"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
-	"github.com/coffeyvidzro/monogo/pkg/httputil"
+	"github.com/leamout/leamout/server/internal/security/authn"
+	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
 type Handler struct {

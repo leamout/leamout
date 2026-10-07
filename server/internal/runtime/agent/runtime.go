@@ -6,10 +6,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/orchestration"
-	"github.com/coffeyvidzro/monogo/internal/integrations/freeswitch"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
-	"github.com/coffeyvidzro/monogo/internal/runtime/medianodes"
+	"github.com/leamout/leamout/server/internal/ai/orchestration"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
+	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/runtime/medianodes"
 )
 
 type Runtime struct {

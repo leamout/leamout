@@ -4,7 +4,7 @@ import (
 	"net/netip"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func validateCreate(req CreateRequest) (CreateRequest, netip.Prefix, error) {

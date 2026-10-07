@@ -14,9 +14,9 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/media/transport"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/transport"
 )
 
 type handler struct {

@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	s3integration "github.com/coffeyvidzro/monogo/internal/integrations/s3"
-	"github.com/coffeyvidzro/monogo/internal/security/encryption"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	s3integration "github.com/leamout/leamout/server/internal/integrations/s3"
+	"github.com/leamout/leamout/server/internal/security/encryption"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {

@@ -1,9 +1,7 @@
-# Monogo
+# Leamout
 
 **Leamout is a carrier-grade platform for autonomous voice agents. Run it
 yourself or use Leamout Cloud.**
-
-Monogo is the core runtime implementation behind Leamout.
 
 Leamout sits between customer-owned telephony infrastructure and realtime AI
 systems. It owns the runtime required to establish, control, process, and

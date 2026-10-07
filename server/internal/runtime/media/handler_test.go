@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/media/engine/echo"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/media/transport"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/engine/echo"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/transport"
 )
 
 func TestHandlerCreatesAuthenticatedSessionAndUpdatesReadiness(t *testing.T) {

@@ -5,10 +5,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	redisintegration "github.com/coffeyvidzro/monogo/internal/integrations/redis"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
-	"github.com/coffeyvidzro/monogo/internal/runtime/medianodes"
+	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/runtime/medianodes"
 )
 
 const mediaNodeHeartbeatInterval = 5 * time.Second

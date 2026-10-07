@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	aicatalog "github.com/coffeyvidzro/monogo/internal/ai/catalog"
 	"github.com/google/uuid"
+	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 )
 
 func TestCredentialResponseNeverSerializesSecretMaterial(t *testing.T) {

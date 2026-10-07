@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/coffeyvidzro/monogo/internal/ai/conversations"
-	"github.com/coffeyvidzro/monogo/internal/ai/tools"
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/ai/tools"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 type mediaControl struct {

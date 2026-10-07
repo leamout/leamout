@@ -4,8 +4,8 @@ import (
 	"context"
 	"net/netip"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct{ repo *Repository }

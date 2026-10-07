@@ -82,10 +82,10 @@ github.com/klauspost/cpuid/v2 v2.4.0 h1:S6Hrbc7+ywsr0r+RLapfGBHfyefhCTwEh3A0tV91
 github.com/klauspost/cpuid/v2 v2.4.0/go.mod h1:19jmZ9mjzoF//ddRSUsv0zfBTJWh3QJh9FNxZTMrGxU=
 github.com/klauspost/crc32 v1.3.0 h1:sSmTt3gUt81RP655XGZPElI0PelVTZ6YwCRnPSupoFM=
 github.com/klauspost/crc32 v1.3.0/go.mod h1:D7kQaZhnkX/Y0tstFGf8VUzv2UofNGqCjnC3zdHB0Hw=
-github.com/leamout/ai-providers v0.0.0-20261006075251-53d5eabe6adc h1:BTqLlwWJJ7RefuWdV5rhstmEPWs6i3QFUCSMETTl9YM=
-github.com/leamout/ai-providers v0.0.0-20261006075251-53d5eabe6adc/go.mod h1:EQmDruaIOaBZ//z8Njiy4AxPShQ/Egr2EJOoT9E4WoU=
-github.com/leamout/contracts v0.0.0-20261005140544-dd4407421e49 h1:GR2xpK1xj4wExLfCKj4fNaDbA3AgK8Lju1E4bMeaCmI=
-github.com/leamout/contracts v0.0.0-20261005140544-dd4407421e49/go.mod h1:UMu3d57bCEkimVHB17CD6M6CbXPK9oKzhwxBkT0t+aI=
+github.com/leamout/ai-providers v0.1.0 h1:RaNAF9ib1if8bhJNlISTOjswhlTCMO7FA7aXhreoWUY=
+github.com/leamout/ai-providers v0.1.0/go.mod h1:EQmDruaIOaBZ//z8Njiy4AxPShQ/Egr2EJOoT9E4WoU=
+github.com/leamout/contracts v0.1.0 h1:BbHY3VFUu9GDl0vHf/zFWdOn1CCTopjXosYlZXrvVSQ=
+github.com/leamout/contracts v0.1.0/go.mod h1:UMu3d57bCEkimVHB17CD6M6CbXPK9oKzhwxBkT0t+aI=
 github.com/minio/crc64nvme v1.1.1 h1:8dwx/Pz49suywbO+auHCBpCtlW1OfpcLN7wYgVR6wAI=
 github.com/minio/crc64nvme v1.1.1/go.mod h1:eVfm2fAzLlxMdUGc0EEBGSMmPwmXD5XiNRpnu9J3bvg=
 github.com/minio/md5-simd v1.1.2 h1:Gdi1DZK69+ZVMoNHRXJyNcxrMA4dSxoYHZSQbirFg34=

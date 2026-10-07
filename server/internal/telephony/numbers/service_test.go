@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func TestNormalizeBYOC(t *testing.T) {

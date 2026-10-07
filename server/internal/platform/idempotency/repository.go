@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 type Repository struct{ queries *sqlc.Queries }

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {

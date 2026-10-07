@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestValidateProviderTopologyReportsMissingBinding(t *testing.T) {

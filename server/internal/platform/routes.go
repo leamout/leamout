@@ -5,13 +5,13 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/coffeyvidzro/monogo/internal/platform/audit"
-	"github.com/coffeyvidzro/monogo/internal/platform/entitlements"
-	"github.com/coffeyvidzro/monogo/internal/platform/networking"
-	"github.com/coffeyvidzro/monogo/internal/platform/retention"
-	"github.com/coffeyvidzro/monogo/internal/platform/storage"
-	"github.com/coffeyvidzro/monogo/internal/platform/webhooks"
-	"github.com/coffeyvidzro/monogo/internal/security/scim"
+	"github.com/leamout/leamout/server/internal/platform/audit"
+	"github.com/leamout/leamout/server/internal/platform/entitlements"
+	"github.com/leamout/leamout/server/internal/platform/networking"
+	"github.com/leamout/leamout/server/internal/platform/retention"
+	"github.com/leamout/leamout/server/internal/platform/storage"
+	"github.com/leamout/leamout/server/internal/platform/webhooks"
+	"github.com/leamout/leamout/server/internal/security/scim"
 )
 
 func RegisterRoutes(

@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/coffeyvidzro/monogo/internal/platform/metrics"
+	"github.com/leamout/leamout/server/internal/platform/metrics"
 )
 
 // Metrics records process-level HTTP request and error counters.

@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/conversations"
-	"github.com/coffeyvidzro/monogo/internal/media/session"
+	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 type conversationState struct {

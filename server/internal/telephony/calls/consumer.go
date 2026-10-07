@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
 )
 
 type Consumer struct {

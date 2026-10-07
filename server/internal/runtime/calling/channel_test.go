@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/telephony/routing"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/telephony/routing"
 )
 
 func TestChannelKey(t *testing.T) {

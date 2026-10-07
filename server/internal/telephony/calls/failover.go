@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/coffeyvidzro/monogo/internal/runtime/calling"
-	"github.com/coffeyvidzro/monogo/internal/telephony/routing"
+	"github.com/leamout/leamout/server/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/telephony/routing"
 )
 
 const maxOutboundAttempts = 3

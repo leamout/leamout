@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func normalizeCreate(req CreateRequest) (CreateRequest, error) {

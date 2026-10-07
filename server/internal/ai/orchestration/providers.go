@@ -3,9 +3,9 @@ package orchestration
 import (
 	"context"
 
-	"github.com/coffeyvidzro/monogo/internal/media/session"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/media/session"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func (s *Service) ProviderRuntimes(

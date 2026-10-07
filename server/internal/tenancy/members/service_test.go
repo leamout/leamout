@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 type stubRepository struct {

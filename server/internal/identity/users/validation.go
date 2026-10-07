@@ -3,7 +3,7 @@ package users
 import (
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func validateUpdateProfileRequest(req UpdateProfileRequest) error {

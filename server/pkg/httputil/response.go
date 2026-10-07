@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 // Response is the standard JSON envelope for API responses.

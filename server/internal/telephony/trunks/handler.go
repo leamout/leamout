@@ -3,12 +3,12 @@ package trunks
 import (
 	"net/http"
 
-	"github.com/coffeyvidzro/monogo/internal/platform/middleware"
-	"github.com/coffeyvidzro/monogo/pkg/apperror"
-	"github.com/coffeyvidzro/monogo/pkg/helper"
-	"github.com/coffeyvidzro/monogo/pkg/httputil"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/platform/middleware"
+	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/helper"
+	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
 type Handler struct {

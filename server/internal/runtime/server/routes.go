@@ -5,15 +5,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/coffeyvidzro/monogo/internal/ai"
-	"github.com/coffeyvidzro/monogo/internal/identity"
-	"github.com/coffeyvidzro/monogo/internal/platform"
-	"github.com/coffeyvidzro/monogo/internal/platform/config"
-	"github.com/coffeyvidzro/monogo/internal/platform/logging"
-	"github.com/coffeyvidzro/monogo/internal/platform/metrics"
-	"github.com/coffeyvidzro/monogo/internal/platform/middleware"
-	"github.com/coffeyvidzro/monogo/internal/telephony"
-	"github.com/coffeyvidzro/monogo/internal/tenancy"
+	"github.com/leamout/leamout/server/internal/ai"
+	"github.com/leamout/leamout/server/internal/identity"
+	"github.com/leamout/leamout/server/internal/platform"
+	"github.com/leamout/leamout/server/internal/platform/config"
+	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/platform/metrics"
+	"github.com/leamout/leamout/server/internal/platform/middleware"
+	"github.com/leamout/leamout/server/internal/telephony"
+	"github.com/leamout/leamout/server/internal/tenancy"
 )
 
 func newRouter(cfg config.Config, logger *logging.Logger, modules *modules) *chi.Mux {

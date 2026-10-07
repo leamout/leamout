@@ -3,8 +3,8 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/coffeyvidzro/monogo/internal/security/authn"
-	"github.com/coffeyvidzro/monogo/internal/security/authz"
+	"github.com/leamout/leamout/server/internal/security/authn"
+	"github.com/leamout/leamout/server/internal/security/authz"
 )
 
 // RequirePermission returns middleware that requires an authenticated

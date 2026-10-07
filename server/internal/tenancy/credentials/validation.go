@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/coffeyvidzro/monogo/internal/security/authz"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/security/authz"
 )
 
 const (

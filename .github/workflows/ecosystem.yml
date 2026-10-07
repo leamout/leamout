@@ -1,0 +1,72 @@
+name: Ecosystem compatibility
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/go.mod"
+      - "server/internal/ai/**"
+      - ".github/workflows/ecosystem.yml"
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Leamout
+        uses: actions/checkout@v4
+        with:
+          path: leamout
+
+      - name: Checkout contracts
+        uses: actions/checkout@v4
+        with:
+          repository: leamout/contracts
+          path: contracts
+
+      - name: Checkout AI providers
+        uses: actions/checkout@v4
+        with:
+          repository: leamout/ai-providers
+          path: ai-providers
+
+      - name: Checkout agents
+        uses: actions/checkout@v4
+        with:
+          repository: leamout/agents
+          path: agents
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: leamout/server/go.mod
+          cache: false
+
+      - name: Validate contracts
+        working-directory: contracts
+        run: go test ./...
+
+      - name: Validate providers against contracts
+        working-directory: ai-providers
+        run: |
+          go mod edit -replace github.com/leamout/contracts=../contracts
+          go test ./...
+
+      - name: Validate runtime AI boundaries
+        working-directory: leamout/server
+        run: |
+          go mod edit -replace github.com/leamout/contracts=../../contracts
+          go mod edit -replace github.com/leamout/ai-providers=../../ai-providers
+          go test ./internal/ai/catalog ./internal/ai/manifest
+
+      - name: Validate agent catalog
+        working-directory: agents
+        run: |
+          go mod edit -replace github.com/leamout/contracts=../contracts
+          go mod edit -replace github.com/leamout/ai-providers=../ai-providers
+          go run ./cmd/validate

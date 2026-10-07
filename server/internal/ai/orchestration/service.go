@@ -2,10 +2,10 @@
 package orchestration
 
 import (
-	"github.com/coffeyvidzro/monogo/internal/ai/agents"
-	"github.com/coffeyvidzro/monogo/internal/ai/conversations"
-	"github.com/coffeyvidzro/monogo/internal/ai/providers"
-	"github.com/coffeyvidzro/monogo/internal/ai/tools"
+	"github.com/leamout/leamout/server/internal/ai/agents"
+	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/ai/providers"
+	"github.com/leamout/leamout/server/internal/ai/tools"
 )
 
 type Service struct {

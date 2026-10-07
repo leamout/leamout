@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/coffeyvidzro/monogo/internal/ai/providers"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/ai/providers"
 )
 
 func (s *Service) Readiness(
