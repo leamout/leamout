@@ -15,7 +15,7 @@ func TestBuiltins(t *testing.T) {
 	assertProviderIDs(t, catalog.List(ai.KindSTT), []string{"assemblyai", "deepgram"})
 	assertProviderIDs(t, catalog.List(ai.KindLLM), []string{"groq", "openai"})
 	assertProviderIDs(t, catalog.List(ai.KindTTS), []string{"cartesia", "elevenlabs"})
-	assertProviderIDs(t, catalog.List(ai.KindRealtime), []string{"openai"})
+	assertProviderIDs(t, catalog.List(ai.KindRealtime), []string{"gemini", "openai"})
 
 	if _, ok := catalog.STT("deepgram"); !ok {
 		t.Fatal("deepgram STT provider is not registered")
@@ -38,8 +38,11 @@ func TestBuiltins(t *testing.T) {
 	if _, ok := catalog.Realtime("openai"); !ok {
 		t.Fatal("openai realtime provider is not registered")
 	}
+	if _, ok := catalog.Realtime("gemini"); !ok {
+		t.Fatal("gemini realtime provider is not registered")
+	}
 
-	if !catalog.Has("assemblyai") || !catalog.Has("elevenlabs") {
+	if !catalog.Has("assemblyai") || !catalog.Has("elevenlabs") || !catalog.Has("gemini") {
 		t.Fatal("catalog Has() does not include all built-in providers")
 	}
 	if catalog.Has("missing") {
