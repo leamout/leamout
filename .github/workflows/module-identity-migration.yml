@@ -1,0 +1,71 @@
+name: One-shot Leamout module identity migration
+
+on:
+  push:
+    branches:
+      - feat/ecosystem-sync-v1
+    paths:
+      - ".github/workflows/module-identity-migration.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/ecosystem-sync-v1
+
+      - name: Rewrite module identity
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          old = "github.com/coffeyvidzro/monogo"
+          new = "github.com/leamout/leamout/server"
+
+          for path in Path("server").rglob("*"):
+              if not path.is_file():
+                  continue
+              if path.suffix not in {".go", ".mod", ".sum"}:
+                  continue
+              try:
+                  value = path.read_text()
+              except UnicodeDecodeError:
+                  continue
+              if old not in value:
+                  continue
+              path.write_text(value.replace(old, new))
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("README.md")
+          value = path.read_text()
+          value = value.replace("# Monogo", "# Leamout", 1)
+          value = value.replace(
+              "Monogo is the core runtime implementation behind Leamout.\n\n",
+              "",
+              1,
+          )
+          path.write_text(value)
+          PY
+
+          rm .github/workflows/module-identity-migration.yml
+          gofmt -w $(find server -name '*.go' -type f)
+
+      - name: Commit migration
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "refactor: migrate module identity to leamout"
+          git push origin HEAD:feat/ecosystem-sync-v1
