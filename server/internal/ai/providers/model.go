@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leamout/contracts/ai"
 )
 
 const (
@@ -15,10 +16,10 @@ const (
 	ProviderCartesia   = "cartesia"
 	ProviderElevenLabs = "elevenlabs"
 
-	RoleRealtime = "realtime"
-	RoleSTT      = "stt"
-	RoleLLM      = "llm"
-	RoleTTS      = "tts"
+	RoleRealtime = string(ai.KindRealtime)
+	RoleSTT      = string(ai.KindSTT)
+	RoleLLM      = string(ai.KindLLM)
+	RoleTTS      = string(ai.KindTTS)
 
 	ConnectionUnchecked   = "unchecked"
 	ConnectionReady       = "ready"
