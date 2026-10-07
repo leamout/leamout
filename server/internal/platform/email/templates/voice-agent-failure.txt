@@ -1,0 +1,7 @@
+Voice agent needs attention
+
+The voice agent {{.AgentName}} in {{.Organization}} encountered a terminal runtime failure at {{.OccurredAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}.
+
+Reason: {{.FailureReason}}
+
+Review the affected session and provider configuration before retrying.

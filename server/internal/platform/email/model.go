@@ -23,12 +23,21 @@ type SendError struct {
 func (e *SendError) Error() string { return "email provider: " + e.Code }
 
 type Data struct {
-	Code         string    `json:"code,omitempty"`
-	ExpiresAt    time.Time `json:"expires_at"`
-	Organization string    `json:"organization,omitempty"`
-	Inviter      string    `json:"inviter,omitempty"`
-	Role         string    `json:"role,omitempty"`
-	AcceptURL    string    `json:"accept_url,omitempty"`
+	UserName      string    `json:"user_name,omitempty"`
+	MemberName    string    `json:"member_name,omitempty"`
+	EventName     string    `json:"event_name,omitempty"`
+	OccurredAt    time.Time `json:"occurred_at,omitempty"`
+	KeyName       string    `json:"key_name,omitempty"`
+	KeyExpiresAt  time.Time `json:"key_expires_at,omitempty"`
+	TrunkName     string    `json:"trunk_name,omitempty"`
+	AgentName     string    `json:"agent_name,omitempty"`
+	FailureReason string    `json:"failure_reason,omitempty"`
+	Code          string    `json:"code,omitempty"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	Organization  string    `json:"organization,omitempty"`
+	Inviter       string    `json:"inviter,omitempty"`
+	Role          string    `json:"role,omitempty"`
+	AcceptURL     string    `json:"accept_url,omitempty"`
 }
 type Request struct {
 	To              string

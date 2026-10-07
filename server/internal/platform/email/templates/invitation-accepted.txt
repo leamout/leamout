@@ -1,0 +1,5 @@
+Your invitation was accepted
+
+{{.MemberName}} accepted your invitation and joined {{.Organization}} as {{.Role}}.
+
+You can review their access in your organization’s member settings.

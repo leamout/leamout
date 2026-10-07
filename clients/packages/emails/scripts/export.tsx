@@ -1,12 +1,30 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { pretty, render } from "react-email";
+import APIKeyExpiryEmail from "../emails/api-key-expiry";
 import InvitationEmail from "../emails/invitation";
+import InvitationAcceptedEmail from "../emails/invitation-accepted";
 import OTPEmail from "../emails/otp";
+import SecurityAlertEmail from "../emails/security-alert";
+import SIPTrunkFailureEmail from "../emails/sip-trunk-failure";
+import VoiceAgentFailureEmail from "../emails/voice-agent-failure";
+import WelcomeEmail from "../emails/welcome";
 
 // Substitute trusted Go actions only after React has escaped and formatted HTML.
 // This preserves date format quotes and placeholders inside link attributes.
 const actions = {
+  LEAMOUT_USER_NAME_TOKEN: "{{.UserName}}",
+  LEAMOUT_MEMBER_NAME_TOKEN: "{{.MemberName}}",
+  LEAMOUT_EVENT_NAME_TOKEN: "{{.EventName}}",
+  LEAMOUT_OCCURRED_AT_TOKEN:
+    '{{.OccurredAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}',
+  LEAMOUT_KEY_NAME_TOKEN: "{{.KeyName}}",
+  LEAMOUT_KEY_EXPIRES_AT_TOKEN:
+    '{{.KeyExpiresAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}',
+  LEAMOUT_TRUNK_NAME_TOKEN: "{{.TrunkName}}",
+  LEAMOUT_AGENT_NAME_TOKEN: "{{.AgentName}}",
+  LEAMOUT_FAILURE_REASON_TOKEN: "{{.FailureReason}}",
+
   LEAMOUT_CODE_TOKEN: "{{.Code}}",
   LEAMOUT_EXPIRY_TOKEN: '{{.ExpiresAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}',
   LEAMOUT_ORGANIZATION_TOKEN: "{{.Organization}}",
@@ -16,6 +34,44 @@ const actions = {
 };
 
 const templates = {
+  welcome: <WelcomeEmail userName="LEAMOUT_USER_NAME_TOKEN" />,
+  "invitation-accepted": (
+    <InvitationAcceptedEmail
+      memberName="LEAMOUT_MEMBER_NAME_TOKEN"
+      organization="LEAMOUT_ORGANIZATION_TOKEN"
+      membershipRole="LEAMOUT_ROLE_TOKEN"
+    />
+  ),
+  "security-alert": (
+    <SecurityAlertEmail
+      eventName="LEAMOUT_EVENT_NAME_TOKEN"
+      occurredAt="LEAMOUT_OCCURRED_AT_TOKEN"
+    />
+  ),
+  "api-key-expiry": (
+    <APIKeyExpiryEmail
+      keyName="LEAMOUT_KEY_NAME_TOKEN"
+      organization="LEAMOUT_ORGANIZATION_TOKEN"
+      keyExpiresAt="LEAMOUT_KEY_EXPIRES_AT_TOKEN"
+    />
+  ),
+  "sip-trunk-failure": (
+    <SIPTrunkFailureEmail
+      trunkName="LEAMOUT_TRUNK_NAME_TOKEN"
+      organization="LEAMOUT_ORGANIZATION_TOKEN"
+      failureReason="LEAMOUT_FAILURE_REASON_TOKEN"
+      occurredAt="LEAMOUT_OCCURRED_AT_TOKEN"
+    />
+  ),
+  "voice-agent-failure": (
+    <VoiceAgentFailureEmail
+      agentName="LEAMOUT_AGENT_NAME_TOKEN"
+      organization="LEAMOUT_ORGANIZATION_TOKEN"
+      failureReason="LEAMOUT_FAILURE_REASON_TOKEN"
+      occurredAt="LEAMOUT_OCCURRED_AT_TOKEN"
+    />
+  ),
+
   otp: <OTPEmail code="LEAMOUT_CODE_TOKEN" expiresAt="LEAMOUT_EXPIRY_TOKEN" />,
   invitation: (
     <InvitationEmail

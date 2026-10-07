@@ -1,0 +1,5 @@
+Account security alert
+
+{{.EventName}} occurred on your Leamout account at {{.OccurredAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}.
+
+If you made this change, no action is needed. If you do not recognize it, secure your account and contact your organization administrator.

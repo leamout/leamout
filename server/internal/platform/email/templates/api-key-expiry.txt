@@ -1,0 +1,7 @@
+Your API key is expiring
+
+The API key {{.KeyName}} for {{.Organization}} expires at {{.KeyExpiresAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}.
+
+Create a replacement key, update the applications using it, and revoke the old key when the transition is complete.
+
+This email never contains your API key secret.

@@ -1,6 +1,6 @@
 # Leamout email templates
 
-React Email owns the HTML layout for OTP and organization invitation emails.
+React Email owns the HTML layout for authentication, onboarding, membership, security, and operational emails.
 Go owns runtime data validation, subject lines, plain-text rendering, durable
 queueing, and AWS SES delivery. This package runs during development and export;
 it does not run inside the server or worker container.
@@ -34,3 +34,14 @@ When adding an email, define its React component, preview data, export mapping,
 Go template data validation and subject, and a plain-text version. Wire its
 business operation to the existing transactional queue separately. Invitation
 rendering is supported here; this change does not implement invitation endpoints.
+
+Available templates: `otp`, `invitation`, `welcome`, `invitation-accepted`,
+`security-alert`, `api-key-expiry`, `sip-trunk-failure`, and `voice-agent-failure`.
+The six notification templates have preview data and Go rendering support;
+their business triggers, recipients, preferences, and deduplication are not
+implemented here. Pass a sanitized failure summary, never raw provider errors,
+credentials, transcripts, or API key secrets.
+
+`Data.ExpiresAt` remains the delivery deadline required by the existing queue.
+Only OTP and invitation display it. API key expiry uses `Data.KeyExpiresAt`, and
+security/failure notifications use `Data.OccurredAt` for the event timestamp.

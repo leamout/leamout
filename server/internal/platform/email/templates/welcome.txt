@@ -1,0 +1,7 @@
+Welcome to Leamout
+
+Hello {{.UserName}},
+
+Welcome to Leamout. You can now create an organization, configure your SIP trunks, and build voice agents.
+
+Your account is ready. Sign in to get started.

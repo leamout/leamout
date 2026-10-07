@@ -1,0 +1,7 @@
+SIP trunk needs attention
+
+The SIP trunk {{.TrunkName}} in {{.Organization}} reported a failure at {{.OccurredAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}.
+
+Reason: {{.FailureReason}}
+
+Review the trunk status, connectivity, and credentials. Calls using this trunk may be affected.
