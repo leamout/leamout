@@ -32,16 +32,20 @@ UI components, which target browsers. The shared layout lives in
 
 When adding an email, define its React component, preview data, export mapping,
 Go template data validation and subject, and a plain-text version. Wire its
-business operation to the existing transactional queue separately. Invitation
-rendering is supported here; this change does not implement invitation endpoints.
+business operation to the transactional queue in the same database transaction.
 
 Available templates: `otp`, `invitation`, `welcome`, `invitation-accepted`,
 `security-alert`, `api-key-expiry`, `sip-trunk-failure`, and `voice-agent-failure`.
 The six notification templates have preview data and Go rendering support;
-their business triggers, recipients, preferences, and deduplication are not
-implemented here. Pass a sanitized failure summary, never raw provider errors,
+welcome, password-change security alerts, invitations, and invitation-accepted
+notifications are connected to business transactions. Operational alerts and
+key expiry reminders still require recipient preferences and deduplication. Pass a sanitized failure summary, never raw provider errors,
 credentials, transcripts, or API key secrets.
 
-`Data.ExpiresAt` remains the delivery deadline required by the existing queue.
-Only OTP and invitation display it. API key expiry uses `Data.KeyExpiresAt`, and
+`Request.ExpiresAt` is the delivery deadline required by the queue.
+`Data.ExpiresAt` is the expiry shown only by OTP and invitation templates. API key expiry uses `Data.KeyExpiresAt`, and
 security/failure notifications use `Data.OccurredAt` for the event timestamp.
+
+Invitation links use `https://DOMAIN/invitations/accept`; host the console at
+that domain and expose the Go API at `https://api.DOMAIN`. Local console
+development uses the API at `http://localhost:8080`.

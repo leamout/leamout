@@ -20,9 +20,10 @@ import (
 )
 
 type Service struct {
-	repo   *Repository
-	pool   *pgxpool.Pool
-	emails *email.Service
+	repo    *Repository
+	pool    *pgxpool.Pool
+	emails  *email.Service
+	emailTx pgx.Tx
 }
 
 func NewService(repo *Repository) *Service {
@@ -137,10 +138,35 @@ func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, value strin
 		return sqlc.User{}, apperror.NewInternal("failed to hash password", err)
 	}
 
-	return s.repo.SetUserPassword(ctx, sqlc.SetUserPasswordParams{
+	if s.pool == nil || s.emails == nil {
+		return sqlc.User{}, apperror.NewInternal("email delivery is not configured", nil)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlc.User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	user, err := sqlc.New(tx).SetUserPassword(ctx, sqlc.SetUserPasswordParams{
 		ID:           userID,
 		PasswordHash: &hash,
 	})
+	if err != nil {
+		return sqlc.User{}, err
+	}
+	now := time.Now()
+	_, err = s.emails.QueueTx(ctx, tx, email.Request{
+		To:        user.Email,
+		Template:  "security-alert",
+		ExpiresAt: now.Add(24 * time.Hour),
+		Data:      email.Data{EventName: "Password changed", OccurredAt: now},
+	})
+	if err != nil {
+		return sqlc.User{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.User{}, err
+	}
+	return user, nil
 }
 
 func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string, error) {
@@ -196,7 +222,7 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 	if err != nil {
 		return "", err
 	}
-	_, err = s.emails.QueueTx(ctx, tx, email.Request{To: transaction.Identifier, Template: "otp", CancellationKey: &key, Data: email.Data{Code: code, ExpiresAt: expiresAt}})
+	_, err = s.emails.QueueTx(ctx, tx, email.Request{To: transaction.Identifier, Template: "otp", CancellationKey: &key, ExpiresAt: expiresAt, Data: email.Data{Code: code, ExpiresAt: expiresAt}})
 	if err != nil {
 		return "", err
 	}
@@ -225,6 +251,8 @@ func (s *Service) VerifyOTP(ctx context.Context, transactionID uuid.UUID, code s
 		return sqlc.User{}, err
 	}
 	local := NewService(NewRepository(sqlc.New(tx)))
+	local.emails = s.emails
+	local.emailTx = tx
 	user, verifyErr := local.verifyOTP(ctx, transactionID, code)
 	// Preserve failed-code counters, but roll back unexpected verification failures.
 	if verifyErr != nil {
@@ -348,7 +376,35 @@ func (s *Service) getOrCreateOTPUser(ctx context.Context, transaction sqlc.AuthT
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return sqlc.User{}, err
 	}
-	return s.repo.CreateUser(ctx, sqlc.CreateUserParams{Email: email})
+	user, err = s.repo.CreateUser(ctx, sqlc.CreateUserParams{Email: email})
+	if err != nil {
+		return sqlc.User{}, err
+	}
+	if s.emails != nil && s.emailTx != nil {
+		_, err = s.emails.QueueTx(ctx, s.emailTx, emailRequestWelcome(user))
+		if err != nil {
+			return sqlc.User{}, err
+		}
+	}
+	return user, nil
 }
 
-func otpEmailCancellationKey(id uuid.UUID) string { return "auth:otp:" + id.String() }
+func otpEmailCancellationKey(id uuid.UUID) string {
+	return "auth:otp:" + id.String()
+}
+
+func emailRequestWelcome(user sqlc.User) email.Request {
+	name := ""
+	if user.Name != nil {
+		name = strings.TrimSpace(*user.Name)
+	}
+	if name == "" {
+		name = "there"
+	}
+	return email.Request{
+		To:        user.Email,
+		Template:  "welcome",
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		Data:      email.Data{UserName: name},
+	}
+}

@@ -9,6 +9,9 @@ on:
       - "clients/bun.lock"
       - "clients/biome.json"
       - "server/internal/platform/email/**"
+      - "server/internal/identity/auth/**"
+      - "server/internal/tenancy/invitations/**"
+      - "clients/apps/console/app/invitations/**"
       - ".github/workflows/emails.yml"
   push:
     branches: [main]
@@ -18,6 +21,9 @@ on:
       - "clients/bun.lock"
       - "clients/biome.json"
       - "server/internal/platform/email/**"
+      - "server/internal/identity/auth/**"
+      - "server/internal/tenancy/invitations/**"
+      - "clients/apps/console/app/invitations/**"
       - ".github/workflows/emails.yml"
 
 permissions:
@@ -27,6 +33,20 @@ jobs:
   templates:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: email-test-password
+          POSTGRES_DB: email_tests
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U postgres -d email_tests"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: oven-sh/setup-bun@v2
@@ -41,6 +61,9 @@ jobs:
       - name: Typecheck email sources
         working-directory: clients
         run: bun run --filter @leamout/emails typecheck
+      - name: Typecheck invitation page
+        working-directory: clients
+        run: bun x tsc --noEmit -p apps/console/tsconfig.json
       - name: Check generated templates
         working-directory: clients
         run: bun run emails:check
@@ -48,6 +71,12 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
+      - name: Initialize shared PostgreSQL extensions
+        env:
+          PGPASSWORD: email-test-password
+        run: psql -h localhost -U postgres -d email_tests -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;'
       - name: Verify Go rendering and delivery
         working-directory: server
-        run: go test -race ./internal/platform/email ./internal/integrations/ses
+        env:
+          EMAIL_TEST_DATABASE_URL: postgres://postgres:email-test-password@localhost:5432/email_tests?sslmode=disable
+        run: go test -race ./internal/platform/email ./internal/integrations/ses ./internal/identity/auth ./internal/tenancy/invitations

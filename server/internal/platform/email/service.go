@@ -20,7 +20,10 @@ type Service struct {
 }
 
 func NewService(cipher *encryption.Cipher) *Service {
-	return &Service{cipher: cipher, renderer: NewRenderer()}
+	return &Service{
+		cipher:   cipher,
+		renderer: NewRenderer(),
+	}
 }
 
 // QueueTx must use the same transaction as the business mutation.
@@ -32,7 +35,7 @@ func (s *Service) QueueTx(ctx context.Context, tx pgx.Tx, req Request) (uuid.UUI
 	if err != nil || address.Address != req.To {
 		return uuid.Nil, fmt.Errorf("invalid email recipient")
 	}
-	if !req.Data.ExpiresAt.After(time.Now()) {
+	if !req.ExpiresAt.After(time.Now()) {
 		return uuid.Nil, fmt.Errorf("email has expired")
 	}
 	if _, err := s.renderer.Render(req.Template, req.Data); err != nil {
@@ -47,7 +50,14 @@ func (s *Service) QueueTx(ctx context.Context, tx pgx.Tx, req Request) (uuid.UUI
 	if err != nil {
 		return uuid.Nil, err
 	}
-	err = sqlc.New(tx).CreateEmailDelivery(ctx, sqlc.CreateEmailDeliveryParams{ID: id, Recipient: req.To, Template: req.Template, EncryptedData: &payload, CancellationKey: req.CancellationKey, ExpiresAt: pgconv.NullableTimestamptz(&req.Data.ExpiresAt)})
+	err = sqlc.New(tx).CreateEmailDelivery(ctx, sqlc.CreateEmailDeliveryParams{
+		ID:              id,
+		Recipient:       req.To,
+		Template:        req.Template,
+		EncryptedData:   &payload,
+		CancellationKey: req.CancellationKey,
+		ExpiresAt:       pgconv.NullableTimestamptz(&req.ExpiresAt),
+	})
 	return id, err
 }
 

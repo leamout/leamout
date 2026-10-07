@@ -25,6 +25,7 @@ import (
 	"github.com/coffeyvidzro/monogo/internal/telephony/recordings"
 	"github.com/coffeyvidzro/monogo/internal/telephony/webrtc"
 	"github.com/coffeyvidzro/monogo/internal/tenancy"
+	"github.com/coffeyvidzro/monogo/internal/tenancy/invitations"
 )
 
 type modules struct {
@@ -111,8 +112,10 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		cfg.IsDevelopment(),
 		cfg.Domain,
 	)
-	identityModule.Auth.Service.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher))
+	emails := email.NewService(credentialCipher)
+	identityModule.Auth.Service.ConfigureEmail(postgresClient.Pool(), emails)
 	tenancyModule := tenancy.New(queries)
+	tenancyModule.Invitations = invitations.NewHandler(invitations.NewService(invitations.NewRepository(postgresClient.Pool()), emails, "https://"+cfg.Domain))
 	trustedProxies, err := cfg.TrustedProxyPrefixes()
 	if err != nil {
 		closeDependencies()

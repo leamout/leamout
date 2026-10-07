@@ -118,3 +118,22 @@ func TestWorkerSkipsSupersededDelivery(t *testing.T) {
 		t.Fatal("superseded delivery was sent")
 	}
 }
+
+func TestWorkerDeliversWelcomeWithoutContentExpiry(t *testing.T) {
+	repo, sender, cipher := fixture(t)
+	data, err := json.Marshal(Data{UserName: "Alex"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.d.Template = "welcome"
+	repo.d.Payload, err = cipher.EncryptForScope("email:"+repo.d.ID.String(), string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := NewWorker(repo, sender, cipher).ProcessOne(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !repo.completed || sender.calls != 1 || !strings.Contains(sender.message.HTML, "Alex") || !strings.Contains(sender.message.Text, "Alex") {
+		t.Fatal("welcome notification was not delivered")
+	}
+}

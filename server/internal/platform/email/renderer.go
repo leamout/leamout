@@ -16,7 +16,10 @@ var codePattern = regexp.MustCompile(`^[0-9]{6}$`)
 
 type Renderer struct{}
 
-func NewRenderer() *Renderer { return &Renderer{} }
+func NewRenderer() *Renderer {
+	return &Renderer{}
+}
+
 func (r *Renderer) Render(name string, data Data) (Message, error) {
 	subject := ""
 	switch name {
@@ -64,7 +67,7 @@ func (r *Renderer) Render(name string, data Data) (Message, error) {
 	default:
 		return Message{}, fmt.Errorf("unknown email template")
 	}
-	if data.ExpiresAt.IsZero() {
+	if (name == "otp" || name == "invitation") && data.ExpiresAt.IsZero() {
 		return Message{}, fmt.Errorf("email expiry is required")
 	}
 	html, err := template.ParseFS(templates, "templates/"+name+".html")

@@ -3,11 +3,13 @@ package tenancy
 import (
 	"github.com/coffeyvidzro/monogo/internal/database/sqlc"
 	"github.com/coffeyvidzro/monogo/internal/tenancy/credentials"
+	"github.com/coffeyvidzro/monogo/internal/tenancy/invitations"
 	"github.com/coffeyvidzro/monogo/internal/tenancy/members"
 	"github.com/coffeyvidzro/monogo/internal/tenancy/organization"
 )
 
 type Module struct {
+	Invitations   *invitations.Handler
 	Organizations OrganizationModule
 	Members       MembersModule
 	Credentials   CredentialsModule

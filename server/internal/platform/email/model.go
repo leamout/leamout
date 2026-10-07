@@ -11,8 +11,15 @@ import (
 type Sender interface {
 	Send(context.Context, Message) (Result, error)
 }
-type Message struct{ To, Subject, HTML, Text string }
-type Result struct{ MessageID string }
+type Message struct {
+	To      string
+	Subject string
+	HTML    string
+	Text    string
+}
+type Result struct {
+	MessageID string
+}
 
 // SendError classifies provider failures without persisting recipient or body data.
 type SendError struct {
@@ -20,7 +27,9 @@ type SendError struct {
 	Permanent bool
 }
 
-func (e *SendError) Error() string { return "email provider: " + e.Code }
+func (e *SendError) Error() string {
+	return "email provider: " + e.Code
+}
 
 type Data struct {
 	UserName      string    `json:"user_name,omitempty"`
@@ -43,11 +52,14 @@ type Request struct {
 	To              string
 	Template        string
 	Data            Data
+	ExpiresAt       time.Time
 	CancellationKey *string
 }
 type Delivery struct {
-	ID                    uuid.UUID
-	To, Template, Payload string
-	Attempts              int
-	ExpiresAt             time.Time
+	ID        uuid.UUID
+	To        string
+	Template  string
+	Payload   string
+	Attempts  int
+	ExpiresAt time.Time
 }

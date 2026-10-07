@@ -128,9 +128,9 @@ func TestOTPEmailTransactionAndReplay(t *testing.T) {
 		t.Fatal("code replay accepted")
 	}
 	// Verified challenges must never be sent by a delayed worker.
-	_, err = email.NewRepository(pool).Claim(ctx, uuid.New())
-	if err == nil {
-		t.Fatal("claimed consumed OTP")
+	delivery, err := email.NewRepository(pool).Claim(ctx, uuid.New())
+	if err != nil || delivery.Template != "welcome" {
+		t.Fatal("expected welcome delivery after signup, never the consumed OTP")
 	}
 	var payload *string
 	if err := pool.QueryRow(ctx, `SELECT encrypted_data FROM email_deliveries WHERE cancellation_key=$1`, otpEmailCancellationKey(transaction.ID)).Scan(&payload); err != nil || payload != nil {
@@ -178,7 +178,7 @@ func TestEmailQueueRollbackAndLeaseOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = service.QueueTx(ctx, tx, email.Request{To: "member@example.com", Template: "invitation", Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
+	_, err = service.QueueTx(ctx, tx, email.Request{To: "member@example.com", Template: "invitation", ExpiresAt: time.Now().Add(time.Hour), Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -196,7 +196,7 @@ func TestEmailQueueRollbackAndLeaseOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := service.QueueTx(ctx, tx, email.Request{To: "member@example.com", Template: "invitation", Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
+	id, err := service.QueueTx(ctx, tx, email.Request{To: "member@example.com", Template: "invitation", ExpiresAt: time.Now().Add(time.Hour), Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func TestEmailRetryAndTerminalFailure(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, err := email.NewService(cipher).QueueTx(ctx, tx, email.Request{To: "retry@example.com", Template: "invitation", Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
+	id, err := email.NewService(cipher).QueueTx(ctx, tx, email.Request{To: "retry@example.com", Template: "invitation", ExpiresAt: time.Now().Add(time.Hour), Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,7 +340,7 @@ func TestGenericEmailCancellationIsIsolatedAndTransactional(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer func() { _ = tx.Rollback(ctx) }()
-		id, err := service.QueueTx(ctx, tx, email.Request{To: "generic@example.com", Template: "invitation", CancellationKey: key, Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
+		id, err := service.QueueTx(ctx, tx, email.Request{To: "generic@example.com", Template: "invitation", ExpiresAt: time.Now().Add(time.Hour), CancellationKey: key, Data: email.Data{Organization: "Acme", AcceptURL: "https://example.com/invite", ExpiresAt: time.Now().Add(time.Hour)}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -456,5 +456,52 @@ func TestPasswordLoginCancelsQueuedOTP(t *testing.T) {
 	var payload *string
 	if err := pool.QueryRow(ctx, `SELECT status,encrypted_data FROM email_deliveries WHERE cancellation_key=$1`, otpEmailCancellationKey(transaction.ID)).Scan(&status, &payload); err != nil || status != "cancelled" || payload != nil {
 		t.Fatal("password login left OTP queued")
+	}
+}
+
+func TestSignupWelcomeOnlyOnce(t *testing.T) {
+	pool, cipher := testEmailDatabase(t)
+	ctx := context.Background()
+	service := NewService(NewRepository(sqlc.New(pool)))
+	service.ConfigureEmail(pool, email.NewService(cipher))
+	for attempt := 0; attempt < 2; attempt++ {
+		transaction, err := service.Start(ctx, "welcome@example.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if attempt > 0 {
+			if _, err := pool.Exec(ctx, "UPDATE email_deliveries SET created_at = created_at - interval '61 seconds'"); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := service.SendOTP(ctx, transaction.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := service.VerifyOTP(ctx, transaction.ID, queuedCode(t, pool, cipher, transaction.ID)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var count int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM email_deliveries WHERE template = 'welcome'").Scan(&count); err != nil || count != 1 {
+		t.Fatalf("welcome count=%d: %v", count, err)
+	}
+}
+
+func TestPasswordNotificationFailureRollsBackPassword(t *testing.T) {
+	pool, _ := testEmailDatabase(t)
+	ctx := context.Background()
+	q := sqlc.New(pool)
+	user, err := q.CreateUser(ctx, sqlc.CreateUserParams{Email: "rollback@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := NewService(NewRepository(q))
+	service.ConfigureEmail(pool, email.NewService(nil))
+	if _, err := service.SetPassword(ctx, user.ID, "strong-password-value-123"); err == nil {
+		t.Fatal("expected notification failure")
+	}
+	user, err = q.GetUserByID(ctx, user.ID)
+	if err != nil || user.PasswordHash != nil {
+		t.Fatal("password committed without notification")
 	}
 }

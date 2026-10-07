@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/coffeyvidzro/monogo/internal/tenancy/credentials"
+	"github.com/coffeyvidzro/monogo/internal/tenancy/invitations"
 	"github.com/coffeyvidzro/monogo/internal/tenancy/members"
 	"github.com/coffeyvidzro/monogo/internal/tenancy/organization"
 	"github.com/go-chi/chi/v5"
@@ -16,6 +17,10 @@ func RegisterRoutes(
 	organizationContextAccess func(string) func(http.Handler) http.Handler,
 	sessionOrganizationAccess func(string) func(http.Handler) http.Handler,
 ) {
+	if module.Invitations != nil {
+		invitations.RegisterRoutes(router, module.Invitations, requireSession, sessionOrganizationAccess("members"))
+	}
+
 	organization.RegisterRoutes(
 		router,
 		module.Organizations.Handler,

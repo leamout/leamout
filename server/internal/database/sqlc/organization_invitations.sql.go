@@ -45,6 +45,41 @@ func (q *Queries) AcceptInvitation(ctx context.Context, id uuid.UUID) (Organizat
 	return i, err
 }
 
+const addInvitedOrganizationMember = `-- name: AddInvitedOrganizationMember :one
+INSERT INTO organization_members (organization_id, user_id, role)
+SELECT i.organization_id, u.id, i.role
+FROM organization_invitations AS i
+JOIN users AS u ON u.email = i.email
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.id = $1
+  AND i.status = 'accepted'
+  AND u.id = $2
+  AND u.disabled_at IS NULL
+  AND u.email_verified = true
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING organization_id, user_id, role, status, created_at, updated_at
+`
+
+type AddInvitedOrganizationMemberParams struct {
+	InvitationID uuid.UUID `db:"invitation_id" json:"invitation_id"`
+	UserID       uuid.UUID `db:"user_id" json:"user_id"`
+}
+
+func (q *Queries) AddInvitedOrganizationMember(ctx context.Context, arg AddInvitedOrganizationMemberParams) (OrganizationMember, error) {
+	row := q.db.QueryRow(ctx, addInvitedOrganizationMember, arg.InvitationID, arg.UserID)
+	var i OrganizationMember
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.UserID,
+		&i.Role,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createInvitation = `-- name: CreateInvitation :one
 INSERT INTO organization_invitations (
     organization_id,
@@ -140,6 +175,19 @@ func (q *Queries) DeclineInvitation(ctx context.Context, id uuid.UUID) (Organiza
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const expireOrganizationInvitations = `-- name: ExpireOrganizationInvitations :exec
+UPDATE organization_invitations
+SET status = 'expired', updated_at = now()
+WHERE organization_id = $1
+  AND status = 'pending'
+  AND expires_at <= now()
+`
+
+func (q *Queries) ExpireOrganizationInvitations(ctx context.Context, organizationID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, expireOrganizationInvitations, organizationID)
+	return err
 }
 
 const expireStaleInvitations = `-- name: ExpireStaleInvitations :exec
@@ -330,6 +378,39 @@ func (q *Queries) ListPendingInvitationsByOrganizationID(ctx context.Context, or
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockInvitationByTokenHash = `-- name: LockInvitationByTokenHash :one
+SELECT i.id, i.organization_id, i.invited_by, i.email, i.role, i.token_hash, i.status, i.expires_at, i.accepted_at, i.declined_at, i.revoked_at, i.created_at, i.updated_at
+FROM organization_invitations AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.token_hash = $1
+  AND i.status = 'pending'
+  AND i.expires_at > now()
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+FOR UPDATE OF i
+`
+
+func (q *Queries) LockInvitationByTokenHash(ctx context.Context, tokenHash string) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, lockInvitationByTokenHash, tokenHash)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.InvitedBy,
+		&i.Email,
+		&i.Role,
+		&i.TokenHash,
+		&i.Status,
+		&i.ExpiresAt,
+		&i.AcceptedAt,
+		&i.DeclinedAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const revokeInvitation = `-- name: RevokeInvitation :one

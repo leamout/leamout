@@ -103,3 +103,36 @@ SET
     updated_at = NOW()
 WHERE status = 'pending'
 AND expires_at <= NOW();
+
+-- name: ExpireOrganizationInvitations :exec
+UPDATE organization_invitations
+SET status = 'expired', updated_at = now()
+WHERE organization_id = sqlc.arg(organization_id)
+  AND status = 'pending'
+  AND expires_at <= now();
+
+-- name: LockInvitationByTokenHash :one
+SELECT i.*
+FROM organization_invitations AS i
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.token_hash = sqlc.arg(token_hash)
+  AND i.status = 'pending'
+  AND i.expires_at > now()
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+FOR UPDATE OF i;
+
+-- name: AddInvitedOrganizationMember :one
+INSERT INTO organization_members (organization_id, user_id, role)
+SELECT i.organization_id, u.id, i.role
+FROM organization_invitations AS i
+JOIN users AS u ON u.email = i.email
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.id = sqlc.arg(invitation_id)
+  AND i.status = 'accepted'
+  AND u.id = sqlc.arg(user_id)
+  AND u.disabled_at IS NULL
+  AND u.email_verified = true
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING *;
