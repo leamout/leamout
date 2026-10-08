@@ -7,8 +7,8 @@ func TestPlatformCredentials(t *testing.T) {
 
 	values := NewPlatformCredentials(map[string]string{
 		" openai ": " platform-secret ",
-		"empty":     " ",
-		"":          "ignored",
+		"empty":    " ",
+		"":         "ignored",
 	})
 
 	secret, ok := values.Get("openai")

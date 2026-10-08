@@ -178,14 +178,14 @@ func (r *Repository) UpsertBinding(
 	}
 
 	return Binding{
-		ID:             row.ID,
-		OrganizationID: row.OrganizationID,
-		VoiceAgentID:   row.VoiceAgentID,
-		Role:           row.Role,
-		Provider:       row.Provider,
-		CredentialID:   row.CredentialID,
+		ID:               row.ID,
+		OrganizationID:   row.OrganizationID,
+		VoiceAgentID:     row.VoiceAgentID,
+		Role:             row.Role,
+		Provider:         row.Provider,
+		CredentialID:     row.CredentialID,
 		CredentialSource: credentialSource(row.CredentialID),
-		Config:          json.RawMessage(row.Config),
+		Config:           json.RawMessage(row.Config),
 	}, nil
 }
 
@@ -208,14 +208,14 @@ func (r *Repository) ListBindings(
 	result := make([]Binding, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, Binding{
-			ID:             row.ID,
-			OrganizationID: row.OrganizationID,
-			VoiceAgentID:   row.VoiceAgentID,
-			Role:           row.Role,
-			Provider:       row.Provider,
+			ID:               row.ID,
+			OrganizationID:   row.OrganizationID,
+			VoiceAgentID:     row.VoiceAgentID,
+			Role:             row.Role,
+			Provider:         row.Provider,
 			CredentialID:     row.CredentialID,
 			CredentialSource: credentialSource(row.CredentialID),
-			Config:            json.RawMessage(row.Config),
+			Config:           json.RawMessage(row.Config),
 		})
 	}
 

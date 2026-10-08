@@ -17,11 +17,11 @@ import (
 )
 
 type Service struct {
-	repo        *Repository
-	cipher      *encryption.Cipher
-	catalog     *aicatalog.Catalog
-	verifier    *Verifier
-	platform    PlatformCredentials
+	repo     *Repository
+	cipher   *encryption.Cipher
+	catalog  *aicatalog.Catalog
+	verifier *Verifier
+	platform PlatformCredentials
 }
 
 func NewService(
