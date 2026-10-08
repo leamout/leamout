@@ -13,13 +13,13 @@ import (
 )
 
 type Service struct {
-	repo       *Repository
-	router     *routing.Service
-	controller *calling.Controller
-	channels   *calling.ChannelStore
-	admission  *calling.AdmissionLimiter
-	metrics              routeAttemptMetrics
-	voiceAgentReadiness  func(context.Context, uuid.UUID, uuid.UUID) error
+	repo                *Repository
+	router              *routing.Service
+	controller          *calling.Controller
+	channels            *calling.ChannelStore
+	admission           *calling.AdmissionLimiter
+	metrics             routeAttemptMetrics
+	voiceAgentReadiness func(context.Context, uuid.UUID, uuid.UUID) error
 }
 
 type routeAttemptMetrics interface {
