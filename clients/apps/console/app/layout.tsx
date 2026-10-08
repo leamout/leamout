@@ -1,7 +1,6 @@
 import { Toaster } from "@leamout/ui/components/sonner";
 import { TooltipProvider } from "@leamout/ui/components/tooltip";
 import type { Metadata } from "next";
-import { ConsoleShell } from "@/components/console-shell";
 import "@leamout/ui/globals.css";
 import { plexMono, plexSans } from "@/lib/fonts";
 
@@ -23,7 +22,7 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
         <TooltipProvider>
-          <ConsoleShell>{children}</ConsoleShell>
+          {children}
           <Toaster richColors closeButton />
         </TooltipProvider>
       </body>
