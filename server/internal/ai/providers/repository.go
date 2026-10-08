@@ -184,7 +184,8 @@ func (r *Repository) UpsertBinding(
 		Role:           row.Role,
 		Provider:       row.Provider,
 		CredentialID:   row.CredentialID,
-		Config:         json.RawMessage(row.Config),
+		CredentialSource: credentialSource(row.CredentialID),
+		Config:          json.RawMessage(row.Config),
 	}, nil
 }
 
@@ -212,8 +213,9 @@ func (r *Repository) ListBindings(
 			VoiceAgentID:   row.VoiceAgentID,
 			Role:           row.Role,
 			Provider:       row.Provider,
-			CredentialID:   row.CredentialID,
-			Config:         json.RawMessage(row.Config),
+			CredentialID:     row.CredentialID,
+			CredentialSource: credentialSource(row.CredentialID),
+			Config:            json.RawMessage(row.Config),
 		})
 	}
 
@@ -286,10 +288,17 @@ func credentialFromRow(row sqlc.AiProviderCredential) Credential {
 	}
 }
 
+func credentialSource(credentialID *uuid.UUID) string {
+	if credentialID == nil {
+		return CredentialSourcePlatform
+	}
+	return CredentialSourceOrganization
+}
+
 type resolvedRow struct {
 	Role             string
 	Provider         string
-	CredentialID     uuid.UUID
+	CredentialID     *uuid.UUID
 	Config           json.RawMessage
-	SecretCiphertext string
+	SecretCiphertext *string
 }
