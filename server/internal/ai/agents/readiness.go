@@ -41,12 +41,13 @@ func (s *Service) Readiness(
 	for _, status := range statuses {
 		byRole[status.Role] = status
 		report.Bindings = append(report.Bindings, BindingDiagnostic{
-			Role:            status.Role,
-			Provider:        status.Provider,
-			IntegrationID:   status.IntegrationID,
-			ConnectionState: status.ConnectionState,
-			FailureCode:     status.FailureCode,
-			Config:          append([]byte(nil), status.Config...),
+			Role:             status.Role,
+			Provider:         status.Provider,
+			IntegrationID:    status.IntegrationID,
+			CredentialSource: status.CredentialSource,
+			ConnectionState:  status.ConnectionState,
+			FailureCode:      status.FailureCode,
+			Config:           append([]byte(nil), status.Config...),
 		})
 	}
 	expected := expectedRoles(agent.Engine)
@@ -80,11 +81,27 @@ func (s *Service) Readiness(
 			continue
 		}
 		if status.ConnectionState != providers.ConnectionReady {
+			code := "integration_not_ready"
+			field := "bindings." + role + ".integration_id"
+			message := fmt.Sprintf(
+				"The %s integration is not ready.",
+				status.Provider,
+			)
+			remediation := "Verify or rotate the integration, then run readiness again."
+			if status.CredentialSource == providers.CredentialSourcePlatform {
+				code = "platform_credential_unavailable"
+				field = "bindings." + role + ".provider"
+				message = fmt.Sprintf(
+					"The platform credential for %s is unavailable.",
+					status.Provider,
+				)
+				remediation = "Configure the platform AI credential or bind an organization integration."
+			}
 			report.Issues = append(report.Issues, readinessIssue(
-				"integration_not_ready",
-				"bindings."+role+".integration_id",
-				fmt.Sprintf("The %s integration is not ready.", status.Provider),
-				"Verify or rotate the integration, then run readiness again.",
+				code,
+				field,
+				message,
+				remediation,
 			))
 		}
 	}
