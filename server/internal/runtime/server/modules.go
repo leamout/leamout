@@ -150,6 +150,9 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		CredentialCipher: credentialCipher,
 		Calls:            telephonyModule.Calls.Service,
 	})
+	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
+		aiModule.Agents.Service.RequireReady,
+	)
 
 	resolver := authn.NewResolver(identityModule.Session.Service, tenancyModule.Credentials.Service)
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)

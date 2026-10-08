@@ -1,6 +1,8 @@
 package calls
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -82,5 +84,111 @@ func TestValidateExistingInboundRejectsTrunkMismatch(t *testing.T) {
 
 	if err := validateExistingInbound(call, req); err == nil {
 		t.Fatal("expected trunk attribution conflict")
+	}
+}
+
+func TestRequireVoiceAgentReadyRejectsUnavailableGuard(t *testing.T) {
+	t.Parallel()
+
+	service := &Service{}
+	err := service.requireVoiceAgentReady(
+		context.Background(),
+		uuid.New(),
+		uuid.New(),
+	)
+	if err == nil {
+		t.Fatal("requireVoiceAgentReady() error = nil")
+	}
+}
+
+func TestRequireVoiceAgentReadyPropagatesReadinessFailure(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("voice agent is not ready")
+	service := &Service{
+		voiceAgentReadiness: func(
+			context.Context,
+			uuid.UUID,
+			uuid.UUID,
+		) error {
+			return want
+		},
+	}
+	err := service.requireVoiceAgentReady(
+		context.Background(),
+		uuid.New(),
+		uuid.New(),
+	)
+	if !errors.Is(err, want) {
+		t.Fatalf("requireVoiceAgentReady() error = %v, want %v", err, want)
+	}
+}
+
+func TestRequireVoiceAgentReadyAcceptsReadyAgent(t *testing.T) {
+	t.Parallel()
+
+	service := &Service{
+		voiceAgentReadiness: func(
+			context.Context,
+			uuid.UUID,
+			uuid.UUID,
+		) error {
+			return nil
+		},
+	}
+	if err := service.requireVoiceAgentReady(
+		context.Background(),
+		uuid.New(),
+		uuid.New(),
+	); err != nil {
+		t.Fatalf("requireVoiceAgentReady() error = %v", err)
+	}
+}
+
+func TestRequireCallVoiceAgentReadySkipsProgrammableCall(t *testing.T) {
+	t.Parallel()
+
+	service := &Service{}
+	if err := service.requireCallVoiceAgentReady(
+		context.Background(),
+		sqlc.Call{OrganizationID: uuid.New()},
+	); err != nil {
+		t.Fatalf("requireCallVoiceAgentReady() error = %v", err)
+	}
+}
+
+func TestRequireCallVoiceAgentReadyChecksBoundAgent(t *testing.T) {
+	t.Parallel()
+
+	organizationID := uuid.New()
+	voiceAgentID := uuid.New()
+	called := false
+	service := &Service{
+		voiceAgentReadiness: func(
+			ctx context.Context,
+			gotOrganizationID uuid.UUID,
+			gotVoiceAgentID uuid.UUID,
+		) error {
+			called = true
+			if gotOrganizationID != organizationID {
+				t.Fatalf("organization id = %s, want %s", gotOrganizationID, organizationID)
+			}
+			if gotVoiceAgentID != voiceAgentID {
+				t.Fatalf("voice agent id = %s, want %s", gotVoiceAgentID, voiceAgentID)
+			}
+			return nil
+		},
+	}
+	if err := service.requireCallVoiceAgentReady(
+		context.Background(),
+		sqlc.Call{
+			OrganizationID: organizationID,
+			VoiceAgentID:   &voiceAgentID,
+		},
+	); err != nil {
+		t.Fatalf("requireCallVoiceAgentReady() error = %v", err)
+	}
+	if !called {
+		t.Fatal("voice agent readiness check was not called")
 	}
 }

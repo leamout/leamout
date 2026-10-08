@@ -13,12 +13,13 @@ import (
 )
 
 type Service struct {
-	repo       *Repository
-	router     *routing.Service
-	controller *calling.Controller
-	channels   *calling.ChannelStore
-	admission  *calling.AdmissionLimiter
-	metrics    routeAttemptMetrics
+	repo                *Repository
+	router              *routing.Service
+	controller          *calling.Controller
+	channels            *calling.ChannelStore
+	admission           *calling.AdmissionLimiter
+	metrics             routeAttemptMetrics
+	voiceAgentReadiness func(context.Context, uuid.UUID, uuid.UUID) error
 }
 
 type routeAttemptMetrics interface {
@@ -71,6 +72,12 @@ func NewService(
 	}
 }
 
+func (s *Service) SetVoiceAgentReadinessCheck(
+	check func(context.Context, uuid.UUID, uuid.UUID) error,
+) {
+	s.voiceAgentReadiness = check
+}
+
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return sqlc.Call{}, err
@@ -78,6 +85,15 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	req, err := normalizeCreateRequest(req)
 	if err != nil {
 		return sqlc.Call{}, err
+	}
+	if req.VoiceAgentID != nil {
+		if err := s.requireVoiceAgentReady(
+			ctx,
+			organizationID,
+			*req.VoiceAgentID,
+		); err != nil {
+			return sqlc.Call{}, err
+		}
 	}
 
 	call, err := s.repo.Create(ctx, organizationID, req)
@@ -313,6 +329,34 @@ func (s *Service) AdmitInbound(
 	return call, nil
 }
 
+func (s *Service) requireVoiceAgentReady(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	voiceAgentID uuid.UUID,
+) error {
+	if s.voiceAgentReadiness == nil {
+		return apperror.NewServiceUnavailable(
+			"voice agent readiness service is unavailable",
+			nil,
+		)
+	}
+	return s.voiceAgentReadiness(ctx, organizationID, voiceAgentID)
+}
+
+func (s *Service) requireCallVoiceAgentReady(
+	ctx context.Context,
+	call sqlc.Call,
+) error {
+	if call.VoiceAgentID == nil {
+		return nil
+	}
+	return s.requireVoiceAgentReady(
+		ctx,
+		call.OrganizationID,
+		*call.VoiceAgentID,
+	)
+}
+
 func validateExistingInbound(call sqlc.Call, req InboundAdmissionRequest) error {
 	if call.Direction != string(DirectionInbound) ||
 		call.OrganizationID != req.OrganizationID ||
@@ -409,9 +453,23 @@ func (s *Service) SetRouteAttribution(ctx context.Context, organizationID, id uu
 }
 
 func (s *Service) Answer(ctx context.Context, org, id uuid.UUID) error {
-	return s.control(ctx, org, id, []State{StateInitiating, StateRinging}, func(channelID string) error {
-		return s.controller.Answer(ctx, channelID)
-	})
+	call, channelID, err := s.controlContext(ctx, org, id)
+	if err != nil {
+		return err
+	}
+	if call.State != string(StateInitiating) &&
+		call.State != string(StateRinging) {
+		return apperror.NewConflict(
+			"call control is not allowed in the current state",
+		)
+	}
+	if err := s.requireCallVoiceAgentReady(ctx, call); err != nil {
+		return err
+	}
+	if err := s.controller.Answer(ctx, channelID); err != nil {
+		return apperror.NewInternal("control call", err)
+	}
+	return nil
 }
 
 func (s *Service) Hangup(ctx context.Context, org, id uuid.UUID) error {
