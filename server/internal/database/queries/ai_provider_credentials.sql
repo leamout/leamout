@@ -91,7 +91,7 @@ SELECT
     b.created_at,
     b.updated_at
 FROM voice_agent_provider_bindings b
-JOIN ai_provider_credentials c
+LEFT JOIN ai_provider_credentials c
   ON c.id = b.credential_id
  AND c.organization_id = b.organization_id
 WHERE b.organization_id = sqlc.arg(organization_id)
