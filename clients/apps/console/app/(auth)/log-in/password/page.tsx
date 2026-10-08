@@ -1,5 +1,5 @@
-import { AuthForm } from "@/features/auth/auth-form";
+import { LoginPasswordForm } from "@/components/auth/login-password-form";
 
 export default function Page() {
-  return <AuthForm mode="login-password" />;
+  return <LoginPasswordForm />;
 }

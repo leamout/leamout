@@ -1,5 +1,5 @@
-import { AuthForm } from "@/features/auth/auth-form";
+import { EmailVerificationForm } from "@/components/auth/email-verification-form";
 
 export default function Page() {
-  return <AuthForm mode="verify" />;
+  return <EmailVerificationForm />;
 }

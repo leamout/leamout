@@ -1,5 +1,5 @@
-import { AuthForm } from "@/features/auth/auth-form";
+import { CreateAccountPasswordForm } from "@/components/auth/create-account-password-form";
 
 export default function Page() {
-  return <AuthForm mode="enroll" />;
+  return <CreateAccountPasswordForm />;
 }

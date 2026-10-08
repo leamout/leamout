@@ -1,5 +1,5 @@
-import { AuthForm } from "@/features/auth/auth-form";
+import { CreateAccountForm } from "@/components/auth/create-account-form";
 
 export default function Page() {
-  return <AuthForm mode="signup" />;
+  return <CreateAccountForm />;
 }
