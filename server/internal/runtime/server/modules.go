@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/leamout/leamout/server/internal/ai"
+	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity"
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
@@ -146,9 +147,16 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		return nil, fmt.Errorf("initialize telephony: %w", err)
 	}
 
+	platformAICredentials, err := cfg.PlatformAICredentials()
+	if err != nil {
+		closeDependencies()
+		return nil, err
+	}
+
 	aiModule := ai.New(queries, ai.Dependencies{
-		CredentialCipher: credentialCipher,
-		Calls:            telephonyModule.Calls.Service,
+		CredentialCipher:    credentialCipher,
+		PlatformCredentials: providers.NewPlatformCredentials(platformAICredentials),
+		Calls:               telephonyModule.Calls.Service,
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
 		aiModule.Agents.Service.RequireReady,
