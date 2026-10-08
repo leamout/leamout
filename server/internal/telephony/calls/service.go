@@ -229,14 +229,6 @@ func (s *Service) AdmitInbound(
 		)
 	}
 
-	if err := s.requireVoiceAgentReady(
-		ctx,
-		req.OrganizationID,
-		req.VoiceAgentID,
-	); err != nil {
-		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
-	}
-
 	decision, err := s.router.ResolveInbound(ctx, routing.InboundRequest{
 		OrganizationID:      req.OrganizationID,
 		VoiceAgentID:        req.VoiceAgentID,
@@ -351,6 +343,20 @@ func (s *Service) requireVoiceAgentReady(
 	return s.voiceAgentReadiness(ctx, organizationID, voiceAgentID)
 }
 
+func (s *Service) requireCallVoiceAgentReady(
+	ctx context.Context,
+	call sqlc.Call,
+) error {
+	if call.VoiceAgentID == nil {
+		return nil
+	}
+	return s.requireVoiceAgentReady(
+		ctx,
+		call.OrganizationID,
+		*call.VoiceAgentID,
+	)
+}
+
 func validateExistingInbound(call sqlc.Call, req InboundAdmissionRequest) error {
 	if call.Direction != string(DirectionInbound) ||
 		call.OrganizationID != req.OrganizationID ||
@@ -447,9 +453,23 @@ func (s *Service) SetRouteAttribution(ctx context.Context, organizationID, id uu
 }
 
 func (s *Service) Answer(ctx context.Context, org, id uuid.UUID) error {
-	return s.control(ctx, org, id, []State{StateInitiating, StateRinging}, func(channelID string) error {
-		return s.controller.Answer(ctx, channelID)
-	})
+	call, channelID, err := s.controlContext(ctx, org, id)
+	if err != nil {
+		return err
+	}
+	if call.State != string(StateInitiating) &&
+		call.State != string(StateRinging) {
+		return apperror.NewConflict(
+			"call control is not allowed in the current state",
+		)
+	}
+	if err := s.requireCallVoiceAgentReady(ctx, call); err != nil {
+		return err
+	}
+	if err := s.controller.Answer(ctx, channelID); err != nil {
+		return apperror.NewInternal("control call", err)
+	}
+	return nil
 }
 
 func (s *Service) Hangup(ctx context.Context, org, id uuid.UUID) error {
