@@ -72,30 +72,37 @@ type VerificationResponse struct {
 	FailureCode     *string    `json:"failure_code,omitempty"`
 }
 
+const (
+	CredentialSourceOrganization = "organization"
+	CredentialSourcePlatform     = "platform"
+)
+
 type Binding struct {
-	ID             uuid.UUID
-	OrganizationID uuid.UUID
-	VoiceAgentID   uuid.UUID
-	Role           string
-	Provider       string
-	CredentialID   uuid.UUID
-	Config         json.RawMessage
+	ID               uuid.UUID
+	OrganizationID   uuid.UUID
+	VoiceAgentID     uuid.UUID
+	Role             string
+	Provider         string
+	CredentialID     *uuid.UUID
+	CredentialSource string
+	Config           json.RawMessage
 }
 
 type UpsertBindingRequest struct {
 	Provider     string          `json:"provider"`
-	CredentialID uuid.UUID       `json:"credential_id"`
+	CredentialID *uuid.UUID      `json:"credential_id,omitempty"`
 	Config       json.RawMessage `json:"config,omitempty"`
 }
 
 type BindingResponse struct {
-	ID             uuid.UUID       `json:"id"`
-	OrganizationID uuid.UUID       `json:"organization_id"`
-	VoiceAgentID   uuid.UUID       `json:"voice_agent_id"`
-	Role           string          `json:"role"`
-	Provider       string          `json:"provider"`
-	CredentialID   uuid.UUID       `json:"credential_id"`
-	Config         json.RawMessage `json:"config"`
+	ID               uuid.UUID       `json:"id"`
+	OrganizationID   uuid.UUID       `json:"organization_id"`
+	VoiceAgentID     uuid.UUID       `json:"voice_agent_id"`
+	Role             string          `json:"role"`
+	Provider         string          `json:"provider"`
+	CredentialID     *uuid.UUID      `json:"credential_id,omitempty"`
+	CredentialSource string          `json:"credential_source"`
+	Config           json.RawMessage `json:"config"`
 }
 
 type ResolvedBinding struct {
@@ -111,14 +118,24 @@ type Integration struct {
 }
 
 type BindingStatus struct {
-	Role            string
-	Provider        string
-	IntegrationID   uuid.UUID
-	ConnectionState string
-	FailureCode     *string
-	Config          json.RawMessage
+	Role             string
+	Provider         string
+	IntegrationID    *uuid.UUID
+	CredentialSource string
+	ConnectionState  string
+	FailureCode      *string
+	Config           json.RawMessage
 }
 
 func bindingResponse(value Binding) BindingResponse {
-	return BindingResponse(value)
+	return BindingResponse{
+		ID:               value.ID,
+		OrganizationID:   value.OrganizationID,
+		VoiceAgentID:     value.VoiceAgentID,
+		Role:             value.Role,
+		Provider:         value.Provider,
+		CredentialID:     value.CredentialID,
+		CredentialSource: value.CredentialSource,
+		Config:           value.Config,
+	}
 }
