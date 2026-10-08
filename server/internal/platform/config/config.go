@@ -36,6 +36,7 @@ type Config struct {
 	FreeSWITCHESLPassword string      `env:"FREESWITCH_ESL_PASSWORD,required"`
 	MediaControlURL       string      `env:"MEDIA_CONTROL_URL" envDefault:"http://127.0.0.1:8090"`
 	MediaControlToken     string      `env:"MEDIA_CONTROL_TOKEN"`
+	AIPlatformCredentials string      `env:"AI_PLATFORM_CREDENTIALS"`
 	EncryptionKey         string      `env:"ENCRYPTION_KEY,required"`
 	MinIO                 MinIOConfig `envPrefix:"MINIO_"`
 	TURNAuthSecret        string      `env:"TURN_AUTH_SECRET,required"`
@@ -55,6 +56,9 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
+	if _, err := cfg.PlatformAICredentials(); err != nil {
+		return Config{}, err
+	}
 
 	return cfg, nil
 }
@@ -76,6 +80,7 @@ func (c *Config) normalize() {
 	c.FreeSWITCHESLPassword = strings.TrimSpace(c.FreeSWITCHESLPassword)
 	c.MediaControlURL = strings.TrimRight(strings.TrimSpace(c.MediaControlURL), "/")
 	c.MediaControlToken = strings.TrimSpace(c.MediaControlToken)
+	c.AIPlatformCredentials = strings.TrimSpace(c.AIPlatformCredentials)
 	c.EncryptionKey = strings.TrimSpace(c.EncryptionKey)
 	c.MinIO.AccessKey = strings.TrimSpace(c.MinIO.AccessKey)
 	c.MinIO.SecretKey = strings.TrimSpace(c.MinIO.SecretKey)
