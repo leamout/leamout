@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/ai/providers"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 func (s *Service) Readiness(
@@ -132,9 +133,9 @@ func (s *Service) RequireReady(
 	}
 
 	if len(report.Issues) == 0 {
-		return fmt.Errorf("voice agent is not ready")
+		return apperror.NewConflict("voice agent is not ready")
 	}
 
 	issue := report.Issues[0]
-	return fmt.Errorf("voice agent is not ready: %s: %s", issue.Code, issue.Message)
+	return apperror.NewConflict(fmt.Sprintf("voice agent is not ready: %s: %s", issue.Code, issue.Message))
 }
