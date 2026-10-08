@@ -137,5 +137,13 @@ func (s *Service) RequireReady(
 	}
 
 	issue := report.Issues[0]
-	return apperror.NewConflict(fmt.Sprintf("voice agent is not ready: %s: %s", issue.Code, issue.Message))
+	message := fmt.Sprintf(
+		"voice agent is not ready: %s: %s",
+		issue.Code,
+		issue.Message,
+	)
+	if issue.Code == "provider_service_unavailable" {
+		return apperror.NewServiceUnavailable(message, nil)
+	}
+	return apperror.NewConflict(message)
 }
