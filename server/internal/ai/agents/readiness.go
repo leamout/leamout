@@ -117,3 +117,24 @@ func readinessIssue(
 		Remediation: remediation,
 	}
 }
+
+func (s *Service) RequireReady(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	agentID uuid.UUID,
+) error {
+	report, err := s.Readiness(ctx, organizationID, agentID)
+	if err != nil {
+		return err
+	}
+	if report.Ready {
+		return nil
+	}
+
+	if len(report.Issues) == 0 {
+		return fmt.Errorf("voice agent is not ready")
+	}
+
+	issue := report.Issues[0]
+	return fmt.Errorf("voice agent is not ready: %s: %s", issue.Code, issue.Message)
+}
