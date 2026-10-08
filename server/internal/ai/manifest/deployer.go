@@ -61,12 +61,9 @@ func (d *Deployer) Deploy(
 
 	bindings := make([]agents.ProviderBindingRequest, 0, len(pkg.Agent.Providers))
 	for _, binding := range pkg.Agent.Providers {
-		integrationID := input.Integrations[binding.Provider]
-		if integrationID == uuid.Nil {
-			return DeploymentResult{}, fmt.Errorf(
-				"integration id is required for provider %q",
-				binding.Provider,
-			)
+		var integrationID *uuid.UUID
+		if value := input.Integrations[binding.Provider]; value != uuid.Nil {
+			integrationID = &value
 		}
 		bindings = append(bindings, agents.ProviderBindingRequest{
 			Role:          string(binding.Role),
