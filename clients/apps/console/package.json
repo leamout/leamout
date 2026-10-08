@@ -15,7 +15,10 @@
     "@leamout/ui": "workspace:*",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "react-hook-form": "^7.0.0",
+    "@hookform/resolvers": "^5.9.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.11",
