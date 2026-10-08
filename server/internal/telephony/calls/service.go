@@ -18,7 +18,8 @@ type Service struct {
 	controller *calling.Controller
 	channels   *calling.ChannelStore
 	admission  *calling.AdmissionLimiter
-	metrics    routeAttemptMetrics
+	metrics              routeAttemptMetrics
+	voiceAgentReadiness  func(context.Context, uuid.UUID, uuid.UUID) error
 }
 
 type routeAttemptMetrics interface {
@@ -71,6 +72,12 @@ func NewService(
 	}
 }
 
+func (s *Service) SetVoiceAgentReadinessCheck(
+	check func(context.Context, uuid.UUID, uuid.UUID) error,
+) {
+	s.voiceAgentReadiness = check
+}
+
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return sqlc.Call{}, err
@@ -78,6 +85,15 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	req, err := normalizeCreateRequest(req)
 	if err != nil {
 		return sqlc.Call{}, err
+	}
+	if req.VoiceAgentID != nil {
+		if err := s.requireVoiceAgentReady(
+			ctx,
+			organizationID,
+			*req.VoiceAgentID,
+		); err != nil {
+			return sqlc.Call{}, err
+		}
 	}
 
 	call, err := s.repo.Create(ctx, organizationID, req)
@@ -213,6 +229,14 @@ func (s *Service) AdmitInbound(
 		)
 	}
 
+	if err := s.requireVoiceAgentReady(
+		ctx,
+		req.OrganizationID,
+		req.VoiceAgentID,
+	); err != nil {
+		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
+	}
+
 	decision, err := s.router.ResolveInbound(ctx, routing.InboundRequest{
 		OrganizationID:      req.OrganizationID,
 		VoiceAgentID:        req.VoiceAgentID,
@@ -311,6 +335,20 @@ func (s *Service) AdmitInbound(
 	}
 
 	return call, nil
+}
+
+func (s *Service) requireVoiceAgentReady(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	voiceAgentID uuid.UUID,
+) error {
+	if s.voiceAgentReadiness == nil {
+		return apperror.NewServiceUnavailable(
+			"voice agent readiness service is unavailable",
+			nil,
+		)
+	}
+	return s.voiceAgentReadiness(ctx, organizationID, voiceAgentID)
 }
 
 func validateExistingInbound(call sqlc.Call, req InboundAdmissionRequest) error {
