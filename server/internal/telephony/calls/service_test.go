@@ -1,6 +1,8 @@
 package calls
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/google/uuid"
@@ -82,5 +84,63 @@ func TestValidateExistingInboundRejectsTrunkMismatch(t *testing.T) {
 
 	if err := validateExistingInbound(call, req); err == nil {
 		t.Fatal("expected trunk attribution conflict")
+	}
+}
+
+func TestRequireVoiceAgentReadyRejectsUnavailableGuard(t *testing.T) {
+	t.Parallel()
+
+	service := &Service{}
+	err := service.requireVoiceAgentReady(
+		context.Background(),
+		uuid.New(),
+		uuid.New(),
+	)
+	if err == nil {
+		t.Fatal("requireVoiceAgentReady() error = nil")
+	}
+}
+
+func TestRequireVoiceAgentReadyPropagatesReadinessFailure(t *testing.T) {
+	t.Parallel()
+
+	want := errors.New("voice agent is not ready")
+	service := &Service{
+		voiceAgentReadiness: func(
+			context.Context,
+			uuid.UUID,
+			uuid.UUID,
+		) error {
+			return want
+		},
+	}
+	err := service.requireVoiceAgentReady(
+		context.Background(),
+		uuid.New(),
+		uuid.New(),
+	)
+	if !errors.Is(err, want) {
+		t.Fatalf("requireVoiceAgentReady() error = %v, want %v", err, want)
+	}
+}
+
+func TestRequireVoiceAgentReadyAcceptsReadyAgent(t *testing.T) {
+	t.Parallel()
+
+	service := &Service{
+		voiceAgentReadiness: func(
+			context.Context,
+			uuid.UUID,
+			uuid.UUID,
+		) error {
+			return nil
+		},
+	}
+	if err := service.requireVoiceAgentReady(
+		context.Background(),
+		uuid.New(),
+		uuid.New(),
+	); err != nil {
+		t.Fatalf("requireVoiceAgentReady() error = %v", err)
 	}
 }
