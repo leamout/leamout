@@ -29,8 +29,8 @@ type Plan struct {
 }
 
 type Entitlement struct {
-	Capability string
-	Enabled    bool
+	Capability string `json:"capability"`
+	Enabled    bool   `json:"enabled"`
 }
 
 type UpsertRequest struct {
@@ -53,7 +53,8 @@ type Response struct {
 	BillingInterval string    `json:"billing_interval"`
 	Status          string    `json:"status"`
 	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	UpdatedAt       time.Time     `json:"updated_at"`
+	Entitlements    []Entitlement `json:"entitlements"`
 }
 
 func response(value Plan) Response {
