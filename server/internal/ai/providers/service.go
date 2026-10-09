@@ -368,11 +368,11 @@ func (s *Service) BindingStatuses(
 	result := make([]BindingStatus, 0, len(bindings))
 	for _, binding := range bindings {
 		status := BindingStatus{
-			Role:             binding.Role,
-			Provider:         binding.Provider,
-			IntegrationID:    binding.CredentialID,
+			Role:            binding.Role,
+			Provider:        binding.Provider,
+			IntegrationID:   binding.CredentialID,
 			ConnectionState: ConnectionReady,
-			Config:           append(json.RawMessage(nil), binding.Config...),
+			Config:          append(json.RawMessage(nil), binding.Config...),
 		}
 
 		if binding.CredentialID == nil {

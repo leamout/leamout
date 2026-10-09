@@ -41,12 +41,12 @@ func (s *Service) Readiness(
 	for _, status := range statuses {
 		byRole[status.Role] = status
 		report.Bindings = append(report.Bindings, BindingDiagnostic{
-			Role:             status.Role,
-			Provider:         status.Provider,
+			Role:            status.Role,
+			Provider:        status.Provider,
 			IntegrationID:   status.IntegrationID,
 			ConnectionState: status.ConnectionState,
-			FailureCode:      status.FailureCode,
-			Config:           append([]byte(nil), status.Config...),
+			FailureCode:     status.FailureCode,
+			Config:          append([]byte(nil), status.Config...),
 		})
 	}
 	expected := expectedRoles(agent.Engine)
