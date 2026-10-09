@@ -1,8 +1,7 @@
-export default function Page() {
-  return (
-    <div className="space-y-2">
-      <h1 className="text-3xl font-semibold tracking-tight">Tool</h1>
-      <p className="text-muted-foreground">Configure an agent tool.</p>
-    </div>
-  );
+import { ToolDetails } from "@/components/tools/tool-details";
+
+export default async function Page({ params }: PageProps<"/tools/[toolId]">) {
+  const { toolId } = await params;
+
+  return <ToolDetails key={toolId} toolId={toolId} />;
 }
