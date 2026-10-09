@@ -61,6 +61,9 @@ func normalizeCreateRequest(req CreateRequest) (CreateRequest, error) {
 }
 
 func validateListRequest(req ListRequest) error {
+	if err := validateFilters(req); err != nil {
+		return err
+	}
 	if req.Offset < 0 {
 		return apperror.NewBadRequest("offset must not be negative")
 	}

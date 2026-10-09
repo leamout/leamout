@@ -940,11 +940,26 @@ const listTrunksByOrganizationID = `-- name: ListTrunksByOrganizationID :many
 SELECT id, organization_id, name, direction, status, outbound_auth_method, auth_username, auth_realm, auth_secret_ciphertext, inbound_enabled, inbound_auth_method, inbound_username, inbound_realm, inbound_secret_ciphertext, max_cps, max_concurrent_calls, codecs, supports_video, supports_fax, created_at, updated_at
 FROM trunks
 WHERE organization_id = $1
-ORDER BY created_at DESC
+  AND ($2::text IS NULL OR status = $2::text)
+  AND ($3::text IS NULL OR direction = $3::text)
+  AND ($4::boolean IS NULL OR inbound_enabled = $4::boolean)
+ORDER BY created_at DESC, id DESC
 `
 
-func (q *Queries) ListTrunksByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]Trunk, error) {
-	rows, err := q.db.Query(ctx, listTrunksByOrganizationID, organizationID)
+type ListTrunksByOrganizationIDParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Status         *string   `db:"status" json:"status"`
+	Direction      *string   `db:"direction" json:"direction"`
+	InboundEnabled *bool     `db:"inbound_enabled" json:"inbound_enabled"`
+}
+
+func (q *Queries) ListTrunksByOrganizationID(ctx context.Context, arg ListTrunksByOrganizationIDParams) ([]Trunk, error) {
+	rows, err := q.db.Query(ctx, listTrunksByOrganizationID,
+		arg.OrganizationID,
+		arg.Status,
+		arg.Direction,
+		arg.InboundEnabled,
+	)
 	if err != nil {
 		return nil, err
 	}

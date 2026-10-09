@@ -212,11 +212,16 @@ func (s *Service) Create(
 func (s *Service) List(
 	ctx context.Context,
 	organizationID uuid.UUID,
+	req ListRequest,
 ) ([]sqlc.Trunk, error) {
+	if err := validateFilters(req); err != nil {
+		return nil, err
+	}
+
 	if err := validateID(organizationID, "organization_id"); err != nil {
 		return nil, err
 	}
-	items, err := s.repo.List(ctx, organizationID)
+	items, err := s.repo.List(ctx, organizationID, req)
 	if err != nil {
 		return nil, apperror.NewInternal("list trunks", err)
 	}

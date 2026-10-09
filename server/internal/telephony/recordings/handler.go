@@ -20,12 +20,18 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		httputil.Error(w, filterErr)
+		return
+	}
 	offset, limit, err := pagination(r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	recordings, err := h.service.List(r.Context(), org, offset, limit)
+	req.Offset, req.Limit = offset, limit
+	recordings, err := h.service.List(r.Context(), org, req)
 	if err != nil {
 		httputil.Error(w, err)
 		return

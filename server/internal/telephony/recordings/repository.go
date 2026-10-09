@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/platform/outbox"
 )
@@ -144,13 +145,16 @@ func (r *Repository) GetCallOrganizationID(
 func (r *Repository) List(
 	ctx context.Context,
 	organizationID uuid.UUID,
-	offset int32,
-	limit int32,
+	req ListRequest,
 ) ([]sqlc.Recording, error) {
 	return r.queries.ListRecordings(ctx, sqlc.ListRecordingsParams{
 		OrganizationID: organizationID,
-		PageOffset:     offset,
-		PageLimit:      limit,
+		PageOffset:     req.Offset,
+		PageLimit:      req.Limit,
+		Status:         req.Status,
+		CallID:         req.CallID,
+		CreatedFrom:    pgconv.NullableTimestamptz(req.CreatedFrom),
+		CreatedBefore:  pgconv.NullableTimestamptz(req.CreatedBefore),
 	})
 }
 

@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const insertAuditEvent = `-- name: InsertAuditEvent :exec
@@ -67,19 +68,44 @@ SELECT
     occurred_at
 FROM audit_events
 WHERE organization_id = $1
+  AND ($2::text IS NULL OR action = $2::text)
+  AND ($3::text IS NULL OR actor_type = $3::text)
+  AND ($4::uuid IS NULL OR actor_id = $4::uuid)
+  AND ($5::text IS NULL OR target_type = $5::text)
+  AND ($6::uuid IS NULL OR target_id = $6::uuid)
+  AND ($7::timestamptz IS NULL OR occurred_at >= $7::timestamptz)
+  AND ($8::timestamptz IS NULL OR occurred_at < $8::timestamptz)
 ORDER BY occurred_at DESC, id DESC
-LIMIT $3::integer
-OFFSET $2::integer
+LIMIT $10::integer
+OFFSET $9::integer
 `
 
 type ListAuditEventsByOrganizationIDParams struct {
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	OffsetCount    int32     `db:"offset_count" json:"offset_count"`
-	LimitCount     int32     `db:"limit_count" json:"limit_count"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Action         *string            `db:"action" json:"action"`
+	ActorType      *string            `db:"actor_type" json:"actor_type"`
+	ActorID        *uuid.UUID         `db:"actor_id" json:"actor_id"`
+	TargetType     *string            `db:"target_type" json:"target_type"`
+	TargetID       *uuid.UUID         `db:"target_id" json:"target_id"`
+	OccurredFrom   pgtype.Timestamptz `db:"occurred_from" json:"occurred_from"`
+	OccurredBefore pgtype.Timestamptz `db:"occurred_before" json:"occurred_before"`
+	OffsetCount    int32              `db:"offset_count" json:"offset_count"`
+	LimitCount     int32              `db:"limit_count" json:"limit_count"`
 }
 
 func (q *Queries) ListAuditEventsByOrganizationID(ctx context.Context, arg ListAuditEventsByOrganizationIDParams) ([]AuditEvent, error) {
-	rows, err := q.db.Query(ctx, listAuditEventsByOrganizationID, arg.OrganizationID, arg.OffsetCount, arg.LimitCount)
+	rows, err := q.db.Query(ctx, listAuditEventsByOrganizationID,
+		arg.OrganizationID,
+		arg.Action,
+		arg.ActorType,
+		arg.ActorID,
+		arg.TargetType,
+		arg.TargetID,
+		arg.OccurredFrom,
+		arg.OccurredBefore,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
 	if err != nil {
 		return nil, err
 	}

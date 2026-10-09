@@ -45,7 +45,9 @@ WHERE va.organization_id = sqlc.arg(organization_id)
   AND va.status = 'active'
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-ORDER BY va.created_at DESC;
+  AND (sqlc.narg(engine)::text IS NULL OR va.engine = sqlc.narg(engine)::text)
+  AND (sqlc.narg(language)::text IS NULL OR va.language = sqlc.narg(language)::text)
+ORDER BY va.created_at DESC, va.id DESC;
 
 -- name: UpdateVoiceAgent :one
 UPDATE voice_agents AS va

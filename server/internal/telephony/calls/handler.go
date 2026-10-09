@@ -217,7 +217,11 @@ func decodeCallRequest(w http.ResponseWriter, r *http.Request, value any) bool {
 }
 
 func listRequest(r *http.Request) (ListRequest, error) {
-	req := ListRequest{Offset: 0, Limit: 50}
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		return ListRequest{}, filterErr
+	}
+	req.Offset, req.Limit = 0, 50
 	if state := strings.TrimSpace(r.URL.Query().Get("state")); state != "" {
 		req.State = &state
 	}

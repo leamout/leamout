@@ -48,11 +48,13 @@ func (r *Repository) InsertDigest(
 	)
 }
 
-func (r *Repository) List(
-	ctx context.Context,
-	organizationID uuid.UUID,
-) ([]sqlc.Trunk, error) {
-	return r.queries.ListTrunksByOrganizationID(ctx, organizationID)
+func (r *Repository) List(ctx context.Context, organizationID uuid.UUID, req ListRequest) ([]sqlc.Trunk, error) {
+	return r.queries.ListTrunksByOrganizationID(ctx, sqlc.ListTrunksByOrganizationIDParams{
+		OrganizationID: organizationID,
+		Status:         req.Status,
+		Direction:      req.Direction,
+		InboundEnabled: req.InboundEnabled,
+	})
 }
 
 func (r *Repository) Get(

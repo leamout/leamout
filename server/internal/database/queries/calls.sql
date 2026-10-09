@@ -55,7 +55,12 @@ SELECT *
 FROM calls
 WHERE organization_id = sqlc.arg(organization_id)
   AND (sqlc.narg(state)::text IS NULL OR state = sqlc.narg(state)::text)
-ORDER BY created_at DESC
+  AND (sqlc.narg(direction)::text IS NULL OR direction = sqlc.narg(direction)::text)
+  AND (sqlc.narg(trunk_id)::uuid IS NULL OR trunk_id = sqlc.narg(trunk_id)::uuid)
+  AND (sqlc.narg(voice_agent_id)::uuid IS NULL OR voice_agent_id = sqlc.narg(voice_agent_id)::uuid)
+  AND (sqlc.narg(created_from)::timestamptz IS NULL OR created_at >= sqlc.narg(created_from)::timestamptz)
+  AND (sqlc.narg(created_before)::timestamptz IS NULL OR created_at < sqlc.narg(created_before)::timestamptz)
+ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_limit)
 OFFSET sqlc.arg(page_offset);
 

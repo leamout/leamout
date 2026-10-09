@@ -23,7 +23,7 @@ type recordingRepository interface {
 	GetIncludingDeleted(context.Context, uuid.UUID, uuid.UUID) (sqlc.Recording, error)
 	GetByCallStorageKey(context.Context, uuid.UUID, string) (sqlc.Recording, error)
 	GetCallOrganizationID(context.Context, uuid.UUID) (uuid.UUID, error)
-	List(context.Context, uuid.UUID, int32, int32) ([]sqlc.Recording, error)
+	List(context.Context, uuid.UUID, ListRequest) ([]sqlc.Recording, error)
 	Start(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (sqlc.Recording, error)
 	MarkReadyForUpload(context.Context, sqlc.Recording, time.Time) (sqlc.Recording, error)
 	Delete(context.Context, sqlc.Recording) (sqlc.Recording, error)
@@ -49,14 +49,18 @@ func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.R
 	return recording, readError(err)
 }
 
-func (s *Service) List(ctx context.Context, organizationID uuid.UUID, offset, limit int32) ([]sqlc.Recording, error) {
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID, req ListRequest) ([]sqlc.Recording, error) {
+	if err := validateFilters(req); err != nil {
+		return nil, err
+	}
+
 	if err := validateOrganizationID(organizationID); err != nil {
 		return nil, err
 	}
-	if err := validatePagination(offset, limit); err != nil {
+	if err := validatePagination(req.Offset, req.Limit); err != nil {
 		return nil, err
 	}
-	recordings, err := s.repo.List(ctx, organizationID, offset, limit)
+	recordings, err := s.repo.List(ctx, organizationID, req)
 	if err != nil {
 		return nil, apperror.NewInternal("list recordings", err)
 	}

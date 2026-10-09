@@ -37,11 +37,18 @@ func Insert(ctx context.Context, tx pgx.Tx, event Event) error {
 	})
 }
 
-func (r *Repository) List(ctx context.Context, organizationID uuid.UUID, limit, offset int32) ([]Event, error) {
+func (r *Repository) List(ctx context.Context, organizationID uuid.UUID, req ListRequest) ([]Event, error) {
 	rows, err := r.queries.ListAuditEventsByOrganizationID(ctx, sqlc.ListAuditEventsByOrganizationIDParams{
 		OrganizationID: organizationID,
-		LimitCount:     limit,
-		OffsetCount:    offset,
+		LimitCount:     req.Limit,
+		OffsetCount:    req.Offset,
+		Action:         req.Action,
+		ActorType:      req.ActorType,
+		ActorID:        req.ActorID,
+		TargetType:     req.TargetType,
+		TargetID:       req.TargetID,
+		OccurredFrom:   pgconv.NullableTimestamptz(req.OccurredFrom),
+		OccurredBefore: pgconv.NullableTimestamptz(req.OccurredBefore),
 	})
 	if err != nil {
 		return nil, err

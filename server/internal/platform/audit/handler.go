@@ -19,6 +19,11 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, apperror.NewBadRequest("organization context required"))
 		return
 	}
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		httputil.Error(w, filterErr)
+		return
+	}
 	limit, offset := int32(50), int32(0)
 	if raw := r.URL.Query().Get("limit"); raw != "" {
 		value, err := strconv.ParseInt(raw, 10, 32)
@@ -36,7 +41,8 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		offset = int32(value)
 	}
-	items, err := h.service.List(r.Context(), organizationID, limit, offset)
+	req.Offset, req.Limit = offset, limit
+	items, err := h.service.List(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)
 		return

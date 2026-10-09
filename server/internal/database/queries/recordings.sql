@@ -156,7 +156,11 @@ SELECT *
 FROM recordings
 WHERE organization_id = sqlc.arg(organization_id)
   AND status <> 'deleted'
-ORDER BY created_at DESC
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(call_id)::uuid IS NULL OR call_id = sqlc.narg(call_id)::uuid)
+  AND (sqlc.narg(created_from)::timestamptz IS NULL OR created_at >= sqlc.narg(created_from)::timestamptz)
+  AND (sqlc.narg(created_before)::timestamptz IS NULL OR created_at < sqlc.narg(created_before)::timestamptz)
+ORDER BY created_at DESC, id DESC
 LIMIT sqlc.arg(page_limit)
 OFFSET sqlc.arg(page_offset);
 

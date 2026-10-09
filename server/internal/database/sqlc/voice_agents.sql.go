@@ -155,11 +155,19 @@ WHERE va.organization_id = $1
   AND va.status = 'active'
   AND o.status = 'active'
   AND o.deleted_at IS NULL
-ORDER BY va.created_at DESC
+  AND ($2::text IS NULL OR va.engine = $2::text)
+  AND ($3::text IS NULL OR va.language = $3::text)
+ORDER BY va.created_at DESC, va.id DESC
 `
 
-func (q *Queries) ListVoiceAgentsByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]VoiceAgent, error) {
-	rows, err := q.db.Query(ctx, listVoiceAgentsByOrganizationID, organizationID)
+type ListVoiceAgentsByOrganizationIDParams struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	Engine         *string   `db:"engine" json:"engine"`
+	Language       *string   `db:"language" json:"language"`
+}
+
+func (q *Queries) ListVoiceAgentsByOrganizationID(ctx context.Context, arg ListVoiceAgentsByOrganizationIDParams) ([]VoiceAgent, error) {
+	rows, err := q.db.Query(ctx, listVoiceAgentsByOrganizationID, arg.OrganizationID, arg.Engine, arg.Language)
 	if err != nil {
 		return nil, err
 	}

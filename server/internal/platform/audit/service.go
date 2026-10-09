@@ -11,17 +11,21 @@ type Service struct{ repo *Repository }
 
 func NewService(repo *Repository) *Service { return &Service{repo: repo} }
 
-func (s *Service) List(ctx context.Context, organizationID uuid.UUID, limit, offset int32) ([]Event, error) {
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID, req ListRequest) ([]Event, error) {
+	if err := validateFilters(req); err != nil {
+		return nil, err
+	}
+
 	if organizationID == uuid.Nil {
 		return nil, apperror.NewBadRequest("organization id is required")
 	}
-	if limit < 1 || limit > 100 {
+	if req.Limit < 1 || req.Limit > 100 {
 		return nil, apperror.NewBadRequest("limit must be between 1 and 100")
 	}
-	if offset < 0 {
+	if req.Offset < 0 {
 		return nil, apperror.NewBadRequest("offset cannot be negative")
 	}
-	items, err := s.repo.List(ctx, organizationID, limit, offset)
+	items, err := s.repo.List(ctx, organizationID, req)
 	if err != nil {
 		return nil, apperror.NewInternal("list audit events", err)
 	}

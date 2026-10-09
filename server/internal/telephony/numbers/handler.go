@@ -44,7 +44,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	rows, err := h.service.List(r.Context(), organizationID)
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		httputil.Error(w, filterErr)
+		return
+	}
+	rows, err := h.service.List(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)
 		return
