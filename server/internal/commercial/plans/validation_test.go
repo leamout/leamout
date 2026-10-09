@@ -3,6 +3,8 @@ package plans
 import "testing"
 
 func TestValidateUpsert(t *testing.T) {
+	t.Parallel()
+
 	req, err := validateUpsert(UpsertRequest{
 		Code:            " pro ",
 		Name:            " Pro ",
@@ -20,6 +22,8 @@ func TestValidateUpsert(t *testing.T) {
 }
 
 func TestValidateUpsertRejectsInvalidAmount(t *testing.T) {
+	t.Parallel()
+
 	_, err := validateUpsert(UpsertRequest{
 		Code:            "pro",
 		Name:            "Pro",
