@@ -28,6 +28,37 @@ func (r *Repository) ListActive(ctx context.Context) ([]Plan, error) {
 	return result, nil
 }
 
+func (r *Repository) ListEntitlements(ctx context.Context, planID uuid.UUID) ([]Entitlement, error) {
+	rows, err := r.queries.ListSubscriptionPlanEntitlements(ctx, planID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Entitlement, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, Entitlement{
+			Capability: row.Capability,
+			Enabled:    row.Enabled,
+		})
+	}
+	return result, nil
+}
+
+func (r *Repository) SetEntitlement(
+	ctx context.Context,
+	planID uuid.UUID,
+	capability string,
+	enabled bool,
+) error {
+	return r.queries.UpsertSubscriptionPlanEntitlement(
+		ctx,
+		sqlc.UpsertSubscriptionPlanEntitlementParams{
+			PlanID:     planID,
+			Capability: capability,
+			Enabled:    enabled,
+		},
+	)
+}
+
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 	row, err := r.queries.GetSubscriptionPlanByID(ctx, id)
 	if err != nil {
