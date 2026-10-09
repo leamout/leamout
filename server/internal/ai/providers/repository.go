@@ -131,7 +131,7 @@ func (r *Repository) ListVoiceAgentIDs(
 		ctx,
 		sqlc.ListVoiceAgentIDsByAIProviderCredentialParams{
 			OrganizationID: organizationID,
-			CredentialID:   credentialID,
+			CredentialID:   &credentialID,
 		},
 	)
 }
