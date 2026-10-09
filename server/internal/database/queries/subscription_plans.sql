@@ -52,3 +52,17 @@ DO UPDATE SET
     billing_interval = EXCLUDED.billing_interval,
     status = EXCLUDED.status
 RETURNING *;
+
+-- name: UpsertSubscriptionPlanEntitlement :exec
+INSERT INTO subscription_plan_entitlements (
+    plan_id,
+    capability,
+    enabled
+)
+VALUES (
+    sqlc.arg(plan_id),
+    sqlc.arg(capability),
+    sqlc.arg(enabled)
+)
+ON CONFLICT (plan_id, capability)
+DO UPDATE SET enabled = EXCLUDED.enabled;
