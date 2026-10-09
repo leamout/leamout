@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/commercial/entitlements"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -82,8 +83,8 @@ func (s *Service) SetEntitlement(
 		return apperror.NewBadRequest("plan_id is required")
 	}
 	capability = strings.TrimSpace(capability)
-	if capability == "" {
-		return apperror.NewBadRequest("capability is required")
+	if !entitlements.Capability(capability).IsValid() {
+		return apperror.NewBadRequest("unsupported organization capability")
 	}
 	if err := s.repo.SetEntitlement(ctx, planID, capability, enabled); err != nil {
 		return apperror.NewInternal("set subscription plan entitlement", err)
