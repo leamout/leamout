@@ -110,3 +110,8 @@ func response(agent sqlc.VoiceAgent) Response {
 		UpdatedAt:             pgconv.TimestamptzToTime(agent.UpdatedAt),
 	}
 }
+
+type ListRequest struct {
+	Engine   *string
+	Language *string
+}

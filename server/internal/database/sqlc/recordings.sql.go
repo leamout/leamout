@@ -560,19 +560,35 @@ SELECT id, organization_id, call_id, storage_integration_id, status, storage_key
 FROM recordings
 WHERE organization_id = $1
   AND status <> 'deleted'
-ORDER BY created_at DESC
-LIMIT $3
-OFFSET $2
+  AND ($2::text IS NULL OR status = $2::text)
+  AND ($3::uuid IS NULL OR call_id = $3::uuid)
+  AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
+  AND ($5::timestamptz IS NULL OR created_at < $5::timestamptz)
+ORDER BY created_at DESC, id DESC
+LIMIT $7
+OFFSET $6
 `
 
 type ListRecordingsParams struct {
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	PageOffset     int32     `db:"page_offset" json:"page_offset"`
-	PageLimit      int32     `db:"page_limit" json:"page_limit"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	Status         *string            `db:"status" json:"status"`
+	CallID         *uuid.UUID         `db:"call_id" json:"call_id"`
+	CreatedFrom    pgtype.Timestamptz `db:"created_from" json:"created_from"`
+	CreatedBefore  pgtype.Timestamptz `db:"created_before" json:"created_before"`
+	PageOffset     int32              `db:"page_offset" json:"page_offset"`
+	PageLimit      int32              `db:"page_limit" json:"page_limit"`
 }
 
 func (q *Queries) ListRecordings(ctx context.Context, arg ListRecordingsParams) ([]Recording, error) {
-	rows, err := q.db.Query(ctx, listRecordings, arg.OrganizationID, arg.PageOffset, arg.PageLimit)
+	rows, err := q.db.Query(ctx, listRecordings,
+		arg.OrganizationID,
+		arg.Status,
+		arg.CallID,
+		arg.CreatedFrom,
+		arg.CreatedBefore,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

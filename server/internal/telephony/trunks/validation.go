@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 var (
@@ -322,6 +323,16 @@ func validatePriority(priority int32) error {
 func validateWeight(weight int32) error {
 	if weight < 1 {
 		return apperror.NewBadRequest("weight must be greater than zero")
+	}
+	return nil
+}
+
+func validateFilters(req ListRequest) error {
+	if err := listquery.Enum("status", req.Status, "active", "disabled"); err != nil {
+		return err
+	}
+	if err := listquery.Enum("direction", req.Direction, "inbound", "outbound", "bidirectional"); err != nil {
+		return err
 	}
 	return nil
 }

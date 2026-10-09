@@ -9,6 +9,7 @@ import (
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/helper"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct{ service *Service }
@@ -40,7 +41,12 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	items, err := h.service.List(r.Context(), organizationID)
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		httputil.Error(w, filterErr)
+		return
+	}
+	items, err := h.service.List(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -185,4 +191,13 @@ func ids(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid voice_agent_id")
 	}
 	return organizationID, agentID, nil
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Engine:   p.Text("engine"),
+		Language: p.Text("language"),
+	}
+	return req, p.Err
 }

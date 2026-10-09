@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/platform/outbox"
 )
@@ -131,6 +132,11 @@ func (r *Repository) List(
 	return r.queries.ListCalls(ctx, sqlc.ListCallsParams{
 		OrganizationID: organizationID,
 		State:          req.State,
+		Direction:      req.Direction,
+		TrunkID:        req.TrunkID,
+		VoiceAgentID:   req.VoiceAgentID,
+		CreatedFrom:    pgconv.NullableTimestamptz(req.CreatedFrom),
+		CreatedBefore:  pgconv.NullableTimestamptz(req.CreatedBefore),
 		PageOffset:     req.Offset,
 		PageLimit:      req.Limit,
 	})

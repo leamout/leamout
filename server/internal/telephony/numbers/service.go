@@ -37,11 +37,16 @@ func (s *Service) Create(
 func (s *Service) List(
 	ctx context.Context,
 	organizationID uuid.UUID,
+	req ListRequest,
 ) ([]sqlc.PhoneNumber, error) {
+	if err := validateFilters(req); err != nil {
+		return nil, err
+	}
+
 	if err := validateOrganization(organizationID); err != nil {
 		return nil, err
 	}
-	rows, err := s.repo.List(ctx, organizationID)
+	rows, err := s.repo.List(ctx, organizationID, req)
 	if err != nil {
 		return nil, apperror.NewInternal("list numbers", err)
 	}

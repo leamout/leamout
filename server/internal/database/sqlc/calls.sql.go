@@ -491,22 +491,37 @@ SELECT id, organization_id, voice_agent_id, trunk_id, trunk_endpoint_id, directi
 FROM calls
 WHERE organization_id = $1
   AND ($2::text IS NULL OR state = $2::text)
-ORDER BY created_at DESC
-LIMIT $4
-OFFSET $3
+  AND ($3::text IS NULL OR direction = $3::text)
+  AND ($4::uuid IS NULL OR trunk_id = $4::uuid)
+  AND ($5::uuid IS NULL OR voice_agent_id = $5::uuid)
+  AND ($6::timestamptz IS NULL OR created_at >= $6::timestamptz)
+  AND ($7::timestamptz IS NULL OR created_at < $7::timestamptz)
+ORDER BY created_at DESC, id DESC
+LIMIT $9
+OFFSET $8
 `
 
 type ListCallsParams struct {
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-	State          *string   `db:"state" json:"state"`
-	PageOffset     int32     `db:"page_offset" json:"page_offset"`
-	PageLimit      int32     `db:"page_limit" json:"page_limit"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	State          *string            `db:"state" json:"state"`
+	Direction      *string            `db:"direction" json:"direction"`
+	TrunkID        *uuid.UUID         `db:"trunk_id" json:"trunk_id"`
+	VoiceAgentID   *uuid.UUID         `db:"voice_agent_id" json:"voice_agent_id"`
+	CreatedFrom    pgtype.Timestamptz `db:"created_from" json:"created_from"`
+	CreatedBefore  pgtype.Timestamptz `db:"created_before" json:"created_before"`
+	PageOffset     int32              `db:"page_offset" json:"page_offset"`
+	PageLimit      int32              `db:"page_limit" json:"page_limit"`
 }
 
 func (q *Queries) ListCalls(ctx context.Context, arg ListCallsParams) ([]Call, error) {
 	rows, err := q.db.Query(ctx, listCalls,
 		arg.OrganizationID,
 		arg.State,
+		arg.Direction,
+		arg.TrunkID,
+		arg.VoiceAgentID,
+		arg.CreatedFrom,
+		arg.CreatedBefore,
 		arg.PageOffset,
 		arg.PageLimit,
 	)

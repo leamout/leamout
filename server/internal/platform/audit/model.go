@@ -45,3 +45,15 @@ func NewEvent(organizationID uuid.UUID, actor Actor, action, targetType string, 
 	}
 	return Event{OrganizationID: organizationID, ActorType: actor.Type, ActorID: actor.ID, Action: action, TargetType: targetType, TargetID: targetID, Metadata: encoded}, nil
 }
+
+type ListRequest struct {
+	Action         *string
+	ActorType      *string
+	ActorID        *uuid.UUID
+	TargetType     *string
+	TargetID       *uuid.UUID
+	OccurredFrom   *time.Time
+	OccurredBefore *time.Time
+	Offset         int32
+	Limit          int32
+}

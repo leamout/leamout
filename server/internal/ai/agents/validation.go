@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 func normalizeCreate(req CreateRequest) (CreateRequest, error) {
@@ -174,4 +175,11 @@ func normalizeOptional(value *string, field string, max int) (*string, error) {
 		return nil, err
 	}
 	return &normalized, nil
+}
+
+func validateFilters(req ListRequest) error {
+	if err := listquery.Enum("engine", req.Engine, "composable", "realtime"); err != nil {
+		return err
+	}
+	return nil
 }

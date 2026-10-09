@@ -49,11 +49,15 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	return agent, nil
 }
 
-func (s *Service) List(ctx context.Context, organizationID uuid.UUID) ([]sqlc.VoiceAgent, error) {
+func (s *Service) List(ctx context.Context, organizationID uuid.UUID, req ListRequest) ([]sqlc.VoiceAgent, error) {
+	if err := validateFilters(req); err != nil {
+		return nil, err
+	}
+
 	if organizationID == uuid.Nil {
 		return nil, apperror.NewBadRequest("organization_id is required")
 	}
-	agents, err := s.repo.List(ctx, organizationID)
+	agents, err := s.repo.List(ctx, organizationID, req)
 	if err != nil {
 		return nil, apperror.NewInternal("list voice agents", err)
 	}

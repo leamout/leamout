@@ -51,7 +51,11 @@ SELECT *
 FROM phone_numbers
 WHERE organization_id = sqlc.arg(organization_id)
   AND status <> 'released'
-ORDER BY created_at DESC;
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(country_code)::text IS NULL OR country_code = sqlc.narg(country_code)::text)
+  AND (sqlc.narg(trunk_id)::uuid IS NULL OR trunk_id = sqlc.narg(trunk_id)::uuid)
+  AND (sqlc.narg(voice_enabled)::boolean IS NULL OR voice_enabled = sqlc.narg(voice_enabled)::boolean)
+ORDER BY created_at DESC, id DESC;
 
 -- name: ListPhoneNumbersByCountry :many
 SELECT *

@@ -77,7 +77,10 @@ LIMIT 1;
 SELECT *
 FROM trunks
 WHERE organization_id = sqlc.arg(organization_id)
-ORDER BY created_at DESC;
+  AND (sqlc.narg(status)::text IS NULL OR status = sqlc.narg(status)::text)
+  AND (sqlc.narg(direction)::text IS NULL OR direction = sqlc.narg(direction)::text)
+  AND (sqlc.narg(inbound_enabled)::boolean IS NULL OR inbound_enabled = sqlc.narg(inbound_enabled)::boolean)
+ORDER BY created_at DESC, id DESC;
 
 -- name: UpdateTrunk :one
 UPDATE trunks

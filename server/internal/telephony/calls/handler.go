@@ -12,6 +12,7 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct {
@@ -217,7 +218,11 @@ func decodeCallRequest(w http.ResponseWriter, r *http.Request, value any) bool {
 }
 
 func listRequest(r *http.Request) (ListRequest, error) {
-	req := ListRequest{Offset: 0, Limit: 50}
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		return ListRequest{}, filterErr
+	}
+	req.Offset, req.Limit = 0, 50
 	if state := strings.TrimSpace(r.URL.Query().Get("state")); state != "" {
 		req.State = &state
 	}
@@ -243,4 +248,16 @@ func parseInt32Query(r *http.Request, key string, fallback int32) (int32, error)
 		return 0, apperror.NewBadRequest(key + " must be an integer")
 	}
 	return int32(parsed), nil
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Direction:     p.Text("direction"),
+		TrunkID:       p.UUID("trunk_id"),
+		VoiceAgentID:  p.UUID("voice_agent_id"),
+		CreatedFrom:   p.Time("created_from"),
+		CreatedBefore: p.Time("created_before"),
+	}
+	return req, p.Err
 }

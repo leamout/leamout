@@ -9,6 +9,7 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct{ service *Service }
@@ -20,12 +21,18 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
+	req, filterErr := parseFilters(r)
+	if filterErr != nil {
+		httputil.Error(w, filterErr)
+		return
+	}
 	offset, limit, err := pagination(r)
 	if err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	recordings, err := h.service.List(r.Context(), org, offset, limit)
+	req.Offset, req.Limit = offset, limit
+	recordings, err := h.service.List(r.Context(), org, req)
 	if err != nil {
 		httputil.Error(w, err)
 		return
@@ -109,4 +116,15 @@ func pagination(r *http.Request) (int32, int32, error) {
 		limit = int32(parsed)
 	}
 	return offset, limit, nil
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Status:        p.Text("status"),
+		CallID:        p.UUID("call_id"),
+		CreatedFrom:   p.Time("created_from"),
+		CreatedBefore: p.Time("created_before"),
+	}
+	return req, p.Err
 }

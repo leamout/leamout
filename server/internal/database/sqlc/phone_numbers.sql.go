@@ -353,11 +353,29 @@ SELECT id, organization_id, number, country_code, trunk_id, voice_enabled, statu
 FROM phone_numbers
 WHERE organization_id = $1
   AND status <> 'released'
-ORDER BY created_at DESC
+  AND ($2::text IS NULL OR status = $2::text)
+  AND ($3::text IS NULL OR country_code = $3::text)
+  AND ($4::uuid IS NULL OR trunk_id = $4::uuid)
+  AND ($5::boolean IS NULL OR voice_enabled = $5::boolean)
+ORDER BY created_at DESC, id DESC
 `
 
-func (q *Queries) ListPhoneNumbersByOrganizationID(ctx context.Context, organizationID uuid.UUID) ([]PhoneNumber, error) {
-	rows, err := q.db.Query(ctx, listPhoneNumbersByOrganizationID, organizationID)
+type ListPhoneNumbersByOrganizationIDParams struct {
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+	Status         *string    `db:"status" json:"status"`
+	CountryCode    *string    `db:"country_code" json:"country_code"`
+	TrunkID        *uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	VoiceEnabled   *bool      `db:"voice_enabled" json:"voice_enabled"`
+}
+
+func (q *Queries) ListPhoneNumbersByOrganizationID(ctx context.Context, arg ListPhoneNumbersByOrganizationIDParams) ([]PhoneNumber, error) {
+	rows, err := q.db.Query(ctx, listPhoneNumbersByOrganizationID,
+		arg.OrganizationID,
+		arg.Status,
+		arg.CountryCode,
+		arg.TrunkID,
+		arg.VoiceEnabled,
+	)
 	if err != nil {
 		return nil, err
 	}

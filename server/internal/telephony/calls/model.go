@@ -106,7 +106,13 @@ type ActiveAdmissionCall struct {
 }
 
 type ListRequest struct {
-	State  *string
+	State         *string
+	Direction     *string
+	TrunkID       *uuid.UUID
+	VoiceAgentID  *uuid.UUID
+	CreatedFrom   *time.Time
+	CreatedBefore *time.Time
+
 	Offset int32
 	Limit  int32
 }

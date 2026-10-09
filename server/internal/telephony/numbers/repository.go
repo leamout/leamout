@@ -32,14 +32,14 @@ func (r *Repository) Create(
 	)
 }
 
-func (r *Repository) List(
-	ctx context.Context,
-	organizationID uuid.UUID,
-) ([]sqlc.PhoneNumber, error) {
-	return r.queries.ListPhoneNumbersByOrganizationID(
-		ctx,
-		organizationID,
-	)
+func (r *Repository) List(ctx context.Context, organizationID uuid.UUID, req ListRequest) ([]sqlc.PhoneNumber, error) {
+	return r.queries.ListPhoneNumbersByOrganizationID(ctx, sqlc.ListPhoneNumbersByOrganizationIDParams{
+		OrganizationID: organizationID,
+		Status:         req.Status,
+		CountryCode:    req.CountryCode,
+		TrunkID:        req.TrunkID,
+		VoiceEnabled:   req.VoiceEnabled,
+	})
 }
 
 func (r *Repository) Get(

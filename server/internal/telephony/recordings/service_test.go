@@ -26,7 +26,7 @@ func (f *fakeServiceRepository) GetByCallStorageKey(context.Context, uuid.UUID, 
 func (f *fakeServiceRepository) GetCallOrganizationID(context.Context, uuid.UUID) (uuid.UUID, error) {
 	return f.recording.OrganizationID, nil
 }
-func (f *fakeServiceRepository) List(context.Context, uuid.UUID, int32, int32) ([]sqlc.Recording, error) {
+func (f *fakeServiceRepository) List(context.Context, uuid.UUID, ListRequest) ([]sqlc.Recording, error) {
 	return []sqlc.Recording{f.recording}, nil
 }
 func (f *fakeServiceRepository) Start(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (sqlc.Recording, error) {
