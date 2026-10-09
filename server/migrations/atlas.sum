@@ -1,4 +1,4 @@
-h1:yY4YB/HEkNP2ThzOKzIbFwu5YzXoI00VfIqzAZiTXWw=
+h1:ZHQq2wp+jtxhkQlolIeixrtXDNYFBYOkO4oe68tG5wA=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:w8z6z5sqnmtExCGa63iYl2ssG9rgXX8m3VPqvb1z4jo=
 003_create_authentication.sql h1:6R8fm0zInr9A/OW74oYTBLpPYHRf3dpVjw13qyjdd7E=
@@ -31,3 +31,5 @@ h1:yY4YB/HEkNP2ThzOKzIbFwu5YzXoI00VfIqzAZiTXWw=
 030_create_retention_policies.sql h1:BIOD3sHMDMkDp42pFHCcD/vBvNh+sDvju+UTNNRMYxs=
 031_create_network_policies.sql h1:e+67GCu/p6LSwv4qbcrKM45I4iTqyeaXjpJOUey2LdI=
 032_create_email_deliveries.sql h1:GePdYAaG8giSGLNGFrkFs66AiRZSRCJLebWi/aOydPs=
+033_create_subscription_plans.sql h1:hMMW2A/pSVm32xiXJX6tHHqblnriC+bRs0+eDwRhlu0=
+034_create_subscriptions.sql h1:/oq6MUoQ+UmIrTf4Xje/Th0u8udP6Pw0JOmaTdp+F20=

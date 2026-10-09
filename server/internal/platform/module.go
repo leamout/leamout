@@ -20,11 +20,11 @@ import (
 type Module struct {
 	Audit       AuditModule
 	Idempotency IdempotencyModule
-	Networking   NetworkingModule
-	Storage      StorageModule
-	SCIM         SCIMModule
-	Retention    RetentionModule
-	Webhooks     WebhooksModule
+	Networking  NetworkingModule
+	Storage     StorageModule
+	SCIM        SCIMModule
+	Retention   RetentionModule
+	Webhooks    WebhooksModule
 }
 
 type AuditModule struct {

@@ -352,6 +352,39 @@ type StorageIntegration struct {
 	UpdatedAt                 pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type Subscription struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID             uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Status             string             `db:"status" json:"status"`
+	CurrentPeriodStart pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
+	CurrentPeriodEnd   pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	TrialEndsAt        pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
+	CancelAtPeriodEnd  bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
+	CanceledAt         pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type SubscriptionPlan struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Code            string             `db:"code" json:"code"`
+	Name            string             `db:"name" json:"name"`
+	Description     *string            `db:"description" json:"description"`
+	Currency        string             `db:"currency" json:"currency"`
+	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
+	BillingInterval string             `db:"billing_interval" json:"billing_interval"`
+	Status          string             `db:"status" json:"status"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type SubscriptionPlanEntitlement struct {
+	PlanID     uuid.UUID `db:"plan_id" json:"plan_id"`
+	Capability string    `db:"capability" json:"capability"`
+	Enabled    bool      `db:"enabled" json:"enabled"`
+}
+
 type Trunk struct {
 	ID                      uuid.UUID          `db:"id" json:"id"`
 	OrganizationID          uuid.UUID          `db:"organization_id" json:"organization_id"`
