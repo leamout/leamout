@@ -23,6 +23,13 @@ func (s *Service) List(ctx context.Context) ([]Plan, error) {
 	if err != nil {
 		return nil, apperror.NewInternal("list subscription plans", err)
 	}
+	for i := range values {
+		entitlements, err := s.repo.ListEntitlements(ctx, values[i].ID)
+		if err != nil {
+			return nil, apperror.NewInternal("list subscription plan entitlements", err)
+		}
+		values[i].Entitlements = entitlements
+	}
 	return values, nil
 }
 
@@ -37,6 +44,11 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 	if err != nil {
 		return Plan{}, apperror.NewInternal("get subscription plan", err)
 	}
+	entitlements, err := s.repo.ListEntitlements(ctx, value.ID)
+	if err != nil {
+		return Plan{}, apperror.NewInternal("list subscription plan entitlements", err)
+	}
+	value.Entitlements = entitlements
 	return value, nil
 }
 
@@ -52,7 +64,31 @@ func (s *Service) GetByCode(ctx context.Context, code string) (Plan, error) {
 	if err != nil {
 		return Plan{}, apperror.NewInternal("get subscription plan", err)
 	}
+	entitlements, err := s.repo.ListEntitlements(ctx, value.ID)
+	if err != nil {
+		return Plan{}, apperror.NewInternal("list subscription plan entitlements", err)
+	}
+	value.Entitlements = entitlements
 	return value, nil
+}
+
+func (s *Service) SetEntitlement(
+	ctx context.Context,
+	planID uuid.UUID,
+	capability string,
+	enabled bool,
+) error {
+	if planID == uuid.Nil {
+		return apperror.NewBadRequest("plan_id is required")
+	}
+	capability = strings.TrimSpace(capability)
+	if capability == "" {
+		return apperror.NewBadRequest("capability is required")
+	}
+	if err := s.repo.SetEntitlement(ctx, planID, capability, enabled); err != nil {
+		return apperror.NewInternal("set subscription plan entitlement", err)
+	}
+	return nil
 }
 
 func (s *Service) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest) (Plan, error) {
