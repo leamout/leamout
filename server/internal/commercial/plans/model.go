@@ -25,6 +25,12 @@ type Plan struct {
 	Status          string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	Entitlements    []Entitlement
+}
+
+type Entitlement struct {
+	Capability string
+	Enabled    bool
 }
 
 type UpsertRequest struct {
