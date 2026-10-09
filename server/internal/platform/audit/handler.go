@@ -7,6 +7,7 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct{ service *Service }
@@ -48,4 +49,18 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httputil.OK(w, map[string]any{"audit_events": items})
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Action:         p.Text("action"),
+		ActorType:      p.Text("actor_type"),
+		ActorID:        p.UUID("actor_id"),
+		TargetType:     p.Text("target_type"),
+		TargetID:       p.UUID("target_id"),
+		OccurredFrom:   p.Time("occurred_from"),
+		OccurredBefore: p.Time("occurred_before"),
+	}
+	return req, p.Err
 }

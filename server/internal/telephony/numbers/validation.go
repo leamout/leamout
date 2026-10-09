@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 var e164 = regexp.MustCompile(`^\+[1-9][0-9]{6,14}$`)
@@ -47,6 +48,22 @@ func normalizeCreate(req *CreateRequest) error {
 func validateUpdate(req UpdateRequest) error {
 	if req.VoiceEnabled == nil {
 		return apperror.NewBadRequest("at least one capability is required")
+	}
+	return nil
+}
+
+func validateFilters(req ListRequest) error {
+	if req.CountryCode != nil {
+		value := *req.CountryCode
+		if len(value) != 2 || value[0] < 'A' || value[0] > 'Z' || value[1] < 'A' || value[1] > 'Z' {
+			return apperror.NewBadRequest("country_code must be a two-letter ISO country code")
+		}
+	}
+	if err := listquery.Enum("status", req.Status, "active", "disabled", "porting"); err != nil {
+		return err
+	}
+	if err := listquery.ID("trunk_id", req.TrunkID); err != nil {
+		return err
 	}
 	return nil
 }

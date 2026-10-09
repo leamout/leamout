@@ -210,3 +210,9 @@ func endpointResponse(endpoint sqlc.TrunkEndpoint) EndpointResponse {
 		UpdatedAt:           pgconv.TimestamptzToTime(endpoint.UpdatedAt),
 	}
 }
+
+type ListRequest struct {
+	Status         *string
+	Direction      *string
+	InboundEnabled *bool
+}

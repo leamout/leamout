@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 func validateOrganizationID(id uuid.UUID) error {
@@ -171,4 +172,17 @@ func validateInboundAdmission(req InboundAdmissionRequest) error {
 		return apperror.NewBadRequest("to_uri is required")
 	}
 	return nil
+}
+
+func validateFilters(req ListRequest) error {
+	if err := listquery.Enum("direction", req.Direction, "inbound", "outbound"); err != nil {
+		return err
+	}
+	if err := listquery.ID("trunk_id", req.TrunkID); err != nil {
+		return err
+	}
+	if err := listquery.ID("voice_agent_id", req.VoiceAgentID); err != nil {
+		return err
+	}
+	return listquery.Range(req.CreatedFrom, req.CreatedBefore)
 }

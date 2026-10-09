@@ -2,6 +2,7 @@ package numbers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -9,6 +10,7 @@ import (
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/helper"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct {
@@ -144,4 +146,19 @@ func requestIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 		return uuid.Nil, uuid.Nil, apperror.NewBadRequest("invalid number id")
 	}
 	return organizationID, id, nil
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Status:       p.Text("status"),
+		CountryCode:  p.Text("country_code"),
+		TrunkID:      p.UUID("trunk_id"),
+		VoiceEnabled: p.Bool("voice_enabled"),
+	}
+	if req.CountryCode != nil {
+		value := strings.ToUpper(*req.CountryCode)
+		req.CountryCode = &value
+	}
+	return req, p.Err
 }

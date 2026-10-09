@@ -48,3 +48,10 @@ func response(row sqlc.PhoneNumber) Response {
 		UpdatedAt:      pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
 }
+
+type ListRequest struct {
+	Status       *string
+	CountryCode  *string
+	TrunkID      *uuid.UUID
+	VoiceEnabled *bool
+}

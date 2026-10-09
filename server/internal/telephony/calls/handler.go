@@ -12,6 +12,7 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct {
@@ -247,4 +248,16 @@ func parseInt32Query(r *http.Request, key string, fallback int32) (int32, error)
 		return 0, apperror.NewBadRequest(key + " must be an integer")
 	}
 	return int32(parsed), nil
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Direction:     p.Text("direction"),
+		TrunkID:       p.UUID("trunk_id"),
+		VoiceAgentID:  p.UUID("voice_agent_id"),
+		CreatedFrom:   p.Time("created_from"),
+		CreatedBefore: p.Time("created_before"),
+	}
+	return req, p.Err
 }

@@ -77,3 +77,12 @@ func recordingResponse(recording sqlc.Recording) RecordingResponse {
 		UpdatedAt:       pgconv.TimestamptzToTime(recording.UpdatedAt),
 	}
 }
+
+type ListRequest struct {
+	Status        *string
+	CallID        *uuid.UUID
+	CreatedFrom   *time.Time
+	CreatedBefore *time.Time
+	Offset        int32
+	Limit         int32
+}

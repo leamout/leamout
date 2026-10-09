@@ -9,6 +9,7 @@ import (
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/helper"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"github.com/leamout/leamout/server/pkg/listquery"
 )
 
 type Handler struct {
@@ -462,4 +463,14 @@ func endpointIDs(
 		)
 	}
 	return organizationID, trunkID, endpointID, nil
+}
+
+func parseFilters(r *http.Request) (ListRequest, error) {
+	p := listquery.Parser{Values: r.URL.Query()}
+	req := ListRequest{
+		Status:         p.Text("status"),
+		Direction:      p.Text("direction"),
+		InboundEnabled: p.Bool("inbound_enabled"),
+	}
+	return req, p.Err
 }
