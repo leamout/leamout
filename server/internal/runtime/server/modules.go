@@ -6,6 +6,7 @@ import (
 
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/ai/providers"
+	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity"
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
@@ -35,6 +36,7 @@ type modules struct {
 	identity             *identity.Module
 	tenancy              *tenancy.Module
 	platform             *platform.Module
+	commercial           *commercial.Module
 	ai                   *ai.Module
 	telephony            *telephony.Module
 	authn                *middleware.AuthnMiddleware
@@ -125,6 +127,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		credentialCipher,
 		trustedProxies,
 	)
+	commercialModule := commercial.New(queries)
 	recordingStorage := recordings.NewResolvedObjectStorage(
 		objectClient,
 		platformModule.Storage.Service,
@@ -186,6 +189,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		identity:             identityModule,
 		tenancy:              tenancyModule,
 		platform:             platformModule,
+		commercial:           commercialModule,
 		ai:                   aiModule,
 		telephony:            telephonyModule,
 		authn:                authMiddleware,
