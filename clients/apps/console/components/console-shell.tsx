@@ -23,7 +23,11 @@ const navigation = [
   { title: "Overview", href: "/" },
   { title: "Agents", href: "/agents" },
   { title: "Calls", href: "/calls" },
-  { title: "Connections", href: "/connections" },
+  { title: "Phone numbers", href: "/phone-numbers" },
+  { title: "SIP trunks", href: "/sip-trunks" },
+  { title: "AI providers", href: "/ai-providers" },
+  { title: "Tools", href: "/tools" },
+  { title: "Webhooks", href: "/webhooks" },
   { title: "Settings", href: "/settings" },
 ];
 
@@ -35,6 +39,10 @@ function Navigation({ settings = false }: { settings?: boolean }) {
     "M5 7h14v13H5z M12 3v4 M8 12h1 M15 12h1 M9 16h6",
     "M5 3h4l2 5-3 2a14 14 0 0 0 6 6l2-3 5 2v4C10 21 3 14 3 5z",
     "M9 15l6-6 M8 13l-2 2a3 3 0 0 0 4 4l3-3 M16 11l2-2a3 3 0 0 0-4-4l-3 3",
+    "M4 4h16v16H4z M8 8h8 M8 12h8 M8 16h4",
+    "M12 3v18 M3 12h18 M5 5l14 14 M5 19L19 5",
+    "M4 7h16 M4 17h16 M8 4v6 M16 14v6",
+    "M5 5h14v14H5z M9 9h6 M9 13h6",
     "M4 7h16 M4 17h16 M8 4v6 M16 14v6",
   ];
 

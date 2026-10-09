@@ -3,7 +3,8 @@ export default function Page() {
     <div className="space-y-2">
       <h1 className="text-3xl font-semibold tracking-tight">Phone numbers</h1>
       <p className="text-muted-foreground">
-        Manage your existing phone numbers and their agent routing.
+        Manage existing BYOC numbers and agent routing. Purchasing and
+        provisioning numbers are deferred.
       </p>
     </div>
   );
