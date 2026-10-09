@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/leamout/leamout/server/internal/commercial/entitlements"
 	"github.com/leamout/leamout/server/internal/platform/audit"
-	"github.com/leamout/leamout/server/internal/platform/entitlements"
 	"github.com/leamout/leamout/server/internal/platform/networking"
 	"github.com/leamout/leamout/server/internal/platform/retention"
 	"github.com/leamout/leamout/server/internal/platform/storage"
@@ -18,6 +18,7 @@ func RegisterRoutes(
 	router chi.Router,
 	module *Module,
 	organizationAccess func(string) func(http.Handler) http.Handler,
+	entitlementsMiddleware *entitlements.Middleware,
 ) {
 	webhooks.RegisterRoutes(
 		router,
@@ -41,20 +42,20 @@ func RegisterRoutes(
 		router,
 		module.Networking.Handler,
 		organizationAccess("networking"),
-		module.Entitlements.Middleware.Require(entitlements.CapabilityPrivateNetworking),
+		entitlementsMiddleware.Require(entitlements.CapabilityPrivateNetworking),
 	)
 
 	scim.RegisterManagementRoutes(
 		router,
 		module.SCIM.Handler,
 		organizationAccess("scim"),
-		module.Entitlements.Middleware.Require(entitlements.CapabilitySCIM),
+		entitlementsMiddleware.Require(entitlements.CapabilitySCIM),
 	)
 
 	retention.RegisterRoutes(
 		router,
 		module.Retention.Handler,
 		organizationAccess("retention"),
-		module.Entitlements.Middleware.Require(entitlements.CapabilityRetentionPolicies),
+		entitlementsMiddleware.Require(entitlements.CapabilityRetentionPolicies),
 	)
 }
