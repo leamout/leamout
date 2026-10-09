@@ -123,16 +123,18 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		admissionLimiter,
 		metrics.New(redisClient),
 	)
-	platformAICredentials, err := cfg.PlatformAICredentials()
-	if err != nil {
-		closeDependencies()
-		return nil, err
-	}
-
 	aiModule := ai.New(queries, ai.Dependencies{
-		CredentialCipher:    credentialCipher,
-		PlatformCredentials: providers.NewPlatformCredentials(platformAICredentials),
-		Calls:               callsService,
+		CredentialCipher: credentialCipher,
+		PlatformCredentials: providers.PlatformCredentials{
+			OpenAI:     cfg.OpenAIAPIKey,
+			Gemini:     cfg.GeminiAPIKey,
+			Deepgram:   cfg.DeepgramAPIKey,
+			AssemblyAI: cfg.AssemblyAIAPIKey,
+			Groq:       cfg.GroqAPIKey,
+			Cartesia:   cfg.CartesiaAPIKey,
+			ElevenLabs: cfg.ElevenLabsAPIKey,
+		},
+		Calls: callsService,
 	})
 	mediaNodes := medianodes.NewRegistry(redisClient)
 	agentRuntime, err := agent.NewWithMediaNodes(
