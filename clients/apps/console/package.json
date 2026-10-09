@@ -12,12 +12,14 @@
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",
+    "@hookform/resolvers": "^5.9.1",
+    "@hugeicons/core-free-icons": "^4.3.5",
+    "@hugeicons/react": "^1.1.10",
     "@leamout/ui": "workspace:*",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.0.0",
-    "@hookform/resolvers": "^5.9.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {
