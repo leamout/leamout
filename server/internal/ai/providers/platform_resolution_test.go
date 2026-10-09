@@ -10,9 +10,9 @@ func TestResolveSecretUsesPlatformCredential(t *testing.T) {
 	t.Parallel()
 
 	service := &Service{
-		platform: NewPlatformCredentials(map[string]string{
-			"openai": "platform-secret",
-		}),
+		platform: PlatformCredentials{
+			OpenAI: "platform-secret",
+		},
 	}
 
 	secret, err := service.resolveSecret(
