@@ -315,13 +315,7 @@ func (s *Service) UpsertBinding(
 			"provider is not compatible with Voice Agent role",
 		)
 	}
-	if req.CredentialID == nil {
-		if !s.platform.Has(req.Provider) {
-			return Binding{}, apperror.NewBadRequest(
-				"credential_id is required because no platform credential is configured for provider",
-			)
-		}
-	} else if *req.CredentialID == uuid.Nil {
+	if req.CredentialID != nil && *req.CredentialID == uuid.Nil {
 		return Binding{}, apperror.NewBadRequest("credential_id is invalid")
 	}
 
