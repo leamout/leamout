@@ -44,15 +44,15 @@ type UpsertRequest struct {
 }
 
 type Response struct {
-	ID              uuid.UUID `json:"id"`
-	Code            string    `json:"code"`
-	Name            string    `json:"name"`
-	Description     *string   `json:"description,omitempty"`
-	Currency        string    `json:"currency"`
-	AmountMinor     int64     `json:"amount_minor"`
-	BillingInterval string    `json:"billing_interval"`
-	Status          string    `json:"status"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              uuid.UUID     `json:"id"`
+	Code            string        `json:"code"`
+	Name            string        `json:"name"`
+	Description     *string       `json:"description,omitempty"`
+	Currency        string        `json:"currency"`
+	AmountMinor     int64         `json:"amount_minor"`
+	BillingInterval string        `json:"billing_interval"`
+	Status          string        `json:"status"`
+	CreatedAt       time.Time     `json:"created_at"`
 	UpdatedAt       time.Time     `json:"updated_at"`
 	Entitlements    []Entitlement `json:"entitlements"`
 }
