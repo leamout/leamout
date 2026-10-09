@@ -57,5 +57,17 @@ type Response struct {
 }
 
 func response(value Plan) Response {
-	return Response(value)
+	return Response{
+		ID:              value.ID,
+		Code:            value.Code,
+		Name:            value.Name,
+		Description:     value.Description,
+		Currency:        value.Currency,
+		AmountMinor:     value.AmountMinor,
+		BillingInterval: value.BillingInterval,
+		Status:          value.Status,
+		CreatedAt:       value.CreatedAt,
+		UpdatedAt:       value.UpdatedAt,
+		Entitlements:    value.Entitlements,
+	}
 }
