@@ -43,13 +43,12 @@ type ReadinessReport struct {
 }
 
 type BindingDiagnostic struct {
-	Role             string          `json:"role"`
-	Provider         string          `json:"provider"`
-	IntegrationID    *uuid.UUID      `json:"integration_id,omitempty"`
-	CredentialSource string          `json:"credential_source"`
-	ConnectionState  string          `json:"connection_state"`
-	FailureCode      *string         `json:"failure_code,omitempty"`
-	Config           json.RawMessage `json:"config"`
+	Role            string          `json:"role"`
+	Provider        string          `json:"provider"`
+	IntegrationID   *uuid.UUID      `json:"integration_id,omitempty"`
+	ConnectionState string          `json:"connection_state"`
+	FailureCode     *string         `json:"failure_code,omitempty"`
+	Config          json.RawMessage `json:"config"`
 }
 
 type CreateRequest struct {
