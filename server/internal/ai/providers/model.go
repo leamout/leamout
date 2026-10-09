@@ -121,13 +121,5 @@ type BindingStatus struct {
 }
 
 func bindingResponse(value Binding) BindingResponse {
-	return BindingResponse{
-		ID:             value.ID,
-		OrganizationID: value.OrganizationID,
-		VoiceAgentID:   value.VoiceAgentID,
-		Role:           value.Role,
-		Provider:       value.Provider,
-		CredentialID:   value.CredentialID,
-		Config:         value.Config,
-	}
+	return BindingResponse(value)
 }
