@@ -43,9 +43,8 @@ func (s *Service) Readiness(
 		report.Bindings = append(report.Bindings, BindingDiagnostic{
 			Role:             status.Role,
 			Provider:         status.Provider,
-			IntegrationID:    status.IntegrationID,
-			CredentialSource: status.CredentialSource,
-			ConnectionState:  status.ConnectionState,
+			IntegrationID:   status.IntegrationID,
+			ConnectionState: status.ConnectionState,
 			FailureCode:      status.FailureCode,
 			Config:           append([]byte(nil), status.Config...),
 		})
@@ -88,14 +87,14 @@ func (s *Service) Readiness(
 				status.Provider,
 			)
 			remediation := "Verify or rotate the integration, then run readiness again."
-			if status.CredentialSource == providers.CredentialSourcePlatform {
+			if status.IntegrationID == nil {
 				code = "platform_credential_unavailable"
 				field = "bindings." + role + ".provider"
 				message = fmt.Sprintf(
 					"The platform credential for %s is unavailable.",
 					status.Provider,
 				)
-				remediation = "Configure the platform AI credential or bind an organization integration."
+				remediation = "Configure the provider API key for this deployment or bind an organization integration."
 			}
 			report.Issues = append(report.Issues, readinessIssue(
 				code,
