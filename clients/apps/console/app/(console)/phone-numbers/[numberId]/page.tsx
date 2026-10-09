@@ -1,10 +1,9 @@
-export default function Page() {
-  return (
-    <div className="space-y-2">
-      <h1 className="text-3xl font-semibold tracking-tight">Phone number</h1>
-      <p className="text-muted-foreground">
-        Configure the existing number and its agent routing.
-      </p>
-    </div>
-  );
+import { PhoneNumberDetails } from "@/components/phone-numbers/phone-number-details";
+
+export default async function Page({
+  params,
+}: PageProps<"/phone-numbers/[numberId]">) {
+  const { numberId } = await params;
+
+  return <PhoneNumberDetails numberId={numberId} />;
 }
