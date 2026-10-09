@@ -1,10 +1,9 @@
-export default function Page() {
-  return (
-    <div className="space-y-2">
-      <h1 className="text-3xl font-semibold tracking-tight">AI provider</h1>
-      <p className="text-muted-foreground">
-        Configure organization provider credentials.
-      </p>
-    </div>
-  );
+import { ProviderDetails } from "@/components/ai-providers/provider-details";
+
+export default async function Page({
+  params,
+}: PageProps<"/ai-providers/[providerId]">) {
+  const { providerId } = await params;
+
+  return <ProviderDetails key={providerId} providerId={providerId} />;
 }
