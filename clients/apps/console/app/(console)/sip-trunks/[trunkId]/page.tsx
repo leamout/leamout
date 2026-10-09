@@ -1,10 +1,9 @@
-export default function Page() {
-  return (
-    <div className="space-y-2">
-      <h1 className="text-3xl font-semibold tracking-tight">SIP trunk</h1>
-      <p className="text-muted-foreground">
-        Configure SIP connectivity, credentials, and routing.
-      </p>
-    </div>
-  );
+import { TrunkDetails } from "@/components/sip-trunks/trunk-details";
+
+export default async function Page({
+  params,
+}: PageProps<"/sip-trunks/[trunkId]">) {
+  const { trunkId } = await params;
+
+  return <TrunkDetails trunkId={trunkId} />;
 }
