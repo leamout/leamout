@@ -1,11 +1,7 @@
-export default function Page() {
-  return (
-    <div className="space-y-2">
-      <h1 className="text-3xl font-semibold tracking-tight">Agent</h1>
-      <p className="text-muted-foreground">
-        Agent configuration, models and voice, tools, call settings, testing,
-        and activity will use tabs within this page.
-      </p>
-    </div>
-  );
+import { AgentDetails } from "@/components/agents/agent-details";
+
+export default async function Page({ params }: PageProps<"/agents/[agentId]">) {
+  const { agentId } = await params;
+
+  return <AgentDetails agentId={agentId} />;
 }
