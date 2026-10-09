@@ -39,7 +39,7 @@ func NewService(
 }
 
 func (s *Service) ConfigurePlatformCredentials(values PlatformCredentials) {
-	s.platform = NewPlatformCredentials(values)
+	s.platform = values
 }
 
 func firstCatalog(catalogs []*aicatalog.Catalog) *aicatalog.Catalog {
@@ -377,8 +377,7 @@ func (s *Service) BindingStatuses(
 			Role:             binding.Role,
 			Provider:         binding.Provider,
 			IntegrationID:    binding.CredentialID,
-			CredentialSource: binding.CredentialSource,
-			ConnectionState:  ConnectionReady,
+			ConnectionState: ConnectionReady,
 			Config:           append(json.RawMessage(nil), binding.Config...),
 		}
 
