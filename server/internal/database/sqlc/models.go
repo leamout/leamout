@@ -460,7 +460,7 @@ type VoiceAgentProviderBinding struct {
 	VoiceAgentID   uuid.UUID          `db:"voice_agent_id" json:"voice_agent_id"`
 	Role           string             `db:"role" json:"role"`
 	Provider       string             `db:"provider" json:"provider"`
-	CredentialID   uuid.UUID          `db:"credential_id" json:"credential_id"`
+	CredentialID   *uuid.UUID         `db:"credential_id" json:"credential_id"`
 	Config         []byte             `db:"config" json:"config"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`

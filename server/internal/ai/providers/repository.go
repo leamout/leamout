@@ -131,7 +131,7 @@ func (r *Repository) ListVoiceAgentIDs(
 		ctx,
 		sqlc.ListVoiceAgentIDsByAIProviderCredentialParams{
 			OrganizationID: organizationID,
-			CredentialID:   credentialID,
+			CredentialID:   &credentialID,
 		},
 	)
 }
@@ -289,7 +289,7 @@ func credentialFromRow(row sqlc.AiProviderCredential) Credential {
 type resolvedRow struct {
 	Role             string
 	Provider         string
-	CredentialID     uuid.UUID
+	CredentialID     *uuid.UUID
 	Config           json.RawMessage
-	SecretCiphertext string
+	SecretCiphertext *string
 }

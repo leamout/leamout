@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS voice_agent_provider_bindings (
     voice_agent_id UUID NOT NULL,
     role TEXT NOT NULL,
     provider TEXT NOT NULL,
-    credential_id UUID NOT NULL,
+    credential_id UUID,
     config JSONB NOT NULL DEFAULT '{}'::jsonb,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

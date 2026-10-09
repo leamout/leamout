@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/leamout/leamout/server/internal/ai"
+	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
@@ -124,7 +125,16 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	)
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		Calls:            callsService,
+		PlatformCredentials: providers.PlatformCredentials{
+			OpenAI:     cfg.OpenAIAPIKey,
+			Gemini:     cfg.GeminiAPIKey,
+			Deepgram:   cfg.DeepgramAPIKey,
+			AssemblyAI: cfg.AssemblyAIAPIKey,
+			Groq:       cfg.GroqAPIKey,
+			Cartesia:   cfg.CartesiaAPIKey,
+			ElevenLabs: cfg.ElevenLabsAPIKey,
+		},
+		Calls: callsService,
 	})
 	mediaNodes := medianodes.NewRegistry(redisClient)
 	agentRuntime, err := agent.NewWithMediaNodes(

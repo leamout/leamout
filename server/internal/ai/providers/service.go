@@ -21,6 +21,7 @@ type Service struct {
 	cipher   *encryption.Cipher
 	catalog  *aicatalog.Catalog
 	verifier *Verifier
+	platform PlatformCredentials
 }
 
 func NewService(
@@ -35,6 +36,10 @@ func NewService(
 		catalog:  providerCatalog,
 		verifier: NewVerifier(providerCatalog),
 	}
+}
+
+func (s *Service) ConfigurePlatformCredentials(values PlatformCredentials) {
+	s.platform = values
 }
 
 func firstCatalog(catalogs []*aicatalog.Catalog) *aicatalog.Catalog {
@@ -310,8 +315,8 @@ func (s *Service) UpsertBinding(
 			"provider is not compatible with Voice Agent role",
 		)
 	}
-	if req.CredentialID == uuid.Nil {
-		return Binding{}, apperror.NewBadRequest("credential_id is required")
+	if req.CredentialID != nil && *req.CredentialID == uuid.Nil {
+		return Binding{}, apperror.NewBadRequest("credential_id is invalid")
 	}
 
 	if len(req.Config) == 0 {
@@ -321,18 +326,20 @@ func (s *Service) UpsertBinding(
 		return Binding{}, err
 	}
 
-	credential, _, err := s.repo.GetCredentialCiphertext(
-		ctx,
-		organizationID,
-		req.CredentialID,
-	)
-	if err != nil {
-		return Binding{}, dbError(err, "AI provider credential not found")
-	}
-	if credential.Provider != req.Provider {
-		return Binding{}, apperror.NewBadRequest(
-			"credential provider does not match binding provider",
+	if req.CredentialID != nil {
+		credential, _, err := s.repo.GetCredentialCiphertext(
+			ctx,
+			organizationID,
+			*req.CredentialID,
 		)
+		if err != nil {
+			return Binding{}, dbError(err, "AI provider credential not found")
+		}
+		if credential.Provider != req.Provider {
+			return Binding{}, apperror.NewBadRequest(
+				"credential provider does not match binding provider",
+			)
+		}
 	}
 
 	value, err := s.repo.UpsertBinding(
@@ -360,22 +367,35 @@ func (s *Service) BindingStatuses(
 	}
 	result := make([]BindingStatus, 0, len(bindings))
 	for _, binding := range bindings {
+		status := BindingStatus{
+			Role:            binding.Role,
+			Provider:        binding.Provider,
+			IntegrationID:   binding.CredentialID,
+			ConnectionState: ConnectionReady,
+			Config:          append(json.RawMessage(nil), binding.Config...),
+		}
+
+		if binding.CredentialID == nil {
+			if !s.platform.Has(binding.Provider) {
+				code := "platform_credential_missing"
+				status.ConnectionState = ConnectionUnavailable
+				status.FailureCode = &code
+			}
+			result = append(result, status)
+			continue
+		}
+
 		credential, _, err := s.repo.GetCredentialCiphertext(
 			ctx,
 			organizationID,
-			binding.CredentialID,
+			*binding.CredentialID,
 		)
 		if err != nil {
 			return nil, dbError(err, "AI integration not found")
 		}
-		result = append(result, BindingStatus{
-			Role:            binding.Role,
-			Provider:        binding.Provider,
-			IntegrationID:   binding.CredentialID,
-			ConnectionState: credential.ConnectionState,
-			FailureCode:     credential.FailureCode,
-			Config:          append(json.RawMessage(nil), binding.Config...),
-		})
+		status.ConnectionState = credential.ConnectionState
+		status.FailureCode = credential.FailureCode
+		result = append(result, status)
 	}
 	return result, nil
 }
@@ -446,24 +466,17 @@ func (s *Service) Resolve(
 	if len(rows) == 0 {
 		return nil, nil
 	}
-	if s.cipher == nil {
-		return nil, apperror.NewServiceUnavailable(
-			"AI provider credential encryption is unavailable",
-			nil,
-		)
-	}
 
 	result := make([]ResolvedBinding, 0, len(rows))
 	for _, row := range rows {
-		secret, err := s.cipher.DecryptForScope(
-			credentialScope(organizationID, row.CredentialID),
+		secret, err := s.resolveSecret(
+			organizationID,
+			row.Provider,
+			row.CredentialID,
 			row.SecretCiphertext,
 		)
 		if err != nil {
-			return nil, apperror.NewInternal(
-				"decrypt AI provider credential",
-				err,
-			)
+			return nil, err
 		}
 
 		result = append(result, ResolvedBinding{
@@ -485,7 +498,7 @@ func (s *Service) ResolveSnapshot(
 	var bindings []struct {
 		Role         string          `json:"role"`
 		Provider     string          `json:"provider"`
-		CredentialID uuid.UUID       `json:"credential_id"`
+		CredentialID *uuid.UUID      `json:"credential_id"`
 		Config       json.RawMessage `json:"config"`
 	}
 	if err := json.Unmarshal(value, &bindings); err != nil {
@@ -494,37 +507,35 @@ func (s *Service) ResolveSnapshot(
 	if len(bindings) == 0 {
 		return nil, nil
 	}
-	if s.cipher == nil {
-		return nil, apperror.NewServiceUnavailable(
-			"AI provider credential encryption is unavailable",
-			nil,
-		)
-	}
 	result := make([]ResolvedBinding, 0, len(bindings))
 	for _, binding := range bindings {
-		credential, ciphertext, err := s.repo.GetCredentialCiphertext(
-			ctx,
-			organizationID,
-			binding.CredentialID,
-		)
-		if err != nil {
-			return nil, dbError(err, "snapshotted AI integration not found")
-		}
-		if credential.Provider != binding.Provider {
-			return nil, apperror.NewInternal(
-				"snapshotted AI integration provider mismatch",
-				nil,
+		var ciphertext *string
+		if binding.CredentialID != nil {
+			credential, value, err := s.repo.GetCredentialCiphertext(
+				ctx,
+				organizationID,
+				*binding.CredentialID,
 			)
+			if err != nil {
+				return nil, dbError(err, "snapshotted AI integration not found")
+			}
+			if credential.Provider != binding.Provider {
+				return nil, apperror.NewInternal(
+					"snapshotted AI integration provider mismatch",
+					nil,
+				)
+			}
+			ciphertext = &value
 		}
-		secret, err := s.cipher.DecryptForScope(
-			credentialScope(organizationID, binding.CredentialID),
+
+		secret, err := s.resolveSecret(
+			organizationID,
+			binding.Provider,
+			binding.CredentialID,
 			ciphertext,
 		)
 		if err != nil {
-			return nil, apperror.NewInternal(
-				"decrypt snapshotted AI integration",
-				err,
-			)
+			return nil, err
 		}
 		result = append(result, ResolvedBinding{
 			Role:     binding.Role,
@@ -534,6 +545,46 @@ func (s *Service) ResolveSnapshot(
 		})
 	}
 	return result, nil
+}
+
+func (s *Service) resolveSecret(
+	organizationID uuid.UUID,
+	provider string,
+	credentialID *uuid.UUID,
+	ciphertext *string,
+) (string, error) {
+	if credentialID == nil {
+		if secret, ok := s.platform.Get(provider); ok {
+			return secret, nil
+		}
+		return "", apperror.NewServiceUnavailable(
+			"platform AI credential is unavailable for provider",
+			nil,
+		)
+	}
+	if s.cipher == nil {
+		return "", apperror.NewServiceUnavailable(
+			"AI provider credential encryption is unavailable",
+			nil,
+		)
+	}
+	if ciphertext == nil {
+		return "", apperror.NewInternal(
+			"AI provider credential ciphertext is missing",
+			nil,
+		)
+	}
+	secret, err := s.cipher.DecryptForScope(
+		credentialScope(organizationID, *credentialID),
+		*ciphertext,
+	)
+	if err != nil {
+		return "", apperror.NewInternal(
+			"decrypt AI provider credential",
+			err,
+		)
+	}
+	return secret, nil
 }
 
 func (s *Service) credentialResponse(

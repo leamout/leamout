@@ -80,11 +80,27 @@ func (s *Service) Readiness(
 			continue
 		}
 		if status.ConnectionState != providers.ConnectionReady {
+			code := "integration_not_ready"
+			field := "bindings." + role + ".integration_id"
+			message := fmt.Sprintf(
+				"The %s integration is not ready.",
+				status.Provider,
+			)
+			remediation := "Verify or rotate the integration, then run readiness again."
+			if status.IntegrationID == nil {
+				code = "platform_credential_unavailable"
+				field = "bindings." + role + ".provider"
+				message = fmt.Sprintf(
+					"The platform credential for %s is unavailable.",
+					status.Provider,
+				)
+				remediation = "Configure the provider API key for this deployment or bind an organization integration."
+			}
 			report.Issues = append(report.Issues, readinessIssue(
-				"integration_not_ready",
-				"bindings."+role+".integration_id",
-				fmt.Sprintf("The %s integration is not ready.", status.Provider),
-				"Verify or rotate the integration, then run readiness again.",
+				code,
+				field,
+				message,
+				remediation,
 			))
 		}
 	}

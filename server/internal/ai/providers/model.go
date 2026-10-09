@@ -10,6 +10,7 @@ import (
 
 const (
 	ProviderOpenAI     = "openai"
+	ProviderGemini     = "gemini"
 	ProviderDeepgram   = "deepgram"
 	ProviderAssemblyAI = "assemblyai"
 	ProviderGroq       = "groq"
@@ -78,13 +79,13 @@ type Binding struct {
 	VoiceAgentID   uuid.UUID
 	Role           string
 	Provider       string
-	CredentialID   uuid.UUID
+	CredentialID   *uuid.UUID
 	Config         json.RawMessage
 }
 
 type UpsertBindingRequest struct {
 	Provider     string          `json:"provider"`
-	CredentialID uuid.UUID       `json:"credential_id"`
+	CredentialID *uuid.UUID      `json:"credential_id,omitempty"`
 	Config       json.RawMessage `json:"config,omitempty"`
 }
 
@@ -94,7 +95,7 @@ type BindingResponse struct {
 	VoiceAgentID   uuid.UUID       `json:"voice_agent_id"`
 	Role           string          `json:"role"`
 	Provider       string          `json:"provider"`
-	CredentialID   uuid.UUID       `json:"credential_id"`
+	CredentialID   *uuid.UUID      `json:"credential_id,omitempty"`
 	Config         json.RawMessage `json:"config"`
 }
 
@@ -113,7 +114,7 @@ type Integration struct {
 type BindingStatus struct {
 	Role            string
 	Provider        string
-	IntegrationID   uuid.UUID
+	IntegrationID   *uuid.UUID
 	ConnectionState string
 	FailureCode     *string
 	Config          json.RawMessage
