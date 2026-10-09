@@ -5,23 +5,25 @@ import "testing"
 func TestPlatformCredentials(t *testing.T) {
 	t.Parallel()
 
-	values := NewPlatformCredentials(map[string]string{
-		" openai ": " platform-secret ",
-		"empty":    " ",
-		"":         "ignored",
-	})
+	values := PlatformCredentials{
+		OpenAI:   " platform-secret ",
+		Deepgram: "deepgram-secret",
+	}
 
-	secret, ok := values.Get("openai")
+	secret, ok := values.Get(ProviderOpenAI)
 	if !ok {
 		t.Fatal("expected OpenAI platform credential")
 	}
 	if secret != "platform-secret" {
 		t.Fatalf("Get(openai) = %q, want platform-secret", secret)
 	}
-	if values.Has("empty") {
-		t.Fatal("empty platform credential should not be configured")
+
+	secret, ok = values.Get(ProviderDeepgram)
+	if !ok || secret != "deepgram-secret" {
+		t.Fatalf("Get(deepgram) = %q, %v", secret, ok)
 	}
-	if values.Has("missing") {
-		t.Fatal("missing platform credential should not be configured")
+
+	if values.Has(ProviderCartesia) {
+		t.Fatal("unset Cartesia credential should not be configured")
 	}
 }
