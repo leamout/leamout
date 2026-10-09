@@ -6,7 +6,6 @@ import {
   DashboardSquare01Icon,
   LinkSquare02Icon,
   RoboticIcon,
-  Settings01Icon,
   TelephoneIcon,
   ToolsIcon,
   WebhookIcon,
@@ -30,6 +29,7 @@ import {
 } from "@leamout/ui/components/sidebar";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 
 const navigation = [
   { title: "Overview", href: "/", icon: DashboardSquare01Icon },
@@ -40,17 +40,15 @@ const navigation = [
   { title: "AI providers", href: "/ai-providers", icon: AiBrain01Icon },
   { title: "Tools", href: "/tools", icon: ToolsIcon },
   { title: "Webhooks", href: "/webhooks", icon: WebhookIcon },
-  { title: "Settings", href: "/settings", icon: Settings01Icon },
 ];
 
-function Navigation({ settings = false }: { settings?: boolean }) {
+function Navigation() {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
   return (
     <SidebarMenu>
       {navigation.map((item) => {
-        if ((item.href === "/settings") !== settings) return null;
         const active =
           item.href === "/"
             ? pathname === "/"
@@ -92,7 +90,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
       item.href === "/"
         ? pathname === "/"
         : pathname === item.href || pathname.startsWith(`${item.href}/`),
-    )?.title ?? "Console";
+    )?.title ?? (pathname.startsWith("/settings") ? "Settings" : "Console");
 
   return (
     <SidebarProvider>
@@ -125,7 +123,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
         </SidebarContent>
         <SidebarFooter>
           <nav aria-label="Settings navigation">
-            <Navigation settings />
+            <SettingsSidebar />
           </nav>
           <p className="px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
             Console preview · Account integration coming soon
