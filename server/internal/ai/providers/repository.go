@@ -184,7 +184,6 @@ func (r *Repository) UpsertBinding(
 		Role:             row.Role,
 		Provider:         row.Provider,
 		CredentialID:     row.CredentialID,
-		CredentialSource: credentialSource(row.CredentialID),
 		Config:           json.RawMessage(row.Config),
 	}, nil
 }
@@ -214,7 +213,6 @@ func (r *Repository) ListBindings(
 			Role:             row.Role,
 			Provider:         row.Provider,
 			CredentialID:     row.CredentialID,
-			CredentialSource: credentialSource(row.CredentialID),
 			Config:           json.RawMessage(row.Config),
 		})
 	}
@@ -286,13 +284,6 @@ func credentialFromRow(row sqlc.AiProviderCredential) Credential {
 		RotatedAt:       pgconv.TimestamptzToTime(row.RotatedAt),
 		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
 	}
-}
-
-func credentialSource(credentialID *uuid.UUID) string {
-	if credentialID == nil {
-		return CredentialSourcePlatform
-	}
-	return CredentialSourceOrganization
 }
 
 type resolvedRow struct {
