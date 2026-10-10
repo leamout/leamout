@@ -9,9 +9,26 @@ import {
 } from "@leamout/ui/components/tabs";
 import Link from "next/link";
 import { AgentForm } from "@/components/agents/agent-form";
+import {
+  type AgentProviderBinding,
+  AgentProviderSettings,
+} from "@/components/agents/agent-provider-settings";
+import {
+  AgentReadiness,
+  type AgentReadinessReport,
+} from "@/components/agents/agent-readiness";
+import {
+  AgentRouting,
+  type AgentRoutingBinding,
+} from "@/components/agents/agent-routing";
 import { AgentSettingsForm } from "@/components/agents/agent-settings-form";
+import { AgentTools } from "@/components/agents/agent-tools";
+import type { Tool } from "@/components/tools/types";
 
 const sections = [
+  { value: "readiness", title: "Readiness" },
+  { value: "providers", title: "Providers" },
+  { value: "routing", title: "Routing" },
   {
     value: "models",
     title: "Models & voice",
@@ -50,7 +67,19 @@ const sections = [
   },
 ];
 
-export function AgentDetails({ agentId }: { agentId: string }) {
+export function AgentDetails({
+  agentId,
+  readiness,
+  providerBindings,
+  routingBindings,
+  tools,
+}: {
+  agentId: string;
+  readiness?: AgentReadinessReport;
+  providerBindings?: AgentProviderBinding[];
+  routingBindings?: AgentRoutingBinding[];
+  tools?: Tool[];
+}) {
   return (
     <div className="space-y-6">
       <Link
@@ -84,7 +113,15 @@ export function AgentDetails({ agentId }: { agentId: string }) {
         </TabsContent>
         {sections.map((section) => (
           <TabsContent key={section.value} value={section.value}>
-            {section.value === "models" || section.value === "calls" ? (
+            {section.value === "readiness" ? (
+              <AgentReadiness report={readiness} />
+            ) : section.value === "providers" ? (
+              <AgentProviderSettings bindings={providerBindings} />
+            ) : section.value === "routing" ? (
+              <AgentRouting bindings={routingBindings} />
+            ) : section.value === "tools" ? (
+              <AgentTools agentId={agentId} tools={tools} />
+            ) : section.value === "models" || section.value === "calls" ? (
               <AgentSettingsForm section={section.value} />
             ) : (
               <div className="space-y-4 rounded-lg border p-6">

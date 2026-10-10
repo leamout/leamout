@@ -19,16 +19,8 @@ export function AgentSettingsForm({
   const fields =
     section === "models"
       ? mode === "realtime"
-        ? ["Realtime provider", "Realtime model", "Voice"]
-        : [
-            "STT provider",
-            "STT model",
-            "LLM provider",
-            "LLM model",
-            "TTS provider",
-            "TTS model",
-            "Voice",
-          ]
+        ? ["Realtime model", "Voice"]
+        : ["STT model", "LLM model", "TTS model", "Voice"]
       : [
           "Maximum call duration (seconds)",
           "Silence timeout (seconds)",
@@ -60,7 +52,8 @@ export function AgentSettingsForm({
             <option value="pipeline">STT → LLM → TTS</option>
           </select>
           <FieldDescription>
-            Provider and model availability will be connected later.
+            Manage credentials in the Providers tab. Model availability will be
+            connected later.
           </FieldDescription>
         </Field>
       )}
