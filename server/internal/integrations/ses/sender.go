@@ -7,27 +7,37 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
-	"github.com/leamout/leamout/server/internal/platform/email"
 )
 
-type API interface {
-	SendEmail(
-		context.Context,
-		*sesv2.SendEmailInput,
-		...func(*sesv2.Options),
-	) (*sesv2.SendEmailOutput, error)
+type Message struct {
+	To      string
+	Subject string
+	HTML    string
+	Text    string
 }
 
+type Result struct {
+	MessageID string
+}
+
+// SendError classifies provider failures without persisting recipient or body data.
+type SendError struct {
+	Code      string
+	Permanent bool
+}
+
+func (e *SendError) Error() string { return "email provider: " + e.Code }
+
 type Sender struct {
-	client API
+	client *sesv2.Client
 	config Config
 }
 
-func NewSender(client API, cfg Config) *Sender {
+func NewSender(client *sesv2.Client, cfg Config) *Sender {
 	return &Sender{client: client, config: cfg}
 }
 
-func (s *Sender) Send(ctx context.Context, message email.Message) (email.Result, error) {
+func (s *Sender) Send(ctx context.Context, message Message) (Result, error) {
 	input := &sesv2.SendEmailInput{
 		FromEmailAddress: aws.String(s.config.From),
 		Destination: &types.Destination{
@@ -50,13 +60,13 @@ func (s *Sender) Send(ctx context.Context, message email.Message) (email.Result,
 
 	output, err := s.client.SendEmail(ctx, input)
 	if err != nil {
-		return email.Result{}, classifySendError(err)
+		return Result{}, classifySendError(err)
 	}
 	if output == nil || aws.ToString(output.MessageId) == "" {
-		return email.Result{}, &email.SendError{Code: "missing_message_id"}
+		return Result{}, &SendError{Code: "missing_message_id"}
 	}
 
-	return email.Result{MessageID: aws.ToString(output.MessageId)}, nil
+	return Result{MessageID: aws.ToString(output.MessageId)}, nil
 }
 
 func content(value string) *types.Content {
@@ -68,7 +78,7 @@ func content(value string) *types.Content {
 
 // Classify concrete SES errors, including errors wrapped by the SDK.
 // Persist only known codes, never provider messages containing recipient data.
-func classifySendError(err error) *email.SendError {
+func classifySendError(err error) *SendError {
 	var (
 		rejected      *types.MessageRejected
 		unverified    *types.MailFromDomainNotVerifiedException
@@ -83,24 +93,24 @@ func classifySendError(err error) *email.SendError {
 
 	switch {
 	case errors.As(err, &rejected):
-		return &email.SendError{Code: "MessageRejected", Permanent: true}
+		return &SendError{Code: "MessageRejected", Permanent: true}
 	case errors.As(err, &unverified):
-		return &email.SendError{Code: "MailFromDomainNotVerifiedException", Permanent: true}
+		return &SendError{Code: "MailFromDomainNotVerifiedException", Permanent: true}
 	case errors.As(err, &badRequest):
-		return &email.SendError{Code: "BadRequestException", Permanent: true}
+		return &SendError{Code: "BadRequestException", Permanent: true}
 	case errors.As(err, &notFound):
-		return &email.SendError{Code: "NotFoundException", Permanent: true}
+		return &SendError{Code: "NotFoundException", Permanent: true}
 	case errors.As(err, &suspended):
-		return &email.SendError{Code: "AccountSuspendedException", Permanent: true}
+		return &SendError{Code: "AccountSuspendedException", Permanent: true}
 	case errors.As(err, &paused):
-		return &email.SendError{Code: "SendingPausedException", Permanent: true}
+		return &SendError{Code: "SendingPausedException", Permanent: true}
 	case errors.As(err, &throttled):
-		return &email.SendError{Code: "TooManyRequestsException"}
+		return &SendError{Code: "TooManyRequestsException"}
 	case errors.As(err, &limitExceeded):
-		return &email.SendError{Code: "LimitExceededException"}
+		return &SendError{Code: "LimitExceededException"}
 	case errors.As(err, &internal):
-		return &email.SendError{Code: "InternalServiceErrorException"}
+		return &SendError{Code: "InternalServiceErrorException"}
 	default:
-		return &email.SendError{Code: "transport_error"}
+		return &SendError{Code: "transport_error"}
 	}
 }

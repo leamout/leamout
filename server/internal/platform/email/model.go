@@ -2,25 +2,10 @@
 package email
 
 import (
-	"context"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-type Sender interface {
-	Send(context.Context, Message) (Result, error)
-}
-type Message struct{ To, Subject, HTML, Text string }
-type Result struct{ MessageID string }
-
-// SendError classifies provider failures without persisting recipient or body data.
-type SendError struct {
-	Code      string
-	Permanent bool
-}
-
-func (e *SendError) Error() string { return "email provider: " + e.Code }
 
 type Data struct {
 	ChangedAt    string    `json:"changed_at,omitempty"`

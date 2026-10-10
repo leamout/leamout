@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/integrations/ses"
 	"github.com/leamout/leamout/server/internal/platform/email"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 )
@@ -212,14 +213,14 @@ func TestEmailQueueRollbackAndLeaseOwnership(t *testing.T) {
 	if _, err := repo.Claim(ctx, uuid.New()); err == nil {
 		t.Fatal("leased email claimed twice")
 	}
-	if err := repo.Complete(ctx, id, uuid.New(), email.Result{MessageID: "wrong"}); err != nil {
+	if err := repo.Complete(ctx, id, uuid.New(), ses.Result{MessageID: "wrong"}); err != nil {
 		t.Fatal(err)
 	}
 	ready, err := repo.Ready(ctx, id, lease)
 	if err != nil || !ready {
 		t.Fatal("wrong lease changed delivery")
 	}
-	if err := repo.Complete(ctx, id, lease, email.Result{MessageID: "ses-id"}); err != nil {
+	if err := repo.Complete(ctx, id, lease, ses.Result{MessageID: "ses-id"}); err != nil {
 		t.Fatal(err)
 	}
 	var status string
@@ -387,7 +388,7 @@ func TestGenericEmailCancellationIsIsolatedAndTransactional(t *testing.T) {
 		t.Fatal("cancelled delivery remains ready")
 	}
 	// A provider response arriving after cancellation cannot restore the delivery.
-	if err := repo.Complete(ctx, idA, lease, email.Result{MessageID: "late-response"}); err != nil {
+	if err := repo.Complete(ctx, idA, lease, ses.Result{MessageID: "late-response"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := repo.Fail(ctx, delivery, lease, "late-failure", false); err != nil {

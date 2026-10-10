@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/integrations/ses"
 )
 
 type Repository struct{ queries *sqlc.Queries }
@@ -29,7 +30,7 @@ func (r *Repository) Claim(ctx context.Context, lease uuid.UUID) (Delivery, erro
 	}
 	return Delivery{ID: row.ID, To: row.Recipient, Template: row.Template, Payload: payload, Attempts: int(row.Attempts), ExpiresAt: pgconv.TimestamptzToTime(row.ExpiresAt)}, nil
 }
-func (r *Repository) Complete(ctx context.Context, id, lease uuid.UUID, result Result) error {
+func (r *Repository) Complete(ctx context.Context, id, lease uuid.UUID, result ses.Result) error {
 	return r.queries.CompleteEmailDelivery(ctx, sqlc.CompleteEmailDeliveryParams{ID: id, LockToken: &lease, ProviderMessageID: &result.MessageID})
 }
 func (r *Repository) Fail(ctx context.Context, d Delivery, lease uuid.UUID, code string, permanent bool) error {

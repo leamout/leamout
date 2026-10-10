@@ -9,23 +9,18 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/integrations/ses"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 )
 
-type deliveryRepository interface {
-	Claim(context.Context, uuid.UUID) (Delivery, error)
-	Ready(context.Context, uuid.UUID, uuid.UUID) (bool, error)
-	Complete(context.Context, uuid.UUID, uuid.UUID, Result) error
-	Fail(context.Context, Delivery, uuid.UUID, string, bool) error
-}
 type Worker struct {
-	repo     deliveryRepository
-	sender   Sender
+	repo     *Repository
+	sender   *ses.Sender
 	cipher   *encryption.Cipher
 	renderer *Renderer
 }
 
-func NewWorker(repo deliveryRepository, sender Sender, cipher *encryption.Cipher) *Worker {
+func NewWorker(repo *Repository, sender *ses.Sender, cipher *encryption.Cipher) *Worker {
 	return &Worker{repo: repo, sender: sender, cipher: cipher, renderer: NewRenderer()}
 }
 func (w *Worker) Run(ctx context.Context) error {
@@ -79,7 +74,7 @@ func (w *Worker) ProcessOne(ctx context.Context) error {
 	defer cancel()
 	result, err := w.sender.Send(sendCtx, message)
 	if err != nil {
-		var provider *SendError
+		var provider *ses.SendError
 		if errors.As(err, &provider) {
 			return fail(provider.Code, provider.Permanent)
 		}
