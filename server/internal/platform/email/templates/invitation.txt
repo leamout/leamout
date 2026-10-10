@@ -2,13 +2,13 @@
 Leamout
 
 
-JOIN {{.Organization}}
+Join {{.Organization}}
 
 {{.Inviter}} invited you to join {{.Organization}} on Leamout as {{.Role}}.
 
 Accept invitation {{.AcceptURL}}
 
-This invitation expires {{.ExpiresAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}.
+This invitation expires {{.Expiry}}.
 
 If you were not expecting this invitation, you can ignore it.
 

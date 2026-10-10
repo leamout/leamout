@@ -45,11 +45,15 @@ func (r *Renderer) Render(name string, data Data) (Message, error) {
 	if err != nil {
 		return Message{}, err
 	}
+	values := struct {
+		Data
+		Expiry string
+	}{Data: data, Expiry: data.ExpiresAt.UTC().Format("15:04 UTC on 02 Jan 2006")}
 	var h, t bytes.Buffer
-	if err := html.ExecuteTemplate(&h, name+".html", data); err != nil {
+	if err := html.ExecuteTemplate(&h, name+".html", values); err != nil {
 		return Message{}, err
 	}
-	if err := plain.Execute(&t, data); err != nil {
+	if err := plain.Execute(&t, values); err != nil {
 		return Message{}, err
 	}
 	return Message{Subject: subject, HTML: h.String(), Text: t.String()}, nil

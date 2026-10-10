@@ -45,3 +45,11 @@ OrganizationInvitation.PreviewProps = {
   acceptUrl: "https://example.com/invitation",
   expiresAt: "October 17, 2026 at 12:00 UTC",
 } satisfies OrganizationInvitationProps;
+
+OrganizationInvitation.ExportProps = {
+  inviterName: "{{.Inviter}}",
+  organizationName: "{{.Organization}}",
+  role: "{{.Role}}",
+  acceptUrl: "{{.AcceptURL}}",
+  expiresAt: "{{.Expiry}}",
+} satisfies OrganizationInvitationProps;

@@ -66,3 +66,9 @@ VerificationCode.PreviewProps = {
   expiresInMinutes: 10,
   purpose: "create-account",
 } satisfies VerificationCodeProps;
+
+VerificationCode.ExportProps = {
+  code: "{{.Code}}",
+  expiresAt: "{{.Expiry}}",
+  purpose: "log-in",
+} satisfies VerificationCodeProps;

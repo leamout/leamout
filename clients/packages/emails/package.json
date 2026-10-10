@@ -7,8 +7,7 @@
     "dev": "email dev --dir emails --port 3002",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
-    "render": "bun scripts/render.ts",
-    "export": "bun scripts/render.ts --export"
+    "export": "bun scripts/render.ts"
   },
   "dependencies": {
     "react": "19.2.8",

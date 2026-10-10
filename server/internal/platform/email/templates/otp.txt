@@ -2,13 +2,13 @@
 Leamout
 
 
-YOUR LOGIN CODE
+Your login code
 
 Use this code to continue logging in to Leamout.
 
 {{.Code}}
 
-This code expires {{.ExpiresAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}. Do not share it with anyone.
+This code expires {{.Expiry}}. Do not share it with anyone.
 
 If you did not request this code, you can ignore this email.
 
