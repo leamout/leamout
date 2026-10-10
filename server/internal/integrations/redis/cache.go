@@ -140,6 +140,52 @@ return 'ok'
 	return reason == "ok", reason, nil
 }
 
+// AcquireConcurrentLease atomically acquires a bounded concurrent lease.
+// Expired leases are removed before counting so crashed workers cannot hold
+// organization capacity forever.
+func (c *Client) AcquireConcurrentLease(
+	ctx context.Context,
+	prefix, leaseID string,
+	maxConcurrent int64,
+	ttl time.Duration,
+) (bool, error) {
+	if err := c.validateKey(prefix); err != nil {
+		return false, err
+	}
+	if ctx == nil || leaseID == "" || maxConcurrent <= 0 || ttl <= 0 {
+		return false, fmt.Errorf("valid concurrent lease context, id, limit, and TTL are required")
+	}
+
+	const script = `
+redis.call('ZREMRANGEBYSCORE', KEYS[1], '-inf', ARGV[1])
+local existing = redis.call('ZSCORE', KEYS[1], ARGV[4])
+if existing then
+  redis.call('ZADD', KEYS[1], ARGV[3], ARGV[4])
+  redis.call('PEXPIRE', KEYS[1], ARGV[5])
+  return 1
+end
+if redis.call('ZCARD', KEYS[1]) >= tonumber(ARGV[2]) then return 0 end
+redis.call('ZADD', KEYS[1], ARGV[3], ARGV[4])
+redis.call('PEXPIRE', KEYS[1], ARGV[5])
+return 1
+`
+	now := time.Now().UnixMilli()
+	allowed, err := c.client.Eval(
+		ctx,
+		script,
+		[]string{prefix + ":leases"},
+		now,
+		maxConcurrent,
+		now+ttl.Milliseconds(),
+		leaseID,
+		ttl.Milliseconds(),
+	).Bool()
+	if err != nil {
+		return false, fmt.Errorf("acquire Redis concurrent lease: %w", err)
+	}
+	return allowed, nil
+}
+
 func (c *Client) BindCallLease(ctx context.Context, prefix, leaseID, callID string) error {
 	if err := c.validateKey(prefix); err != nil {
 		return err
