@@ -43,8 +43,8 @@ SELECT
     COALESCE(
         oe.enabled,
         CASE
-            WHEN jsonb_typeof(p.entitlements -> sqlc.arg(capability)) = 'boolean'
-                THEN (p.entitlements ->> sqlc.arg(capability))::boolean
+            WHEN jsonb_typeof(p.entitlements -> (sqlc.arg(capability)::text)) = 'boolean'
+                THEN (p.entitlements ->> (sqlc.arg(capability)::text))::boolean
             ELSE FALSE
         END,
         FALSE
@@ -52,7 +52,7 @@ SELECT
 FROM organizations o
 LEFT JOIN entitlements oe
   ON oe.organization_id = o.id
- AND oe.capability = sqlc.arg(capability)
+ AND oe.capability = (sqlc.arg(capability)::text)
 LEFT JOIN subscriptions s
   ON s.organization_id = o.id
  AND s.status IN ('trialing', 'active')
