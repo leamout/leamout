@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
@@ -66,7 +65,7 @@ func (r *Repository) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest
 		Description:     req.Description,
 		PricingType:     req.PricingType,
 		Currency:        req.Currency,
-		AmountMinor:     nullableInt8(req.AmountMinor),
+		AmountMinor:     req.AmountMinor,
 		BillingInterval: req.BillingInterval,
 		Entitlements:    entitlements,
 		Limits:          limits,
@@ -98,7 +97,7 @@ func fromRow(row sqlc.Plan) (Plan, error) {
 		Description:     row.Description,
 		PricingType:     row.PricingType,
 		Currency:        row.Currency,
-		AmountMinor:     int8Ptr(row.AmountMinor),
+		AmountMinor:     row.AmountMinor,
 		BillingInterval: row.BillingInterval,
 		Entitlements:    entitlements,
 		Limits:          limits,
@@ -108,17 +107,3 @@ func fromRow(row sqlc.Plan) (Plan, error) {
 	}, nil
 }
 
-func nullableInt8(value *int64) pgtype.Int8 {
-	if value == nil {
-		return pgtype.Int8{}
-	}
-	return pgtype.Int8{Int64: *value, Valid: true}
-}
-
-func int8Ptr(value pgtype.Int8) *int64 {
-	if !value.Valid {
-		return nil
-	}
-	result := value.Int64
-	return &result
-}
