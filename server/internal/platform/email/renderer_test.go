@@ -36,3 +36,23 @@ func TestRendererRejectsInvalidData(t *testing.T) {
 		}
 	}
 }
+
+func TestGeneratedInvitationPreservesDynamicData(t *testing.T) {
+	data := Data{Organization: `Acme {{.Code}} & Co`, Inviter: `Alice <Admin>`, Role: "member", AcceptURL: "https://app.example.com/invitation?token=abc&next=console", ExpiresAt: time.Now().Add(time.Hour)}
+	message, err := NewRenderer().Render("invitation", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(message.HTML, "Acme {{.Code}} &amp; Co") || strings.Contains(message.HTML, "<Admin>") {
+		t.Fatal("dynamic text was not safely escaped")
+	}
+	if !strings.Contains(message.HTML, "token=abc&amp;next=console") {
+		t.Fatal("dynamic URL was not escaped")
+	}
+	if !strings.Contains(message.Text, data.AcceptURL) || !strings.Contains(message.Text, data.Organization) {
+		t.Fatal("plain text lost dynamic data")
+	}
+	if strings.Contains(message.HTML, "SENTINEL") || strings.Contains(message.Text, "SENTINEL") {
+		t.Fatal("export placeholder leaked")
+	}
+}

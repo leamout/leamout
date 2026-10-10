@@ -37,7 +37,7 @@ func (r *Renderer) Render(name string, data Data) (Message, error) {
 	if data.ExpiresAt.IsZero() {
 		return Message{}, fmt.Errorf("email expiry is required")
 	}
-	html, err := template.ParseFS(templates, "templates/layout.html", "templates/"+name+".html")
+	html, err := template.ParseFS(templates, "templates/"+name+".html")
 	if err != nil {
 		return Message{}, err
 	}
@@ -46,7 +46,7 @@ func (r *Renderer) Render(name string, data Data) (Message, error) {
 		return Message{}, err
 	}
 	var h, t bytes.Buffer
-	if err := html.ExecuteTemplate(&h, "layout", data); err != nil {
+	if err := html.ExecuteTemplate(&h, name+".html", data); err != nil {
 		return Message{}, err
 	}
 	if err := plain.Execute(&t, data); err != nil {

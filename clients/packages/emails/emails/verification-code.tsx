@@ -3,7 +3,8 @@ import Layout, { headingStyle, textStyle } from "../components/layout";
 
 type VerificationCodeProps = {
   code: string;
-  expiresInMinutes: number;
+  expiresInMinutes?: number;
+  expiresAt?: string;
   purpose: "create-account" | "log-in" | "password-recovery";
 };
 const messages = {
@@ -24,6 +25,7 @@ const messages = {
 export default function VerificationCode({
   code,
   expiresInMinutes,
+  expiresAt,
   purpose,
 }: VerificationCodeProps) {
   const message = messages[purpose];
@@ -47,8 +49,10 @@ export default function VerificationCode({
         {code}
       </Text>
       <Text style={textStyle}>
-        This code expires in {expiresInMinutes} minutes. Do not share it with
-        anyone.
+        {expiresAt
+          ? `This code expires ${expiresAt}.`
+          : `This code expires in ${expiresInMinutes} minutes.`}{" "}
+        Do not share it with anyone.
       </Text>
       <Text style={textStyle}>
         If you did not request this code, you can ignore this email.
