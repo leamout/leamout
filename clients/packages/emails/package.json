@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "email dev --dir emails --port 3002",
     "typecheck": "tsc --noEmit",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "render": "bun scripts/render.ts"
   },
   "dependencies": {
     "react": "19.2.8",
