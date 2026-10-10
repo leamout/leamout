@@ -13,9 +13,7 @@ import (
 	natsintegration "github.com/leamout/leamout/server/internal/integrations/nats"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
-	"github.com/leamout/leamout/server/internal/integrations/ses"
 	"github.com/leamout/leamout/server/internal/platform/config"
-	"github.com/leamout/leamout/server/internal/platform/email"
 	"github.com/leamout/leamout/server/internal/platform/idempotency"
 	"github.com/leamout/leamout/server/internal/platform/logging"
 	"github.com/leamout/leamout/server/internal/platform/metrics"
@@ -34,7 +32,6 @@ import (
 )
 
 type modules struct {
-	emailDelivery           *email.Worker
 	postgres                *postgres.Client
 	redis                   *redisintegration.Client
 	nats                    *natsintegration.Client
@@ -245,21 +242,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize webhook delivery worker: %w", err)
 	}
 
-	sender, err := ses.New(ctx, ses.Config{
-		Region:           cfg.AWS.Region,
-		From:             cfg.AWS.FromEmail,
-		AccessKey:        cfg.AWS.AccessKey,
-		SecretKey:        cfg.AWS.SecretKey,
-		ConfigurationSet: cfg.AWS.ConfigurationSet,
-	})
-	if err != nil {
-		closeDependencies()
-		return nil, fmt.Errorf("initialize SES: %w", err)
-	}
-	emailDelivery := email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
-
 	return &modules{
-		emailDelivery:           emailDelivery,
 		postgres:                postgresClient,
 		redis:                   redisClient,
 		nats:                    natsClient,

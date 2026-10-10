@@ -1,5 +1,0 @@
-{{.Inviter}} invited you to join {{.Organization}} on Leamout as {{.Role}}.
-
-Accept invitation: {{.AcceptURL}}
-Expires at {{.ExpiresAt.UTC.Format "15:04 UTC on 02 Jan 2006"}}.
-If you were not expecting this invitation, you can ignore this email.
