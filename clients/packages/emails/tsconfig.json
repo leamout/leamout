@@ -9,5 +9,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["emails/**/*.tsx"]
+  "include": ["emails/**/*.tsx", "components/**/*.tsx"]
 }

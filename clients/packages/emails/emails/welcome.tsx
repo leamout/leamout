@@ -1,41 +1,29 @@
-import {
-  Body,
-  Container,
-  Head,
-  Heading,
-  Html,
-  Preview,
-  Text,
-} from "react-email";
+import { Button, Heading, Text } from "react-email";
+import Layout, {
+  buttonStyle,
+  headingStyle,
+  textStyle,
+} from "../components/layout";
 
-export default function Welcome({ name = "Alex" }: { name?: string }) {
+type WelcomeProps = { name: string; consoleUrl: string };
+
+export default function Welcome({ name, consoleUrl }: WelcomeProps) {
   return (
-    <Html>
-      <Head />
-      <Preview>Welcome to Leamout</Preview>
-      <Body
-        style={{
-          backgroundColor: "#f8fafc",
-          fontFamily: "Arial, sans-serif",
-          padding: "32px 16px",
-        }}
-      >
-        <Container
-          style={{
-            backgroundColor: "#ffffff",
-            padding: "32px",
-            borderRadius: "12px",
-            maxWidth: "560px",
-          }}
-        >
-          <Heading>Welcome to Leamout, {name}</Heading>
-          <Text>Your workspace for autonomous voice agents.</Text>
-          <Text>
-            Connect your AI providers and SIP trunk, then configure your first
-            agent.
-          </Text>
-        </Container>
-      </Body>
-    </Html>
+    <Layout preview="Your Leamout account is ready">
+      <Heading style={headingStyle}>Welcome to Leamout</Heading>
+      <Text style={textStyle}>Hi {name}, your account is ready.</Text>
+      <Text style={textStyle}>
+        Create your organization, configure an agent, and connect your existing
+        phone numbers through a SIP trunk.
+      </Text>
+      <Button href={consoleUrl} style={buttonStyle}>
+        Open console
+      </Button>
+    </Layout>
   );
 }
+
+Welcome.PreviewProps = {
+  name: "Alex",
+  consoleUrl: "https://example.com/console",
+} satisfies WelcomeProps;
