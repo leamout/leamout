@@ -17,6 +17,7 @@ var (
 	ErrChannelUnavailable  = errors.New("active call channel unavailable")
 	ErrAdmissionCPS        = errors.New("trunk CPS limit exceeded")
 	ErrAdmissionConcurrent = errors.New("trunk concurrent call limit exceeded")
+	ErrPlanConcurrent      = errors.New("organization concurrent call limit exceeded")
 )
 
 const callAdmissionLeaseTTL = 26 * time.Hour
@@ -163,10 +164,90 @@ func (l *AdmissionLimiter) Refresh(
 	)
 }
 
+func (l *AdmissionLimiter) AcquireOrganization(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	leaseID string,
+	maxConcurrent int64,
+) error {
+	if organizationID == uuid.Nil || leaseID == "" {
+		return fmt.Errorf("organization id and lease id are required")
+	}
+	if maxConcurrent < 1 {
+		return fmt.Errorf("organization concurrent call limit must be positive")
+	}
+
+	allowed, err := l.client.AcquireConcurrentLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		leaseID,
+		maxConcurrent,
+		callAdmissionLeaseTTL,
+	)
+	if err != nil {
+		return fmt.Errorf("acquire organization call lease: %w", err)
+	}
+	if !allowed {
+		return ErrPlanConcurrent
+	}
+	return nil
+}
+
+func (l *AdmissionLimiter) BindOrganization(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	leaseID string,
+	callID uuid.UUID,
+) error {
+	if organizationID == uuid.Nil || leaseID == "" || callID == uuid.Nil {
+		return fmt.Errorf("organization id, lease id, and call id are required")
+	}
+	return l.client.BindCallLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		leaseID,
+		callID.String(),
+	)
+}
+
+func (l *AdmissionLimiter) ReleaseOrganization(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	callOrLeaseID string,
+) error {
+	if organizationID == uuid.Nil || callOrLeaseID == "" {
+		return fmt.Errorf("organization id and call or lease id are required")
+	}
+	return l.client.ReleaseCallLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		callOrLeaseID,
+	)
+}
+
+func (l *AdmissionLimiter) RefreshOrganization(
+	ctx context.Context,
+	organizationID, callID uuid.UUID,
+) error {
+	if organizationID == uuid.Nil || callID == uuid.Nil {
+		return fmt.Errorf("organization id and call id are required")
+	}
+	return l.client.RefreshCallLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		callID.String(),
+		callAdmissionLeaseTTL,
+	)
+}
+
 func channelKey(callID uuid.UUID) string {
 	return "telecom:calls:channel:" + callID.String()
 }
 
 func admissionPrefix(trunkID uuid.UUID) string {
 	return "telecom:admission:trunk:" + trunkID.String()
+}
+
+func organizationAdmissionPrefix(organizationID uuid.UUID) string {
+	return "telecom:admission:organization:" + organizationID.String()
 }
