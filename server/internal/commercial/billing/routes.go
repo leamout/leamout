@@ -16,8 +16,7 @@ func RegisterRoutes(
 		r.Post("/checkout", handler.Checkout)
 		r.Post("/portal", handler.Portal)
 	})
-}
 
-func RegisterStripeWebhookRoute(router chi.Router, handler *Handler) {
+	// Stripe authenticates this endpoint with the Stripe-Signature header.
 	router.Post("/webhooks/stripe", handler.StripeWebhook)
 }
