@@ -2,7 +2,7 @@
 SELECT *
 FROM plans
 WHERE status = 'active'
-ORDER BY amount_minor ASC, created_at ASC;
+ORDER BY amount_minor ASC NULLS LAST, created_at ASC;
 
 -- name: GetPlanByID :one
 SELECT *
@@ -22,10 +22,12 @@ INSERT INTO plans (
     code,
     name,
     description,
+    pricing_type,
     currency,
     amount_minor,
     billing_interval,
     entitlements,
+    limits,
     status
 )
 VALUES (
@@ -33,19 +35,23 @@ VALUES (
     sqlc.arg(code),
     sqlc.arg(name),
     sqlc.narg(description),
+    sqlc.arg(pricing_type),
     sqlc.arg(currency),
-    sqlc.arg(amount_minor),
+    sqlc.narg(amount_minor),
     sqlc.arg(billing_interval),
     sqlc.arg(entitlements),
+    sqlc.arg(limits),
     sqlc.arg(status)
 )
 ON CONFLICT (code)
 DO UPDATE SET
     name = EXCLUDED.name,
     description = EXCLUDED.description,
+    pricing_type = EXCLUDED.pricing_type,
     currency = EXCLUDED.currency,
     amount_minor = EXCLUDED.amount_minor,
     billing_interval = EXCLUDED.billing_interval,
     entitlements = EXCLUDED.entitlements,
+    limits = EXCLUDED.limits,
     status = EXCLUDED.status
 RETURNING *;
