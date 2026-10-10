@@ -16,12 +16,6 @@ FROM plans
 WHERE code = sqlc.arg(code)
 LIMIT 1;
 
--- name: ListPlanEntitlements :many
-SELECT capability, enabled
-FROM plan_entitlements
-WHERE plan_id = sqlc.arg(plan_id)
-ORDER BY capability;
-
 -- name: UpsertPlan :one
 INSERT INTO plans (
     id,
@@ -31,6 +25,7 @@ INSERT INTO plans (
     currency,
     amount_minor,
     billing_interval,
+    entitlements,
     status
 )
 VALUES (
@@ -41,6 +36,7 @@ VALUES (
     sqlc.arg(currency),
     sqlc.arg(amount_minor),
     sqlc.arg(billing_interval),
+    sqlc.arg(entitlements),
     sqlc.arg(status)
 )
 ON CONFLICT (code)
@@ -50,19 +46,6 @@ DO UPDATE SET
     currency = EXCLUDED.currency,
     amount_minor = EXCLUDED.amount_minor,
     billing_interval = EXCLUDED.billing_interval,
+    entitlements = EXCLUDED.entitlements,
     status = EXCLUDED.status
 RETURNING *;
-
--- name: UpsertPlanEntitlement :exec
-INSERT INTO plan_entitlements (
-    plan_id,
-    capability,
-    enabled
-)
-VALUES (
-    sqlc.arg(plan_id),
-    sqlc.arg(capability),
-    sqlc.arg(enabled)
-)
-ON CONFLICT (plan_id, capability)
-DO UPDATE SET enabled = EXCLUDED.enabled;
