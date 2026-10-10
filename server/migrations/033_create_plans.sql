@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS plans (
     currency TEXT NOT NULL DEFAULT 'USD',
     amount_minor BIGINT NOT NULL DEFAULT 0,
     billing_interval TEXT NOT NULL DEFAULT 'month',
+    entitlements JSONB NOT NULL DEFAULT '{}'::jsonb,
     status TEXT NOT NULL DEFAULT 'active',
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -22,24 +23,10 @@ CREATE TABLE IF NOT EXISTS plans (
         CHECK (amount_minor >= 0),
     CONSTRAINT chk_plans_interval
         CHECK (billing_interval IN ('month', 'year')),
+    CONSTRAINT chk_plans_entitlements
+        CHECK (jsonb_typeof(entitlements) = 'object'),
     CONSTRAINT chk_plans_status
         CHECK (status IN ('active', 'inactive'))
-);
-
-CREATE TABLE IF NOT EXISTS plan_entitlements (
-    plan_id UUID NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
-    capability TEXT NOT NULL,
-    enabled BOOLEAN NOT NULL DEFAULT TRUE,
-
-    PRIMARY KEY (plan_id, capability),
-    CONSTRAINT chk_plan_entitlements_capability
-        CHECK (capability IN (
-            'sso',
-            'scim',
-            'advanced_rbac',
-            'retention_policies',
-            'private_networking'
-        ))
 );
 
 CREATE INDEX IF NOT EXISTS idx_plans_active
