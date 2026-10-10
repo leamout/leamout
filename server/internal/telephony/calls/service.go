@@ -20,6 +20,7 @@ type Service struct {
 	admission           *calling.AdmissionLimiter
 	metrics             routeAttemptMetrics
 	voiceAgentReadiness func(context.Context, uuid.UUID, uuid.UUID) error
+	planConcurrency     func(context.Context, uuid.UUID) (int64, bool, error)
 }
 
 type routeAttemptMetrics interface {
@@ -78,6 +79,12 @@ func (s *Service) SetVoiceAgentReadinessCheck(
 	s.voiceAgentReadiness = check
 }
 
+func (s *Service) SetPlanConcurrencyResolver(
+	resolve func(context.Context, uuid.UUID) (int64, bool, error),
+) {
+	s.planConcurrency = resolve
+}
+
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Call, error) {
 	if err := validateOrganizationID(organizationID); err != nil {
 		return sqlc.Call{}, err
@@ -100,6 +107,11 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return sqlc.Call{}, apperror.NewInternal("create call", err)
 	}
+	if err := s.acquireOrganizationAdmission(ctx, organizationID, call.ID.String()); err != nil {
+		reason := "plan_concurrent_limit"
+		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
+		return sqlc.Call{}, err
+	}
 
 	decision, err := s.router.ResolveOutbound(ctx, routing.OutboundRequest{
 		OrganizationID: organizationID,
@@ -109,12 +121,14 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		reason := "route_resolution_failed"
 		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
+		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
 		return sqlc.Call{}, err
 	}
 	_, ok := decision.Primary()
 	if !ok {
 		reason := "route_resolution_failed"
 		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
+		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
 		return sqlc.Call{}, apperror.NewNotFound("no eligible outbound route")
 	}
 
@@ -177,11 +191,13 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		reason := "originate_failed"
 		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
+		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
 		return sqlc.Call{}, apperror.NewInternal("originate call", err)
 	}
 	if err := s.channels.Bind(ctx, call.ID, result.ChannelID); err != nil {
 		_ = s.controller.Hangup(ctx, result.ChannelID)
 		_ = s.admission.Release(ctx, selected.TrunkID, call.ID.String())
+		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
 		reason := "channel_binding_failed"
 		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
 		return sqlc.Call{}, apperror.NewInternal("bind call channel", err)
@@ -206,6 +222,17 @@ func (s *Service) AdmitInbound(
 		existing, err = s.ensureInboundAttribution(ctx, existing, req)
 		if err != nil {
 			return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
+		}
+		if err := s.admission.RefreshOrganization(
+			ctx,
+			existing.OrganizationID,
+			existing.ID,
+		); err != nil {
+			return sqlc.Call{}, s.rejectInbound(
+				ctx,
+				req.ChannelID,
+				apperror.NewServiceUnavailable("refresh organization admission lease", err),
+			)
 		}
 		if existing.TrunkID != nil {
 			if err := s.admission.Refresh(ctx, *existing.TrunkID, existing.ID); err != nil {
@@ -241,12 +268,21 @@ func (s *Service) AdmitInbound(
 		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
 	}
 
+	if err := s.acquireOrganizationAdmission(
+		ctx,
+		req.OrganizationID,
+		req.ChannelID,
+	); err != nil {
+		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
+	}
+
 	if err := s.admission.Acquire(
 		ctx,
 		decision.TrunkID,
 		req.ChannelID,
 		decision.Limits,
 	); err != nil {
+		_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, req.ChannelID)
 		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, admissionError(err))
 	}
 
@@ -258,6 +294,7 @@ func (s *Service) AdmitInbound(
 		if readErr == nil {
 			if existing.ID.String() != req.ChannelID {
 				_ = s.admission.Release(ctx, decision.TrunkID, req.ChannelID)
+				_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, req.ChannelID)
 			}
 			if validateErr := validateExistingInbound(existing, req); validateErr != nil {
 				return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, validateErr)
@@ -265,6 +302,17 @@ func (s *Service) AdmitInbound(
 			existing, attributionErr := s.ensureInboundAttribution(ctx, existing, req)
 			if attributionErr != nil {
 				return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, attributionErr)
+			}
+			if refreshErr := s.admission.RefreshOrganization(
+				ctx,
+				existing.OrganizationID,
+				existing.ID,
+			); refreshErr != nil {
+				return sqlc.Call{}, s.rejectInbound(
+					ctx,
+					req.ChannelID,
+					apperror.NewServiceUnavailable("refresh organization admission lease", refreshErr),
+				)
 			}
 			if existing.TrunkID != nil {
 				if refreshErr := s.admission.Refresh(ctx, *existing.TrunkID, existing.ID); refreshErr != nil {
@@ -281,6 +329,7 @@ func (s *Service) AdmitInbound(
 			return existing, nil
 		}
 		_ = s.admission.Release(ctx, decision.TrunkID, req.ChannelID)
+		_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, req.ChannelID)
 		return sqlc.Call{}, s.rejectInbound(
 			ctx,
 			req.ChannelID,
@@ -294,12 +343,30 @@ func (s *Service) AdmitInbound(
 	})
 	if err != nil {
 		_ = s.admission.Release(ctx, decision.TrunkID, req.ChannelID)
+		_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, req.ChannelID)
 		reason := "inbound_attribution_failed"
 		_, _ = s.repo.MarkFailed(ctx, req.OrganizationID, call.ID, &reason)
 		return sqlc.Call{}, s.rejectInbound(
 			ctx,
 			req.ChannelID,
 			apperror.NewInternal("set inbound route attribution", err),
+		)
+	}
+
+	if err := s.admission.BindOrganization(
+		ctx,
+		req.OrganizationID,
+		req.ChannelID,
+		call.ID,
+	); err != nil {
+		reason := "organization_admission_binding_failed"
+		_, _ = s.repo.MarkFailed(ctx, req.OrganizationID, call.ID, &reason)
+		_ = s.admission.Release(ctx, decision.TrunkID, req.ChannelID)
+		_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, req.ChannelID)
+		return sqlc.Call{}, s.rejectInbound(
+			ctx,
+			req.ChannelID,
+			apperror.NewInternal("bind organization admission lease", err),
 		)
 	}
 
@@ -312,6 +379,7 @@ func (s *Service) AdmitInbound(
 		reason := "inbound_admission_binding_failed"
 		_, _ = s.repo.MarkFailed(ctx, req.OrganizationID, call.ID, &reason)
 		_ = s.admission.Release(ctx, decision.TrunkID, req.ChannelID)
+		_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, call.ID.String())
 		return sqlc.Call{}, s.rejectInbound(
 			ctx,
 			req.ChannelID,
@@ -321,12 +389,45 @@ func (s *Service) AdmitInbound(
 
 	if err := s.bindInboundChannel(ctx, call, req.ChannelID); err != nil {
 		_ = s.admission.Release(ctx, decision.TrunkID, call.ID.String())
+		_ = s.admission.ReleaseOrganization(ctx, req.OrganizationID, call.ID.String())
 		reason := "inbound_channel_binding_failed"
 		_, _ = s.repo.MarkFailed(ctx, req.OrganizationID, call.ID, &reason)
 		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
 	}
 
 	return call, nil
+}
+
+func (s *Service) acquireOrganizationAdmission(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	leaseID string,
+) error {
+	if s.planConcurrency == nil {
+		return apperror.NewServiceUnavailable(
+			"commercial plan limit service is unavailable",
+			nil,
+		)
+	}
+	maxConcurrent, limited, err := s.planConcurrency(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	if !limited {
+		return nil
+	}
+	if err := s.admission.AcquireOrganization(
+		ctx,
+		organizationID,
+		leaseID,
+		maxConcurrent,
+	); err != nil {
+		if errors.Is(err, calling.ErrPlanConcurrent) {
+			return apperror.NewPaymentRequired("organization concurrent call limit exceeded")
+		}
+		return apperror.NewServiceUnavailable("organization admission service unavailable", err)
+	}
+	return nil
 }
 
 func (s *Service) requireVoiceAgentReady(

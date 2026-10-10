@@ -42,14 +42,28 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 		}
 	}
 
-	if !isTerminalLifecycle(event.Type) && snapshot.TrunkID != nil {
-		if err := s.admission.Refresh(ctx, *snapshot.TrunkID, event.CallID); err != nil {
-			return apperror.NewServiceUnavailable("refresh trunk call lease", err)
+	if !isTerminalLifecycle(event.Type) {
+		if err := s.admission.RefreshOrganization(
+			ctx,
+			snapshot.OrganizationID,
+			event.CallID,
+		); err != nil {
+			return apperror.NewServiceUnavailable("refresh organization call lease", err)
+		}
+		if snapshot.TrunkID != nil {
+			if err := s.admission.Refresh(ctx, *snapshot.TrunkID, event.CallID); err != nil {
+				return apperror.NewServiceUnavailable("refresh trunk call lease", err)
+			}
 		}
 	}
 	if lifecycleAlreadyApplied(snapshot, event.Type) {
 		if isTerminalLifecycle(event.Type) {
 			_ = s.channels.Delete(ctx, event.CallID)
+			_ = s.admission.ReleaseOrganization(
+				ctx,
+				snapshot.OrganizationID,
+				event.CallID.String(),
+			)
 			if snapshot.TrunkID != nil {
 				_ = s.admission.Release(ctx, *snapshot.TrunkID, event.CallID.String())
 			}
@@ -81,6 +95,11 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 	}
 	if err == nil && isTerminalLifecycle(event.Type) {
 		_ = s.channels.Delete(ctx, event.CallID)
+		_ = s.admission.ReleaseOrganization(
+			ctx,
+			snapshot.OrganizationID,
+			event.CallID.String(),
+		)
 		if snapshot.TrunkID != nil {
 			_ = s.admission.Release(ctx, *snapshot.TrunkID, event.CallID.String())
 		}

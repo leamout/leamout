@@ -135,6 +135,10 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 			"pro":       cfg.Stripe.ProPriceID,
 		},
 	})
+	platformModule.Retention.Service.SetPlanRetentionResolver(
+		commercialModule.Limits.Service.RetentionDays,
+	)
+
 	recordingStorage := recordings.NewResolvedObjectStorage(
 		objectClient,
 		platformModule.Storage.Service,
@@ -172,6 +176,9 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
 		aiModule.Agents.Service.RequireReady,
+	)
+	telephonyModule.Calls.Service.SetPlanConcurrencyResolver(
+		commercialModule.Limits.Service.MaxConcurrentCalls,
 	)
 
 	resolver := authn.NewResolver(identityModule.Session.Service, tenancyModule.Credentials.Service)

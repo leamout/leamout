@@ -80,7 +80,14 @@ func (j *ReconciliationJob) Reconcile(ctx context.Context) error {
 
 	for _, call := range active {
 		if err := j.service.admission.Refresh(ctx, call.TrunkID, call.ID); err != nil {
-			return fmt.Errorf("refresh admission lease for call %s: %w", call.ID, err)
+			return fmt.Errorf("refresh trunk admission lease for call %s: %w", call.ID, err)
+		}
+		if err := j.service.admission.RefreshOrganization(
+			ctx,
+			call.OrganizationID,
+			call.ID,
+		); err != nil {
+			return fmt.Errorf("refresh organization admission lease for call %s: %w", call.ID, err)
 		}
 	}
 

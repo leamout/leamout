@@ -7,6 +7,9 @@ import (
 
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/ai/providers"
+	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
+	commercialplans "github.com/leamout/leamout/server/internal/commercial/plans"
+	commercialsubscriptions "github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
@@ -120,6 +123,13 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		admissionLimiter,
 		metrics.New(redisClient),
 	)
+	planLimits := commerciallimits.NewService(
+		commercialplans.NewService(commercialplans.NewRepository(queries)),
+		commercialsubscriptions.NewService(
+			commercialsubscriptions.NewRepository(queries),
+		),
+	)
+	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
 		PlatformCredentials: providers.PlatformCredentials{

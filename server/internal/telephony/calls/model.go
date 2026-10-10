@@ -101,8 +101,9 @@ type DTMFActionRequest struct {
 }
 
 type ActiveAdmissionCall struct {
-	ID      uuid.UUID
-	TrunkID uuid.UUID
+	ID             uuid.UUID
+	OrganizationID uuid.UUID
+	TrunkID        uuid.UUID
 }
 
 type ListRequest struct {
