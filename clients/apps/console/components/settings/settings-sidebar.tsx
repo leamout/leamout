@@ -34,6 +34,7 @@ const pages = [
   "API keys",
   "Storage",
   "Audit log",
+  "Network policies",
 ].map((title) => ({
   title,
   href: `/settings/${title === "API keys" ? "api-keys" : title.toLowerCase().replaceAll(" ", "-")}`,
