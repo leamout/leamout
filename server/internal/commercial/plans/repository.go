@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
@@ -54,15 +55,21 @@ func (r *Repository) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest
 	if err != nil {
 		return Plan{}, err
 	}
+	limits, err := json.Marshal(req.Limits)
+	if err != nil {
+		return Plan{}, err
+	}
 	row, err := r.queries.UpsertPlan(ctx, sqlc.UpsertPlanParams{
 		ID:              id,
 		Code:            req.Code,
 		Name:            req.Name,
 		Description:     req.Description,
+		PricingType:     req.PricingType,
 		Currency:        req.Currency,
-		AmountMinor:     req.AmountMinor,
+		AmountMinor:     nullableInt8(req.AmountMinor),
 		BillingInterval: req.BillingInterval,
 		Entitlements:    entitlements,
+		Limits:          limits,
 		Status:          req.Status,
 	})
 	if err != nil {
@@ -78,17 +85,40 @@ func fromRow(row sqlc.Plan) (Plan, error) {
 			return Plan{}, err
 		}
 	}
+	limits := map[string]int64{}
+	if len(row.Limits) > 0 {
+		if err := json.Unmarshal(row.Limits, &limits); err != nil {
+			return Plan{}, err
+		}
+	}
 	return Plan{
 		ID:              row.ID,
 		Code:            row.Code,
 		Name:            row.Name,
 		Description:     row.Description,
+		PricingType:     row.PricingType,
 		Currency:        row.Currency,
-		AmountMinor:     row.AmountMinor,
+		AmountMinor:     int8Ptr(row.AmountMinor),
 		BillingInterval: row.BillingInterval,
 		Entitlements:    entitlements,
+		Limits:          limits,
 		Status:          row.Status,
 		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
 		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
 	}, nil
+}
+
+func nullableInt8(value *int64) pgtype.Int8 {
+	if value == nil {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: *value, Valid: true}
+}
+
+func int8Ptr(value pgtype.Int8) *int64 {
+	if !value.Valid {
+		return nil
+	}
+	result := value.Int64
+	return &result
 }
