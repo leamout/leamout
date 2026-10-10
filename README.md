@@ -315,8 +315,7 @@ The root `.env` supplies infrastructure settings for Compose, such as
 `POSTGRES_PASSWORD` and `PUBLIC_IP`. `server/.env` supplies application settings
 through `env_file`; Go owns their defaults and validation. The server, worker,
 media runtime, Caddy, FreeSWITCH, and Coturn load the same application file so
-shared domains and secrets stay consistent. This also makes AWS credentials
-available inside those containers; only the worker uses them for SES.
+shared domains and secrets stay consistent.
 
 Keep the password in `server/.env`'s `DATABASE_URL` consistent with the root
 `POSTGRES_PASSWORD`. Set `DOMAIN`, `CORS_ORIGINS`, `TURN_PUBLIC_URLS`, and the root
