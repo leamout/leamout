@@ -38,18 +38,17 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, params CheckoutParam
 		return CheckoutSession{}, err
 	}
 
-	values := url.Values{
-		"mode":                                         {"subscription"},
-		"line_items[0][price]":                         {params.PriceID},
-		"line_items[0][quantity]":                      {"1"},
-		"client_reference_id":                          {params.OrganizationID},
-		"metadata[organization_id]":                    {params.OrganizationID},
-		"metadata[plan_code]":                          {params.PlanCode},
-		"subscription_data[metadata][organization_id]": {params.OrganizationID},
-		"subscription_data[metadata][plan_code]":       {params.PlanCode},
-		"success_url":                                  {params.SuccessURL},
-		"cancel_url":                                   {params.CancelURL},
-	}
+	values := url.Values{}
+	values.Set("mode", "subscription")
+	values.Set("line_items[0][price]", params.PriceID)
+	values.Set("line_items[0][quantity]", "1")
+	values.Set("client_reference_id", params.OrganizationID)
+	values.Set("metadata[organization_id]", params.OrganizationID)
+	values.Set("metadata[plan_code]", params.PlanCode)
+	values.Set("subscription_data[metadata][organization_id]", params.OrganizationID)
+	values.Set("subscription_data[metadata][plan_code]", params.PlanCode)
+	values.Set("success_url", params.SuccessURL)
+	values.Set("cancel_url", params.CancelURL)
 	if params.CustomerID != "" {
 		values.Set("customer", params.CustomerID)
 	}
