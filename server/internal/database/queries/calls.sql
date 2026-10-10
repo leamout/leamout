@@ -76,6 +76,7 @@ LIMIT sqlc.arg(batch_size);
 -- name: ListActiveCallsForAdmissionReconciliation :many
 SELECT
     id,
+    organization_id,
     trunk_id
 FROM calls
 WHERE state IN ('initiating', 'ringing', 'answered', 'active')
