@@ -106,4 +106,3 @@ func fromRow(row sqlc.Plan) (Plan, error) {
 		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
 	}, nil
 }
-
