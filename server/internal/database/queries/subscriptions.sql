@@ -48,7 +48,7 @@ LEFT JOIN entitlements oe
 LEFT JOIN subscriptions s
   ON s.organization_id = o.id
  AND s.status IN ('trialing', 'active')
-LEFT JOIN subscription_plan_entitlements pe
+LEFT JOIN plan_entitlements pe
   ON pe.plan_id = s.plan_id
  AND pe.capability = sqlc.arg(capability)
 WHERE o.id = sqlc.arg(organization_id)
