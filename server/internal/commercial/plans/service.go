@@ -22,12 +22,12 @@ func NewService(repo *Repository) *Service {
 func (s *Service) List(ctx context.Context) ([]Plan, error) {
 	values, err := s.repo.ListActive(ctx)
 	if err != nil {
-		return nil, apperror.NewInternal("list subscription plans", err)
+		return nil, apperror.NewInternal("list plans", err)
 	}
 	for i := range values {
 		entitlements, err := s.repo.ListEntitlements(ctx, values[i].ID)
 		if err != nil {
-			return nil, apperror.NewInternal("list subscription plan entitlements", err)
+			return nil, apperror.NewInternal("list plan entitlements", err)
 		}
 		values[i].Entitlements = entitlements
 	}
@@ -40,14 +40,14 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 	}
 	value, err := s.repo.GetByID(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Plan{}, apperror.NewNotFound("subscription plan not found")
+		return Plan{}, apperror.NewNotFound("plan not found")
 	}
 	if err != nil {
-		return Plan{}, apperror.NewInternal("get subscription plan", err)
+		return Plan{}, apperror.NewInternal("get plan", err)
 	}
 	entitlements, err := s.repo.ListEntitlements(ctx, value.ID)
 	if err != nil {
-		return Plan{}, apperror.NewInternal("list subscription plan entitlements", err)
+		return Plan{}, apperror.NewInternal("list plan entitlements", err)
 	}
 	value.Entitlements = entitlements
 	return value, nil
@@ -60,14 +60,14 @@ func (s *Service) GetByCode(ctx context.Context, code string) (Plan, error) {
 	}
 	value, err := s.repo.GetByCode(ctx, code)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Plan{}, apperror.NewNotFound("subscription plan not found")
+		return Plan{}, apperror.NewNotFound("plan not found")
 	}
 	if err != nil {
-		return Plan{}, apperror.NewInternal("get subscription plan", err)
+		return Plan{}, apperror.NewInternal("get plan", err)
 	}
 	entitlements, err := s.repo.ListEntitlements(ctx, value.ID)
 	if err != nil {
-		return Plan{}, apperror.NewInternal("list subscription plan entitlements", err)
+		return Plan{}, apperror.NewInternal("list plan entitlements", err)
 	}
 	value.Entitlements = entitlements
 	return value, nil
@@ -87,7 +87,7 @@ func (s *Service) SetEntitlement(
 		return apperror.NewBadRequest("unsupported organization capability")
 	}
 	if err := s.repo.SetEntitlement(ctx, planID, capability, enabled); err != nil {
-		return apperror.NewInternal("set subscription plan entitlement", err)
+		return apperror.NewInternal("set plan entitlement", err)
 	}
 	return nil
 }
@@ -102,7 +102,7 @@ func (s *Service) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest) (
 	}
 	value, err := s.repo.Upsert(ctx, id, normalized)
 	if err != nil {
-		return Plan{}, apperror.NewInternal("upsert subscription plan", err)
+		return Plan{}, apperror.NewInternal("upsert plan", err)
 	}
 	return value, nil
 }
