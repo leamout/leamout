@@ -71,7 +71,7 @@ const listActivePlans = `-- name: ListActivePlans :many
 SELECT id, code, name, description, pricing_type, currency, amount_minor, billing_interval, entitlements, limits, status, created_at, updated_at
 FROM plans
 WHERE status = 'active'
-ORDER BY amount_minor ASC, created_at ASC
+ORDER BY amount_minor ASC NULLS LAST, created_at ASC
 `
 
 func (q *Queries) ListActivePlans(ctx context.Context) ([]Plan, error) {
@@ -114,10 +114,12 @@ INSERT INTO plans (
     code,
     name,
     description,
+    pricing_type,
     currency,
     amount_minor,
     billing_interval,
     entitlements,
+    limits,
     status
 )
 VALUES (
@@ -129,16 +131,20 @@ VALUES (
     $6,
     $7,
     $8,
-    $9
+    $9,
+    $10,
+    $11
 )
 ON CONFLICT (code)
 DO UPDATE SET
     name = EXCLUDED.name,
     description = EXCLUDED.description,
+    pricing_type = EXCLUDED.pricing_type,
     currency = EXCLUDED.currency,
     amount_minor = EXCLUDED.amount_minor,
     billing_interval = EXCLUDED.billing_interval,
     entitlements = EXCLUDED.entitlements,
+    limits = EXCLUDED.limits,
     status = EXCLUDED.status
 RETURNING id, code, name, description, pricing_type, currency, amount_minor, billing_interval, entitlements, limits, status, created_at, updated_at
 `
@@ -148,10 +154,12 @@ type UpsertPlanParams struct {
 	Code            string    `db:"code" json:"code"`
 	Name            string    `db:"name" json:"name"`
 	Description     *string   `db:"description" json:"description"`
+	PricingType     string    `db:"pricing_type" json:"pricing_type"`
 	Currency        string    `db:"currency" json:"currency"`
 	AmountMinor     *int64    `db:"amount_minor" json:"amount_minor"`
 	BillingInterval string    `db:"billing_interval" json:"billing_interval"`
 	Entitlements    []byte    `db:"entitlements" json:"entitlements"`
+	Limits          []byte    `db:"limits" json:"limits"`
 	Status          string    `db:"status" json:"status"`
 }
 
@@ -161,10 +169,12 @@ func (q *Queries) UpsertPlan(ctx context.Context, arg UpsertPlanParams) (Plan, e
 		arg.Code,
 		arg.Name,
 		arg.Description,
+		arg.PricingType,
 		arg.Currency,
 		arg.AmountMinor,
 		arg.BillingInterval,
 		arg.Entitlements,
+		arg.Limits,
 		arg.Status,
 	)
 	var i Plan
