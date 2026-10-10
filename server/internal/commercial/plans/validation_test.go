@@ -23,6 +23,9 @@ func TestValidateUpsert(t *testing.T) {
 	if req.Code != "pro" || req.Name != "Pro" || req.Currency != "USD" {
 		t.Fatalf("validateUpsert() normalization = %#v", req)
 	}
+	if !req.Entitlements["advanced_rbac"] {
+		t.Fatal("expected advanced_rbac entitlement to remain true")
+	}
 }
 
 func TestValidateUpsertRejectsInvalidAmount(t *testing.T) {
