@@ -17,7 +17,7 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 }
 
 func (r *Repository) ListActive(ctx context.Context) ([]Plan, error) {
-	rows, err := r.queries.ListActiveSubscriptionPlans(ctx)
+	rows, err := r.queries.ListActivePlans(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +29,7 @@ func (r *Repository) ListActive(ctx context.Context) ([]Plan, error) {
 }
 
 func (r *Repository) ListEntitlements(ctx context.Context, planID uuid.UUID) ([]Entitlement, error) {
-	rows, err := r.queries.ListSubscriptionPlanEntitlements(ctx, planID)
+	rows, err := r.queries.ListPlanEntitlements(ctx, planID)
 	if err != nil {
 		return nil, err
 	}
@@ -49,9 +49,9 @@ func (r *Repository) SetEntitlement(
 	capability string,
 	enabled bool,
 ) error {
-	return r.queries.UpsertSubscriptionPlanEntitlement(
+	return r.queries.UpsertPlanEntitlement(
 		ctx,
-		sqlc.UpsertSubscriptionPlanEntitlementParams{
+		sqlc.UpsertPlanEntitlementParams{
 			PlanID:     planID,
 			Capability: capability,
 			Enabled:    enabled,
@@ -60,7 +60,7 @@ func (r *Repository) SetEntitlement(
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
-	row, err := r.queries.GetSubscriptionPlanByID(ctx, id)
+	row, err := r.queries.GetPlanByID(ctx, id)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -68,7 +68,7 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 }
 
 func (r *Repository) GetByCode(ctx context.Context, code string) (Plan, error) {
-	row, err := r.queries.GetSubscriptionPlanByCode(ctx, code)
+	row, err := r.queries.GetPlanByCode(ctx, code)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -76,7 +76,7 @@ func (r *Repository) GetByCode(ctx context.Context, code string) (Plan, error) {
 }
 
 func (r *Repository) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest) (Plan, error) {
-	row, err := r.queries.UpsertSubscriptionPlan(ctx, sqlc.UpsertSubscriptionPlanParams{
+	row, err := r.queries.UpsertPlan(ctx, sqlc.UpsertPlanParams{
 		ID:              id,
 		Code:            req.Code,
 		Name:            req.Name,
@@ -92,7 +92,7 @@ func (r *Repository) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest
 	return fromRow(row), nil
 }
 
-func fromRow(row sqlc.SubscriptionPlan) Plan {
+func fromRow(row sqlc.Plan) Plan {
 	return Plan{
 		ID:              row.ID,
 		Code:            row.Code,
