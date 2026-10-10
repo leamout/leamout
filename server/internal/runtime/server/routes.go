@@ -31,6 +31,7 @@ func newRouter(cfg config.Config, logger *logging.Logger, modules *modules) *chi
 
 	registerHealthRoutes(router, modules)
 	router.Handle("/metrics", metrics.Handler(modules.metrics))
+	commercial.RegisterPublicRoutes(router, modules.commercial)
 
 	organizationAccess := func(resource string) func(http.Handler) http.Handler {
 		return func(next http.Handler) http.Handler {
