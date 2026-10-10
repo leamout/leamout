@@ -8,6 +8,7 @@ import {
   RoboticIcon,
   TelephoneIcon,
   ToolsIcon,
+  VoiceIcon,
   WebhookIcon,
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
@@ -35,6 +36,7 @@ const navigation = [
   { title: "Overview", href: "/", icon: DashboardSquare01Icon },
   { title: "Agents", href: "/agents", icon: RoboticIcon },
   { title: "Calls", href: "/calls", icon: Call02Icon },
+  { title: "Recordings", href: "/recordings", icon: VoiceIcon },
   { title: "Phone numbers", href: "/phone-numbers", icon: TelephoneIcon },
   { title: "SIP trunks", href: "/sip-trunks", icon: LinkSquare02Icon },
   { title: "AI providers", href: "/ai-providers", icon: AiBrain01Icon },
