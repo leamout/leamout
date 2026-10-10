@@ -17,8 +17,8 @@ SELECT
     COALESCE(
         oe.enabled,
         CASE
-            WHEN jsonb_typeof(p.entitlements -> $1) = 'boolean'
-                THEN (p.entitlements ->> $1)::boolean
+            WHEN jsonb_typeof(p.entitlements -> ($1::text)) = 'boolean'
+                THEN (p.entitlements ->> ($1::text))::boolean
             ELSE FALSE
         END,
         FALSE
@@ -26,7 +26,7 @@ SELECT
 FROM organizations o
 LEFT JOIN entitlements oe
   ON oe.organization_id = o.id
- AND oe.capability = $1
+ AND oe.capability = ($1::text)
 LEFT JOIN subscriptions s
   ON s.organization_id = o.id
  AND s.status IN ('trialing', 'active')
@@ -37,7 +37,7 @@ LIMIT 1
 `
 
 type GetEffectiveOrganizationEntitlementParams struct {
-	Capability     []byte    `db:"capability" json:"capability"`
+	Capability     string    `db:"capability" json:"capability"`
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 
