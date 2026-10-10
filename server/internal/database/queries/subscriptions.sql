@@ -14,7 +14,11 @@ INSERT INTO subscriptions (
     current_period_end,
     trial_ends_at,
     cancel_at_period_end,
-    canceled_at
+    canceled_at,
+    provider,
+    provider_customer_id,
+    provider_subscription_id,
+    provider_event_created_at
 )
 VALUES (
     sqlc.arg(id),
@@ -25,7 +29,11 @@ VALUES (
     sqlc.narg(current_period_end),
     sqlc.narg(trial_ends_at),
     sqlc.arg(cancel_at_period_end),
-    sqlc.narg(canceled_at)
+    sqlc.narg(canceled_at),
+    sqlc.narg(provider),
+    sqlc.narg(provider_customer_id),
+    sqlc.narg(provider_subscription_id),
+    sqlc.narg(provider_event_created_at)
 )
 ON CONFLICT (organization_id)
 DO UPDATE SET
@@ -35,7 +43,14 @@ DO UPDATE SET
     current_period_end = EXCLUDED.current_period_end,
     trial_ends_at = EXCLUDED.trial_ends_at,
     cancel_at_period_end = EXCLUDED.cancel_at_period_end,
-    canceled_at = EXCLUDED.canceled_at
+    canceled_at = EXCLUDED.canceled_at,
+    provider = EXCLUDED.provider,
+    provider_customer_id = EXCLUDED.provider_customer_id,
+    provider_subscription_id = EXCLUDED.provider_subscription_id,
+    provider_event_created_at = EXCLUDED.provider_event_created_at
+WHERE subscriptions.provider_event_created_at IS NULL
+   OR EXCLUDED.provider_event_created_at IS NULL
+   OR EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
 RETURNING *;
 
 -- name: GetEffectiveOrganizationEntitlement :one
