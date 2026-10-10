@@ -13,9 +13,7 @@ type Repository struct {
 }
 
 func NewRepository(queries *sqlc.Queries) *Repository {
-	return &Repository{
-		queries: queries,
-	}
+	return &Repository{queries: queries}
 }
 
 func (r *Repository) List(
@@ -26,7 +24,6 @@ func (r *Repository) List(
 	if err != nil {
 		return nil, err
 	}
-
 	result := make([]Entitlement, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, entitlementFromRow(row))
@@ -39,17 +36,28 @@ func (r *Repository) Get(
 	organizationID uuid.UUID,
 	capability Capability,
 ) (Entitlement, error) {
-	row, err := r.queries.GetEntitlement(
-		ctx,
-		sqlc.GetEntitlementParams{
-			OrganizationID: organizationID,
-			Capability:     string(capability),
-		},
-	)
+	row, err := r.queries.GetEntitlement(ctx, sqlc.GetEntitlementParams{
+		OrganizationID: organizationID,
+		Capability:     string(capability),
+	})
 	if err != nil {
 		return Entitlement{}, err
 	}
 	return entitlementFromRow(row), nil
+}
+
+func (r *Repository) EffectiveEnabled(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	capability Capability,
+) (bool, error) {
+	return r.queries.GetEffectiveOrganizationEntitlement(
+		ctx,
+		sqlc.GetEffectiveOrganizationEntitlementParams{
+			OrganizationID: organizationID,
+			Capability:     string(capability),
+		},
+	)
 }
 
 func (r *Repository) Set(
@@ -58,14 +66,11 @@ func (r *Repository) Set(
 	capability Capability,
 	enabled bool,
 ) (Entitlement, error) {
-	row, err := r.queries.UpsertEntitlement(
-		ctx,
-		sqlc.UpsertEntitlementParams{
-			OrganizationID: organizationID,
-			Capability:     string(capability),
-			Enabled:        enabled,
-		},
-	)
+	row, err := r.queries.UpsertEntitlement(ctx, sqlc.UpsertEntitlementParams{
+		OrganizationID: organizationID,
+		Capability:     string(capability),
+		Enabled:        enabled,
+	})
 	if err != nil {
 		return Entitlement{}, err
 	}

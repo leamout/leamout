@@ -7,7 +7,6 @@ import (
 
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/platform/audit"
-	"github.com/leamout/leamout/server/internal/platform/entitlements"
 	"github.com/leamout/leamout/server/internal/platform/idempotency"
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/internal/platform/networking"
@@ -19,26 +18,19 @@ import (
 )
 
 type Module struct {
-	Audit        AuditModule
-	Entitlements EntitlementsModule
-	Idempotency  IdempotencyModule
-	Networking   NetworkingModule
-	Storage      StorageModule
-	SCIM         SCIMModule
-	Retention    RetentionModule
-	Webhooks     WebhooksModule
+	Audit       AuditModule
+	Idempotency IdempotencyModule
+	Networking  NetworkingModule
+	Storage     StorageModule
+	SCIM        SCIMModule
+	Retention   RetentionModule
+	Webhooks    WebhooksModule
 }
 
 type AuditModule struct {
 	Repository *audit.Repository
 	Service    *audit.Service
 	Handler    *audit.Handler
-}
-
-type EntitlementsModule struct {
-	Repository *entitlements.Repository
-	Service    *entitlements.Service
-	Middleware *middleware.EntitlementMiddleware
 }
 
 type IdempotencyModule struct {
@@ -88,9 +80,6 @@ func New(
 	auditRepository := audit.NewRepository(db)
 	auditService := audit.NewService(auditRepository)
 
-	entitlementsRepository := entitlements.NewRepository(queries)
-	entitlementsService := entitlements.NewService(entitlementsRepository)
-
 	idempotencyRepository := idempotency.NewRepository(queries)
 	idempotencyService := idempotency.NewService(
 		idempotencyRepository,
@@ -117,11 +106,6 @@ func New(
 			Repository: auditRepository,
 			Service:    auditService,
 			Handler:    audit.NewHandler(auditService),
-		},
-		Entitlements: EntitlementsModule{
-			Repository: entitlementsRepository,
-			Service:    entitlementsService,
-			Middleware: middleware.NewEntitlementMiddleware(entitlementsService),
 		},
 		Idempotency: IdempotencyModule{
 			Repository: idempotencyRepository,

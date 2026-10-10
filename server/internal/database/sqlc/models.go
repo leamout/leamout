@@ -247,6 +247,22 @@ type PhoneNumber struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type Plan struct {
+	ID              uuid.UUID          `db:"id" json:"id"`
+	Code            string             `db:"code" json:"code"`
+	Name            string             `db:"name" json:"name"`
+	Description     *string            `db:"description" json:"description"`
+	PricingType     string             `db:"pricing_type" json:"pricing_type"`
+	Currency        string             `db:"currency" json:"currency"`
+	AmountMinor     *int64             `db:"amount_minor" json:"amount_minor"`
+	BillingInterval string             `db:"billing_interval" json:"billing_interval"`
+	Entitlements    []byte             `db:"entitlements" json:"entitlements"`
+	Limits          []byte             `db:"limits" json:"limits"`
+	Status          string             `db:"status" json:"status"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type ProcessedEvent struct {
 	ConsumerName string             `db:"consumer_name" json:"consumer_name"`
 	EventID      uuid.UUID          `db:"event_id" json:"event_id"`
@@ -350,6 +366,24 @@ type StorageIntegration struct {
 	Status                    string             `db:"status" json:"status"`
 	CreatedAt                 pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt                 pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type Subscription struct {
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Status                 string             `db:"status" json:"status"`
+	CurrentPeriodStart     pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
+	CurrentPeriodEnd       pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	TrialEndsAt            pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
+	CancelAtPeriodEnd      bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
+	CanceledAt             pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Provider               *string            `db:"provider" json:"provider"`
+	ProviderCustomerID     *string            `db:"provider_customer_id" json:"provider_customer_id"`
+	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
+	ProviderEventCreatedAt pgtype.Timestamptz `db:"provider_event_created_at" json:"provider_event_created_at"`
 }
 
 type Trunk struct {

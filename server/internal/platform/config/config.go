@@ -16,7 +16,25 @@ type MinIOConfig struct {
 	SecretKey string `env:"APP_SECRET_KEY,required"`
 }
 
+type StripeConfig struct {
+	SecretKey        string `env:"SECRET_KEY"`
+	WebhookSecret    string `env:"WEBHOOK_SECRET"`
+	DeveloperPriceID string `env:"DEVELOPER_PRICE_ID"`
+	ProPriceID       string `env:"PRO_PRICE_ID"`
+}
+
+type AWSConfig struct {
+	FromEmail        string `env:"FROM_EMAIL" envDefault:"noreply@leamout.com"`
+	Region           string `env:"REGION" envDefault:"us-east-1"`
+	AccessKey        string `env:"ACCESS_KEY_ID"`
+	SecretKey        string `env:"SECRET_ACCESS_KEY"`
+	ConfigurationSet string `env:"CONFIGURATION_SET" envDefault:"leamout-transactional"`
+}
+
 type Config struct {
+	AWS    AWSConfig    `envPrefix:"AWS_"`
+	Stripe StripeConfig `envPrefix:"STRIPE_"`
+
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	Domain                string      `env:"DOMAIN"`
 	DatabaseURL           string      `env:"DATABASE_URL,required"`
@@ -61,6 +79,13 @@ func (c Config) IsDevelopment() bool {
 }
 
 func (c *Config) normalize() {
+	c.AWS.Region = strings.TrimSpace(c.AWS.Region)
+	c.AWS.FromEmail = strings.TrimSpace(c.AWS.FromEmail)
+	c.AWS.ConfigurationSet = strings.TrimSpace(c.AWS.ConfigurationSet)
+	c.Stripe.SecretKey = strings.TrimSpace(c.Stripe.SecretKey)
+	c.Stripe.WebhookSecret = strings.TrimSpace(c.Stripe.WebhookSecret)
+	c.Stripe.DeveloperPriceID = strings.TrimSpace(c.Stripe.DeveloperPriceID)
+	c.Stripe.ProPriceID = strings.TrimSpace(c.Stripe.ProPriceID)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)

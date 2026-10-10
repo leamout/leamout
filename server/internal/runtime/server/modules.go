@@ -6,11 +6,13 @@ import (
 
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/ai/providers"
+	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity"
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
+	"github.com/leamout/leamout/server/internal/integrations/payments/stripe"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
 	"github.com/leamout/leamout/server/internal/platform"
@@ -34,6 +36,7 @@ type modules struct {
 	identity             *identity.Module
 	tenancy              *tenancy.Module
 	platform             *platform.Module
+	commercial           *commercial.Module
 	ai                   *ai.Module
 	telephony            *telephony.Module
 	authn                *middleware.AuthnMiddleware
@@ -124,6 +127,14 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		credentialCipher,
 		trustedProxies,
 	)
+	stripeClient := stripe.New(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret)
+	commercialModule := commercial.New(queries, commercial.Dependencies{
+		Stripe: stripeClient,
+		StripePrices: map[string]string{
+			"developer": cfg.Stripe.DeveloperPriceID,
+			"pro":       cfg.Stripe.ProPriceID,
+		},
+	})
 	recordingStorage := recordings.NewResolvedObjectStorage(
 		objectClient,
 		platformModule.Storage.Service,
@@ -185,6 +196,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		identity:             identityModule,
 		tenancy:              tenancyModule,
 		platform:             platformModule,
+		commercial:           commercialModule,
 		ai:                   aiModule,
 		telephony:            telephonyModule,
 		authn:                authMiddleware,

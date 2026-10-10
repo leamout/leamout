@@ -6,9 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// Capability identifies an optional product capability. Capabilities apply to
-// organizations on either Self-Hosted or Cloud; they do not select a deployment
-// architecture.
 type Capability string
 
 const (
@@ -19,10 +16,23 @@ const (
 	CapabilityPrivateNetworking Capability = "private_networking"
 )
 
+var capabilities = []Capability{
+	CapabilitySSO,
+	CapabilitySCIM,
+	CapabilityAdvancedRBAC,
+	CapabilityRetentionPolicies,
+	CapabilityPrivateNetworking,
+}
+
 type Entitlement struct {
 	OrganizationID uuid.UUID
 	Capability     Capability
 	Enabled        bool
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+type EffectiveEntitlement struct {
+	Capability Capability `json:"capability"`
+	Enabled    bool       `json:"enabled"`
 }

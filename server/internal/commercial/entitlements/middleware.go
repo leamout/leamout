@@ -1,27 +1,25 @@
-package middleware
+package entitlements
 
 import (
 	"net/http"
 
-	"github.com/leamout/leamout/server/internal/platform/entitlements"
+	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
-type EntitlementMiddleware struct {
-	service *entitlements.Service
+type Middleware struct {
+	service *Service
 }
 
-func NewEntitlementMiddleware(service *entitlements.Service) *EntitlementMiddleware {
-	return &EntitlementMiddleware{
-		service: service,
-	}
+func NewMiddleware(service *Service) *Middleware {
+	return &Middleware{service: service}
 }
 
-func (m *EntitlementMiddleware) Require(capability entitlements.Capability) func(http.Handler) http.Handler {
+func (m *Middleware) Require(capability Capability) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			organizationID, ok := OrganizationIDFromContext(r.Context())
+			organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
 			if !ok {
 				httputil.Error(w, apperror.NewBadRequest("organization context required"))
 				return

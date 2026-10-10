@@ -8,36 +8,12 @@ func TestCapabilityValidation(t *testing.T) {
 		capability Capability
 		valid      bool
 	}{
-		{
-			name:       "sso",
-			capability: CapabilitySSO,
-			valid:      true,
-		},
-		{
-			name:       "scim",
-			capability: CapabilitySCIM,
-			valid:      true,
-		},
-		{
-			name:       "advanced RBAC",
-			capability: CapabilityAdvancedRBAC,
-			valid:      true,
-		},
-		{
-			name:       "retention policies",
-			capability: CapabilityRetentionPolicies,
-			valid:      true,
-		},
-		{
-			name:       "private networking",
-			capability: CapabilityPrivateNetworking,
-			valid:      true,
-		},
-		{
-			name:       "unknown",
-			capability: "enterprise_runtime",
-			valid:      false,
-		},
+		{name: "sso", capability: CapabilitySSO, valid: true},
+		{name: "scim", capability: CapabilitySCIM, valid: true},
+		{name: "advanced RBAC", capability: CapabilityAdvancedRBAC, valid: true},
+		{name: "retention policies", capability: CapabilityRetentionPolicies, valid: true},
+		{name: "private networking", capability: CapabilityPrivateNetworking, valid: true},
+		{name: "unknown", capability: "enterprise_runtime", valid: false},
 	}
 
 	for _, test := range tests {
