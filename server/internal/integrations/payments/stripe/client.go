@@ -67,9 +67,9 @@ func (c *Client) doForm(ctx context.Context, method, path string, values url.Val
 		}
 		_ = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&payload)
 		if payload.Error.Message != "" {
-			return fmt.Errorf("Stripe %s: %s", payload.Error.Type, payload.Error.Message)
+			return fmt.Errorf("stripe %s: %s", payload.Error.Type, payload.Error.Message)
 		}
-		return fmt.Errorf("Stripe request failed with status %d", resp.StatusCode)
+		return fmt.Errorf("stripe request failed with status %d", resp.StatusCode)
 	}
 
 	if out == nil {
