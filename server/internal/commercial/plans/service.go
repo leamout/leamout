@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/leamout/leamout/server/internal/commercial/entitlements"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -24,13 +23,6 @@ func (s *Service) List(ctx context.Context) ([]Plan, error) {
 	if err != nil {
 		return nil, apperror.NewInternal("list plans", err)
 	}
-	for i := range values {
-		entitlements, err := s.repo.ListEntitlements(ctx, values[i].ID)
-		if err != nil {
-			return nil, apperror.NewInternal("list plan entitlements", err)
-		}
-		values[i].Entitlements = entitlements
-	}
 	return values, nil
 }
 
@@ -45,11 +37,6 @@ func (s *Service) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 	if err != nil {
 		return Plan{}, apperror.NewInternal("get plan", err)
 	}
-	entitlements, err := s.repo.ListEntitlements(ctx, value.ID)
-	if err != nil {
-		return Plan{}, apperror.NewInternal("list plan entitlements", err)
-	}
-	value.Entitlements = entitlements
 	return value, nil
 }
 
@@ -65,31 +52,7 @@ func (s *Service) GetByCode(ctx context.Context, code string) (Plan, error) {
 	if err != nil {
 		return Plan{}, apperror.NewInternal("get plan", err)
 	}
-	entitlements, err := s.repo.ListEntitlements(ctx, value.ID)
-	if err != nil {
-		return Plan{}, apperror.NewInternal("list plan entitlements", err)
-	}
-	value.Entitlements = entitlements
 	return value, nil
-}
-
-func (s *Service) SetEntitlement(
-	ctx context.Context,
-	planID uuid.UUID,
-	capability string,
-	enabled bool,
-) error {
-	if planID == uuid.Nil {
-		return apperror.NewBadRequest("plan_id is required")
-	}
-	capability = strings.TrimSpace(capability)
-	if !entitlements.Capability(capability).IsValid() {
-		return apperror.NewBadRequest("unsupported organization capability")
-	}
-	if err := s.repo.SetEntitlement(ctx, planID, capability, enabled); err != nil {
-		return apperror.NewInternal("set plan entitlement", err)
-	}
-	return nil
 }
 
 func (s *Service) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest) (Plan, error) {
