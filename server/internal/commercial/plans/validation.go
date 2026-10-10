@@ -3,6 +3,7 @@ package plans
 import (
 	"strings"
 
+	"github.com/leamout/leamout/server/internal/commercial/entitlements"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -31,6 +32,15 @@ func validateUpsert(req UpsertRequest) (UpsertRequest, error) {
 	if req.Status != StatusActive && req.Status != StatusInactive {
 		return UpsertRequest{}, apperror.NewBadRequest("unsupported plan status")
 	}
+	if req.Entitlements == nil {
+		req.Entitlements = map[string]bool{}
+	}
+	for capability := range req.Entitlements {
+		if !entitlements.Capability(capability).IsValid() {
+			return UpsertRequest{}, apperror.NewBadRequest("unsupported plan entitlement")
+		}
+	}
+
 	if req.Description != nil {
 		value := strings.TrimSpace(*req.Description)
 		if value == "" {
