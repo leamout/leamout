@@ -135,6 +135,10 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 			"pro":       cfg.Stripe.ProPriceID,
 		},
 	})
+	platformModule.Retention.Service.SetPlanRetentionResolver(
+		commercialModule.Limits.Service.RetentionDays,
+	)
+
 	recordingStorage := recordings.NewResolvedObjectStorage(
 		objectClient,
 		platformModule.Storage.Service,
