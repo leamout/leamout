@@ -12,6 +12,7 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
+	"github.com/leamout/leamout/server/internal/integrations/payments/stripe"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
 	"github.com/leamout/leamout/server/internal/platform"
@@ -127,7 +128,14 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		credentialCipher,
 		trustedProxies,
 	)
-	commercialModule := commercial.New(queries)
+	stripeClient := stripe.New(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret)
+	commercialModule := commercial.New(queries, commercial.Dependencies{
+		Stripe: stripeClient,
+		StripePrices: map[string]string{
+			"developer": cfg.Stripe.DeveloperPriceID,
+			"pro":       cfg.Stripe.ProPriceID,
+		},
+	})
 	recordingStorage := recordings.NewResolvedObjectStorage(
 		objectClient,
 		platformModule.Storage.Service,

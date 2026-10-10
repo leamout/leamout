@@ -14,6 +14,16 @@ func validateSync(req SyncRequest) error {
 	default:
 		return apperror.NewBadRequest("unsupported subscription status")
 	}
+	if req.Provider != nil {
+		if *req.Provider != ProviderStripe {
+			return apperror.NewBadRequest("unsupported subscription provider")
+		}
+		if req.ProviderCustomerID == nil ||
+			req.ProviderSubscriptionID == nil ||
+			req.ProviderEventCreatedAt == nil {
+			return apperror.NewBadRequest("provider subscription metadata is incomplete")
+		}
+	}
 	if req.CurrentPeriodStart != nil &&
 		req.CurrentPeriodEnd != nil &&
 		!req.CurrentPeriodEnd.After(*req.CurrentPeriodStart) {
