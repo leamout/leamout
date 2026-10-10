@@ -1,0 +1,14 @@
+Leamout
+
+
+JOIN {{.Organization}}
+
+{{.Inviter}} invited you to join {{.Organization}} on Leamout as {{.Role}}.
+
+Accept invitation {{.AcceptURL}}
+
+This invitation expires {{.Expiry}}.
+
+If you were not expecting this invitation, you can ignore it.
+
+Leamout · Autonomous voice agents

@@ -17,6 +17,7 @@ import (
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
 	"github.com/leamout/leamout/server/internal/platform"
 	"github.com/leamout/leamout/server/internal/platform/config"
+	"github.com/leamout/leamout/server/internal/platform/email"
 	"github.com/leamout/leamout/server/internal/platform/logging"
 	"github.com/leamout/leamout/server/internal/platform/metrics"
 	"github.com/leamout/leamout/server/internal/platform/middleware"
@@ -114,7 +115,10 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		cfg.IsDevelopment(),
 		cfg.Domain,
 	)
-	identityModule.Auth.Service.ConfigureDatabase(postgresClient.Pool())
+	identityModule.Auth.Service.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher))
+	if cfg.Domain != "" {
+		identityModule.Auth.Service.ConfigureRecoveryURL("https://" + cfg.Domain + "/forgot-password")
+	}
 	tenancyModule := tenancy.New(queries)
 	trustedProxies, err := cfg.TrustedProxyPrefixes()
 	if err != nil {
