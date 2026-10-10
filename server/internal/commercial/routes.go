@@ -22,7 +22,3 @@ func RegisterRoutes(
 	subscriptions.RegisterRoutes(router, module.Subscriptions.Handler, auth)
 	entitlements.RegisterRoutes(router, module.Entitlements.Handler, auth)
 }
-
-func RegisterPublicRoutes(router chi.Router, module *Module) {
-	billing.RegisterStripeWebhookRoute(router, module.Billing.Handler)
-}
