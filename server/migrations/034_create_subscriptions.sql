@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    plan_id UUID NOT NULL REFERENCES subscription_plans(id) ON DELETE RESTRICT,
+    plan_id UUID NOT NULL REFERENCES plans(id) ON DELETE RESTRICT,
 
     status TEXT NOT NULL DEFAULT 'active',
     current_period_start TIMESTAMPTZ,
