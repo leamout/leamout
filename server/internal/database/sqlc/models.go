@@ -369,17 +369,21 @@ type StorageIntegration struct {
 }
 
 type Subscription struct {
-	ID                 uuid.UUID          `db:"id" json:"id"`
-	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
-	PlanID             uuid.UUID          `db:"plan_id" json:"plan_id"`
-	Status             string             `db:"status" json:"status"`
-	CurrentPeriodStart pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
-	CurrentPeriodEnd   pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
-	TrialEndsAt        pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
-	CancelAtPeriodEnd  bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
-	CanceledAt         pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
-	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Status                 string             `db:"status" json:"status"`
+	CurrentPeriodStart     pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
+	CurrentPeriodEnd       pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	TrialEndsAt            pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
+	CancelAtPeriodEnd      bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
+	CanceledAt             pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Provider               *string            `db:"provider" json:"provider"`
+	ProviderCustomerID     *string            `db:"provider_customer_id" json:"provider_customer_id"`
+	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
+	ProviderEventCreatedAt pgtype.Timestamptz `db:"provider_event_created_at" json:"provider_event_created_at"`
 }
 
 type Trunk struct {

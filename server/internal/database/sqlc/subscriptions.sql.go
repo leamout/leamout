@@ -49,7 +49,7 @@ func (q *Queries) GetEffectiveOrganizationEntitlement(ctx context.Context, arg G
 }
 
 const getOrganizationSubscription = `-- name: GetOrganizationSubscription :one
-SELECT id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, created_at, updated_at
+SELECT id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, created_at, updated_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at
 FROM subscriptions
 WHERE organization_id = $1
 LIMIT 1
@@ -70,6 +70,10 @@ func (q *Queries) GetOrganizationSubscription(ctx context.Context, organizationI
 		&i.CanceledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Provider,
+		&i.ProviderCustomerID,
+		&i.ProviderSubscriptionID,
+		&i.ProviderEventCreatedAt,
 	)
 	return i, err
 }
@@ -84,7 +88,11 @@ INSERT INTO subscriptions (
     current_period_end,
     trial_ends_at,
     cancel_at_period_end,
-    canceled_at
+    canceled_at,
+    provider,
+    provider_customer_id,
+    provider_subscription_id,
+    provider_event_created_at
 )
 VALUES (
     $1,
@@ -95,7 +103,11 @@ VALUES (
     $6,
     $7,
     $8,
-    $9
+    $9,
+    $10,
+    $11,
+    $12,
+    $13
 )
 ON CONFLICT (organization_id)
 DO UPDATE SET
@@ -105,20 +117,31 @@ DO UPDATE SET
     current_period_end = EXCLUDED.current_period_end,
     trial_ends_at = EXCLUDED.trial_ends_at,
     cancel_at_period_end = EXCLUDED.cancel_at_period_end,
-    canceled_at = EXCLUDED.canceled_at
-RETURNING id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, created_at, updated_at
+    canceled_at = EXCLUDED.canceled_at,
+    provider = EXCLUDED.provider,
+    provider_customer_id = EXCLUDED.provider_customer_id,
+    provider_subscription_id = EXCLUDED.provider_subscription_id,
+    provider_event_created_at = EXCLUDED.provider_event_created_at
+WHERE subscriptions.provider_event_created_at IS NULL
+   OR EXCLUDED.provider_event_created_at IS NULL
+   OR EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
+RETURNING id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, created_at, updated_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at
 `
 
 type UpsertOrganizationSubscriptionParams struct {
-	ID                 uuid.UUID          `db:"id" json:"id"`
-	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
-	PlanID             uuid.UUID          `db:"plan_id" json:"plan_id"`
-	Status             string             `db:"status" json:"status"`
-	CurrentPeriodStart pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
-	CurrentPeriodEnd   pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
-	TrialEndsAt        pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
-	CancelAtPeriodEnd  bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
-	CanceledAt         pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	Status                 string             `db:"status" json:"status"`
+	CurrentPeriodStart     pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
+	CurrentPeriodEnd       pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	TrialEndsAt            pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
+	CancelAtPeriodEnd      bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
+	CanceledAt             pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
+	Provider               *string            `db:"provider" json:"provider"`
+	ProviderCustomerID     *string            `db:"provider_customer_id" json:"provider_customer_id"`
+	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
+	ProviderEventCreatedAt pgtype.Timestamptz `db:"provider_event_created_at" json:"provider_event_created_at"`
 }
 
 func (q *Queries) UpsertOrganizationSubscription(ctx context.Context, arg UpsertOrganizationSubscriptionParams) (Subscription, error) {
@@ -132,6 +155,10 @@ func (q *Queries) UpsertOrganizationSubscription(ctx context.Context, arg Upsert
 		arg.TrialEndsAt,
 		arg.CancelAtPeriodEnd,
 		arg.CanceledAt,
+		arg.Provider,
+		arg.ProviderCustomerID,
+		arg.ProviderSubscriptionID,
+		arg.ProviderEventCreatedAt,
 	)
 	var i Subscription
 	err := row.Scan(
@@ -146,6 +173,10 @@ func (q *Queries) UpsertOrganizationSubscription(ctx context.Context, arg Upsert
 		&i.CanceledAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Provider,
+		&i.ProviderCustomerID,
+		&i.ProviderSubscriptionID,
+		&i.ProviderEventCreatedAt,
 	)
 	return i, err
 }
