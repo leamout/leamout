@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/leamout/leamout/server/internal/ai"
+	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/identity"
 	"github.com/leamout/leamout/server/internal/platform"
 	"github.com/leamout/leamout/server/internal/platform/config"
@@ -77,7 +78,13 @@ func newRouter(cfg config.Config, logger *logging.Logger, modules *modules) *chi
 			organizationContextAccess,
 			sessionOrganizationAccess,
 		)
-		platform.RegisterRoutes(r, modules.platform, organizationAccess)
+		platform.RegisterRoutes(
+			r,
+			modules.platform,
+			organizationAccess,
+			modules.commercial.Entitlements.Middleware,
+		)
+		commercial.RegisterRoutes(r, modules.commercial, organizationAccess)
 		ai.RegisterRoutes(r, modules.ai, organizationAccess)
 		telephony.RegisterRoutes(
 			r,

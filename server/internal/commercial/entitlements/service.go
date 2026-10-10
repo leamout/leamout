@@ -2,11 +2,9 @@ package entitlements
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -15,23 +13,28 @@ type Service struct {
 }
 
 func NewService(repo *Repository) *Service {
-	return &Service{
-		repo: repo,
-	}
+	return &Service{repo: repo}
 }
 
-func (s *Service) List(
+func (s *Service) ListEffective(
 	ctx context.Context,
 	organizationID uuid.UUID,
-) ([]Entitlement, error) {
+) ([]EffectiveEntitlement, error) {
 	if organizationID == uuid.Nil {
 		return nil, apperror.NewBadRequest("organization_id is required")
 	}
-	values, err := s.repo.List(ctx, organizationID)
-	if err != nil {
-		return nil, apperror.NewInternal("list organization entitlements", err)
+	result := make([]EffectiveEntitlement, 0, len(capabilities))
+	for _, capability := range capabilities {
+		enabled, err := s.Enabled(ctx, organizationID, capability)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, EffectiveEntitlement{
+			Capability: capability,
+			Enabled:    enabled,
+		})
 	}
-	return values, nil
+	return result, nil
 }
 
 func (s *Service) Enabled(
@@ -46,15 +49,11 @@ func (s *Service) Enabled(
 	if err != nil {
 		return false, err
 	}
-
-	value, err := s.repo.Get(ctx, organizationID, capability)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil
-	}
+	enabled, err := s.repo.EffectiveEnabled(ctx, organizationID, capability)
 	if err != nil {
-		return false, apperror.NewInternal("get organization entitlement", err)
+		return false, apperror.NewInternal("get effective organization entitlement", err)
 	}
-	return value.Enabled, nil
+	return enabled, nil
 }
 
 func (s *Service) Require(
@@ -87,7 +86,6 @@ func (s *Service) Set(
 	if err != nil {
 		return Entitlement{}, err
 	}
-
 	value, err := s.repo.Set(ctx, organizationID, capability, enabled)
 	if err != nil {
 		return Entitlement{}, apperror.NewInternal("set organization entitlement", err)
