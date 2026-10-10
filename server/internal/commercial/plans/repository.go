@@ -2,6 +2,7 @@ package plans
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
@@ -23,40 +24,13 @@ func (r *Repository) ListActive(ctx context.Context) ([]Plan, error) {
 	}
 	result := make([]Plan, 0, len(rows))
 	for _, row := range rows {
-		result = append(result, fromRow(row))
+		value, err := fromRow(row)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, value)
 	}
 	return result, nil
-}
-
-func (r *Repository) ListEntitlements(ctx context.Context, planID uuid.UUID) ([]Entitlement, error) {
-	rows, err := r.queries.ListPlanEntitlements(ctx, planID)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]Entitlement, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, Entitlement{
-			Capability: row.Capability,
-			Enabled:    row.Enabled,
-		})
-	}
-	return result, nil
-}
-
-func (r *Repository) SetEntitlement(
-	ctx context.Context,
-	planID uuid.UUID,
-	capability string,
-	enabled bool,
-) error {
-	return r.queries.UpsertPlanEntitlement(
-		ctx,
-		sqlc.UpsertPlanEntitlementParams{
-			PlanID:     planID,
-			Capability: capability,
-			Enabled:    enabled,
-		},
-	)
 }
 
 func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
@@ -64,7 +38,7 @@ func (r *Repository) GetByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	return fromRow(row), nil
+	return fromRow(row)
 }
 
 func (r *Repository) GetByCode(ctx context.Context, code string) (Plan, error) {
@@ -72,10 +46,14 @@ func (r *Repository) GetByCode(ctx context.Context, code string) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	return fromRow(row), nil
+	return fromRow(row)
 }
 
 func (r *Repository) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest) (Plan, error) {
+	entitlements, err := json.Marshal(req.Entitlements)
+	if err != nil {
+		return Plan{}, err
+	}
 	row, err := r.queries.UpsertPlan(ctx, sqlc.UpsertPlanParams{
 		ID:              id,
 		Code:            req.Code,
@@ -84,15 +62,22 @@ func (r *Repository) Upsert(ctx context.Context, id uuid.UUID, req UpsertRequest
 		Currency:        req.Currency,
 		AmountMinor:     req.AmountMinor,
 		BillingInterval: req.BillingInterval,
+		Entitlements:    entitlements,
 		Status:          req.Status,
 	})
 	if err != nil {
 		return Plan{}, err
 	}
-	return fromRow(row), nil
+	return fromRow(row)
 }
 
-func fromRow(row sqlc.Plan) Plan {
+func fromRow(row sqlc.Plan) (Plan, error) {
+	entitlements := map[string]bool{}
+	if len(row.Entitlements) > 0 {
+		if err := json.Unmarshal(row.Entitlements, &entitlements); err != nil {
+			return Plan{}, err
+		}
+	}
 	return Plan{
 		ID:              row.ID,
 		Code:            row.Code,
@@ -101,8 +86,9 @@ func fromRow(row sqlc.Plan) Plan {
 		Currency:        row.Currency,
 		AmountMinor:     row.AmountMinor,
 		BillingInterval: row.BillingInterval,
+		Entitlements:    entitlements,
 		Status:          row.Status,
 		CreatedAt:       pgconv.TimestamptzToTime(row.CreatedAt),
 		UpdatedAt:       pgconv.TimestamptzToTime(row.UpdatedAt),
-	}
+	}, nil
 }
