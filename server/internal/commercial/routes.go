@@ -14,11 +14,9 @@ func RegisterRoutes(
 	module *Module,
 	organizationAccess func(string) func(http.Handler) http.Handler,
 ) {
-	router.Route("/commercial", func(r chi.Router) {
-		plans.RegisterRoutes(r, module.Plans.Handler)
+	plans.RegisterRoutes(router, module.Plans.Handler)
 
-		auth := organizationAccess("commercial")
-		subscriptions.RegisterRoutes(r, module.Subscriptions.Handler, auth)
-		entitlements.RegisterRoutes(r, module.Entitlements.Handler, auth)
-	})
+	auth := organizationAccess("commercial")
+	subscriptions.RegisterRoutes(router, module.Subscriptions.Handler, auth)
+	entitlements.RegisterRoutes(router, module.Entitlements.Handler, auth)
 }
