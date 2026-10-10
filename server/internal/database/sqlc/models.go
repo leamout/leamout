@@ -252,10 +252,12 @@ type Plan struct {
 	Code            string             `db:"code" json:"code"`
 	Name            string             `db:"name" json:"name"`
 	Description     *string            `db:"description" json:"description"`
+	PricingType     string             `db:"pricing_type" json:"pricing_type"`
 	Currency        string             `db:"currency" json:"currency"`
-	AmountMinor     int64              `db:"amount_minor" json:"amount_minor"`
+	AmountMinor     *int64             `db:"amount_minor" json:"amount_minor"`
 	BillingInterval string             `db:"billing_interval" json:"billing_interval"`
 	Entitlements    []byte             `db:"entitlements" json:"entitlements"`
+	Limits          []byte             `db:"limits" json:"limits"`
 	Status          string             `db:"status" json:"status"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`

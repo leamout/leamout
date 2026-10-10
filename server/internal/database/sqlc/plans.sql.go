@@ -12,7 +12,7 @@ import (
 )
 
 const getPlanByCode = `-- name: GetPlanByCode :one
-SELECT id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
+SELECT id, code, name, description, pricing_type, currency, amount_minor, billing_interval, entitlements, limits, status, created_at, updated_at
 FROM plans
 WHERE code = $1
 LIMIT 1
@@ -26,10 +26,12 @@ func (q *Queries) GetPlanByCode(ctx context.Context, code string) (Plan, error) 
 		&i.Code,
 		&i.Name,
 		&i.Description,
+		&i.PricingType,
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
 		&i.Entitlements,
+		&i.Limits,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -38,7 +40,7 @@ func (q *Queries) GetPlanByCode(ctx context.Context, code string) (Plan, error) 
 }
 
 const getPlanByID = `-- name: GetPlanByID :one
-SELECT id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
+SELECT id, code, name, description, pricing_type, currency, amount_minor, billing_interval, entitlements, limits, status, created_at, updated_at
 FROM plans
 WHERE id = $1
 LIMIT 1
@@ -52,10 +54,12 @@ func (q *Queries) GetPlanByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 		&i.Code,
 		&i.Name,
 		&i.Description,
+		&i.PricingType,
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
 		&i.Entitlements,
+		&i.Limits,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -64,7 +68,7 @@ func (q *Queries) GetPlanByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 }
 
 const listActivePlans = `-- name: ListActivePlans :many
-SELECT id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
+SELECT id, code, name, description, pricing_type, currency, amount_minor, billing_interval, entitlements, limits, status, created_at, updated_at
 FROM plans
 WHERE status = 'active'
 ORDER BY amount_minor ASC, created_at ASC
@@ -84,10 +88,12 @@ func (q *Queries) ListActivePlans(ctx context.Context) ([]Plan, error) {
 			&i.Code,
 			&i.Name,
 			&i.Description,
+			&i.PricingType,
 			&i.Currency,
 			&i.AmountMinor,
 			&i.BillingInterval,
 			&i.Entitlements,
+			&i.Limits,
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -134,7 +140,7 @@ DO UPDATE SET
     billing_interval = EXCLUDED.billing_interval,
     entitlements = EXCLUDED.entitlements,
     status = EXCLUDED.status
-RETURNING id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
+RETURNING id, code, name, description, pricing_type, currency, amount_minor, billing_interval, entitlements, limits, status, created_at, updated_at
 `
 
 type UpsertPlanParams struct {
@@ -143,7 +149,7 @@ type UpsertPlanParams struct {
 	Name            string    `db:"name" json:"name"`
 	Description     *string   `db:"description" json:"description"`
 	Currency        string    `db:"currency" json:"currency"`
-	AmountMinor     int64     `db:"amount_minor" json:"amount_minor"`
+	AmountMinor     *int64    `db:"amount_minor" json:"amount_minor"`
 	BillingInterval string    `db:"billing_interval" json:"billing_interval"`
 	Entitlements    []byte    `db:"entitlements" json:"entitlements"`
 	Status          string    `db:"status" json:"status"`
@@ -167,10 +173,12 @@ func (q *Queries) UpsertPlan(ctx context.Context, arg UpsertPlanParams) (Plan, e
 		&i.Code,
 		&i.Name,
 		&i.Description,
+		&i.PricingType,
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
 		&i.Entitlements,
+		&i.Limits,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
