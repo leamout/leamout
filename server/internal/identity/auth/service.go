@@ -12,23 +12,28 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/email"
+	"github.com/leamout/leamout/server/internal/security/otp"
 	"github.com/leamout/leamout/server/internal/security/password"
 	"github.com/leamout/leamout/server/internal/security/token"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {
-	repo *Repository
-	pool *pgxpool.Pool
+	repo        *Repository
+	pool        *pgxpool.Pool
+	emails      *email.Service
+	recoveryURL string
 }
 
 func NewService(repo *Repository) *Service {
 	return &Service{repo: repo}
 }
 
-// ConfigureDatabase enables transaction locking at application startup.
-func (s *Service) ConfigureDatabase(pool *pgxpool.Pool) {
+// ConfigureEmail wires transactional delivery at application startup.
+func (s *Service) ConfigureEmail(pool *pgxpool.Pool, emails *email.Service) {
 	s.pool = pool
+	s.emails = emails
 }
 
 func (s *Service) Start(ctx context.Context, email string) (sqlc.AuthTransaction, error) {
@@ -77,6 +82,11 @@ func (s *Service) LoginWithPassword(ctx context.Context, transactionID uuid.UUID
 	user, err := local.loginWithPassword(ctx, transactionID, value)
 	if err != nil {
 		return sqlc.User{}, err
+	}
+	if s.emails != nil {
+		if err := s.emails.CancelTx(ctx, tx, otpEmailCancellationKey(transactionID)); err != nil {
+			return sqlc.User{}, err
+		}
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return sqlc.User{}, err
@@ -128,14 +138,97 @@ func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, value strin
 		return sqlc.User{}, apperror.NewInternal("failed to hash password", err)
 	}
 
-	return s.repo.SetUserPassword(ctx, sqlc.SetUserPasswordParams{
-		ID:           userID,
-		PasswordHash: &hash,
-	})
+	params := sqlc.SetUserPasswordParams{ID: userID, PasswordHash: &hash}
+	if s.pool == nil || s.emails == nil {
+		return s.repo.SetUserPassword(ctx, params)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlc.User{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	user, err := sqlc.New(tx).SetUserPassword(ctx, params)
+	if err != nil {
+		return sqlc.User{}, err
+	}
+	if s.recoveryURL != "" {
+		now := time.Now()
+		_, err = s.emails.QueueTx(ctx, tx, email.Request{
+			To:       user.Email,
+			Template: "password-changed",
+			Data:     email.Data{ChangedAt: now.UTC().Format("15:04 UTC on 02 Jan 2006"), RecoveryURL: s.recoveryURL, ExpiresAt: now.Add(24 * time.Hour)},
+		})
+		if err != nil {
+			return sqlc.User{}, err
+		}
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.User{}, err
+	}
+	return user, nil
 }
 
 func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string, error) {
-	return "", apperror.NewServiceUnavailable("email code authentication is unavailable", nil)
+	if s.pool == nil || s.emails == nil {
+		return "", apperror.NewInternal("email delivery is not configured", nil)
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	// Serialize resend and verification for this authentication transaction.
+	if _, err = sqlc.New(tx).LockAuthTransaction(ctx, transactionID); err != nil {
+		return "", err
+	}
+	queries := sqlc.New(tx)
+	local := NewService(NewRepository(queries))
+	transaction, err := local.getValidTransaction(ctx, transactionID)
+	if err != nil {
+		return "", err
+	}
+	// Serialize recipient quotas across different transactions.
+	if err = queries.LockAuthRecipient(ctx, transaction.Identifier); err != nil {
+		return "", err
+	}
+	now := time.Now()
+	minute, err := queries.CountEmailDeliveriesSince(ctx, sqlc.CountEmailDeliveriesSinceParams{Recipient: transaction.Identifier, Template: "verification-code", Since: pgconv.TimeToTimestamptz(now.Add(-time.Minute))})
+	if err != nil {
+		return "", err
+	}
+	hour, err := queries.CountEmailDeliveriesSince(ctx, sqlc.CountEmailDeliveriesSinceParams{Recipient: transaction.Identifier, Template: "verification-code", Since: pgconv.TimeToTimestamptz(now.Add(-time.Hour))})
+	if err != nil {
+		return "", err
+	}
+	if minute > 0 || hour >= 5 {
+		return "", apperror.NewTooManyRequests("please wait before requesting another code")
+	}
+	if err := queries.InvalidateAuthOTPChallenges(ctx, &transactionID); err != nil {
+		return "", err
+	}
+	key := otpEmailCancellationKey(transactionID)
+	if err := s.emails.CancelTx(ctx, tx, key); err != nil {
+		return "", err
+	}
+	code, err := otp.GenerateNumeric(6)
+	if err != nil {
+		return "", err
+	}
+	expiresAt := pgconv.TimestamptzToTime(transaction.ExpiresAt)
+	_, err = queries.CreateAuthChallenge(ctx, sqlc.CreateAuthChallengeParams{
+		Identifier: transaction.Identifier, SecretHash: token.Hash(code), ExpiresAt: pgconv.NullableTimestamptz(&expiresAt), Purpose: "email_otp", State: []byte(`{}`), AuthTransactionID: &transactionID, MaxAttempts: 5,
+	})
+	if err != nil {
+		return "", err
+	}
+	_, err = s.emails.QueueTx(ctx, tx, email.Request{To: transaction.Identifier, Template: "verification-code", CancellationKey: &key, Data: email.Data{Code: code, ExpiresAt: expiresAt}})
+	if err != nil {
+		return "", err
+	}
+	if _, err = queries.SetAuthTransactionState(ctx, sqlc.SetAuthTransactionStateParams{ID: transactionID, State: "otp_sent"}); err != nil {
+		return "", err
+	}
+	return "", tx.Commit(ctx)
 }
 
 // VerifyOTP verifies the active OTP challenge and authenticates the
@@ -163,6 +256,21 @@ func (s *Service) VerifyOTP(ctx context.Context, transactionID uuid.UUID, code s
 		var app *apperror.AppError
 		if !errors.As(verifyErr, &app) || app.Code != "UNAUTHORIZED" {
 			return sqlc.User{}, verifyErr
+		}
+	}
+	if s.emails != nil {
+		cancel := verifyErr == nil
+		if verifyErr != nil {
+			_, activeErr := local.repo.GetActiveAuthChallenge(ctx, sqlc.GetActiveAuthChallengeParams{AuthTransactionID: &transactionID, Purpose: "email_otp"})
+			if activeErr != nil && !errors.Is(activeErr, pgx.ErrNoRows) {
+				return sqlc.User{}, activeErr
+			}
+			cancel = errors.Is(activeErr, pgx.ErrNoRows)
+		}
+		if cancel {
+			if err := s.emails.CancelTx(ctx, tx, otpEmailCancellationKey(transactionID)); err != nil {
+				return sqlc.User{}, err
+			}
 		}
 	}
 	// Commit failed-code attempt counters too; database errors abort and roll back.
@@ -267,3 +375,7 @@ func (s *Service) getOrCreateOTPUser(ctx context.Context, transaction sqlc.AuthT
 	}
 	return s.repo.CreateUser(ctx, sqlc.CreateUserParams{Email: email})
 }
+
+func otpEmailCancellationKey(id uuid.UUID) string { return "auth:otp:" + id.String() }
+
+func (s *Service) ConfigureRecoveryURL(value string) { s.recoveryURL = value }
