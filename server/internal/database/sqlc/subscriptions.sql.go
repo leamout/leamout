@@ -14,7 +14,15 @@ import (
 
 const getEffectiveOrganizationEntitlement = `-- name: GetEffectiveOrganizationEntitlement :one
 SELECT
-    COALESCE(oe.enabled, pe.enabled, FALSE)::boolean AS enabled
+    COALESCE(
+        oe.enabled,
+        CASE
+            WHEN jsonb_typeof(p.entitlements -> $1) = 'boolean'
+                THEN (p.entitlements ->> $1)::boolean
+            ELSE FALSE
+        END,
+        FALSE
+    )::boolean AS enabled
 FROM organizations o
 LEFT JOIN entitlements oe
   ON oe.organization_id = o.id
@@ -22,15 +30,14 @@ LEFT JOIN entitlements oe
 LEFT JOIN subscriptions s
   ON s.organization_id = o.id
  AND s.status IN ('trialing', 'active')
-LEFT JOIN plan_entitlements pe
-  ON pe.plan_id = s.plan_id
- AND pe.capability = $1
+LEFT JOIN plans p
+  ON p.id = s.plan_id
 WHERE o.id = $2
 LIMIT 1
 `
 
 type GetEffectiveOrganizationEntitlementParams struct {
-	Capability     string    `db:"capability" json:"capability"`
+	Capability     []byte    `db:"capability" json:"capability"`
 	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
 }
 

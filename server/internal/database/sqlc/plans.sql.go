@@ -12,7 +12,7 @@ import (
 )
 
 const getPlanByCode = `-- name: GetPlanByCode :one
-SELECT id, code, name, description, currency, amount_minor, billing_interval, status, created_at, updated_at
+SELECT id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
 FROM plans
 WHERE code = $1
 LIMIT 1
@@ -29,6 +29,7 @@ func (q *Queries) GetPlanByCode(ctx context.Context, code string) (Plan, error) 
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
+		&i.Entitlements,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -37,7 +38,7 @@ func (q *Queries) GetPlanByCode(ctx context.Context, code string) (Plan, error) 
 }
 
 const getPlanByID = `-- name: GetPlanByID :one
-SELECT id, code, name, description, currency, amount_minor, billing_interval, status, created_at, updated_at
+SELECT id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
 FROM plans
 WHERE id = $1
 LIMIT 1
@@ -54,6 +55,7 @@ func (q *Queries) GetPlanByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
+		&i.Entitlements,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -62,7 +64,7 @@ func (q *Queries) GetPlanByID(ctx context.Context, id uuid.UUID) (Plan, error) {
 }
 
 const listActivePlans = `-- name: ListActivePlans :many
-SELECT id, code, name, description, currency, amount_minor, billing_interval, status, created_at, updated_at
+SELECT id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
 FROM plans
 WHERE status = 'active'
 ORDER BY amount_minor ASC, created_at ASC
@@ -85,42 +87,11 @@ func (q *Queries) ListActivePlans(ctx context.Context) ([]Plan, error) {
 			&i.Currency,
 			&i.AmountMinor,
 			&i.BillingInterval,
+			&i.Entitlements,
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPlanEntitlements = `-- name: ListPlanEntitlements :many
-SELECT capability, enabled
-FROM plan_entitlements
-WHERE plan_id = $1
-ORDER BY capability
-`
-
-type ListPlanEntitlementsRow struct {
-	Capability string `db:"capability" json:"capability"`
-	Enabled    bool   `db:"enabled" json:"enabled"`
-}
-
-func (q *Queries) ListPlanEntitlements(ctx context.Context, planID uuid.UUID) ([]ListPlanEntitlementsRow, error) {
-	rows, err := q.db.Query(ctx, listPlanEntitlements, planID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListPlanEntitlementsRow{}
-	for rows.Next() {
-		var i ListPlanEntitlementsRow
-		if err := rows.Scan(&i.Capability, &i.Enabled); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -140,6 +111,7 @@ INSERT INTO plans (
     currency,
     amount_minor,
     billing_interval,
+    entitlements,
     status
 )
 VALUES (
@@ -150,7 +122,8 @@ VALUES (
     $5,
     $6,
     $7,
-    $8
+    $8,
+    $9
 )
 ON CONFLICT (code)
 DO UPDATE SET
@@ -159,8 +132,9 @@ DO UPDATE SET
     currency = EXCLUDED.currency,
     amount_minor = EXCLUDED.amount_minor,
     billing_interval = EXCLUDED.billing_interval,
+    entitlements = EXCLUDED.entitlements,
     status = EXCLUDED.status
-RETURNING id, code, name, description, currency, amount_minor, billing_interval, status, created_at, updated_at
+RETURNING id, code, name, description, currency, amount_minor, billing_interval, entitlements, status, created_at, updated_at
 `
 
 type UpsertPlanParams struct {
@@ -171,6 +145,7 @@ type UpsertPlanParams struct {
 	Currency        string    `db:"currency" json:"currency"`
 	AmountMinor     int64     `db:"amount_minor" json:"amount_minor"`
 	BillingInterval string    `db:"billing_interval" json:"billing_interval"`
+	Entitlements    []byte    `db:"entitlements" json:"entitlements"`
 	Status          string    `db:"status" json:"status"`
 }
 
@@ -183,6 +158,7 @@ func (q *Queries) UpsertPlan(ctx context.Context, arg UpsertPlanParams) (Plan, e
 		arg.Currency,
 		arg.AmountMinor,
 		arg.BillingInterval,
+		arg.Entitlements,
 		arg.Status,
 	)
 	var i Plan
@@ -194,35 +170,10 @@ func (q *Queries) UpsertPlan(ctx context.Context, arg UpsertPlanParams) (Plan, e
 		&i.Currency,
 		&i.AmountMinor,
 		&i.BillingInterval,
+		&i.Entitlements,
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const upsertPlanEntitlement = `-- name: UpsertPlanEntitlement :exec
-INSERT INTO plan_entitlements (
-    plan_id,
-    capability,
-    enabled
-)
-VALUES (
-    $1,
-    $2,
-    $3
-)
-ON CONFLICT (plan_id, capability)
-DO UPDATE SET enabled = EXCLUDED.enabled
-`
-
-type UpsertPlanEntitlementParams struct {
-	PlanID     uuid.UUID `db:"plan_id" json:"plan_id"`
-	Capability string    `db:"capability" json:"capability"`
-	Enabled    bool      `db:"enabled" json:"enabled"`
-}
-
-func (q *Queries) UpsertPlanEntitlement(ctx context.Context, arg UpsertPlanEntitlementParams) error {
-	_, err := q.db.Exec(ctx, upsertPlanEntitlement, arg.PlanID, arg.Capability, arg.Enabled)
-	return err
 }
