@@ -33,9 +33,10 @@ const pages = [
   "Security",
   "API keys",
   "Storage",
+  "Audit log",
 ].map((title) => ({
   title,
-  href: `/settings/${title === "API keys" ? "api-keys" : title.toLowerCase()}`,
+  href: `/settings/${title === "API keys" ? "api-keys" : title.toLowerCase().replaceAll(" ", "-")}`,
 }));
 
 export function SettingsSidebar() {
