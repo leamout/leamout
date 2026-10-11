@@ -520,6 +520,13 @@ func (s *Service) rejectInbound(ctx context.Context, channelID string, cause err
 	return cause
 }
 
+func (s *Service) ResolveChannelCallID(
+	ctx context.Context,
+	channelID string,
+) (uuid.UUID, error) {
+	return s.channels.GetCallID(ctx, channelID)
+}
+
 func (s *Service) Get(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
 	if err := validateIDs(organizationID, id); err != nil {
 		return sqlc.Call{}, err
