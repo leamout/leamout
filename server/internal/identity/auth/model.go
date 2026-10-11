@@ -41,3 +41,9 @@ type authenticationResponse struct {
 type sendOTPResponse struct {
 	TransactionID uuid.UUID `json:"transaction_id"`
 }
+
+type resetPasswordRequest struct {
+	TransactionID string `json:"transaction_id"`
+	Code          string `json:"code"`
+	Password      string `json:"password"`
+}

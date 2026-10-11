@@ -13,6 +13,8 @@ func RegisterRoutes(
 ) {
 	router.Route("/auth", func(r chi.Router) {
 		r.Post("/start", handler.Start)
+		r.Post("/password/recovery", handler.StartRecovery)
+		r.Post("/password/reset", handler.ResetPassword)
 
 		r.Post("/password/login", handler.LoginWithPassword)
 

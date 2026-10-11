@@ -70,3 +70,5 @@ VerificationCode.PreviewProps = {
   expiresInMinutes: 10,
   purpose: "create-account",
 } satisfies VerificationCodeProps;
+
+export const subject = "Your Leamout verification code";

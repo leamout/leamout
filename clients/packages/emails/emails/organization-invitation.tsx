@@ -45,3 +45,5 @@ OrganizationInvitation.PreviewProps = {
   acceptUrl: "https://example.com/invitation",
   expiresAt: "October 17, 2026 at 12:00 UTC",
 } satisfies OrganizationInvitationProps;
+
+export const subject = "You’re invited to join {{.Organization}} on Leamout";

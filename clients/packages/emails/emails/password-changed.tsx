@@ -32,3 +32,5 @@ PasswordChanged.PreviewProps = {
   changedAt: "October 10, 2026 at 07:30 UTC",
   recoveryUrl: "https://example.com/forgot-password",
 } satisfies PasswordChangedProps;
+
+export const subject = "Your Leamout password was changed";

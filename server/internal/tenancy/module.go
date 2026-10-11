@@ -1,13 +1,17 @@
 package tenancy
 
 import (
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/email"
 	"github.com/leamout/leamout/server/internal/tenancy/credentials"
+	"github.com/leamout/leamout/server/internal/tenancy/invitations"
 	"github.com/leamout/leamout/server/internal/tenancy/members"
 	"github.com/leamout/leamout/server/internal/tenancy/organization"
 )
 
 type Module struct {
+	Invitations   *invitations.Handler
 	Organizations OrganizationModule
 	Members       MembersModule
 	Credentials   CredentialsModule
@@ -58,4 +62,10 @@ func New(queries *sqlc.Queries) *Module {
 			Handler:    credentials.NewHandler(credentialsService),
 		},
 	}
+}
+
+func (m *Module) ConfigureEmail(pool *pgxpool.Pool, emails *email.Service, acceptURL string) {
+	repo := invitations.NewRepository(pool)
+	service := invitations.NewService(repo, emails, acceptURL)
+	m.Invitations = invitations.NewHandler(service)
 }

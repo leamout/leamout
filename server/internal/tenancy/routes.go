@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leamout/leamout/server/internal/tenancy/credentials"
+	"github.com/leamout/leamout/server/internal/tenancy/invitations"
 	"github.com/leamout/leamout/server/internal/tenancy/members"
 	"github.com/leamout/leamout/server/internal/tenancy/organization"
 )
@@ -16,6 +17,9 @@ func RegisterRoutes(
 	organizationContextAccess func(string) func(http.Handler) http.Handler,
 	sessionOrganizationAccess func(string) func(http.Handler) http.Handler,
 ) {
+	if module.Invitations != nil {
+		invitations.RegisterRoutes(router, module.Invitations, requireSession, sessionOrganizationAccess("members"))
+	}
 	organization.RegisterRoutes(
 		router,
 		module.Organizations.Handler,

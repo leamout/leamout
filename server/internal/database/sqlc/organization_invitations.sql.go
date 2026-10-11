@@ -45,6 +45,42 @@ func (q *Queries) AcceptInvitation(ctx context.Context, id uuid.UUID) (Organizat
 	return i, err
 }
 
+const addInvitedOrganizationMember = `-- name: AddInvitedOrganizationMember :one
+INSERT INTO organization_members (organization_id, user_id, role)
+SELECT i.organization_id, u.id, i.role
+FROM organization_invitations AS i
+JOIN users AS u ON u.id = $1
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.id = $2
+  AND i.status = 'accepted'
+  AND i.expires_at > NOW()
+  AND u.email = i.email
+  AND u.email_verified = TRUE
+  AND u.disabled_at IS NULL
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING organization_id, user_id, role, status, created_at, updated_at
+`
+
+type AddInvitedOrganizationMemberParams struct {
+	UserID       uuid.UUID `db:"user_id" json:"user_id"`
+	InvitationID uuid.UUID `db:"invitation_id" json:"invitation_id"`
+}
+
+func (q *Queries) AddInvitedOrganizationMember(ctx context.Context, arg AddInvitedOrganizationMemberParams) (OrganizationMember, error) {
+	row := q.db.QueryRow(ctx, addInvitedOrganizationMember, arg.UserID, arg.InvitationID)
+	var i OrganizationMember
+	err := row.Scan(
+		&i.OrganizationID,
+		&i.UserID,
+		&i.Role,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createInvitation = `-- name: CreateInvitation :one
 INSERT INTO organization_invitations (
     organization_id,

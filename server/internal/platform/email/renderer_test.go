@@ -77,3 +77,21 @@ func TestGeneratedInvitationPreservesDynamicData(t *testing.T) {
 		t.Fatal("export placeholder leaked")
 	}
 }
+
+func TestSubjectComesFromTemplate(t *testing.T) {
+	data := Data{Organization: "Acme", Inviter: "Alice", Role: "member", AcceptURL: "https://console.example.com/invitations/accept", ExpiresAt: time.Now().Add(time.Hour)}
+	message, err := NewRenderer().Render("organization-invitation", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if message.Subject != "You’re invited to join Acme on Leamout" {
+		t.Fatal("subject did not render organization name")
+	}
+	data.Organization = "Acme\r\nBcc: other@example.com"
+	if _, err := NewRenderer().Render("organization-invitation", data); err == nil {
+		t.Fatal("accepted a multiline subject")
+	}
+	if _, err := NewRenderer().Render("../organization-invitation", data); err == nil {
+		t.Fatal("accepted a template path")
+	}
+}

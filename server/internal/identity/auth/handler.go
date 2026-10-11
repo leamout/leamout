@@ -237,3 +237,39 @@ func (h *Handler) createSession(
 func authenticationMethods() []string {
 	return []string{"password", "otp"}
 }
+
+func (h *Handler) StartRecovery(w http.ResponseWriter, r *http.Request) {
+	req, err := helper.DecodeJSON[startRequest](r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	transaction, err := h.service.StartRecovery(r.Context(), req.Email)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, sendOTPResponse{TransactionID: transaction.ID})
+}
+
+func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	req, err := helper.DecodeJSON[resetPasswordRequest](r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	id, code, err := validateVerifyOTPRequest(verifyOTPRequest{TransactionID: req.TransactionID, Code: req.Code})
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	if err := validateSetPasswordRequest(setPasswordRequest{Password: req.Password}); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	if err := h.service.ResetPassword(r.Context(), id, code, req.Password); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

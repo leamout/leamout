@@ -204,7 +204,7 @@ func (q *Queries) IncrementAuthChallengeAttempts(ctx context.Context, id uuid.UU
 
 const invalidateAuthOTPChallenges = `-- name: InvalidateAuthOTPChallenges :exec
 UPDATE auth_challenges SET consumed_at=now()
-WHERE auth_transaction_id=$1 AND purpose='email_otp' AND consumed_at IS NULL
+WHERE auth_transaction_id=$1 AND purpose IN ('email_otp', 'password_reset') AND consumed_at IS NULL
 `
 
 func (q *Queries) InvalidateAuthOTPChallenges(ctx context.Context, authTransactionID *uuid.UUID) error {

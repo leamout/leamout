@@ -78,6 +78,7 @@ jobs:
 
       - name: Run tests
         env:
+          EMAIL_TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/monogo_test?sslmode=disable
           TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/monogo_test?sslmode=disable
         run: go test -race -coverprofile=coverage.out ./...
 

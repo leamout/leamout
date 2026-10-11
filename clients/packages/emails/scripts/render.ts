@@ -2,9 +2,15 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createElement } from "react";
 import { render, toPlainText } from "react-email";
-import OrganizationInvitation from "../emails/organization-invitation";
-import PasswordChanged from "../emails/password-changed";
-import VerificationCode from "../emails/verification-code";
+import OrganizationInvitation, {
+  subject as invitationSubject,
+} from "../emails/organization-invitation";
+import PasswordChanged, {
+  subject as passwordSubject,
+} from "../emails/password-changed";
+import VerificationCode, {
+  subject as verificationSubject,
+} from "../emails/verification-code";
 
 const fields = {
   LEAMOUT_CODE_SENTINEL: "{{.Code}}",
@@ -20,6 +26,7 @@ const fields = {
 const templates = [
   {
     name: "verification-code",
+    subject: verificationSubject,
     element: createElement(VerificationCode, {
       code: "LEAMOUT_CODE_SENTINEL",
       expiresAt: "LEAMOUT_EXPIRY_SENTINEL",
@@ -28,6 +35,7 @@ const templates = [
   },
   {
     name: "organization-invitation",
+    subject: invitationSubject,
     element: createElement(OrganizationInvitation, {
       inviterName: "LEAMOUT_INVITER_SENTINEL",
       organizationName: "LEAMOUT_ORGANIZATION_SENTINEL",
@@ -38,6 +46,7 @@ const templates = [
   },
   {
     name: "password-changed",
+    subject: passwordSubject,
     element: createElement(PasswordChanged, {
       changedAt: "LEAMOUT_CHANGED_AT_SENTINEL",
       recoveryUrl: "https://placeholder.invalid/recovery",
@@ -64,6 +73,10 @@ function substitute(content: string): string {
 }
 
 for (const template of templates) {
+  await writeFile(
+    `${output}${template.name}.subject.txt`,
+    `${template.subject}\n`,
+  );
   const html = await render(template.element);
   const text = toPlainText(html);
   await writeFile(`${output}${template.name}.html`, substitute(html));

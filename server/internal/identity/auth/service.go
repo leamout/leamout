@@ -129,6 +129,9 @@ func (s *Service) loginWithPassword(ctx context.Context, transactionID uuid.UUID
 }
 
 func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, value string) (sqlc.User, error) {
+	if s.emails != nil && s.recoveryURL == "" {
+		return sqlc.User{}, apperror.NewServiceUnavailable("password notification URL is not configured", nil)
+	}
 	if userID == uuid.Nil {
 		return sqlc.User{}, apperror.NewUnauthorized("authentication required")
 	}
@@ -187,6 +190,9 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 	if err != nil {
 		return "", err
 	}
+	if transaction.SelectedMethod != nil && *transaction.SelectedMethod == "password" && transaction.UserID == nil {
+		return "", nil
+	}
 	// Serialize recipient quotas across different transactions.
 	if err = queries.LockAuthRecipient(ctx, transaction.Identifier); err != nil {
 		return "", err
@@ -201,6 +207,9 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 		return "", err
 	}
 	if minute > 0 || hour >= 5 {
+		if challengePurpose(transaction) == "password_reset" {
+			return "", nil
+		}
 		return "", apperror.NewTooManyRequests("please wait before requesting another code")
 	}
 	if err := queries.InvalidateAuthOTPChallenges(ctx, &transactionID); err != nil {
@@ -216,7 +225,7 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 	}
 	expiresAt := pgconv.TimestamptzToTime(transaction.ExpiresAt)
 	_, err = queries.CreateAuthChallenge(ctx, sqlc.CreateAuthChallengeParams{
-		Identifier: transaction.Identifier, SecretHash: token.Hash(code), ExpiresAt: pgconv.NullableTimestamptz(&expiresAt), Purpose: "email_otp", State: []byte(`{}`), AuthTransactionID: &transactionID, MaxAttempts: 5,
+		Identifier: transaction.Identifier, SecretHash: token.Hash(code), ExpiresAt: pgconv.NullableTimestamptz(&expiresAt), Purpose: challengePurpose(transaction), State: []byte(`{}`), AuthTransactionID: &transactionID, MaxAttempts: 5,
 	})
 	if err != nil {
 		return "", err
@@ -248,6 +257,9 @@ func (s *Service) VerifyOTP(ctx context.Context, transactionID uuid.UUID, code s
 	}
 	if err := sqlc.New(tx).LockAuthRecipient(ctx, transaction.Identifier); err != nil {
 		return sqlc.User{}, err
+	}
+	if transaction.SelectedMethod != nil && *transaction.SelectedMethod == "password" {
+		return sqlc.User{}, apperror.NewBadRequest("use password reset to verify a recovery code")
 	}
 	local := NewService(NewRepository(sqlc.New(tx)))
 	user, verifyErr := local.verifyOTP(ctx, transactionID, code)
@@ -288,7 +300,7 @@ func (s *Service) verifyOTP(ctx context.Context, transactionID uuid.UUID, code s
 
 	challenge, err := s.repo.GetActiveAuthChallenge(ctx, sqlc.GetActiveAuthChallengeParams{
 		AuthTransactionID: &transactionID,
-		Purpose:           "email_otp",
+		Purpose:           challengePurpose(transaction),
 	})
 	if err != nil {
 		return sqlc.User{}, apperror.NewUnauthorized("invalid or expired authentication code")
@@ -379,3 +391,106 @@ func (s *Service) getOrCreateOTPUser(ctx context.Context, transaction sqlc.AuthT
 func otpEmailCancellationKey(id uuid.UUID) string { return "auth:otp:" + id.String() }
 
 func (s *Service) ConfigureRecoveryURL(value string) { s.recoveryURL = value }
+
+// StartRecovery never discloses whether the address has an account.
+func (s *Service) StartRecovery(ctx context.Context, address string) (sqlc.AuthTransaction, error) {
+	if s.pool == nil || s.emails == nil {
+		return sqlc.AuthTransaction{}, apperror.NewServiceUnavailable("email delivery is not configured", nil)
+	}
+	address = normalizeEmail(address)
+	parsed, err := mail.ParseAddress(address)
+	if err != nil || parsed.Address != address {
+		return sqlc.AuthTransaction{}, apperror.NewBadRequest("invalid email")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sqlc.AuthTransaction{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := sqlc.New(tx)
+	user, err := queries.GetUserByEmail(ctx, address)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.AuthTransaction{}, err
+	}
+	var userID *uuid.UUID
+	if err == nil && !user.DisabledAt.Valid {
+		userID = &user.ID
+	}
+	expiry := time.Now().Add(10 * time.Minute)
+	transaction, err := queries.CreateAuthTransaction(ctx, sqlc.CreateAuthTransactionParams{Identifier: address, UserID: userID, ExpiresAt: pgconv.NullableTimestamptz(&expiry)})
+	if err != nil {
+		return sqlc.AuthTransaction{}, err
+	}
+	method := "password"
+	transaction, err = queries.SetAuthTransactionMethod(ctx, sqlc.SetAuthTransactionMethodParams{ID: transaction.ID, SelectedMethod: &method})
+	if err != nil {
+		return sqlc.AuthTransaction{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.AuthTransaction{}, err
+	}
+	_, err = s.SendOTP(ctx, transaction.ID)
+	return transaction, err
+}
+
+// ResetPassword consumes the recovery code, changes the password, revokes
+// existing sessions, and queues the notification in one transaction.
+func (s *Service) ResetPassword(ctx context.Context, id uuid.UUID, code, value string) error {
+	if s.pool == nil || s.emails == nil || s.recoveryURL == "" {
+		return apperror.NewServiceUnavailable("password recovery is not configured", nil)
+	}
+	hash, err := password.Hash(value)
+	if err != nil {
+		return apperror.NewBadRequest("invalid password")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := sqlc.New(tx)
+	transaction, err := queries.LockAuthTransaction(ctx, id)
+	if err != nil {
+		return apperror.NewUnauthorized("invalid recovery transaction")
+	}
+	if transaction.SelectedMethod == nil || *transaction.SelectedMethod != "password" || transaction.UserID == nil {
+		return apperror.NewUnauthorized("invalid recovery transaction")
+	}
+	if err := queries.LockAuthRecipient(ctx, transaction.Identifier); err != nil {
+		return err
+	}
+	local := NewService(NewRepository(queries))
+	user, err := local.verifyOTP(ctx, id, code)
+	if err != nil {
+		var app *apperror.AppError
+		if errors.As(err, &app) && app.Code == "UNAUTHORIZED" {
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				return commitErr
+			}
+		}
+		return err
+	}
+	if _, err := queries.SetUserPassword(ctx, sqlc.SetUserPasswordParams{ID: user.ID, PasswordHash: &hash}); err != nil {
+		return err
+	}
+	if err := queries.RevokeUserSessions(ctx, user.ID); err != nil {
+		return err
+	}
+	if err := s.emails.CancelTx(ctx, tx, otpEmailCancellationKey(id)); err != nil {
+		return err
+	}
+	now := time.Now()
+	if _, err := s.emails.QueueTx(ctx, tx, email.Request{To: user.Email, Template: "password-changed", Data: email.Data{ChangedAt: now.UTC().Format("15:04 UTC on 02 Jan 2006"), RecoveryURL: s.recoveryURL, ExpiresAt: now.Add(24 * time.Hour)}}); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+// Recovery selects the password method and verifies a password_reset challenge;
+// normal email login uses email_otp. Both values already exist in the schema.
+func challengePurpose(transaction sqlc.AuthTransaction) string {
+	if transaction.SelectedMethod != nil && *transaction.SelectedMethod == "password" {
+		return "password_reset"
+	}
+	return "email_otp"
+}

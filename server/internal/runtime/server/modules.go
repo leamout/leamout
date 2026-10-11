@@ -120,6 +120,11 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		identityModule.Auth.Service.ConfigureRecoveryURL("https://" + cfg.Domain + "/forgot-password")
 	}
 	tenancyModule := tenancy.New(queries)
+	invitationURL := ""
+	if cfg.Domain != "" {
+		invitationURL = "https://" + cfg.Domain + "/invitations/accept"
+	}
+	tenancyModule.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher), invitationURL)
 	trustedProxies, err := cfg.TrustedProxyPrefixes()
 	if err != nil {
 		closeDependencies()

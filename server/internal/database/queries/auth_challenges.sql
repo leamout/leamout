@@ -66,4 +66,4 @@ WHERE expires_at <= NOW()
 
 -- name: InvalidateAuthOTPChallenges :exec
 UPDATE auth_challenges SET consumed_at=now()
-WHERE auth_transaction_id=sqlc.arg(auth_transaction_id) AND purpose='email_otp' AND consumed_at IS NULL;
+WHERE auth_transaction_id=sqlc.arg(auth_transaction_id) AND purpose IN ('email_otp', 'password_reset') AND consumed_at IS NULL;

@@ -31,6 +31,10 @@ func testEmailDatabase(t *testing.T) (*pgxpool.Pool, *encryption.Cipher) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := admin.Exec(ctx, "CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public; CREATE EXTENSION IF NOT EXISTS citext WITH SCHEMA public;"); err != nil {
+		admin.Close()
+		t.Fatal(err)
+	}
 	schema := "email_test_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 		admin.Close()
@@ -52,7 +56,7 @@ func testEmailDatabase(t *testing.T) (*pgxpool.Pool, *encryption.Cipher) {
 		t.Fatal(err)
 	}
 	t.Cleanup(pool.Close)
-	for _, name := range []string{"001_extensions.sql", "002_create_users.sql", "003_create_authentication.sql", "032_create_email_deliveries.sql"} {
+	for _, name := range []string{"001_extensions.sql", "002_create_users.sql", "003_create_authentication.sql", "004_create_sessions.sql", "005_create_organizations.sql", "006_create_organization_members.sql", "007_create_organization_invitations.sql", "032_create_email_deliveries.sql"} {
 		body, err := os.ReadFile(filepath.Join("../../../migrations", name))
 		if err != nil {
 			t.Fatal(err)
