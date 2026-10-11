@@ -156,13 +156,23 @@ func TranslateInboundFreeSWITCHEvent(event freeswitch.Event) (InboundEvent, erro
 }
 
 func TranslateFreeSWITCHEvent(event freeswitch.Event) (LifecycleEvent, error) {
-	eventType, err := lifecycleEventType(event)
-	if err != nil {
-		return LifecycleEvent{}, err
-	}
 	callID, err := uuid.Parse(strings.TrimSpace(event.Header("variable_leamout_call_id")))
 	if err != nil {
 		return LifecycleEvent{}, fmt.Errorf("%w: missing valid Leamout call id", ErrUncorrelatedEvent)
+	}
+	return TranslateFreeSWITCHEventForCall(event, callID)
+}
+
+func TranslateFreeSWITCHEventForCall(
+	event freeswitch.Event,
+	callID uuid.UUID,
+) (LifecycleEvent, error) {
+	if callID == uuid.Nil {
+		return LifecycleEvent{}, fmt.Errorf("%w: missing valid Leamout call id", ErrUncorrelatedEvent)
+	}
+	eventType, err := lifecycleEventType(event)
+	if err != nil {
+		return LifecycleEvent{}, err
 	}
 	channelID := strings.TrimSpace(event.Header("Unique-ID"))
 	if channelID == "" {
