@@ -386,6 +386,7 @@ def add_source_and_inbound():
         (201,),
     )
     trunk_call_uuid = str(uuid.uuid4())
+    call = None
     try:
         before = {x["id"] for x in api("GET", "/v1/calls/?limit=100")["calls"]}
         output = fs(
@@ -409,6 +410,17 @@ def add_source_and_inbound():
         S["inbound"] = call
     finally:
         fs(f"uuid_kill {trunk_call_uuid}")
+        if call is not None:
+            def terminal():
+                current = api("GET", f"/v1/calls/{call['id']}")
+                return (
+                    current
+                    if current.get("state") in ("completed", "failed", "cancelled")
+                    else None
+                )
+
+            wait("inbound terminal state", terminal)
+
         api(
             "DELETE",
             f"/v1/trunks/{S['trunk']['id']}/source-ips/{source['id']}",
