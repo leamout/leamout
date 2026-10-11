@@ -409,23 +409,24 @@ def add_source_and_inbound():
         )
         S["inbound"] = call
     finally:
-        fs(f"uuid_kill {trunk_call_uuid}")
-        if call is not None:
-            def terminal():
-                current = api("GET", f"/v1/calls/{call['id']}")
-                return (
-                    current
-                    if current.get("state") in ("completed", "failed", "cancelled")
-                    else None
-                )
+        try:
+            fs(f"uuid_kill {trunk_call_uuid}")
+            if call is not None:
+                def terminal():
+                    current = api("GET", f"/v1/calls/{call['id']}")
+                    return (
+                        current
+                        if current.get("state") in ("completed", "failed", "cancelled")
+                        else None
+                    )
 
-            wait("inbound terminal state", terminal)
-
-        api(
-            "DELETE",
-            f"/v1/trunks/{S['trunk']['id']}/source-ips/{source['id']}",
-            expected=(204,),
-        )
+                wait("inbound terminal state", terminal)
+        finally:
+            api(
+                "DELETE",
+                f"/v1/trunks/{S['trunk']['id']}/source-ips/{source['id']}",
+                expected=(204,),
+            )
 
     rejected = fs(
         f"originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()"
