@@ -317,6 +317,14 @@ def outbound(label):
     for field, value in expected.items():
         if persisted.get(field) != value:
             raise Failure(f"persisted {field}={persisted.get(field)!r}, want {value}")
+
+    api("POST", f"/v1/calls/{call['id']}/hangup")
+
+    def terminal():
+        current = api("GET", f"/v1/calls/{call['id']}")
+        return current if current.get("state") in ("completed", "failed", "cancelled") else None
+
+    wait(f"{label} outbound terminal state", terminal)
     return f"{label} authenticated call {call['id']} persisted trunk/endpoint attribution"
 
 
