@@ -209,7 +209,6 @@ func TestTranslateInboundFreeSWITCHEventIgnoresUnrelatedChannel(t *testing.T) {
 	}
 }
 
-
 func TestTranslateFreeSWITCHEventForCallRecoversMissingVariable(t *testing.T) {
 	t.Parallel()
 
