@@ -1,4 +1,17 @@
-Leamout
+{{if eq .Purpose "password-recovery"}}Leamout
+
+
+VERIFY YOUR RECOVERY REQUEST
+
+Use this code to continue resetting your Leamout password.
+
+{{.Code}}
+
+This code expires {{.Expiry}}. Do not share it with anyone.
+
+If you did not request this code, you can ignore this email.
+
+Leamout · Autonomous voice agents{{else}}Leamout
 
 
 YOUR VERIFICATION CODE
@@ -11,4 +24,4 @@ This code expires {{.Expiry}}. Do not share it with anyone.
 
 If you did not request this code, you can ignore this email.
 
-Leamout · Autonomous voice agents
+Leamout · Autonomous voice agents{{end}}

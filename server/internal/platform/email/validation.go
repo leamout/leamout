@@ -2,8 +2,10 @@ package email
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 var codePattern = regexp.MustCompile(`^[0-9]{6}$`)
@@ -18,22 +20,44 @@ func validateData(name string, data Data) error {
 	}
 	switch name {
 	case "verification-code":
+		if data.Purpose != "" && data.Purpose != "verification" && data.Purpose != "password-recovery" {
+			return fmt.Errorf("invalid verification purpose")
+		}
+
 		if !codePattern.MatchString(data.Code) {
 			return fmt.Errorf("invalid verification code")
 		}
 	case "organization-invitation":
-		if !validURL(data.AcceptURL) || data.Organization == "" {
+		if !ValidURL(data.AcceptURL) || data.Organization == "" {
 			return fmt.Errorf("invalid invitation data")
 		}
 	case "password-changed":
-		if !validURL(data.RecoveryURL) || data.ChangedAt == "" {
+		if !ValidURL(data.RecoveryURL) || data.ChangedAt == "" {
 			return fmt.Errorf("invalid password notification data")
 		}
 	}
 	return nil
 }
 
-func validURL(value string) bool {
+// ValidURL accepts HTTPS links and HTTP links to localhost or loopback addresses.
+func ValidURL(value string) bool {
 	u, err := url.Parse(value)
-	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil
+	if err != nil || u.Hostname() == "" || u.User != nil {
+		return false
+	}
+
+	if u.Scheme == "https" {
+		return true
+	}
+
+	if u.Scheme != "http" {
+		return false
+	}
+
+	if strings.EqualFold(u.Hostname(), "localhost") {
+		return true
+	}
+
+	address, err := netip.ParseAddr(u.Hostname())
+	return err == nil && address.IsLoopback()
 }

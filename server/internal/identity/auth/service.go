@@ -289,11 +289,17 @@ func (s *Service) SendOTP(ctx context.Context, transactionID uuid.UUID) (string,
 		return "", err
 	}
 
+	purpose := "verification"
+	if challengePurpose(transaction) == "password_reset" {
+		purpose = "password-recovery"
+	}
+
 	_, err = s.emails.QueueTx(ctx, tx, email.Request{
 		To:              transaction.Identifier,
 		Template:        "verification-code",
 		CancellationKey: &key,
 		Data: email.Data{
+			Purpose:   purpose,
 			Code:      code,
 			ExpiresAt: expiresAt,
 		},

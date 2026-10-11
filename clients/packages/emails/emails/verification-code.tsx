@@ -72,3 +72,5 @@ VerificationCode.PreviewProps = {
 } satisfies VerificationCodeProps;
 
 export const subject = "Your Leamout verification code";
+
+export const recoverySubject = "Reset your Leamout password";

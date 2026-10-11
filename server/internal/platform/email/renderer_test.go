@@ -95,3 +95,62 @@ func TestSubjectComesFromTemplate(t *testing.T) {
 		t.Fatal("accepted a template path")
 	}
 }
+
+func TestVerificationPurpose(t *testing.T) {
+	for _, purpose := range []string{"", "verification", "password-recovery"} {
+		t.Run(purpose, func(t *testing.T) {
+			message, err := NewRenderer().Render("verification-code", Data{
+				Purpose:   purpose,
+				Code:      "012345",
+				ExpiresAt: time.Now().Add(time.Minute),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			wantSubject := "Your Leamout verification code"
+			wantBody := "continue your Leamout authentication request"
+			if purpose == "password-recovery" {
+				wantSubject = "Reset your Leamout password"
+				wantBody = "continue resetting your Leamout password"
+			}
+
+			if message.Subject != wantSubject {
+				t.Fatalf("subject = %q, want %q", message.Subject, wantSubject)
+			}
+
+			for _, body := range []string{message.HTML, message.Text} {
+				if !strings.Contains(body, wantBody) || !strings.Contains(body, "012345") {
+					t.Fatal("email lost purpose wording or code")
+				}
+
+				if strings.Contains(body, "{{if") {
+					t.Fatal("unrendered condition in email")
+				}
+			}
+		})
+	}
+}
+
+func TestLocalDevelopmentLinks(t *testing.T) {
+	for _, name := range []string{"organization-invitation", "password-changed"} {
+		t.Run(name, func(t *testing.T) {
+			link := "http://localhost:3000/forgot-password"
+			data := Data{
+				Organization: "Acme",
+				AcceptURL:    link,
+				RecoveryURL:  link,
+				ChangedAt:    "12:00 UTC",
+				ExpiresAt:    time.Now().Add(time.Hour),
+			}
+			message, err := NewRenderer().Render(name, data)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !strings.Contains(message.HTML, link) || !strings.Contains(message.Text, link) {
+				t.Fatal("local URL was not preserved")
+			}
+		})
+	}
+}

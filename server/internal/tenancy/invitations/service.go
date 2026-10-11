@@ -53,7 +53,7 @@ func (s *Service) Create(ctx context.Context, userID, organizationID uuid.UUID, 
 	}
 
 	u, err := url.Parse(s.acceptURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || s.emails == nil {
+	if err != nil || !email.ValidURL(s.acceptURL) || s.emails == nil {
 		return Response{}, apperror.NewServiceUnavailable("invitation email is not configured", nil)
 	}
 

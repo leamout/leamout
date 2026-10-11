@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { render, toPlainText } from "react-email";
 import OrganizationInvitation, {
   subject as invitationSubject,
@@ -9,6 +9,7 @@ import PasswordChanged, {
   subject as passwordSubject,
 } from "../emails/password-changed";
 import VerificationCode, {
+  recoverySubject,
   subject as verificationSubject,
 } from "../emails/verification-code";
 
@@ -23,7 +24,18 @@ const fields = {
   "https://placeholder.invalid/recovery": "{{.RecoveryURL}}",
 };
 
-const templates = [
+type Template = {
+  name: string;
+  subject: string;
+  element: ReactElement;
+  variants?: {
+    condition: string;
+    subject: string;
+    element: ReactElement;
+  }[];
+};
+
+const templates: Template[] = [
   {
     name: "verification-code",
     subject: verificationSubject,
@@ -32,6 +44,17 @@ const templates = [
       expiresAt: "LEAMOUT_EXPIRY_SENTINEL",
       purpose: "verification",
     }),
+    variants: [
+      {
+        condition: 'eq .Purpose "password-recovery"',
+        subject: recoverySubject,
+        element: createElement(VerificationCode, {
+          code: "LEAMOUT_CODE_SENTINEL",
+          expiresAt: "LEAMOUT_EXPIRY_SENTINEL",
+          purpose: "password-recovery",
+        }),
+      },
+    ],
   },
   {
     name: "organization-invitation",
@@ -73,12 +96,20 @@ function substitute(content: string): string {
 }
 
 for (const template of templates) {
-  await writeFile(
-    `${output}${template.name}.subject.txt`,
-    `${template.subject}\n`,
-  );
-  const html = await render(template.element);
-  const text = toPlainText(html);
+  let subject = template.subject;
+  let html = await render(template.element);
+  let text = toPlainText(html);
+
+  for (const variant of [...(template.variants ?? [])].reverse()) {
+    const variantHTML = await render(variant.element);
+    const branch = (matching: string, fallback: string) =>
+      `{{if ${variant.condition}}}${matching}{{else}}${fallback}{{end}}`;
+    subject = branch(variant.subject, subject);
+    html = branch(variantHTML, html);
+    text = branch(toPlainText(variantHTML), text);
+  }
+
+  await writeFile(`${output}${template.name}.subject.txt`, `${subject}\n`);
   await writeFile(`${output}${template.name}.html`, substitute(html));
   await writeFile(`${output}${template.name}.txt`, `${substitute(text)}\n`);
 }
