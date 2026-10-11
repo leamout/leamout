@@ -1,1 +1,0 @@
-{{if eq .Purpose "password-recovery"}}Reset your Leamout password{{else}}Your Leamout verification code{{end}}

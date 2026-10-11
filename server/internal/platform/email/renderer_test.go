@@ -16,7 +16,7 @@ func TestRendererPasswordChanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, body := range []string{message.HTML, message.Text} {
+	for _, body := range []string{message.HTML} {
 		if !strings.Contains(body, data.ChangedAt) || !strings.Contains(body, data.RecoveryURL) {
 			t.Fatal("password notification lost dynamic data")
 		}
@@ -32,7 +32,7 @@ func TestRendererOTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, body := range []string{m.HTML, m.Text} {
+	for _, body := range []string{m.HTML} {
 		if !strings.Contains(body, "012345") || !strings.Contains(body, "12:30 UTC") {
 			t.Fatal("missing code or expiry")
 		}
@@ -58,7 +58,7 @@ func TestRendererRejectsInvalidData(t *testing.T) {
 	}
 }
 
-func TestGeneratedInvitationPreservesDynamicData(t *testing.T) {
+func TestInvitationPreservesDynamicData(t *testing.T) {
 	data := Data{Organization: `Acme {{.Code}} & Co`, Inviter: `Alice <Admin>`, Role: "member", AcceptURL: "https://app.example.com/invitation?token=abc&next=console", ExpiresAt: time.Now().Add(time.Hour)}
 	message, err := NewRenderer().Render("organization-invitation", data)
 	if err != nil {
@@ -70,10 +70,8 @@ func TestGeneratedInvitationPreservesDynamicData(t *testing.T) {
 	if !strings.Contains(message.HTML, "token=abc&amp;next=console") {
 		t.Fatal("dynamic URL was not escaped")
 	}
-	if !strings.Contains(message.Text, data.AcceptURL) || !strings.Contains(message.Text, data.Organization) {
-		t.Fatal("plain text lost dynamic data")
-	}
-	if strings.Contains(message.HTML, "SENTINEL") || strings.Contains(message.Text, "SENTINEL") {
+
+	if strings.Contains(message.HTML, "SENTINEL") {
 		t.Fatal("export placeholder leaked")
 	}
 }
@@ -119,7 +117,7 @@ func TestVerificationPurpose(t *testing.T) {
 				t.Fatalf("subject = %q, want %q", message.Subject, wantSubject)
 			}
 
-			for _, body := range []string{message.HTML, message.Text} {
+			for _, body := range []string{message.HTML} {
 				if !strings.Contains(body, wantBody) || !strings.Contains(body, "012345") {
 					t.Fatal("email lost purpose wording or code")
 				}
@@ -148,7 +146,7 @@ func TestLocalDevelopmentLinks(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if !strings.Contains(message.HTML, link) || !strings.Contains(message.Text, link) {
+			if !strings.Contains(message.HTML, link) {
 				t.Fatal("local URL was not preserved")
 			}
 		})

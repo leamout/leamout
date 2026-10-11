@@ -13,7 +13,6 @@ type Message struct {
 	To      string
 	Subject string
 	HTML    string
-	Text    string
 }
 
 type Result struct {
@@ -48,7 +47,6 @@ func (s *Sender) Send(ctx context.Context, message Message) (Result, error) {
 				Subject: content(message.Subject),
 				Body: &types.Body{
 					Html: content(message.HTML),
-					Text: content(message.Text),
 				},
 			},
 		},

@@ -11,45 +11,61 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/ses"
 )
 
-//go:embed templates/*
+//go:embed templates/*.html
 var templates embed.FS
 
 type Renderer struct{}
 
-func NewRenderer() *Renderer { return &Renderer{} }
+func NewRenderer() *Renderer {
+	return &Renderer{}
+}
+
 func (r *Renderer) Render(name string, data Data) (ses.Message, error) {
 	if err := validateData(name, data); err != nil {
 		return ses.Message{}, err
 	}
-	subjectTemplate, err := texttemplate.ParseFS(templates, "templates/"+name+".subject.txt")
+
+	source, err := templates.ReadFile("templates/" + name + ".html")
 	if err != nil {
 		return ses.Message{}, err
 	}
-	html, err := template.ParseFS(templates, "templates/"+name+".html")
+
+	// Render the subject as text so HTML escaping does not alter the header.
+	subjectTemplate, err := texttemplate.New(name).Parse(string(source))
 	if err != nil {
 		return ses.Message{}, err
 	}
-	plain, err := texttemplate.ParseFS(templates, "templates/"+name+".txt")
+
+	bodyTemplate, err := template.New(name).Parse(string(source))
 	if err != nil {
 		return ses.Message{}, err
 	}
+
 	values := struct {
 		Data
 		Expiry string
-	}{Data: data, Expiry: data.ExpiresAt.UTC().Format("15:04 UTC on 02 Jan 2006")}
-	var h, t, subject bytes.Buffer
-	if err := html.ExecuteTemplate(&h, name+".html", values); err != nil {
+	}{
+		Data:   data,
+		Expiry: data.ExpiresAt.UTC().Format("15:04 UTC on 02 Jan 2006"),
+	}
+
+	var subject bytes.Buffer
+	if err := subjectTemplate.ExecuteTemplate(&subject, "subject", values); err != nil {
 		return ses.Message{}, err
 	}
-	if err := plain.Execute(&t, values); err != nil {
-		return ses.Message{}, err
-	}
-	if err := subjectTemplate.Execute(&subject, values); err != nil {
-		return ses.Message{}, err
-	}
+
 	subjectValue := strings.TrimSpace(subject.String())
 	if subjectValue == "" || strings.ContainsAny(subjectValue, "\r\n") {
 		return ses.Message{}, fmt.Errorf("invalid email subject")
 	}
-	return ses.Message{Subject: subjectValue, HTML: h.String(), Text: t.String()}, nil
+
+	var body bytes.Buffer
+	if err := bodyTemplate.ExecuteTemplate(&body, "body", values); err != nil {
+		return ses.Message{}, err
+	}
+
+	return ses.Message{
+		Subject: subjectValue,
+		HTML:    body.String(),
+	}, nil
 }
