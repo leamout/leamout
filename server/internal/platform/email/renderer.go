@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
-	"github.com/leamout/leamout/server/internal/integrations/ses"
 	"html/template"
 	"net/url"
 	"regexp"
 	texttemplate "text/template"
+
+	"github.com/leamout/leamout/server/internal/integrations/ses"
 )
 
 //go:embed templates/*
