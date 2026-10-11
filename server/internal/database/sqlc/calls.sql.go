@@ -387,6 +387,7 @@ func (q *Queries) GetInboundCallContext(ctx context.Context, arg GetInboundCallC
 const listActiveCallsForAdmissionReconciliation = `-- name: ListActiveCallsForAdmissionReconciliation :many
 SELECT
     id,
+    organization_id,
     trunk_id
 FROM calls
 WHERE state IN ('initiating', 'ringing', 'answered', 'active')
@@ -395,8 +396,9 @@ ORDER BY created_at ASC
 `
 
 type ListActiveCallsForAdmissionReconciliationRow struct {
-	ID      uuid.UUID  `db:"id" json:"id"`
-	TrunkID *uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	ID             uuid.UUID  `db:"id" json:"id"`
+	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
+	TrunkID        *uuid.UUID `db:"trunk_id" json:"trunk_id"`
 }
 
 func (q *Queries) ListActiveCallsForAdmissionReconciliation(ctx context.Context) ([]ListActiveCallsForAdmissionReconciliationRow, error) {
@@ -408,7 +410,7 @@ func (q *Queries) ListActiveCallsForAdmissionReconciliation(ctx context.Context)
 	items := []ListActiveCallsForAdmissionReconciliationRow{}
 	for rows.Next() {
 		var i ListActiveCallsForAdmissionReconciliationRow
-		if err := rows.Scan(&i.ID, &i.TrunkID); err != nil {
+		if err := rows.Scan(&i.ID, &i.OrganizationID, &i.TrunkID); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

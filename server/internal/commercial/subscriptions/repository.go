@@ -2,10 +2,8 @@ package subscriptions
 
 import (
 	"context"
-	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
@@ -20,9 +18,6 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 
 func (r *Repository) Get(ctx context.Context, organizationID uuid.UUID) (Subscription, error) {
 	row, err := r.queries.GetOrganizationSubscription(ctx, organizationID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return r.Get(ctx, organizationID)
-	}
 	if err != nil {
 		return Subscription{}, err
 	}

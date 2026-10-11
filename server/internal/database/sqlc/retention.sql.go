@@ -55,6 +55,68 @@ func (q *Queries) GetRetentionPolicy(ctx context.Context, arg GetRetentionPolicy
 	return i, err
 }
 
+const listEffectiveRecordingRetention = `-- name: ListEffectiveRecordingRetention :many
+WITH effective_plans AS (
+    SELECT
+        o.id AS organization_id,
+        COALESCE(active_plan.limits, free_plan.limits) AS limits
+    FROM organizations AS o
+    LEFT JOIN subscriptions AS s
+      ON s.organization_id = o.id
+     AND s.status IN ('trialing', 'active')
+    LEFT JOIN plans AS active_plan
+      ON active_plan.id = s.plan_id
+    CROSS JOIN plans AS free_plan
+    WHERE free_plan.code = 'free'
+      AND o.status = 'active'
+      AND o.deleted_at IS NULL
+)
+SELECT
+    ep.organization_id,
+    CASE
+        WHEN NULLIF(ep.limits ->> 'retention_days', '') IS NULL
+            THEN rp.retention_days
+        WHEN rp.enabled
+            THEN LEAST(
+                rp.retention_days,
+                (ep.limits ->> 'retention_days')::INTEGER
+            )
+        ELSE (ep.limits ->> 'retention_days')::INTEGER
+    END::INTEGER AS retention_days
+FROM effective_plans AS ep
+LEFT JOIN retention_policies AS rp
+  ON rp.organization_id = ep.organization_id
+ AND rp.resource = 'recordings'
+WHERE NULLIF(ep.limits ->> 'retention_days', '') IS NOT NULL
+   OR (rp.enabled AND rp.retention_days IS NOT NULL)
+ORDER BY ep.organization_id
+`
+
+type ListEffectiveRecordingRetentionRow struct {
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	RetentionDays  int32     `db:"retention_days" json:"retention_days"`
+}
+
+func (q *Queries) ListEffectiveRecordingRetention(ctx context.Context) ([]ListEffectiveRecordingRetentionRow, error) {
+	rows, err := q.db.Query(ctx, listEffectiveRecordingRetention)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListEffectiveRecordingRetentionRow{}
+	for rows.Next() {
+		var i ListEffectiveRecordingRetentionRow
+		if err := rows.Scan(&i.OrganizationID, &i.RetentionDays); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEnabledRetentionPolicies = `-- name: ListEnabledRetentionPolicies :many
 SELECT organization_id, resource, retention_days, enabled, created_at, updated_at
 FROM retention_policies

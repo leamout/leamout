@@ -317,6 +317,14 @@ def outbound(label):
     for field, value in expected.items():
         if persisted.get(field) != value:
             raise Failure(f"persisted {field}={persisted.get(field)!r}, want {value}")
+
+    api("POST", f"/v1/calls/{call['id']}/hangup")
+
+    def terminal():
+        current = api("GET", f"/v1/calls/{call['id']}")
+        return current if current.get("state") in ("completed", "failed", "cancelled") else None
+
+    wait(f"{label} outbound terminal state", terminal)
     return f"{label} authenticated call {call['id']} persisted trunk/endpoint attribution"
 
 
@@ -378,6 +386,7 @@ def add_source_and_inbound():
         (201,),
     )
     trunk_call_uuid = str(uuid.uuid4())
+    call = None
     try:
         before = {x["id"] for x in api("GET", "/v1/calls/?limit=100")["calls"]}
         output = fs(
@@ -400,12 +409,24 @@ def add_source_and_inbound():
         )
         S["inbound"] = call
     finally:
-        fs(f"uuid_kill {trunk_call_uuid}")
-        api(
-            "DELETE",
-            f"/v1/trunks/{S['trunk']['id']}/source-ips/{source['id']}",
-            expected=(204,),
-        )
+        try:
+            fs(f"uuid_kill {trunk_call_uuid}")
+            if call is not None:
+                def terminal():
+                    current = api("GET", f"/v1/calls/{call['id']}")
+                    return (
+                        current
+                        if current.get("state") in ("completed", "failed", "cancelled")
+                        else None
+                    )
+
+                wait("inbound terminal state", terminal)
+        finally:
+            api(
+                "DELETE",
+                f"/v1/trunks/{S['trunk']['id']}/source-ips/{source['id']}",
+                expected=(204,),
+            )
 
     rejected = fs(
         f"originate {{origination_caller_id_number={CALLER}}}sofia/internal/{DID}@opensips:5060 &park()"

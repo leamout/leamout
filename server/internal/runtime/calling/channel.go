@@ -17,6 +17,7 @@ var (
 	ErrChannelUnavailable  = errors.New("active call channel unavailable")
 	ErrAdmissionCPS        = errors.New("trunk CPS limit exceeded")
 	ErrAdmissionConcurrent = errors.New("trunk concurrent call limit exceeded")
+	ErrPlanConcurrent      = errors.New("organization concurrent call limit exceeded")
 )
 
 const callAdmissionLeaseTTL = 26 * time.Hour
@@ -37,7 +38,15 @@ func (s *ChannelStore) Bind(ctx context.Context, callID uuid.UUID, channelID str
 	if callID == uuid.Nil || channelID == "" {
 		return fmt.Errorf("call id and channel id are required")
 	}
-	return s.client.Set(ctx, channelKey(callID), channelID, 24*time.Hour)
+
+	if err := s.client.Set(ctx, channelKey(callID), channelID, 24*time.Hour); err != nil {
+		return err
+	}
+	if err := s.client.Set(ctx, channelCallKey(channelID), callID.String(), 24*time.Hour); err != nil {
+		_ = s.client.Delete(ctx, channelKey(callID))
+		return err
+	}
+	return nil
 }
 
 func (s *ChannelStore) Get(ctx context.Context, callID uuid.UUID) (string, error) {
@@ -60,11 +69,42 @@ func (s *ChannelStore) Get(ctx context.Context, callID uuid.UUID) (string, error
 	return channelID, nil
 }
 
+func (s *ChannelStore) GetCallID(ctx context.Context, channelID string) (uuid.UUID, error) {
+	channelID = strings.TrimSpace(channelID)
+	if channelID == "" {
+		return uuid.Nil, fmt.Errorf("channel id is required")
+	}
+
+	value, err := s.client.Get(ctx, channelCallKey(channelID))
+	if errors.Is(err, redisv9.Nil) {
+		return uuid.Nil, ErrChannelUnavailable
+	}
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	callID, err := uuid.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("invalid call id stored for channel: %w", err)
+	}
+	return callID, nil
+}
+
 func (s *ChannelStore) Delete(ctx context.Context, callID uuid.UUID) error {
 	if callID == uuid.Nil {
 		return fmt.Errorf("call id is required")
 	}
-	return s.client.Delete(ctx, channelKey(callID))
+
+	channelID, err := s.client.Get(ctx, channelKey(callID))
+	if err != nil && !errors.Is(err, redisv9.Nil) {
+		return err
+	}
+
+	keys := []string{channelKey(callID)}
+	if channelID = strings.TrimSpace(channelID); channelID != "" {
+		keys = append(keys, channelCallKey(channelID))
+	}
+	return s.client.Delete(ctx, keys...)
 }
 
 type AdmissionLimiter struct {
@@ -163,10 +203,94 @@ func (l *AdmissionLimiter) Refresh(
 	)
 }
 
+func (l *AdmissionLimiter) AcquireOrganization(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	leaseID string,
+	maxConcurrent int64,
+) error {
+	if organizationID == uuid.Nil || leaseID == "" {
+		return fmt.Errorf("organization id and lease id are required")
+	}
+	if maxConcurrent < 1 {
+		return fmt.Errorf("organization concurrent call limit must be positive")
+	}
+
+	allowed, err := l.client.AcquireConcurrentLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		leaseID,
+		maxConcurrent,
+		callAdmissionLeaseTTL,
+	)
+	if err != nil {
+		return fmt.Errorf("acquire organization call lease: %w", err)
+	}
+	if !allowed {
+		return ErrPlanConcurrent
+	}
+	return nil
+}
+
+func (l *AdmissionLimiter) BindOrganization(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	leaseID string,
+	callID uuid.UUID,
+) error {
+	if organizationID == uuid.Nil || leaseID == "" || callID == uuid.Nil {
+		return fmt.Errorf("organization id, lease id, and call id are required")
+	}
+	return l.client.BindCallLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		leaseID,
+		callID.String(),
+	)
+}
+
+func (l *AdmissionLimiter) ReleaseOrganization(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	callOrLeaseID string,
+) error {
+	if organizationID == uuid.Nil || callOrLeaseID == "" {
+		return fmt.Errorf("organization id and call or lease id are required")
+	}
+	return l.client.ReleaseCallLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		callOrLeaseID,
+	)
+}
+
+func (l *AdmissionLimiter) RefreshOrganization(
+	ctx context.Context,
+	organizationID, callID uuid.UUID,
+) error {
+	if organizationID == uuid.Nil || callID == uuid.Nil {
+		return fmt.Errorf("organization id and call id are required")
+	}
+	return l.client.RefreshCallLease(
+		ctx,
+		organizationAdmissionPrefix(organizationID),
+		callID.String(),
+		callAdmissionLeaseTTL,
+	)
+}
+
 func channelKey(callID uuid.UUID) string {
 	return "telecom:calls:channel:" + callID.String()
 }
 
+func channelCallKey(channelID string) string {
+	return "telecom:calls:channel-call:" + channelID
+}
+
 func admissionPrefix(trunkID uuid.UUID) string {
 	return "telecom:admission:trunk:" + trunkID.String()
+}
+
+func organizationAdmissionPrefix(organizationID uuid.UUID) string {
+	return "telecom:admission:organization:" + organizationID.String()
 }

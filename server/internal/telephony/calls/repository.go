@@ -117,8 +117,9 @@ func (r *Repository) ListActiveForAdmissionReconciliation(
 			continue
 		}
 		items = append(items, ActiveAdmissionCall{
-			ID:      row.ID,
-			TrunkID: *row.TrunkID,
+			ID:             row.ID,
+			OrganizationID: row.OrganizationID,
+			TrunkID:        *row.TrunkID,
 		})
 	}
 	return items, nil

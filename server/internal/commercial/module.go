@@ -3,6 +3,7 @@ package commercial
 import (
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/entitlements"
+	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
@@ -13,6 +14,7 @@ type Module struct {
 	Billing       BillingModule
 	Plans         PlansModule
 	Subscriptions SubscriptionsModule
+	Limits        LimitsModule
 	Entitlements  EntitlementsModule
 }
 
@@ -38,6 +40,10 @@ type SubscriptionsModule struct {
 	Handler    *subscriptions.Handler
 }
 
+type LimitsModule struct {
+	Service *limits.Service
+}
+
 type EntitlementsModule struct {
 	Repository *entitlements.Repository
 	Service    *entitlements.Service
@@ -55,6 +61,7 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 
 	subscriptionsRepository := subscriptions.NewRepository(queries)
 	subscriptionsService := subscriptions.NewService(subscriptionsRepository)
+	limitsService := limits.NewService(plansService, subscriptionsService)
 
 	billingService := billing.NewService(
 		plansService,
@@ -80,6 +87,9 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 			Repository: subscriptionsRepository,
 			Service:    subscriptionsService,
 			Handler:    subscriptions.NewHandler(subscriptionsService),
+		},
+		Limits: LimitsModule{
+			Service: limitsService,
 		},
 		Entitlements: EntitlementsModule{
 			Repository: entitlementsRepository,

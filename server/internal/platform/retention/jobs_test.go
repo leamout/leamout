@@ -15,8 +15,20 @@ type cleanupRepositoryStub struct {
 	before         time.Time
 }
 
-func (s *cleanupRepositoryStub) ListEnabled(context.Context) ([]Policy, error) {
-	return s.policies, nil
+func (s *cleanupRepositoryStub) ListEffectiveRecordingRetention(
+	context.Context,
+) ([]EffectiveRecordingRetention, error) {
+	out := make([]EffectiveRecordingRetention, 0, len(s.policies))
+	for _, policy := range s.policies {
+		if policy.Resource != ResourceRecordings || !policy.Enabled {
+			continue
+		}
+		out = append(out, EffectiveRecordingRetention{
+			OrganizationID: policy.OrganizationID,
+			RetentionDays:  policy.RetentionDays,
+		})
+	}
+	return out, nil
 }
 func (s *cleanupRepositoryStub) ListExpiredRecordings(_ context.Context, organizationID uuid.UUID, before time.Time, _ int32) ([]uuid.UUID, error) {
 	s.organizationID = organizationID

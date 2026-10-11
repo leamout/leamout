@@ -13,7 +13,7 @@ type recordingDeleter interface {
 }
 
 type cleanupRepository interface {
-	ListEnabled(context.Context) ([]Policy, error)
+	ListEffectiveRecordingRetention(context.Context) ([]EffectiveRecordingRetention, error)
 	ListExpiredRecordings(context.Context, uuid.UUID, time.Time, int32) ([]uuid.UUID, error)
 }
 
@@ -68,19 +68,25 @@ func (j *CleanupJob) Run(ctx context.Context) error {
 	}
 }
 func (j *CleanupJob) runOnce(ctx context.Context) error {
-	policies, err := j.repo.ListEnabled(ctx)
+	policies, err := j.repo.ListEffectiveRecordingRetention(ctx)
 	if err != nil {
-		return fmt.Errorf("list enabled retention policies: %w", err)
+		return fmt.Errorf("list effective recording retention: %w", err)
 	}
 	for _, policy := range policies {
-		if policy.Resource != ResourceRecordings {
-			continue
-		}
 		cutoff := j.now().UTC().AddDate(0, 0, -int(policy.RetentionDays))
 		for {
-			ids, err := j.repo.ListExpiredRecordings(ctx, policy.OrganizationID, cutoff, j.config.BatchSize)
+			ids, err := j.repo.ListExpiredRecordings(
+				ctx,
+				policy.OrganizationID,
+				cutoff,
+				j.config.BatchSize,
+			)
 			if err != nil {
-				return fmt.Errorf("list expired recordings for organization %s: %w", policy.OrganizationID, err)
+				return fmt.Errorf(
+					"list expired recordings for organization %s: %w",
+					policy.OrganizationID,
+					err,
+				)
 			}
 			for _, id := range ids {
 				// Recording deletion removes the object from its pinned managed/BYOS

@@ -25,3 +25,8 @@ type UpsertRequest struct {
 	RetentionDays int32 `json:"retention_days"`
 	Enabled       bool  `json:"enabled"`
 }
+
+type EffectiveRecordingRetention struct {
+	OrganizationID uuid.UUID
+	RetentionDays  int32
+}

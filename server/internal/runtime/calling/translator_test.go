@@ -208,3 +208,31 @@ func TestTranslateInboundFreeSWITCHEventIgnoresUnrelatedChannel(t *testing.T) {
 		t.Fatalf("error = %v, want ErrNotInboundAdmission", err)
 	}
 }
+
+func TestTranslateFreeSWITCHEventForCallRecoversMissingVariable(t *testing.T) {
+	t.Parallel()
+
+	callID := uuid.New()
+	channelID := uuid.New().String()
+	event := freeswitch.Event{
+		Name: "CHANNEL_HANGUP_COMPLETE",
+		Headers: map[string]string{
+			"Unique-ID":    channelID,
+			"Hangup-Cause": "NORMAL_CLEARING",
+		},
+	}
+
+	got, err := TranslateFreeSWITCHEventForCall(event, callID)
+	if err != nil {
+		t.Fatalf("TranslateFreeSWITCHEventForCall() error = %v", err)
+	}
+	if got.CallID != callID {
+		t.Fatalf("call id = %s, want %s", got.CallID, callID)
+	}
+	if got.ChannelID != channelID {
+		t.Fatalf("channel id = %q, want %q", got.ChannelID, channelID)
+	}
+	if got.Type != LifecycleCancelled {
+		t.Fatalf("type = %q, want %q", got.Type, LifecycleCancelled)
+	}
+}

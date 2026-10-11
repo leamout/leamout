@@ -81,6 +81,31 @@ func subscribeFreeSWITCH(
 			}
 
 			callEvent, err := calling.TranslateFreeSWITCHEvent(event)
+			if errors.Is(err, calling.ErrUncorrelatedEvent) {
+				channelID := strings.TrimSpace(event.Header("Unique-ID"))
+				if channelID != "" {
+					callID, resolveErr := modules.callsService.ResolveChannelCallID(
+						eventCtx,
+						channelID,
+					)
+					switch {
+					case resolveErr == nil:
+						callEvent, err = calling.TranslateFreeSWITCHEventForCall(
+							event,
+							callID,
+						)
+					case errors.Is(resolveErr, calling.ErrChannelUnavailable):
+					default:
+						logger.Error(
+							eventCtx,
+							"resolve call id from FreeSWITCH channel",
+							"channel_id", channelID,
+							"error", resolveErr,
+						)
+					}
+				}
+			}
+
 			switch {
 			case errors.Is(err, calling.ErrUnsupportedEvent),
 				errors.Is(err, calling.ErrUncorrelatedEvent):

@@ -57,6 +57,23 @@ func (r *Repository) ListEnabled(ctx context.Context) ([]Policy, error) {
 	}
 	return out, nil
 }
+func (r *Repository) ListEffectiveRecordingRetention(
+	ctx context.Context,
+) ([]EffectiveRecordingRetention, error) {
+	rows, err := r.queries.ListEffectiveRecordingRetention(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]EffectiveRecordingRetention, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, EffectiveRecordingRetention{
+			OrganizationID: row.OrganizationID,
+			RetentionDays:  row.RetentionDays,
+		})
+	}
+	return out, nil
+}
+
 func (r *Repository) ListExpiredRecordings(ctx context.Context, organizationID uuid.UUID, before time.Time, batchSize int32) ([]uuid.UUID, error) {
 	return r.queries.ListExpiredRecordingsForRetention(ctx, sqlc.ListExpiredRecordingsForRetentionParams{
 		OrganizationID: organizationID,
