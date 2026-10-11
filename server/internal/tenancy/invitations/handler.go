@@ -11,9 +11,13 @@ import (
 	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
-type Handler struct{ service *Service }
+type Handler struct {
+	service *Service
+}
 
-func NewHandler(service *Service) *Handler { return &Handler{service: service} }
+func NewHandler(service *Service) *Handler {
+	return &Handler{service: service}
+}
 
 func organizationIDs(r *http.Request) (uuid.UUID, uuid.UUID, error) {
 	userID, ok := authn.UserIDFromContext(r.Context())

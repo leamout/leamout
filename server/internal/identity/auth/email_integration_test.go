@@ -444,6 +444,7 @@ func TestPasswordLoginCancelsQueuedOTP(t *testing.T) {
 	}
 	service := NewService(NewRepository(queries))
 	service.ConfigureEmail(pool, email.NewService(cipher))
+	service.ConfigureRecoveryURL("https://console.example.com/forgot-password")
 	if _, err := service.SetPassword(ctx, user.ID, "strong-test-password-123"); err != nil {
 		t.Fatal(err)
 	}
