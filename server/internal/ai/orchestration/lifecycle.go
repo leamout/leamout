@@ -143,3 +143,8 @@ func appErrorCode(err error, code string) bool {
 	var appErr *apperror.AppError
 	return errors.As(err, &appErr) && appErr.Code == code
 }
+
+// MarkMediaStarted records successfully running media in the durable session.
+func (s *Service) MarkMediaStarted(ctx context.Context, orgID, sessionID uuid.UUID) error {
+	return s.conversations.MarkMediaStarted(ctx, orgID, sessionID)
+}

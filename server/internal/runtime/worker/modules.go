@@ -45,6 +45,7 @@ type modules struct {
 	callConsumer            *calls.Consumer
 	agentRuntime            *agent.Runtime
 	callReconciliation      *calls.ReconciliationJob
+	sessionReconciliation   *sessionReconciliationJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
@@ -155,6 +156,8 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 
 	callConsumer := calls.NewConsumer(callsService)
+	sessionReconciliation := &sessionReconciliationJob{queries: queries}
+
 	callReconciliation, err := calls.NewReconciliationJob(
 		callsRepository,
 		callsService,
@@ -272,6 +275,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		callConsumer:            callConsumer,
 		agentRuntime:            agentRuntime,
 		callReconciliation:      callReconciliation,
+		sessionReconciliation:   sessionReconciliation,
 		outbox:                  outboxJob,
 		webhookConsumer:         webhooks.NewConsumer(natsClient, webhookService),
 		webhookDelivery:         webhookDeliveryJob,

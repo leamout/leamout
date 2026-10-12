@@ -62,3 +62,11 @@ func (r *Repository) ListTurns(ctx context.Context, identity Identity) ([]sqlc.V
 		OrganizationID: identity.OrganizationID, SessionID: identity.SessionID,
 	})
 }
+
+// MarkMediaStarted is idempotent; media usage begins only after audio attach.
+func (r *Repository) MarkMediaStarted(ctx context.Context, orgID, sessionID uuid.UUID) error {
+	_, err := r.queries.MarkVoiceAgentMediaStarted(ctx, sqlc.MarkVoiceAgentMediaStartedParams{
+		ID: sessionID, OrganizationID: orgID,
+	})
+	return err
+}

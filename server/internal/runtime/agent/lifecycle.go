@@ -174,6 +174,12 @@ func (r *Runtime) attach(ctx context.Context, call sqlc.Call, channelID string) 
 			failErr,
 		)
 	}
+	if err := r.orchestrator.MarkMediaStarted(ctx, call.OrganizationID, record.ID); err != nil {
+		forkErr := r.freeSwitch.StopAudioFork(ctx, channelID)
+		stopErr := r.stopMediaSession(ctx, record.ID)
+		failErr := r.failSession(ctx, call, time.Now().UTC())
+		return errors.Join(fmt.Errorf("record Voice Agent media start: %w", err), forkErr, stopErr, failErr)
+	}
 	return nil
 }
 

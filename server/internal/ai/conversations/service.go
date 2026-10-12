@@ -125,3 +125,11 @@ func conflict(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
+
+// MarkMediaStarted records the first confirmed media attachment for a session.
+func (s *Service) MarkMediaStarted(ctx context.Context, orgID, sessionID uuid.UUID) error {
+	if orgID == uuid.Nil || sessionID == uuid.Nil {
+		return apperror.NewBadRequest("organization and media session IDs are required")
+	}
+	return dbError(s.repo.MarkMediaStarted(ctx, orgID, sessionID), "mark media attached")
+}
