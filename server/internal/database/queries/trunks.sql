@@ -497,3 +497,7 @@ SELECT
 FROM trunk_endpoints AS te
 WHERE te.trunk_id = sqlc.arg(trunk_id)
 ORDER BY te.priority, te.host, te.port;
+
+-- name: CountOrganizationSIPTrunks :one
+SELECT COUNT(*)::bigint AS count FROM trunks
+WHERE organization_id = sqlc.arg(organization_id);

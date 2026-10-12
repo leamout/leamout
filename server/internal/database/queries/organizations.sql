@@ -67,3 +67,10 @@ AND tm.status = 'active'
 AND t.status = 'active'
 AND t.deleted_at IS NULL
 ORDER BY t.created_at DESC;
+
+-- name: LockOrganizationForCapacity :one
+SELECT id FROM organizations
+WHERE id = sqlc.arg(organization_id)
+  AND status = 'active'
+  AND deleted_at IS NULL
+FOR UPDATE;

@@ -83,3 +83,7 @@ WHERE va.id = sqlc.arg(id)
   AND o.id = va.organization_id
   AND o.status = 'active'
   AND o.deleted_at IS NULL;
+
+-- name: CountOrganizationVoiceAgents :one
+SELECT COUNT(*)::bigint AS count FROM voice_agents
+WHERE organization_id = sqlc.arg(organization_id);

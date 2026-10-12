@@ -41,6 +41,18 @@ func (q *Queries) ClearTrunkOutboundAuth(ctx context.Context, arg ClearTrunkOutb
 	return err
 }
 
+const countOrganizationSIPTrunks = `-- name: CountOrganizationSIPTrunks :one
+SELECT COUNT(*)::bigint AS count FROM trunks
+WHERE organization_id = $1
+`
+
+func (q *Queries) CountOrganizationSIPTrunks(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrganizationSIPTrunks, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTrunk = `-- name: CreateTrunk :one
 INSERT INTO trunks (
     id,
