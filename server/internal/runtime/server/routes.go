@@ -67,6 +67,8 @@ func newRouter(cfg config.Config, logger *logging.Logger, modules *modules) *chi
 	}
 
 	router.Route("/v1", func(r chi.Router) {
+		r.Use(middleware.Browser(cfg.FrontendURL))
+
 		r.Group(func(r chi.Router) {
 			r.Use(modules.rateLimit.HandleAuth)
 			identity.RegisterRoutes(r, modules.identity, modules.authn.RequireSession)

@@ -3,7 +3,7 @@
 import { Skeleton } from "@leamout/ui/components/skeleton";
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
-import type { AuthFlow } from "@/lib/auth/flow";
+import type { AuthFlow } from "./auth-flow-provider";
 import { useAuthFlow } from "./auth-flow-provider";
 
 export function AuthStep({

@@ -15,8 +15,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { errorMessage } from "@/lib/api";
-import { authApi } from "@/lib/auth/api";
+import { api, errorMessage } from "@/lib/api";
 import { useAuthFlow } from "./auth-flow-provider";
 import { AuthForm } from "./auth-form";
 import { AuthStep } from "./auth-step";
@@ -26,8 +25,14 @@ export function EmailVerificationForm() {
   const router = useRouter();
   const client = useQueryClient();
   const { flow, save, setRecoveryCode } = useAuthFlow();
-  const verify = useMutation({ mutationFn: authApi.verify });
-  const send = useMutation({ mutationFn: authApi.sendCode });
+  const verify = useMutation({
+    mutationFn: (body: { transaction_id: string; code: string }) =>
+      api<void>("/auth/otp/verify", { method: "POST", body }),
+  });
+  const send = useMutation({
+    mutationFn: (transaction_id: string) =>
+      api<void>("/auth/otp/send", { method: "POST", body: { transaction_id } }),
+  });
   const [now, setNow] = useState(0);
   useEffect(() => {
     setNow(Date.now());

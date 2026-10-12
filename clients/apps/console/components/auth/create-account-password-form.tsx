@@ -15,8 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { errorMessage } from "@/lib/api";
-import { authApi } from "@/lib/auth/api";
+import { api, errorMessage } from "@/lib/api";
 import { useAuthFlow } from "./auth-flow-provider";
 import { AuthForm } from "./auth-form";
 import { AuthStep } from "./auth-step";
@@ -27,7 +26,13 @@ export function CreateAccountPasswordForm() {
   const router = useRouter();
   const client = useQueryClient();
   const { flow, save } = useAuthFlow();
-  const mutation = useMutation({ mutationFn: authApi.enroll });
+  const mutation = useMutation({
+    mutationFn: (password: string) =>
+      api<void>("/auth/password/enroll", {
+        method: "POST",
+        body: { password },
+      }),
+  });
   const [notice, setNotice] = useState("");
   const form = useForm<z.infer<typeof newPasswordSchema>>({
     resolver: zodResolver(newPasswordSchema),

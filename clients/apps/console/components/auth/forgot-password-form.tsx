@@ -15,8 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { errorMessage } from "@/lib/api";
-import { authApi } from "@/lib/auth/api";
+import { api, errorMessage } from "@/lib/api";
 import { useAuthFlow } from "./auth-flow-provider";
 import { AuthForm } from "./auth-form";
 import { emailSchema } from "./schemas";
@@ -24,7 +23,13 @@ import { emailSchema } from "./schemas";
 export function ForgotPasswordForm() {
   const router = useRouter();
   const { save, ready } = useAuthFlow();
-  const start = useMutation({ mutationFn: authApi.recover });
+  const start = useMutation({
+    mutationFn: (email: string) =>
+      api<{ transaction_id: string }>("/auth/password/recovery", {
+        method: "POST",
+        body: { email },
+      }),
+  });
   const [notice, setNotice] = useState("");
   const form = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),

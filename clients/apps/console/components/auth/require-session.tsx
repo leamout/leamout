@@ -5,13 +5,24 @@ import { Skeleton } from "@leamout/ui/components/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
-import { errorMessage } from "@/lib/api";
-import { authApi } from "@/lib/auth/api";
+import { ApiError, api, errorMessage } from "@/lib/api";
 
 export function useSession() {
   return useQuery({
     queryKey: ["session"],
-    queryFn: ({ signal }) => authApi.me(signal),
+    queryFn: async ({ signal }) => {
+      try {
+        return await api<{
+          id: string;
+          email: string;
+          name?: string;
+          email_verified: boolean;
+        }>("/users/me", { signal });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 401) return null;
+        throw error;
+      }
+    },
     retry: false,
     staleTime: 0,
   });

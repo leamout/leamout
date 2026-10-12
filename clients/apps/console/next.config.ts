@@ -3,6 +3,16 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   transpilePackages: ["@leamout/ui"],
 
+  rewrites() {
+    const backendURL = (
+      process.env.BACKEND_URL ?? "http://localhost:8080"
+    ).replace(/\/+$/, "");
+
+    return [
+      { source: "/api/v1/:path*", destination: `${backendURL}/v1/:path*` },
+    ];
+  },
+
   headers() {
     return [
       {

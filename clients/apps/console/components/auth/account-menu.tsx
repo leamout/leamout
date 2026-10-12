@@ -3,9 +3,8 @@
 import { Button } from "@leamout/ui/components/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { ApiError, errorMessage } from "@/lib/api";
-import { authApi } from "@/lib/auth/api";
-import { flowKey } from "@/lib/auth/flow";
+import { ApiError, api, errorMessage } from "@/lib/api";
+import { flowKey } from "./auth-flow-provider";
 import { useSession } from "./require-session";
 
 export function AccountMenu() {
@@ -15,7 +14,7 @@ export function AccountMenu() {
   const logout = useMutation({
     mutationFn: async () => {
       try {
-        await authApi.logout();
+        await api<void>("/sessions/current", { method: "DELETE" });
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 401)) throw error;
       }

@@ -15,8 +15,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
-import { errorMessage } from "@/lib/api";
-import { authApi } from "@/lib/auth/api";
+import { api, errorMessage } from "@/lib/api";
 import { useAuthFlow } from "./auth-flow-provider";
 import { AuthForm } from "./auth-form";
 import { AuthStep } from "./auth-step";
@@ -26,7 +25,13 @@ export function ResetPasswordForm() {
   const router = useRouter();
   const client = useQueryClient();
   const { flow, save, recoveryCode } = useAuthFlow();
-  const mutation = useMutation({ mutationFn: authApi.reset });
+  const mutation = useMutation({
+    mutationFn: (body: {
+      transaction_id: string;
+      code: string;
+      password: string;
+    }) => api<void>("/auth/password/reset", { method: "POST", body }),
+  });
   const [notice, setNotice] = useState("");
   const form = useForm<z.infer<typeof newPasswordSchema>>({
     resolver: zodResolver(newPasswordSchema),
