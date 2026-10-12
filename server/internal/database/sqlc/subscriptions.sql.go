@@ -49,7 +49,7 @@ func (q *Queries) GetEffectiveOrganizationEntitlement(ctx context.Context, arg G
 }
 
 const getOrganizationSubscription = `-- name: GetOrganizationSubscription :one
-SELECT id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, created_at, updated_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at
+SELECT id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at, created_at, updated_at
 FROM subscriptions
 WHERE organization_id = $1
 LIMIT 1
@@ -68,12 +68,12 @@ func (q *Queries) GetOrganizationSubscription(ctx context.Context, organizationI
 		&i.TrialEndsAt,
 		&i.CancelAtPeriodEnd,
 		&i.CanceledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Provider,
 		&i.ProviderCustomerID,
 		&i.ProviderSubscriptionID,
 		&i.ProviderEventCreatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
@@ -125,7 +125,7 @@ DO UPDATE SET
 WHERE subscriptions.provider_event_created_at IS NULL
    OR EXCLUDED.provider_event_created_at IS NULL
    OR EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
-RETURNING id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, created_at, updated_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at
+RETURNING id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at, created_at, updated_at
 `
 
 type UpsertOrganizationSubscriptionParams struct {
@@ -171,12 +171,12 @@ func (q *Queries) UpsertOrganizationSubscription(ctx context.Context, arg Upsert
 		&i.TrialEndsAt,
 		&i.CancelAtPeriodEnd,
 		&i.CanceledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 		&i.Provider,
 		&i.ProviderCustomerID,
 		&i.ProviderSubscriptionID,
 		&i.ProviderEventCreatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }
