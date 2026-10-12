@@ -30,6 +30,7 @@ import {
 } from "@leamout/ui/components/sidebar";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { AccountMenu } from "@/components/auth/account-menu";
 import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 
 const navigation = [
@@ -127,9 +128,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
           <nav aria-label="Settings navigation">
             <SettingsSidebar />
           </nav>
-          <p className="px-2 py-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
-            Console preview · Account integration coming soon
-          </p>
+          <AccountMenu />
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>

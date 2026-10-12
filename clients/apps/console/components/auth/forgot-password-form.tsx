@@ -9,24 +9,49 @@ import {
   FieldLabel,
 } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
+import { useMutation } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
+import { api, errorMessage } from "@/lib/api";
+import { useAuthFlow } from "./auth-flow-provider";
 import { AuthForm } from "./auth-form";
 import { emailSchema } from "./schemas";
 
 export function ForgotPasswordForm() {
+  const router = useRouter();
+  const { save, ready } = useAuthFlow();
+  const start = useMutation({
+    mutationFn: (email: string) =>
+      api<{ transaction_id: string }>("/auth/password/recovery", {
+        method: "POST",
+        body: { email },
+      }),
+  });
   const [notice, setNotice] = useState("");
   const form = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
     defaultValues: { email: "" },
   });
 
-  function onSubmit() {
-    setNotice(
-      "This form is a preview. Authentication will be connected later.",
-    );
+  async function onSubmit(values: z.infer<typeof emailSchema>) {
+    setNotice("");
+    try {
+      const transaction = await start.mutateAsync(values.email);
+      save({
+        transactionId: transaction.transaction_id,
+        email: values.email,
+        intent: "recovery",
+        stage: "verification",
+        expiresAt: Date.now() + 10 * 60_000,
+        resendAt: Date.now() + 60_000,
+      });
+      router.push("/email-verification");
+    } catch (error) {
+      setNotice(errorMessage(error));
+    }
   }
 
   return (
@@ -79,11 +104,11 @@ export function ForgotPasswordForm() {
         <Button
           className="w-full"
           type="submit"
-          disabled={form.formState.isSubmitting}
+          disabled={!ready || form.formState.isSubmitting}
         >
           Continue
         </Button>
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="alert" className="text-sm text-muted-foreground">
           {notice}
         </p>
       </form>

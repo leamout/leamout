@@ -181,3 +181,26 @@ func cookieDomainValue(development bool, domain string) string {
 	}
 	return strings.TrimSpace(domain)
 }
+
+// RevokeCurrent logs out this browser without revoking other sessions.
+func (h *Handler) RevokeCurrent(w http.ResponseWriter, r *http.Request) {
+	userID, err := h.userID(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	sessionID, err := h.sessionID(r)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	if err := h.service.Revoke(r.Context(), sessionID, userID); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+
+	ClearCookie(w, h.development, h.cookieDomain)
+	w.WriteHeader(http.StatusNoContent)
+}

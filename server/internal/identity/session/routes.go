@@ -15,6 +15,7 @@ func RegisterRoutes(
 		r.Use(authMiddleware)
 
 		r.Get("/", handler.List)
+		r.Delete("/current", handler.RevokeCurrent)
 		r.Delete("/{id}", handler.Revoke)
 		r.Delete("/", handler.RevokeAll)
 	})

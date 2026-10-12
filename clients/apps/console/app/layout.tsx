@@ -2,6 +2,7 @@ import { Toaster } from "@leamout/ui/components/sonner";
 import { TooltipProvider } from "@leamout/ui/components/tooltip";
 import type { Metadata } from "next";
 import "@leamout/ui/globals.css";
+import { QueryProvider } from "@/components/query-provider";
 import { plexMono, plexSans } from "@/lib/fonts";
 
 export const metadata: Metadata = {
@@ -21,10 +22,12 @@ export default function RootLayout({
       className={`${plexSans.variable} ${plexMono.variable}`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
-        <TooltipProvider>
-          {children}
-          <Toaster richColors closeButton />
-        </TooltipProvider>
+        <QueryProvider>
+          <TooltipProvider>
+            {children}
+            <Toaster richColors closeButton />
+          </TooltipProvider>
+        </QueryProvider>
       </body>
     </html>
   );
