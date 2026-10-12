@@ -516,6 +516,8 @@ type VoiceAgentSession struct {
 	EndedAt                pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
 	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	MediaStartedAt         pgtype.Timestamptz `db:"media_started_at" json:"media_started_at"`
+	MediaEndedAt           pgtype.Timestamptz `db:"media_ended_at" json:"media_ended_at"`
 }
 
 type VoiceAgentTool struct {
