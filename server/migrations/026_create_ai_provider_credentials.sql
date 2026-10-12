@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS ai_provider_credentials (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 
     CONSTRAINT uq_ai_provider_credentials_id_organization UNIQUE (id, organization_id),
+    CONSTRAINT uq_ai_provider_credentials_scope_provider UNIQUE (id, organization_id, provider),
     CONSTRAINT uq_ai_provider_credentials_name UNIQUE (organization_id, provider, name),
     CONSTRAINT chk_ai_provider_credentials_provider
         CHECK (length(btrim(provider)) BETWEEN 1 AND 64),
@@ -45,7 +46,7 @@ CREATE TABLE IF NOT EXISTS voice_agent_provider_bindings (
     voice_agent_id UUID NOT NULL,
     role TEXT NOT NULL,
     provider TEXT NOT NULL,
-    credential_id UUID,
+    credential_id UUID NOT NULL,
     config JSONB NOT NULL DEFAULT '{}'::jsonb,
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -56,8 +57,8 @@ CREATE TABLE IF NOT EXISTS voice_agent_provider_bindings (
         REFERENCES voice_agents(id, organization_id)
         ON DELETE CASCADE,
     CONSTRAINT fk_voice_agent_provider_bindings_credential_scope
-        FOREIGN KEY (credential_id, organization_id)
-        REFERENCES ai_provider_credentials(id, organization_id)
+        FOREIGN KEY (credential_id, organization_id, provider)
+        REFERENCES ai_provider_credentials(id, organization_id, provider)
         ON DELETE RESTRICT,
 
     CONSTRAINT uq_voice_agent_provider_bindings_role

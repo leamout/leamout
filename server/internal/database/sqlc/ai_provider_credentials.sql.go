@@ -169,7 +169,7 @@ ORDER BY voice_agent_id
 
 type ListVoiceAgentIDsByAIProviderCredentialParams struct {
 	OrganizationID uuid.UUID  `db:"organization_id" json:"organization_id"`
-	CredentialID   *uuid.UUID `db:"credential_id" json:"credential_id"`
+	CredentialID   uuid.UUID  `db:"credential_id" json:"credential_id"`
 }
 
 func (q *Queries) ListVoiceAgentIDsByAIProviderCredential(ctx context.Context, arg ListVoiceAgentIDsByAIProviderCredentialParams) ([]uuid.UUID, error) {
@@ -268,7 +268,7 @@ type ResolveVoiceAgentProviderBindingsRow struct {
 	VoiceAgentID     uuid.UUID          `db:"voice_agent_id" json:"voice_agent_id"`
 	Role             string             `db:"role" json:"role"`
 	Provider         string             `db:"provider" json:"provider"`
-	CredentialID     *uuid.UUID         `db:"credential_id" json:"credential_id"`
+	CredentialID     uuid.UUID          `db:"credential_id" json:"credential_id"`
 	Config           []byte             `db:"config" json:"config"`
 	SecretCiphertext string             `db:"secret_ciphertext" json:"secret_ciphertext"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
@@ -404,7 +404,7 @@ type UpsertVoiceAgentProviderBindingParams struct {
 	VoiceAgentID   uuid.UUID  `db:"voice_agent_id" json:"voice_agent_id"`
 	Role           string     `db:"role" json:"role"`
 	Provider       string     `db:"provider" json:"provider"`
-	CredentialID   *uuid.UUID `db:"credential_id" json:"credential_id"`
+	CredentialID   uuid.UUID  `db:"credential_id" json:"credential_id"`
 	Config         []byte     `db:"config" json:"config"`
 }
 
