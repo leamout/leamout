@@ -1,9 +1,9 @@
 package limits
 
 import (
+	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"testing"
 	"time"
-	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 )
@@ -51,9 +51,9 @@ func TestSubscriptionPeriodActive(t *testing.T) {
 	now := time.Date(2026, time.October, 12, 12, 0, 0, 0, time.UTC)
 	start, end := now.Add(-time.Hour), now.Add(time.Hour)
 	cases := []struct {
-		name string
+		name         string
 		subscription *subscriptions.Subscription
-		want bool
+		want         bool
 	}{
 		{"missing", nil, false},
 		{"active", &subscriptions.Subscription{

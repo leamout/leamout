@@ -1,14 +1,14 @@
 package ai
 
 import (
+	"context"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/ai/agents"
 	"github.com/leamout/leamout/server/internal/ai/conversations"
 	"github.com/leamout/leamout/server/internal/ai/orchestration"
 	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/ai/tools"
-	"context"
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 	"github.com/leamout/leamout/server/internal/telephony/calls"
@@ -17,8 +17,8 @@ import (
 type Dependencies struct {
 	CredentialCipher *encryption.Cipher
 	Calls            *calls.Service
-	PlanAgentLimit func(context.Context, uuid.UUID)(int64,bool,error)
-	Database *pgxpool.Pool
+	PlanAgentLimit   func(context.Context, uuid.UUID) (int64, bool, error)
+	Database         *pgxpool.Pool
 }
 
 type Module struct {

@@ -6,33 +6,36 @@
 package sqlc
 
 import (
-    "context"
-    "github.com/google/uuid"
-    "github.com/jackc/pgx/v5/pgtype"
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getOrganizationRuntimeUsedSeconds = `-- name: GetOrganizationRuntimeUsedSeconds :one
 SELECT COALESCE(SUM(
     GREATEST(0, CEIL(EXTRACT(EPOCH FROM
-        LEAST(COALESCE(ended_at, CURRENT_TIMESTAMP), $2::timestamptz)
-        - GREATEST(started_at, $3::timestamptz)
+        LEAST(COALESCE(ended_at, CURRENT_TIMESTAMP), $1::timestamptz)
+        - GREATEST(started_at, $2::timestamptz)
     )))::bigint
 ), 0)::bigint AS used_seconds
 FROM voice_agent_sessions
-WHERE organization_id = $1
-  AND started_at < $2::timestamptz
-  AND (ended_at IS NULL OR ended_at > $3::timestamptz)
+WHERE organization_id = $3
+  AND started_at < $1::timestamptz
+  AND (ended_at IS NULL OR ended_at > $2::timestamptz)
 `
 
 type GetOrganizationRuntimeUsedSecondsParams struct {
-    OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-    PeriodEnd pgtype.Timestamptz `db:"period_end" json:"period_end"`
-    PeriodStart pgtype.Timestamptz `db:"period_start" json:"period_start"`
+	PeriodEnd      pgtype.Timestamptz `db:"period_end" json:"period_end"`
+	PeriodStart    pgtype.Timestamptz `db:"period_start" json:"period_start"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
+// Count each persisted Voice Agent session's overlap with the billing window.
+// A session spanning two periods contributes only the overlapping seconds.
 func (q *Queries) GetOrganizationRuntimeUsedSeconds(ctx context.Context, arg GetOrganizationRuntimeUsedSecondsParams) (int64, error) {
-    row := q.db.QueryRow(ctx, getOrganizationRuntimeUsedSeconds, arg.OrganizationID, arg.PeriodEnd, arg.PeriodStart)
-    var seconds int64
-    err := row.Scan(&seconds)
-    return seconds, err
+	row := q.db.QueryRow(ctx, getOrganizationRuntimeUsedSeconds, arg.PeriodEnd, arg.PeriodStart, arg.OrganizationID)
+	var used_seconds int64
+	err := row.Scan(&used_seconds)
+	return used_seconds, err
 }

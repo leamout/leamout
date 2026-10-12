@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5"
-	"github.com/leamout/leamout/server/pkg/apperror"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
-type Repository struct{
+type Repository struct {
 	queries *sqlc.Queries
-	db *pgxpool.Pool
+	db      *pgxpool.Pool
 }
 
 func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }

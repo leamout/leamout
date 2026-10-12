@@ -86,13 +86,15 @@ func (s *Service) SetPlanConcurrencyResolver(
 	s.planConcurrency = resolve
 }
 
-func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context,uuid.UUID)error) {
-	s.runtimeAllowance=check
+func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context, uuid.UUID) error) {
+	s.runtimeAllowance = check
 }
 
-func (s *Service) requireRuntimeAllowance(ctx context.Context,organizationID uuid.UUID)error{
-	if s.runtimeAllowance==nil {return apperror.NewServiceUnavailable("runtime allowance service unavailable",nil)}
-	return s.runtimeAllowance(ctx,organizationID)
+func (s *Service) requireRuntimeAllowance(ctx context.Context, organizationID uuid.UUID) error {
+	if s.runtimeAllowance == nil {
+		return apperror.NewServiceUnavailable("runtime allowance service unavailable", nil)
+	}
+	return s.runtimeAllowance(ctx, organizationID)
 }
 
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Call, error) {
@@ -103,8 +105,10 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return sqlc.Call{}, err
 	}
-	if req.VoiceAgentID!=nil {
-		if err:=s.requireRuntimeAllowance(ctx,organizationID);err!=nil{return sqlc.Call{},err}
+	if req.VoiceAgentID != nil {
+		if err := s.requireRuntimeAllowance(ctx, organizationID); err != nil {
+			return sqlc.Call{}, err
+		}
 	}
 	if req.VoiceAgentID != nil {
 		if err := s.requireVoiceAgentReady(
@@ -281,8 +285,8 @@ func (s *Service) AdmitInbound(
 		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
 	}
 
-	if err:=s.requireRuntimeAllowance(ctx,req.OrganizationID);err!=nil{
-		return sqlc.Call{},s.rejectInbound(ctx,req.ChannelID,err)
+	if err := s.requireRuntimeAllowance(ctx, req.OrganizationID); err != nil {
+		return sqlc.Call{}, s.rejectInbound(ctx, req.ChannelID, err)
 	}
 	if err := s.acquireOrganizationAdmission(
 		ctx,

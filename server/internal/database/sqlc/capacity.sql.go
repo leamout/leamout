@@ -6,10 +6,34 @@
 package sqlc
 
 import (
-    "context"
+	"context"
 
-    "github.com/google/uuid"
+	"github.com/google/uuid"
 )
+
+const countOrganizationSIPTrunks = `-- name: CountOrganizationSIPTrunks :one
+SELECT COUNT(*)::bigint AS count FROM trunks
+WHERE organization_id = $1
+`
+
+func (q *Queries) CountOrganizationSIPTrunks(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrganizationSIPTrunks, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countOrganizationVoiceAgents = `-- name: CountOrganizationVoiceAgents :one
+SELECT COUNT(*)::bigint AS count FROM voice_agents
+WHERE organization_id = $1
+`
+
+func (q *Queries) CountOrganizationVoiceAgents(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrganizationVoiceAgents, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const lockOrganizationForCapacity = `-- name: LockOrganizationForCapacity :one
 SELECT id FROM organizations
@@ -20,32 +44,8 @@ FOR UPDATE
 `
 
 func (q *Queries) LockOrganizationForCapacity(ctx context.Context, organizationID uuid.UUID) (uuid.UUID, error) {
-    row := q.db.QueryRow(ctx, lockOrganizationForCapacity, organizationID)
-    var id uuid.UUID
-    err := row.Scan(&id)
-    return id, err
-}
-
-const countOrganizationVoiceAgents = `-- name: CountOrganizationVoiceAgents :one
-SELECT COUNT(*)::bigint AS count FROM voice_agents
-WHERE organization_id = $1
-`
-
-func (q *Queries) CountOrganizationVoiceAgents(ctx context.Context, organizationID uuid.UUID) (int64, error) {
-    row := q.db.QueryRow(ctx, countOrganizationVoiceAgents, organizationID)
-    var count int64
-    err := row.Scan(&count)
-    return count, err
-}
-
-const countOrganizationSIPTrunks = `-- name: CountOrganizationSIPTrunks :one
-SELECT COUNT(*)::bigint AS count FROM trunks
-WHERE organization_id = $1
-`
-
-func (q *Queries) CountOrganizationSIPTrunks(ctx context.Context, organizationID uuid.UUID) (int64, error) {
-    row := q.db.QueryRow(ctx, countOrganizationSIPTrunks, organizationID)
-    var count int64
-    err := row.Scan(&count)
-    return count, err
+	row := q.db.QueryRow(ctx, lockOrganizationForCapacity, organizationID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
 }

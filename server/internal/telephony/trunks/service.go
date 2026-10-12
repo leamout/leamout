@@ -18,11 +18,11 @@ import (
 )
 
 type Service struct {
-	repo   *Repository
-	db     *pgxpool.Pool
-	outbox *outbox.Repository
-	cipher *encryption.Cipher
-	planTrunkLimit func(context.Context,uuid.UUID)(int64,bool,error)
+	repo           *Repository
+	db             *pgxpool.Pool
+	outbox         *outbox.Repository
+	cipher         *encryption.Cipher
+	planTrunkLimit func(context.Context, uuid.UUID) (int64, bool, error)
 }
 
 func NewService(
@@ -41,8 +41,8 @@ func NewService(
 	return service
 }
 
-func (s *Service) SetPlanTrunkLimit(limit func(context.Context,uuid.UUID)(int64,bool,error)) {
-	s.planTrunkLimit=limit
+func (s *Service) SetPlanTrunkLimit(limit func(context.Context, uuid.UUID) (int64, bool, error)) {
+	s.planTrunkLimit = limit
 }
 
 func (s *Service) Create(
@@ -132,11 +132,19 @@ func (s *Service) Create(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if s.planTrunkLimit==nil{return sqlc.Trunk{},apperror.NewServiceUnavailable("plan trunk limits unavailable",nil)}
-	cap,limited,limitErr:=s.planTrunkLimit(ctx,organizationID)
-	if limitErr!=nil{return sqlc.Trunk{},limitErr}
-	if !limited||cap<=0{return sqlc.Trunk{},apperror.NewServiceUnavailable("plan trunk limit is required",nil)}
-	if err:=s.repo.LockAndCheckTrunkCapacity(ctx,tx,organizationID,cap);err!=nil{return sqlc.Trunk{},err}
+	if s.planTrunkLimit == nil {
+		return sqlc.Trunk{}, apperror.NewServiceUnavailable("plan trunk limits unavailable", nil)
+	}
+	cap, limited, limitErr := s.planTrunkLimit(ctx, organizationID)
+	if limitErr != nil {
+		return sqlc.Trunk{}, limitErr
+	}
+	if !limited || cap <= 0 {
+		return sqlc.Trunk{}, apperror.NewServiceUnavailable("plan trunk limit is required", nil)
+	}
+	if err := s.repo.LockAndCheckTrunkCapacity(ctx, tx, organizationID, cap); err != nil {
+		return sqlc.Trunk{}, err
+	}
 
 	transactionRepo := s.repo.WithTx(tx)
 	item, err := transactionRepo.Create(ctx, sqlc.CreateTrunkParams{

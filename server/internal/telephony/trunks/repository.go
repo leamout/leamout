@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Repository struct {

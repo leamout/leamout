@@ -11,15 +11,15 @@ import (
 )
 
 type Service struct {
-	agents        *agents.Service
-	conversations *conversations.Service
-	tools         *tools.Executor
-	providers     *providers.Service
-	runtimeAllowance func(context.Context,uuid.UUID)error
+	agents           *agents.Service
+	conversations    *conversations.Service
+	tools            *tools.Executor
+	providers        *providers.Service
+	runtimeAllowance func(context.Context, uuid.UUID) error
 }
 
-func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context,uuid.UUID)error){
-	s.runtimeAllowance=check
+func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context, uuid.UUID) error) {
+	s.runtimeAllowance = check
 }
 
 func NewService(
