@@ -21,7 +21,6 @@ type Service struct {
 	cipher   *encryption.Cipher
 	catalog  *aicatalog.Catalog
 	verifier *Verifier
-	platform PlatformCredentials
 }
 
 func NewService(
@@ -36,10 +35,6 @@ func NewService(
 		catalog:  providerCatalog,
 		verifier: NewVerifier(providerCatalog),
 	}
-}
-
-func (s *Service) ConfigurePlatformCredentials(values PlatformCredentials) {
-	s.platform = values
 }
 
 func firstCatalog(catalogs []*aicatalog.Catalog) *aicatalog.Catalog {
@@ -315,8 +310,8 @@ func (s *Service) UpsertBinding(
 			"provider is not compatible with Voice Agent role",
 		)
 	}
-	if req.CredentialID != nil && *req.CredentialID == uuid.Nil {
-		return Binding{}, apperror.NewBadRequest("credential_id is invalid")
+	if req.CredentialID == nil || *req.CredentialID == uuid.Nil {
+		return Binding{}, apperror.NewBadRequest("credential_id is required for BYOA")
 	}
 
 	if len(req.Config) == 0 {
@@ -326,20 +321,18 @@ func (s *Service) UpsertBinding(
 		return Binding{}, err
 	}
 
-	if req.CredentialID != nil {
-		credential, _, err := s.repo.GetCredentialCiphertext(
-			ctx,
-			organizationID,
-			*req.CredentialID,
+	credential, _, err := s.repo.GetCredentialCiphertext(
+		ctx,
+		organizationID,
+		*req.CredentialID,
+	)
+	if err != nil {
+		return Binding{}, dbError(err, "AI provider credential not found")
+	}
+	if credential.Provider != req.Provider {
+		return Binding{}, apperror.NewBadRequest(
+			"credential provider does not match binding provider",
 		)
-		if err != nil {
-			return Binding{}, dbError(err, "AI provider credential not found")
-		}
-		if credential.Provider != req.Provider {
-			return Binding{}, apperror.NewBadRequest(
-				"credential provider does not match binding provider",
-			)
-		}
 	}
 
 	value, err := s.repo.UpsertBinding(
@@ -376,11 +369,9 @@ func (s *Service) BindingStatuses(
 		}
 
 		if binding.CredentialID == nil {
-			if !s.platform.Has(binding.Provider) {
-				code := "platform_credential_missing"
-				status.ConnectionState = ConnectionUnavailable
-				status.FailureCode = &code
-			}
+			code := "organization_integration_required"
+			status.ConnectionState = ConnectionUnavailable
+			status.FailureCode = &code
 			result = append(result, status)
 			continue
 		}
@@ -471,7 +462,6 @@ func (s *Service) Resolve(
 	for _, row := range rows {
 		secret, err := s.resolveSecret(
 			organizationID,
-			row.Provider,
 			row.CredentialID,
 			row.SecretCiphertext,
 		)
@@ -530,7 +520,6 @@ func (s *Service) ResolveSnapshot(
 
 		secret, err := s.resolveSecret(
 			organizationID,
-			binding.Provider,
 			binding.CredentialID,
 			ciphertext,
 		)
@@ -549,17 +538,12 @@ func (s *Service) ResolveSnapshot(
 
 func (s *Service) resolveSecret(
 	organizationID uuid.UUID,
-	provider string,
 	credentialID *uuid.UUID,
 	ciphertext *string,
 ) (string, error) {
-	if credentialID == nil {
-		if secret, ok := s.platform.Get(provider); ok {
-			return secret, nil
-		}
-		return "", apperror.NewServiceUnavailable(
-			"platform AI credential is unavailable for provider",
-			nil,
+	if credentialID == nil || *credentialID == uuid.Nil {
+		return "", apperror.NewConflict(
+			"organization AI integration is required for provider execution",
 		)
 	}
 	if s.cipher == nil {

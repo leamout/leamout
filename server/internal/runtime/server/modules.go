@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/leamout/leamout/server/internal/ai"
-	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity"
@@ -167,15 +166,6 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		PlatformCredentials: providers.PlatformCredentials{
-			OpenAI:     cfg.OpenAIAPIKey,
-			Gemini:     cfg.GeminiAPIKey,
-			Deepgram:   cfg.DeepgramAPIKey,
-			AssemblyAI: cfg.AssemblyAIAPIKey,
-			Groq:       cfg.GroqAPIKey,
-			Cartesia:   cfg.CartesiaAPIKey,
-			ElevenLabs: cfg.ElevenLabsAPIKey,
-		},
 		Calls: telephonyModule.Calls.Service,
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(

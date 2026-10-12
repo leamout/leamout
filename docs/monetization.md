@@ -124,9 +124,8 @@ and adds the appropriate support, security, governance, and contractual terms.
 
 ## AI providers
 
-AI-provider credentials remain organization-scoped and customer-owned in both
-deployment models unless a future commercial offering explicitly changes that
-policy. Voice Agents bind credentials for STT, LLM, TTS, or Realtime providers;
+AI-provider credentials are organization-scoped and customer-owned in both
+deployment models. No platform AI key fallback is available for voice agents. Voice Agents bind credentials for STT, LLM, TTS, or Realtime providers;
 provider-specific settings remain part of the agent/provider configuration.
 
 ```text

@@ -79,33 +79,34 @@ func (s *Service) Readiness(
 			))
 			continue
 		}
-		if status.ConnectionState != providers.ConnectionReady {
-			code := "integration_not_ready"
-			field := "bindings." + role + ".integration_id"
-			message := fmt.Sprintf(
-				"The %s integration is not ready.",
-				status.Provider,
-			)
-			remediation := "Verify or rotate the integration, then run readiness again."
-			if status.IntegrationID == nil {
-				code = "platform_credential_unavailable"
-				field = "bindings." + role + ".provider"
-				message = fmt.Sprintf(
-					"The platform credential for %s is unavailable.",
-					status.Provider,
-				)
-				remediation = "Configure the provider API key for this deployment or bind an organization integration."
-			}
-			report.Issues = append(report.Issues, readinessIssue(
-				code,
-				field,
-				message,
-				remediation,
-			))
+		if status.IntegrationID == nil ||
+			status.ConnectionState != providers.ConnectionReady {
+			report.Issues = append(report.Issues, providerBindingReadinessIssue(role, status))
 		}
 	}
 	report.Ready = len(report.Issues) == 0
 	return report, nil
+}
+
+func providerBindingReadinessIssue(
+	role string,
+	status providers.BindingStatus,
+) ReadinessIssue {
+	field := "bindings." + role + ".integration_id"
+	if status.IntegrationID == nil {
+		return readinessIssue(
+			"missing_organization_integration",
+			field,
+			fmt.Sprintf("The %s role requires an organization-owned AI integration.", role),
+			"Connect and verify an organization AI integration for this role.",
+		)
+	}
+	return readinessIssue(
+		"integration_not_ready",
+		field,
+		fmt.Sprintf("The %s integration is not ready.", status.Provider),
+		"Verify or rotate the integration, then run readiness again.",
+	)
 }
 
 func expectedRoles(engine string) map[string]struct{} {

@@ -6,7 +6,7 @@ yourself or use Leamout Cloud.**
 Leamout sits between customer-owned telephony infrastructure and realtime AI
 systems. It owns the runtime required to establish, control, process, and
 observe autonomous voice calls while customers keep their carrier relationships,
-phone numbers, SIP trunks, PBXs, and carrier billing.
+phone numbers, SIP trunks, PBXs, AI provider accounts, and provider billing.
 
 Leamout is not a general-purpose CPaaS, telecom reseller, or managed carrier.
 
@@ -140,9 +140,11 @@ The media runtime supports two engine models:
 - **Integrated**: an end-to-end realtime voice model.
 
 Current provider integrations include Deepgram, Groq, Cartesia, and OpenAI
-Realtime. Provider packages adapt external protocols into Leamout's
-provider-neutral media contracts; providers do not define the product
-architecture.
+Realtime. Every active provider binding must reference a verified,
+organization-owned AI integration. Missing integrations block agent readiness
+and runtime execution; deployment-global keys are not used as fallback.
+Provider packages adapt external protocols into Leamout's provider-neutral
+media contracts; providers do not define the product architecture.
 
 ## Media path
 
