@@ -13,6 +13,7 @@ import (
 // browser origin headers can continue to authenticate through the API directly.
 func Browser(frontendURL string) func(http.Handler) http.Handler {
 	trustedOrigin := ""
+
 	if parsed, err := url.Parse(frontendURL); err == nil && parsed.Host != "" {
 		trustedOrigin = parsed.Scheme + "://" + parsed.Host
 	}
@@ -24,24 +25,35 @@ func Browser(frontendURL string) func(http.Handler) http.Handler {
 			switch r.Method {
 			case http.MethodGet, http.MethodHead, http.MethodOptions:
 				next.ServeHTTP(w, r)
+
 				return
 			}
 
 			origin := r.Header.Get("Origin")
+
 			if (origin != "" && origin != trustedOrigin) ||
 				(origin == "" && r.Header.Get("Sec-Fetch-Site") == "cross-site") {
 				httputil.JSON(w, http.StatusForbidden, httputil.Response{
-					Error: &httputil.ErrorObj{Code: "FORBIDDEN", Message: "Request origin is not allowed"},
+					Error: &httputil.ErrorObj{
+						Code:    "FORBIDDEN",
+						Message: "Request origin is not allowed",
+					},
 				})
+
 				return
 			}
 
 			if r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/auth/") {
 				mediaType, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+
 				if err != nil || mediaType != "application/json" {
 					httputil.JSON(w, http.StatusUnsupportedMediaType, httputil.Response{
-						Error: &httputil.ErrorObj{Code: "UNSUPPORTED_MEDIA_TYPE", Message: "Content-Type must be application/json"},
+						Error: &httputil.ErrorObj{
+							Code:    "UNSUPPORTED_MEDIA_TYPE",
+							Message: "Content-Type must be application/json",
+						},
 					})
+
 					return
 				}
 			}
