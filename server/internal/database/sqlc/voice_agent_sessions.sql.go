@@ -33,7 +33,7 @@ SET
 WHERE session.id = $7
   AND session.organization_id = $8
   AND session.state = 'active'
-RETURNING session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at
+RETURNING session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at, session.media_started_at, session.media_ended_at
 `
 
 type CompleteVoiceAgentSessionParams struct {
@@ -181,7 +181,7 @@ func (q *Queries) CreateVoiceAgentSession(ctx context.Context, arg CreateVoiceAg
 }
 
 const getActiveVoiceAgentSessionByCallID = `-- name: GetActiveVoiceAgentSessionByCallID :one
-SELECT session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at
+SELECT session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at, session.media_started_at, session.media_ended_at
 FROM voice_agent_sessions AS session
 JOIN organizations AS o ON o.id = session.organization_id
 WHERE session.organization_id = $1
@@ -246,8 +246,9 @@ type GetOrganizationRuntimeUsedSecondsParams struct {
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
 }
 
-// Count each persisted Voice Agent session's overlap with the billing window.
-// A session spanning two periods contributes only the overlapping seconds.
+// Count only confirmed media attachment time, excluding session setup.
+// Intersect the audio interval with the requested subscription period. A
+// terminal call bounds unfinished sessions even before reconciliation runs.
 func (q *Queries) GetOrganizationRuntimeUsedSeconds(ctx context.Context, arg GetOrganizationRuntimeUsedSecondsParams) (int64, error) {
 	row := q.db.QueryRow(ctx, getOrganizationRuntimeUsedSeconds, arg.PeriodEnd, arg.PeriodStart, arg.OrganizationID)
 	var used_seconds int64
@@ -255,55 +256,8 @@ func (q *Queries) GetOrganizationRuntimeUsedSeconds(ctx context.Context, arg Get
 	return used_seconds, err
 }
 
-const markVoiceAgentMediaStarted = `-- name: MarkVoiceAgentMediaStarted :one
-UPDATE voice_agent_sessions AS session
-SET media_started_at = COALESCE(session.media_started_at, GREATEST(session.started_at, NOW())),
-    updated_at = NOW()
-WHERE session.id = $1
-  AND session.organization_id = $2
-  AND session.state = 'active'
-RETURNING session.media_started_at
-`
-
-type MarkVoiceAgentMediaStartedParams struct {
-	ID uuid.UUID `db:"id" json:"id"`
-	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
-}
-
-func (q *Queries) MarkVoiceAgentMediaStarted(ctx context.Context, arg MarkVoiceAgentMediaStartedParams) (pgtype.Timestamptz, error) {
-	row := q.db.QueryRow(ctx, markVoiceAgentMediaStarted, arg.ID, arg.OrganizationID)
-	var started pgtype.Timestamptz
-	err := row.Scan(&started)
-	return started, err
-}
-
-const reconcileTerminatedVoiceAgentSessions = `-- name: ReconcileTerminatedVoiceAgentSessions :execrows
-UPDATE voice_agent_sessions AS session
-SET state = calls.state,
-    ended_at = GREATEST(session.started_at, calls.ended_at),
-    media_ended_at = CASE WHEN session.media_started_at IS NOT NULL
-        THEN GREATEST(session.media_started_at,
-                      LEAST(COALESCE(session.media_ended_at, calls.ended_at), calls.ended_at))
-        ELSE NULL END,
-    updated_at = NOW()
-FROM calls
-WHERE calls.id = session.call_id
-  AND calls.organization_id = session.organization_id
-  AND calls.state IN ('completed', 'failed', 'cancelled')
-  AND calls.ended_at IS NOT NULL
-  AND session.state = 'active'
-`
-
-func (q *Queries) ReconcileTerminatedVoiceAgentSessions(ctx context.Context) (int64, error) {
-	result, err := q.db.Exec(ctx, reconcileTerminatedVoiceAgentSessions)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getVoiceAgentSessionByID = `-- name: GetVoiceAgentSessionByID :one
-SELECT session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at
+SELECT session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at, session.media_started_at, session.media_ended_at
 FROM voice_agent_sessions AS session
 WHERE session.id = $1
   AND session.organization_id = $2
@@ -338,4 +292,55 @@ func (q *Queries) GetVoiceAgentSessionByID(ctx context.Context, arg GetVoiceAgen
 		&i.MediaEndedAt,
 	)
 	return i, err
+}
+
+const markVoiceAgentMediaStarted = `-- name: MarkVoiceAgentMediaStarted :one
+UPDATE voice_agent_sessions AS session
+SET media_started_at = COALESCE(session.media_started_at, GREATEST(session.started_at, NOW())),
+    updated_at = NOW()
+WHERE session.id = $1
+  AND session.organization_id = $2
+  AND session.state = 'active'
+RETURNING session.media_started_at
+`
+
+type MarkVoiceAgentMediaStartedParams struct {
+	ID             uuid.UUID `db:"id" json:"id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+// Called after an audio fork and clock are running. Repeated events do not
+// reset the authoritative start timestamp.
+func (q *Queries) MarkVoiceAgentMediaStarted(ctx context.Context, arg MarkVoiceAgentMediaStartedParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, markVoiceAgentMediaStarted, arg.ID, arg.OrganizationID)
+	var media_started_at pgtype.Timestamptz
+	err := row.Scan(&media_started_at)
+	return media_started_at, err
+}
+
+const reconcileTerminatedVoiceAgentSessions = `-- name: ReconcileTerminatedVoiceAgentSessions :execrows
+UPDATE voice_agent_sessions AS session
+SET state = calls.state,
+    ended_at = GREATEST(session.started_at, calls.ended_at),
+    media_ended_at = CASE WHEN session.media_started_at IS NOT NULL
+        THEN GREATEST(session.media_started_at,
+                      LEAST(COALESCE(session.media_ended_at, calls.ended_at), calls.ended_at))
+        ELSE NULL END,
+    updated_at = NOW()
+FROM calls
+WHERE calls.id = session.call_id
+  AND calls.organization_id = session.organization_id
+  AND calls.state IN ('completed', 'failed', 'cancelled')
+  AND calls.ended_at IS NOT NULL
+  AND session.state = 'active'
+`
+
+// Terminal calls provide a durable bound for sessions left active by a worker
+// crash or missed event. This update is idempotent and tenant-scoped.
+func (q *Queries) ReconcileTerminatedVoiceAgentSessions(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, reconcileTerminatedVoiceAgentSessions)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
