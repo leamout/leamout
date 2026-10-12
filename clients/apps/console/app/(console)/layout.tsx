@@ -1,3 +1,4 @@
+import { RequireSession } from "@/components/auth/require-session";
 import { ConsoleShell } from "@/components/console-shell";
 
 export default function ConsoleLayout({
@@ -5,5 +6,9 @@ export default function ConsoleLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <ConsoleShell>{children}</ConsoleShell>;
+  return (
+    <RequireSession>
+      <ConsoleShell>{children}</ConsoleShell>
+    </RequireSession>
+  );
 }

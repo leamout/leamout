@@ -1,12 +1,23 @@
 # Leamout console
 
-Auth pages live in `app/(auth)`, each using a dedicated form in `components/auth`. React Hook Form and Zod handle form validation. The shared AuthForm handles presentation; each dedicated form handles its own preview submission feedback.
+Authentication uses React Hook Form and Zod for form validation, TanStack Query for API mutations and session queries, and a small AuthFlowProvider for progress across auth pages.
 
-Onboarding pages live in `app/(onboarding)`, with dedicated components in `components/onboarding`. `/create-organization` validates an organization name. `/organizations` displays an empty state by default; the selector component also supports an organization list for UI previews.
+Run `bun install` from `clients`, then `bun run dev` from `clients/apps/console`. The console listens on http://localhost:3001. Its server-side API proxy uses `BACKEND_URL` (default http://localhost:8080); set it in the console's `.env.local` when the Go API runs elsewhere. No backend URL or session token is exposed in the browser bundle.
 
-Console pages live in `app/(console)` with the sidebar.
+For local Go development, set `APP_ENV=development` and `FRONTEND_URL=http://localhost:3001` in `server/.env`. The backend must be running with its dependencies and SES worker for email codes. In production, serve the console over HTTPS and configure the backend `DOMAIN` so its session cookie covers the console hostname (or leave it empty for a host-only cookie). Do not point BACKEND_URL at the console's own `/api` proxy.
 
-These pages are UI previews. No API requests, transaction storage, sessions, or backend guards are integrated. Submitting forms displays a preview notice without creating accounts or organizations. Links allow reviewing the page designs.
+## Authentication
+
+- Login starts a transaction, then accepts a password or sends an email code.
+- Signup sends and verifies a code before enrolling a password with the new HttpOnly session.
+- Recovery starts with an email and collects a code, then submits the code and replacement password together to `/auth/password/reset`. The recovery code is verified by the backend at that final step. Refreshing the reset page requires entering the code again.
+- The transaction ID, email, intent, stage, and local expiry/cooldown hints are stored in sessionStorage. Passwords and codes are never persisted. The backend enforces all transaction and session validity.
+- Console and onboarding layouts check `/users/me` before displaying their content. API authorization remains enforced by Go. Network errors show retry controls; an expired session returns to login.
+- Logout revokes only the current session, clears the cookie and private query cache, and returns to login.
+
+The same-origin Next route handler forwards an explicit set of auth endpoints, rejects cross-origin writes, and forwards HttpOnly cookies. The Go auth limiter currently counts the proxy peer IP, so its existing 30 requests/minute budget is shared by browsers using that proxy. Forwarded client IP headers are not accepted in this integration.
+
+Organization selection and other resource pages remain previews and are not integrated in this PR. Successful authentication opens the console overview.
 
 ## Console route structure
 

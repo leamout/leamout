@@ -1,0 +1,57 @@
+"use client";
+
+import { Button } from "@leamout/ui/components/button";
+import { Skeleton } from "@leamout/ui/components/skeleton";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { type ReactNode, useEffect } from "react";
+import { errorMessage } from "@/lib/api";
+import { authApi } from "@/lib/auth/api";
+
+export function useSession() {
+  return useQuery({
+    queryKey: ["session"],
+    queryFn: ({ signal }) => authApi.me(signal),
+    retry: false,
+    staleTime: 0,
+  });
+}
+
+export function RequireSession({ children }: { children: ReactNode }) {
+  const session = useSession();
+  const router = useRouter();
+  const client = useQueryClient();
+
+  useEffect(() => {
+    if (session.data === null) {
+      client.removeQueries({
+        predicate: (query) => query.queryKey[0] !== "session",
+      });
+      router.replace("/log-in");
+    }
+  }, [session.data, router, client]);
+
+  if (session.isError) {
+    return (
+      <div className="m-auto space-y-4 p-6" role="alert">
+        <p>{errorMessage(session.error)}</p>
+        <Button onClick={() => session.refetch()}>Try again</Button>
+      </div>
+    );
+  }
+
+  if (!session.data) {
+    return (
+      <div
+        className="mx-auto w-full max-w-sm space-y-4 p-8"
+        role="status"
+        aria-label="Checking your session"
+      >
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-12 w-full" />
+      </div>
+    );
+  }
+
+  return children;
+}
