@@ -1,12 +1,3 @@
-import { constructMetadata } from "@/lib/metadata";
-
-export const metadata = constructMetadata({
-  title: "Carrier-grade runtime for autonomous voice agents",
-  description:
-    "Leamout is the carrier-grade runtime and control plane for autonomous voice agents.",
-  path: "/",
-});
-
 export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
