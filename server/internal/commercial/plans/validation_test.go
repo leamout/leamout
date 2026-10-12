@@ -18,8 +18,11 @@ func TestValidateUpsert(t *testing.T) {
 			"retention_policies": true,
 		},
 		Limits: map[string]int64{
-			LimitMaxConcurrentCalls: 10,
-			LimitRetentionDays:      14,
+			LimitMaxConcurrentCalls:    10,
+			LimitRetentionDays:         14,
+			LimitMonthlyRuntimeMinutes: 2000,
+			LimitMaxVoiceAgents:        5,
+			LimitMaxSIPTrunks:          3,
 		},
 		Status: StatusActive,
 	})

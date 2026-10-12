@@ -97,10 +97,29 @@ need to run customer-side nodes: we operate the infrastructure beneath these
 product concepts, including the established SIP, media, and agent execution
 components.
 
-Cloud is subscription-led. Subscription packaging may vary by product
-capabilities, capacity, retention, governance, and support, but this document
-does not define exact prices. Customers continue to connect and pay their own
-carrier and AI-provider accounts.
+Cloud is subscription-led. Customers connect and pay for their own
+carriers and AI providers. Subscription prices and included capacity below are
+initial product hypotheses subject to infrastructure benchmarks and customer
+validation. They are not usage-based telecom or AI charges.
+
+| Plan | USD/month | Concurrent calls | Monthly runtime minutes | Voice agents | SIP trunks | Retention |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Free | $0 | 1 | 100 | 1 | 1 | 1 day |
+| Developer | $79 | 3 | 2,000 | 5 | 3 | 14 days |
+| Pro | $299 | 15 | 10,000 | 25 | 10 | 30 days |
+| Scale | $799 | 40 | 30,000 | 100 | 30 | 90 days |
+| Enterprise | Custom | Contract | Contract | Contract | Contract | Contract |
+
+The monthly runtime allowance measures Leamout-hosted voice-agent runtime, not
+carrier billing minutes or provider STT/LLM/TTS usage. The intended overage
+policy is **no automatic overage charges**: let established calls finish,
+reject new Voice Agent sessions after allowance exhaustion, and reset usage at
+the next subscription billing period. Monthly allowances must be enforced in
+the backend before these tiers are published. Recordings and storage require
+separate measured retention and storage budgets.
+
+Self-hosted capacity is operated and paid for by the customer and requires
+separate licensing terms, not automatically the Cloud subscription quotas.
 
 ## Enterprise packaging
 

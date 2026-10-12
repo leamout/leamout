@@ -2,12 +2,19 @@ package agents
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
-type Repository struct{ queries *sqlc.Queries }
+type Repository struct {
+	queries *sqlc.Queries
+	db      *pgxpool.Pool
+}
 
 func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }
 
@@ -58,4 +65,59 @@ func (r *Repository) Update(ctx context.Context, organizationID, id uuid.UUID, r
 
 func (r *Repository) Disable(ctx context.Context, organizationID, id uuid.UUID) error {
 	return r.queries.DisableVoiceAgent(ctx, sqlc.DisableVoiceAgentParams{ID: id, OrganizationID: organizationID})
+}
+
+// SetDatabase enables serialized organization creation capacity checks.
+func (r *Repository) SetDatabase(db *pgxpool.Pool) {
+	r.db = db
+}
+
+// CreateWithLimit serializes creates per organization. The LIMIT applies to
+// all Voice Agent records, including disabled ones.
+func (r *Repository) CreateWithLimit(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	req CreateRequest,
+	maxAgents int64,
+) (sqlc.VoiceAgent, error) {
+	if r.db == nil {
+		return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("Voice Agent capacity store is unavailable", nil)
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	queries := r.queries.WithTx(tx)
+	if _, err := queries.LockOrganizationForCapacity(ctx, organizationID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return sqlc.VoiceAgent{}, apperror.NewNotFound("organization not found")
+		}
+		return sqlc.VoiceAgent{}, err
+	}
+	count, err := queries.CountOrganizationVoiceAgents(ctx, organizationID)
+	if err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	if count >= maxAgents {
+		return sqlc.VoiceAgent{}, apperror.NewPaymentRequired("organization Voice Agent limit reached")
+	}
+	agent, err := queries.CreateVoiceAgent(ctx, sqlc.CreateVoiceAgentParams{
+		OrganizationID:     organizationID,
+		Name:               req.Name,
+		Engine:             req.Engine,
+		Instructions:       req.Instructions,
+		Voice:              req.Voice,
+		Language:           req.Language,
+		EngineConfig:       []byte(req.EngineConfig),
+		InterruptionPolicy: req.InterruptionPolicy,
+		RecordingPolicy:    req.RecordingPolicy,
+	})
+	if err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	return agent, nil
 }

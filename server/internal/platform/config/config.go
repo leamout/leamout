@@ -21,6 +21,7 @@ type StripeConfig struct {
 	WebhookSecret    string `env:"WEBHOOK_SECRET"`
 	DeveloperPriceID string `env:"DEVELOPER_PRICE_ID"`
 	ProPriceID       string `env:"PRO_PRICE_ID"`
+	ScalePriceID     string `env:"SCALE_PRICE_ID"`
 }
 
 type AWSConfig struct {
@@ -81,6 +82,7 @@ func (c *Config) normalize() {
 	c.Stripe.WebhookSecret = strings.TrimSpace(c.Stripe.WebhookSecret)
 	c.Stripe.DeveloperPriceID = strings.TrimSpace(c.Stripe.DeveloperPriceID)
 	c.Stripe.ProPriceID = strings.TrimSpace(c.Stripe.ProPriceID)
+	c.Stripe.ScalePriceID = strings.TrimSpace(c.Stripe.ScalePriceID)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
 	c.FrontendURL = strings.TrimRight(strings.TrimSpace(c.FrontendURL), "/")

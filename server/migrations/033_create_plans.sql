@@ -77,7 +77,10 @@ VALUES
         }'::jsonb,
         '{
             "max_concurrent_calls": 1,
-            "retention_days": 1
+            "retention_days": 1,
+            "monthly_runtime_minutes": 100,
+            "max_voice_agents": 1,
+            "max_sip_trunks": 1
         }'::jsonb,
         'active'
     ),
@@ -87,7 +90,7 @@ VALUES
         'For developers and small production voice-agent deployments.',
         'fixed',
         'USD',
-        4900,
+        7900,
         'month',
         '{
             "sso": false,
@@ -97,8 +100,11 @@ VALUES
             "private_networking": false
         }'::jsonb,
         '{
-            "max_concurrent_calls": 10,
-            "retention_days": 14
+            "max_concurrent_calls": 3,
+            "retention_days": 14,
+            "monthly_runtime_minutes": 2000,
+            "max_voice_agents": 5,
+            "max_sip_trunks": 3
         }'::jsonb,
         'active'
     ),
@@ -108,7 +114,7 @@ VALUES
         'For production teams running higher-volume voice-agent workloads.',
         'fixed',
         'USD',
-        19900,
+        29900,
         'month',
         '{
             "sso": false,
@@ -118,8 +124,35 @@ VALUES
             "private_networking": false
         }'::jsonb,
         '{
-            "max_concurrent_calls": 50,
-            "retention_days": 90
+            "max_concurrent_calls": 15,
+            "retention_days": 30,
+            "monthly_runtime_minutes": 10000,
+            "max_voice_agents": 25,
+            "max_sip_trunks": 10
+        }'::jsonb,
+        'active'
+    ),
+    (
+        'scale',
+        'Scale',
+        'For high-volume production voice agents and expanding teams.',
+        'fixed',
+        'USD',
+        79900,
+        'month',
+        '{
+            "sso": false,
+            "scim": false,
+            "advanced_rbac": true,
+            "retention_policies": true,
+            "private_networking": false
+        }'::jsonb,
+        '{
+            "max_concurrent_calls": 40,
+            "retention_days": 90,
+            "monthly_runtime_minutes": 30000,
+            "max_voice_agents": 100,
+            "max_sip_trunks": 30
         }'::jsonb,
         'active'
     ),

@@ -208,6 +208,34 @@ func (q *Queries) GetActiveVoiceAgentSessionByCallID(ctx context.Context, arg Ge
 	return i, err
 }
 
+const getOrganizationRuntimeUsedSeconds = `-- name: GetOrganizationRuntimeUsedSeconds :one
+SELECT COALESCE(SUM(
+    GREATEST(0, CEIL(EXTRACT(EPOCH FROM
+        LEAST(COALESCE(ended_at, CURRENT_TIMESTAMP), $1::timestamptz)
+        - GREATEST(started_at, $2::timestamptz)
+    )))::bigint
+), 0)::bigint AS used_seconds
+FROM voice_agent_sessions
+WHERE organization_id = $3
+  AND started_at < $1::timestamptz
+  AND (ended_at IS NULL OR ended_at > $2::timestamptz)
+`
+
+type GetOrganizationRuntimeUsedSecondsParams struct {
+	PeriodEnd      pgtype.Timestamptz `db:"period_end" json:"period_end"`
+	PeriodStart    pgtype.Timestamptz `db:"period_start" json:"period_start"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+}
+
+// Count each persisted Voice Agent session's overlap with the billing window.
+// A session spanning two periods contributes only the overlapping seconds.
+func (q *Queries) GetOrganizationRuntimeUsedSeconds(ctx context.Context, arg GetOrganizationRuntimeUsedSecondsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, getOrganizationRuntimeUsedSeconds, arg.PeriodEnd, arg.PeriodStart, arg.OrganizationID)
+	var used_seconds int64
+	err := row.Scan(&used_seconds)
+	return used_seconds, err
+}
+
 const getVoiceAgentSessionByID = `-- name: GetVoiceAgentSessionByID :one
 SELECT session.id, session.organization_id, session.call_id, session.voice_agent_id, session.configuration_revision, session.configuration_snapshot, session.state, session.turn_count, session.interruption_count, session.first_response_latency_ms, session.avg_turn_latency_ms, session.started_at, session.ended_at, session.created_at, session.updated_at
 FROM voice_agent_sessions AS session

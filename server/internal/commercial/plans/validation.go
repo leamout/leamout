@@ -60,7 +60,8 @@ func validateUpsert(req UpsertRequest) (UpsertRequest, error) {
 	}
 	for name, value := range req.Limits {
 		switch name {
-		case LimitMaxConcurrentCalls, LimitRetentionDays:
+		case LimitMaxConcurrentCalls, LimitRetentionDays,
+			LimitMonthlyRuntimeMinutes, LimitMaxVoiceAgents, LimitMaxSIPTrunks:
 			if value <= 0 {
 				return UpsertRequest{}, apperror.NewBadRequest("plan limit must be positive")
 			}

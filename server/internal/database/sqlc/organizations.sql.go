@@ -176,6 +176,21 @@ func (q *Queries) ListOrganizationsByUserID(ctx context.Context, userID uuid.UUI
 	return items, nil
 }
 
+const lockOrganizationForCapacity = `-- name: LockOrganizationForCapacity :one
+SELECT id FROM organizations
+WHERE id = $1
+  AND status = 'active'
+  AND deleted_at IS NULL
+FOR UPDATE
+`
+
+func (q *Queries) LockOrganizationForCapacity(ctx context.Context, organizationID uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, lockOrganizationForCapacity, organizationID)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const updateOrganization = `-- name: UpdateOrganization :one
 UPDATE organizations
 SET

@@ -11,6 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+const countOrganizationVoiceAgents = `-- name: CountOrganizationVoiceAgents :one
+SELECT COUNT(*)::bigint AS count FROM voice_agents
+WHERE organization_id = $1
+`
+
+func (q *Queries) CountOrganizationVoiceAgents(ctx context.Context, organizationID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countOrganizationVoiceAgents, organizationID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createVoiceAgent = `-- name: CreateVoiceAgent :one
 INSERT INTO voice_agents (
     organization_id,

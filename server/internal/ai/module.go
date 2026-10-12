@@ -1,6 +1,10 @@
 package ai
 
 import (
+	"context"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/ai/agents"
 	"github.com/leamout/leamout/server/internal/ai/conversations"
 	"github.com/leamout/leamout/server/internal/ai/orchestration"
@@ -14,6 +18,8 @@ import (
 type Dependencies struct {
 	CredentialCipher *encryption.Cipher
 	Calls            *calls.Service
+	PlanAgentLimit   func(context.Context, uuid.UUID) (int64, bool, error)
+	Database         *pgxpool.Pool
 }
 
 type Module struct {
@@ -62,7 +68,9 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	providersService := providers.NewService(providersRepository, deps.CredentialCipher)
 
 	agentsRepository := agents.NewRepository(queries)
+	agentsRepository.SetDatabase(deps.Database)
 	agentsService := agents.NewService(agentsRepository, providersService)
+	agentsService.SetPlanAgentLimit(deps.PlanAgentLimit)
 
 	conversationsRepository := conversations.NewRepository(queries)
 	conversationsService := conversations.NewService(conversationsRepository)

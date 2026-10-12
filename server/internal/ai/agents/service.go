@@ -13,8 +13,9 @@ import (
 )
 
 type Service struct {
-	repo      *Repository
-	providers *providers.Service
+	repo           *Repository
+	providers      *providers.Service
+	planAgentLimit func(context.Context, uuid.UUID) (int64, bool, error)
 }
 
 func NewService(repo *Repository, providerServices ...*providers.Service) *Service {
@@ -28,6 +29,10 @@ func NewService(repo *Repository, providerServices ...*providers.Service) *Servi
 	}
 }
 
+func (s *Service) SetPlanAgentLimit(limit func(context.Context, uuid.UUID) (int64, bool, error)) {
+	s.planAgentLimit = limit
+}
+
 func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.VoiceAgent, error) {
 	if organizationID == uuid.Nil {
 		return sqlc.VoiceAgent{}, apperror.NewBadRequest("organization_id is required")
@@ -36,7 +41,17 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return sqlc.VoiceAgent{}, err
 	}
-	agent, err := s.repo.Create(ctx, organizationID, normalized)
+	if s.planAgentLimit == nil {
+		return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("plan agent limits unavailable", nil)
+	}
+	cap, limited, err := s.planAgentLimit(ctx, organizationID)
+	if err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	if !limited || cap <= 0 {
+		return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("plan agent limit is required", nil)
+	}
+	agent, err := s.repo.CreateWithLimit(ctx, organizationID, normalized, cap)
 	if err != nil {
 		return agent, writeError(err, "create voice agent")
 	}
@@ -168,6 +183,10 @@ func readError(err error, message string) error {
 func writeError(err error, message string) error {
 	if err == nil {
 		return nil
+	}
+	var appErr *apperror.AppError
+	if errors.As(err, &appErr) {
+		return err
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperror.NewNotFound(message)

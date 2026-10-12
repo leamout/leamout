@@ -136,6 +136,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		StripePrices: map[string]string{
 			"developer": cfg.Stripe.DeveloperPriceID,
 			"pro":       cfg.Stripe.ProPriceID,
+			"scale":     cfg.Stripe.ScalePriceID,
 		},
 	})
 	platformModule.Retention.Service.SetPlanRetentionResolver(
@@ -167,12 +168,23 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
 		Calls:            telephonyModule.Calls.Service,
+		Database:         postgresClient.Pool(),
+		PlanAgentLimit:   commercialModule.Limits.Service.MaxVoiceAgents,
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
 		aiModule.Agents.Service.RequireReady,
 	)
 	telephonyModule.Calls.Service.SetPlanConcurrencyResolver(
 		commercialModule.Limits.Service.MaxConcurrentCalls,
+	)
+	telephonyModule.Calls.Service.SetRuntimeAllowanceCheck(
+		commercialModule.Limits.Service.RequireRuntimeAllowance,
+	)
+	telephonyModule.Trunks.Service.SetPlanTrunkLimit(
+		commercialModule.Limits.Service.MaxSIPTrunks,
+	)
+	aiModule.Orchestration.SetRuntimeAllowanceCheck(
+		commercialModule.Limits.Service.RequireRuntimeAllowance,
 	)
 
 	resolver := authn.NewResolver(identityModule.Session.Service, tenancyModule.Credentials.Service)
