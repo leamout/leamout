@@ -24,7 +24,7 @@ func TestBrowser(t *testing.T) {
 		{"preflight", "OPTIONS", "/v1/auth/start", "https://console.example.com", "", "cross-site", 204},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			r := httptest.NewRequest(tc.method, tc.path, nil)
+			r := httptest.NewRequestWithContext(t.Context(), tc.method, tc.path, nil)
 			r.Header.Set("Origin", tc.origin)
 			r.Header.Set("Content-Type", tc.contentType)
 			r.Header.Set("Sec-Fetch-Site", tc.fetchSite)
