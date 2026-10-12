@@ -43,6 +43,9 @@ func (s *Service) AttachCall(
 		return sqlc.VoiceAgentSession{}, false, err
 	}
 
+	if s.runtimeAllowance!=nil {
+		if err:=s.runtimeAllowance(ctx,organizationID);err!=nil{return sqlc.VoiceAgentSession{},false,err}
+	}
 	created, err := s.conversations.Create(ctx, organizationID, callID, agent.ID)
 	if err == nil {
 		return created, true, nil

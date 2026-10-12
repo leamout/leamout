@@ -2,6 +2,8 @@
 package orchestration
 
 import (
+	"context"
+	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/ai/agents"
 	"github.com/leamout/leamout/server/internal/ai/conversations"
 	"github.com/leamout/leamout/server/internal/ai/providers"
@@ -13,6 +15,11 @@ type Service struct {
 	conversations *conversations.Service
 	tools         *tools.Executor
 	providers     *providers.Service
+	runtimeAllowance func(context.Context,uuid.UUID)error
+}
+
+func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context,uuid.UUID)error){
+	s.runtimeAllowance=check
 }
 
 func NewService(

@@ -6,6 +6,8 @@ import (
 	"github.com/leamout/leamout/server/internal/ai/orchestration"
 	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/ai/tools"
+	"context"
+	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 	"github.com/leamout/leamout/server/internal/telephony/calls"
@@ -14,6 +16,7 @@ import (
 type Dependencies struct {
 	CredentialCipher *encryption.Cipher
 	Calls            *calls.Service
+	PlanAgentLimit func(context.Context, uuid.UUID)(int64,bool,error)
 }
 
 type Module struct {
@@ -63,6 +66,7 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 
 	agentsRepository := agents.NewRepository(queries)
 	agentsService := agents.NewService(agentsRepository, providersService)
+	agentsService.SetPlanAgentLimit(deps.PlanAgentLimit)
 
 	conversationsRepository := conversations.NewRepository(queries)
 	conversationsService := conversations.NewService(conversationsRepository)

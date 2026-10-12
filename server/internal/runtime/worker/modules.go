@@ -130,13 +130,17 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		commercialsubscriptions.NewService(
 			commercialsubscriptions.NewRepository(queries),
 		),
+		queries,
 	)
 	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
+	callsService.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
 		Calls:            callsService,
+		PlanAgentLimit:   planLimits.MaxVoiceAgents,
 	})
 	mediaNodes := medianodes.NewRegistry(redisClient)
+	aiModule.Orchestration.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
 	agentRuntime, err := agent.NewWithMediaNodes(
 		aiModule.Orchestration,
 		freeSwitch,
