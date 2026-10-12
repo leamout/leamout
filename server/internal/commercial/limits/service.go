@@ -76,8 +76,11 @@ func (s *Service) RetentionDays(
 
 func fromPlan(plan plans.Plan) Effective {
 	return Effective{
-		MaxConcurrentCalls: positiveLimit(plan.Limits[plans.LimitMaxConcurrentCalls]),
-		RetentionDays:      positiveLimit(plan.Limits[plans.LimitRetentionDays]),
+		MaxConcurrentCalls:    positiveLimit(plan.Limits[plans.LimitMaxConcurrentCalls]),
+		RetentionDays:         positiveLimit(plan.Limits[plans.LimitRetentionDays]),
+		MonthlyRuntimeMinutes: positiveLimit(plan.Limits[plans.LimitMonthlyRuntimeMinutes]),
+		MaxVoiceAgents:        positiveLimit(plan.Limits[plans.LimitMaxVoiceAgents]),
+		MaxSIPTrunks:          positiveLimit(plan.Limits[plans.LimitMaxSIPTrunks]),
 	}
 }
 

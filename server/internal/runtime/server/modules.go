@@ -136,6 +136,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		StripePrices: map[string]string{
 			"developer": cfg.Stripe.DeveloperPriceID,
 			"pro":       cfg.Stripe.ProPriceID,
+			"scale":     cfg.Stripe.ScalePriceID,
 		},
 	})
 	platformModule.Retention.Service.SetPlanRetentionResolver(
