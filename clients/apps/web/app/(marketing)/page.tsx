@@ -33,7 +33,9 @@ export default function Home() {
                   <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     Your SIP peer
                   </p>
-                  <p className="mt-1 text-xs text-foreground">Carrier · PBX · SBC</p>
+                  <p className="mt-1 text-xs text-foreground">
+                    Carrier · PBX · SBC
+                  </p>
                   <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     BYOC
                   </p>
@@ -43,7 +45,9 @@ export default function Home() {
                   <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     Your AI provider
                   </p>
-                  <p className="mt-1 text-xs text-foreground">Realtime · STT · LLM · TTS</p>
+                  <p className="mt-1 text-xs text-foreground">
+                    Realtime · STT · LLM · TTS
+                  </p>
                   <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     BYOAI
                   </p>
