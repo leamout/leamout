@@ -180,6 +180,10 @@ func writeError(err error, message string) error {
 	if err == nil {
 		return nil
 	}
+	var appErr *apperror.AppError
+	if errors.As(err, &appErr) {
+		return err
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperror.NewNotFound(message)
 	}
