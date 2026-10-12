@@ -12,6 +12,7 @@ For local Go development, set `APP_ENV=development` and `FRONTEND_URL=http://loc
 - Signup sends and verifies a code before enrolling a password with the new HttpOnly session.
 - Recovery starts with an email and collects a code, then submits the code and replacement password together to `/auth/password/reset`. The recovery code is verified by the backend at that final step. Refreshing the reset page requires entering the code again.
 - The transaction ID, email, intent, stage, and local expiry/cooldown hints are stored in sessionStorage. Passwords and codes are never persisted. The backend enforces all transaction and session validity.
+- `proxy.ts` redirects requests without a session cookie to `/log-in` before rendering console, onboarding, or password enrollment pages. Public auth pages, API requests, and assets bypass this check. Cookie presence alone does not authenticate a user.
 - Console and onboarding layouts check `/users/me` before displaying their content. API authorization remains enforced by Go. Network errors show retry controls; an expired session returns to login.
 - Logout revokes only the current session, clears the cookie and private query cache, and returns to login.
 
