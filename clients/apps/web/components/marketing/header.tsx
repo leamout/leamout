@@ -1,0 +1,136 @@
+"use client";
+
+import { Button } from "@leamout/ui/components/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@leamout/ui/components/collapsible";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "@leamout/ui/components/navigation-menu";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useRef, useState } from "react";
+
+const links = [
+  { label: "Pricing", href: "/pricing" },
+  { label: "Documentation", href: "/docs" },
+  { label: "Contact", href: "/contact" },
+];
+
+export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  return (
+    <header className="border-b border-border bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-background focus:p-3 focus:ring-2 focus:ring-ring"
+      >
+        Skip to content
+      </a>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-6 px-5 sm:px-6 lg:px-8">
+          <Link
+            href="/"
+            aria-label="Leamout home"
+            className="rounded-sm font-heading text-xl font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => setOpen(false)}
+          >
+            Leamout
+            <span aria-hidden="true" className="text-brand-orange">
+              .
+            </span>
+          </Link>
+          <NavigationMenu
+            aria-label="Main navigation"
+            className="hidden md:flex"
+          >
+            <NavigationMenuList>
+              {links.map((link) => (
+                <NavigationMenuItem key={link.href}>
+                  <NavigationMenuLink
+                    render={<Link href={link.href} />}
+                    active={pathname === link.href}
+                    className={navigationMenuTriggerStyle()}
+                  >
+                    {link.label}
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              ))}
+            </NavigationMenuList>
+          </NavigationMenu>
+          <div className="hidden items-center gap-2 md:flex">
+            <Button
+              variant="ghost"
+              nativeButton={false}
+              render={<a href={`${consoleURL}/log-in`} />}
+            >
+              Log in
+            </Button>
+            <Button
+              nativeButton={false}
+              render={<a href={`${consoleURL}/create-account`} />}
+            >
+              Get started
+            </Button>
+          </div>
+          <CollapsibleTrigger
+            ref={trigger}
+            render={<Button variant="outline" className="md:hidden" />}
+          >
+            {open ? "Close menu" : "Menu"}
+          </CollapsibleTrigger>
+        </div>
+        <CollapsibleContent
+          className="border-t border-border md:hidden"
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              setOpen(false);
+              trigger.current?.focus();
+            }
+          }}
+        >
+          <nav
+            aria-label="Mobile navigation"
+            className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 sm:px-6"
+          >
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={pathname === link.href ? "page" : undefined}
+                onClick={() => setOpen(false)}
+                className="rounded-lg px-3 py-3 text-sm font-medium outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-muted"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-5">
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<a href={`${consoleURL}/log-in`} />}
+              >
+                Log in
+              </Button>
+              <Button
+                nativeButton={false}
+                render={<a href={`${consoleURL}/create-account`} />}
+              >
+                Get started
+              </Button>
+            </div>
+          </nav>
+        </CollapsibleContent>
+      </Collapsible>
+    </header>
+  );
+}
