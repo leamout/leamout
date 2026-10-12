@@ -11,11 +11,11 @@ func TestFromPlan(t *testing.T) {
 
 	value := fromPlan(plans.Plan{
 		Limits: map[string]int64{
-			plans.LimitMaxConcurrentCalls: 50,
-			plans.LimitRetentionDays: 90,
+			plans.LimitMaxConcurrentCalls:    50,
+			plans.LimitRetentionDays:         90,
 			plans.LimitMonthlyRuntimeMinutes: 30000,
-			plans.LimitMaxVoiceAgents: 100,
-			plans.LimitMaxSIPTrunks: 30,
+			plans.LimitMaxVoiceAgents:        100,
+			plans.LimitMaxSIPTrunks:          30,
 		},
 	})
 	if value.MaxConcurrentCalls == nil || *value.MaxConcurrentCalls != 50 {

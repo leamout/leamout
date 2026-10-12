@@ -16,8 +16,8 @@ const (
 	IntervalMonth = "month"
 	IntervalYear  = "year"
 
-	LimitMaxConcurrentCalls = "max_concurrent_calls"
-	LimitRetentionDays      = "retention_days"
+	LimitMaxConcurrentCalls    = "max_concurrent_calls"
+	LimitRetentionDays         = "retention_days"
 	LimitMonthlyRuntimeMinutes = "monthly_runtime_minutes"
 	LimitMaxVoiceAgents        = "max_voice_agents"
 	LimitMaxSIPTrunks          = "max_sip_trunks"
