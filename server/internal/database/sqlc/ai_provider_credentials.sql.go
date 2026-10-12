@@ -270,7 +270,7 @@ type ResolveVoiceAgentProviderBindingsRow struct {
 	Provider         string             `db:"provider" json:"provider"`
 	CredentialID     *uuid.UUID         `db:"credential_id" json:"credential_id"`
 	Config           []byte             `db:"config" json:"config"`
-	SecretCiphertext *string            `db:"secret_ciphertext" json:"secret_ciphertext"`
+	SecretCiphertext string             `db:"secret_ciphertext" json:"secret_ciphertext"`
 	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
