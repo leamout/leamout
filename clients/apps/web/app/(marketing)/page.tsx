@@ -1,7 +1,7 @@
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 sm:px-6 lg:px-8">
+    <div className="bg-background text-foreground">
+      <div className="mx-auto flex w-full max-w-6xl flex-col px-5 sm:px-6 lg:px-8">
         <section className="grid flex-1 items-center gap-14 py-16 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)] lg:gap-16 lg:py-20">
           <div className="rounded-2xl border border-border bg-muted/30 p-5 sm:p-6">
             <div className="flex items-center justify-between border-b border-border pb-4">
@@ -65,6 +65,6 @@ export default function Home() {
           </div>
         </section>
       </div>
-    </main>
+    </div>
   );
 }
