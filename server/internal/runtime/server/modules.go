@@ -166,7 +166,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		Calls: telephonyModule.Calls.Service,
+		Calls:            telephonyModule.Calls.Service,
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
 		aiModule.Agents.Service.RequireReady,

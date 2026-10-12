@@ -134,7 +134,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		Calls: callsService,
+		Calls:            callsService,
 	})
 	mediaNodes := medianodes.NewRegistry(redisClient)
 	agentRuntime, err := agent.NewWithMediaNodes(

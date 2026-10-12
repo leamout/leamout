@@ -12,8 +12,8 @@ import (
 )
 
 type Dependencies struct {
-	CredentialCipher    *encryption.Cipher
-	Calls               *calls.Service
+	CredentialCipher *encryption.Cipher
+	Calls            *calls.Service
 }
 
 type Module struct {
