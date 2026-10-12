@@ -378,12 +378,12 @@ type Subscription struct {
 	TrialEndsAt            pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
 	CancelAtPeriodEnd      bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
 	CanceledAt             pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
-	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	Provider               *string            `db:"provider" json:"provider"`
 	ProviderCustomerID     *string            `db:"provider_customer_id" json:"provider_customer_id"`
 	ProviderSubscriptionID *string            `db:"provider_subscription_id" json:"provider_subscription_id"`
 	ProviderEventCreatedAt pgtype.Timestamptz `db:"provider_event_created_at" json:"provider_event_created_at"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
 type Trunk struct {
@@ -494,7 +494,7 @@ type VoiceAgentProviderBinding struct {
 	VoiceAgentID   uuid.UUID          `db:"voice_agent_id" json:"voice_agent_id"`
 	Role           string             `db:"role" json:"role"`
 	Provider       string             `db:"provider" json:"provider"`
-	CredentialID   *uuid.UUID         `db:"credential_id" json:"credential_id"`
+	CredentialID   uuid.UUID          `db:"credential_id" json:"credential_id"`
 	Config         []byte             `db:"config" json:"config"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`

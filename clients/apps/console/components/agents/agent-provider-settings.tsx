@@ -25,9 +25,9 @@ export function AgentProviderSettings({
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Provider assignments</h2>
         <p className="text-sm text-muted-foreground">
-          Use an organization credential or request a platform credential for
-          each role. Provider availability and role compatibility have not been
-          loaded.
+          Every provider role needs a verified organization-owned AI
+          integration. Provider availability and role compatibility have not
+          been loaded.
         </p>
         <Link href="/ai-providers" className="text-sm hover:underline">
           Manage provider credentials
@@ -64,7 +64,7 @@ export function AgentProviderSettings({
             <h3 className="font-semibold uppercase">{role}</h3>
             <p className="text-sm text-muted-foreground">
               {binding
-                ? `Current provider: ${binding.provider} · ${binding.credentialId ? `Credential ${binding.credentialId}` : "Platform credential"}`
+                ? `Current provider: ${binding.provider} · ${binding.credentialId ? `Credential ${binding.credentialId}` : "Organization integration required"}`
                 : "Current assignment has not been loaded."}
             </p>
             <PreviewSettingsForm
@@ -72,7 +72,7 @@ export function AgentProviderSettings({
                 { name: "provider", label: "Provider ID", required: true },
                 {
                   name: "credentialId",
-                  label: "Organization credential ID (optional)",
+                  label: "Organization credential ID", required: true,
                 },
                 {
                   name: "config",
@@ -84,7 +84,6 @@ export function AgentProviderSettings({
               validate={(values) => {
                 const errors: { field: string; message: string }[] = [];
                 if (
-                  values.credentialId.trim() &&
                   !z.uuid().safeParse(values.credentialId.trim()).success
                 )
                   errors.push({
@@ -111,9 +110,8 @@ export function AgentProviderSettings({
               }}
             />
             <p className="text-xs text-muted-foreground">
-              Leave the credential ID blank to request platform credentials.
-              Availability must be confirmed when integration is connected. Do
-              not enter API secrets in configuration.
+              Select a verified organization integration for every role.
+              Do not enter API secrets in provider configuration.
             </p>
             <Button
               variant="outline"

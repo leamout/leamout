@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/leamout/leamout/server/internal/ai"
-	"github.com/leamout/leamout/server/internal/ai/providers"
 	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
 	commercialplans "github.com/leamout/leamout/server/internal/commercial/plans"
 	commercialsubscriptions "github.com/leamout/leamout/server/internal/commercial/subscriptions"
@@ -135,16 +134,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		PlatformCredentials: providers.PlatformCredentials{
-			OpenAI:     cfg.OpenAIAPIKey,
-			Gemini:     cfg.GeminiAPIKey,
-			Deepgram:   cfg.DeepgramAPIKey,
-			AssemblyAI: cfg.AssemblyAIAPIKey,
-			Groq:       cfg.GroqAPIKey,
-			Cartesia:   cfg.CartesiaAPIKey,
-			ElevenLabs: cfg.ElevenLabsAPIKey,
-		},
-		Calls: callsService,
+		Calls:            callsService,
 	})
 	mediaNodes := medianodes.NewRegistry(redisClient)
 	agentRuntime, err := agent.NewWithMediaNodes(

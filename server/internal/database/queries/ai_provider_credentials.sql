@@ -91,9 +91,10 @@ SELECT
     b.created_at,
     b.updated_at
 FROM voice_agent_provider_bindings b
-LEFT JOIN ai_provider_credentials c
+JOIN ai_provider_credentials c
   ON c.id = b.credential_id
  AND c.organization_id = b.organization_id
+ AND c.provider = b.provider
 WHERE b.organization_id = sqlc.arg(organization_id)
   AND b.voice_agent_id = sqlc.arg(voice_agent_id)
 ORDER BY b.role ASC;

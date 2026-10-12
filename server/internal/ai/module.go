@@ -12,9 +12,8 @@ import (
 )
 
 type Dependencies struct {
-	CredentialCipher    *encryption.Cipher
-	PlatformCredentials providers.PlatformCredentials
-	Calls               *calls.Service
+	CredentialCipher *encryption.Cipher
+	Calls            *calls.Service
 }
 
 type Module struct {
@@ -61,7 +60,6 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 
 	providersRepository := providers.NewRepository(queries)
 	providersService := providers.NewService(providersRepository, deps.CredentialCipher)
-	providersService.ConfigurePlatformCredentials(deps.PlatformCredentials)
 
 	agentsRepository := agents.NewRepository(queries)
 	agentsService := agents.NewService(agentsRepository, providersService)

@@ -56,8 +56,8 @@ mutate the immutable configuration of a session that is already active.
 - Cross-organization reads and bindings fail in repository and service tests.
 - Provider errors are normalized into stable onboarding failure codes.
 - Audit events cover secret creation, verification, rotation, and revocation.
-- Deployment-global AI keys are development fallbacks only and cannot silently
-  override an organization binding.
+- No deployment-global AI keys or platform credentials are used for Voice
+  Agent execution; missing organization integrations fail readiness.
 
 ## Phase 2: Voice Agent configuration and presets
 
@@ -227,17 +227,13 @@ gates. The initial product surface should include:
 The UI must not duplicate readiness rules or infer runtime support from provider
 names. It renders capabilities and remediation returned by the API.
 
-## Later: managed AI and commercial accounting
+## Usage telemetry and capacity planning
 
-Leamout-managed AI is a later credential-sourcing policy, not a new engine.
-When introduced, the runtime should receive the same provider-neutral binding
-and ephemeral runtime secret shape used for customer-owned integrations.
-
-Usage accounting should consume normalized provider usage and call lifecycle
-events asynchronously. Billing, quotas, or pricing must never enter the live
-audio path. Before monetization, usage records need idempotency, reconciliation
-against provider invoices, tenant attribution, and explicit handling for
-provider sessions that fail before reporting final usage.
+Leamout supports BYOA only: organizations pay AI providers directly using
+their own verified credentials. Provider usage and call lifecycle events may
+be collected asynchronously for diagnostics and infrastructure planning,
+without customer AI metering charges or Leamout-managed AI wallets.
+Secrets must remain outside telemetry, logs, and durable session snapshots.
 
 ## Recommended execution slices
 

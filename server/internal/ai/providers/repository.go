@@ -131,7 +131,7 @@ func (r *Repository) ListVoiceAgentIDs(
 		ctx,
 		sqlc.ListVoiceAgentIDsByAIProviderCredentialParams{
 			OrganizationID: organizationID,
-			CredentialID:   &credentialID,
+			CredentialID:   credentialID,
 		},
 	)
 }
@@ -169,7 +169,7 @@ func (r *Repository) UpsertBinding(
 			VoiceAgentID:   agentID,
 			Role:           role,
 			Provider:       req.Provider,
-			CredentialID:   req.CredentialID,
+			CredentialID:   *req.CredentialID,
 			Config:         config,
 		},
 	)
@@ -183,7 +183,7 @@ func (r *Repository) UpsertBinding(
 		VoiceAgentID:   row.VoiceAgentID,
 		Role:           row.Role,
 		Provider:       row.Provider,
-		CredentialID:   row.CredentialID,
+		CredentialID:   &row.CredentialID,
 		Config:         json.RawMessage(row.Config),
 	}, nil
 }
@@ -212,7 +212,7 @@ func (r *Repository) ListBindings(
 			VoiceAgentID:   row.VoiceAgentID,
 			Role:           row.Role,
 			Provider:       row.Provider,
-			CredentialID:   row.CredentialID,
+			CredentialID:   &row.CredentialID,
 			Config:         json.RawMessage(row.Config),
 		})
 	}
@@ -257,9 +257,9 @@ func (r *Repository) ResolveBindings(
 		result = append(result, resolvedRow{
 			Role:             row.Role,
 			Provider:         row.Provider,
-			CredentialID:     row.CredentialID,
+			CredentialID:     &row.CredentialID,
 			Config:           json.RawMessage(row.Config),
-			SecretCiphertext: row.SecretCiphertext,
+			SecretCiphertext: &row.SecretCiphertext,
 		})
 	}
 
