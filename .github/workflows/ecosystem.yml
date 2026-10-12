@@ -19,24 +19,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Leamout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: leamout
 
       - name: Checkout contracts
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: leamout/contracts
           path: contracts
 
       - name: Checkout AI providers
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: leamout/ai-providers
           path: ai-providers
 
       - name: Checkout agents
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: leamout/agents
           path: agents
