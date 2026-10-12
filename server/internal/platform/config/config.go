@@ -36,6 +36,8 @@ type Config struct {
 	Stripe StripeConfig `envPrefix:"STRIPE_"`
 
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
+	FrontendURL           string      `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
+	BackendURL            string      `env:"BACKEND_URL" envDefault:"http://localhost:8080"`
 	Domain                string      `env:"DOMAIN"`
 	DatabaseURL           string      `env:"DATABASE_URL,required"`
 	RedisURL              string      `env:"REDIS_URL,required"`
@@ -88,6 +90,8 @@ func (c *Config) normalize() {
 	c.Stripe.ProPriceID = strings.TrimSpace(c.Stripe.ProPriceID)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
+	c.FrontendURL = strings.TrimRight(strings.TrimSpace(c.FrontendURL), "/")
+	c.BackendURL = strings.TrimRight(strings.TrimSpace(c.BackendURL), "/")
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)
 	c.RedisURL = strings.TrimSpace(c.RedisURL)
 	c.NATSURL = strings.TrimSpace(c.NATSURL)

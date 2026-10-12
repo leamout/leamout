@@ -103,3 +103,19 @@ SET
     updated_at = NOW()
 WHERE status = 'pending'
 AND expires_at <= NOW();
+
+-- name: AddInvitedOrganizationMember :one
+INSERT INTO organization_members (organization_id, user_id, role)
+SELECT i.organization_id, u.id, i.role
+FROM organization_invitations AS i
+JOIN users AS u ON u.id = sqlc.arg(user_id)
+JOIN organizations AS o ON o.id = i.organization_id
+WHERE i.id = sqlc.arg(invitation_id)
+  AND i.status = 'accepted'
+  AND i.expires_at > NOW()
+  AND u.email = i.email
+  AND u.email_verified = TRUE
+  AND u.disabled_at IS NULL
+  AND o.status = 'active'
+  AND o.deleted_at IS NULL
+RETURNING *;
