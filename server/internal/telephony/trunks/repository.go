@@ -2,6 +2,7 @@ package trunks
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"time"
 
@@ -310,7 +311,7 @@ func (r *Repository) LockAndCheckTrunkCapacity(
 ) error {
 	queries := r.queries.WithTx(tx)
 	if _, err := queries.LockOrganizationForCapacity(ctx, organizationID); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return apperror.NewNotFound("organization not found")
 		}
 		return err

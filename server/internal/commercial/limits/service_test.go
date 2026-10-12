@@ -1,11 +1,11 @@
 package limits
 
 import (
-	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"testing"
 	"time"
 
 	"github.com/leamout/leamout/server/internal/commercial/plans"
+	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 )
 
 func TestFromPlan(t *testing.T) {

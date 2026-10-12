@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -89,7 +90,7 @@ func (r *Repository) CreateWithLimit(
 	defer func() { _ = tx.Rollback(ctx) }()
 	queries := r.queries.WithTx(tx)
 	if _, err := queries.LockOrganizationForCapacity(ctx, organizationID); err != nil {
-		if err == pgx.ErrNoRows {
+		if errors.Is(err, pgx.ErrNoRows) {
 			return sqlc.VoiceAgent{}, apperror.NewNotFound("organization not found")
 		}
 		return sqlc.VoiceAgent{}, err
