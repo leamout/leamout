@@ -1,3 +1,12 @@
+import { constructMetadata } from "@/lib/metadata";
+
+export const metadata = constructMetadata({
+  title: "Carrier-grade runtime for autonomous voice agents",
+  description:
+    "Leamout is the carrier-grade runtime and control plane for autonomous voice agents.",
+  path: "/",
+});
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -33,7 +42,9 @@ export default function Home() {
                   <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     Your SIP peer
                   </p>
-                  <p className="mt-1 text-xs text-foreground">Carrier · PBX · SBC</p>
+                  <p className="mt-1 text-xs text-foreground">
+                    Carrier · PBX · SBC
+                  </p>
                   <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     BYOC
                   </p>
@@ -43,7 +54,9 @@ export default function Home() {
                   <p className="font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     Your AI provider
                   </p>
-                  <p className="mt-1 text-xs text-foreground">Realtime · STT · LLM · TTS</p>
+                  <p className="mt-1 text-xs text-foreground">
+                    Realtime · STT · LLM · TTS
+                  </p>
                   <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.11em] text-muted-foreground">
                     BYOAI
                   </p>
