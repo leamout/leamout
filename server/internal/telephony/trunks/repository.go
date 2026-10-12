@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
@@ -297,4 +298,29 @@ func (r *Repository) MarkProbeFailed(
 		},
 	)
 	return err
+}
+
+// LockAndCheckTrunkCapacity must run in the same transaction as CreateTrunk.
+// Row-locking the organization serializes concurrent creation requests.
+func (r *Repository) LockAndCheckTrunkCapacity(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID uuid.UUID,
+	maxTrunks int64,
+) error {
+	queries := r.queries.WithTx(tx)
+	if _, err := queries.LockOrganizationForCapacity(ctx, organizationID); err != nil {
+		if err == pgx.ErrNoRows {
+			return apperror.NewNotFound("organization not found")
+		}
+		return err
+	}
+	count, err := queries.CountOrganizationSIPTrunks(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	if count >= maxTrunks {
+		return apperror.NewPaymentRequired("organization SIP trunk limit reached")
+	}
+	return nil
 }

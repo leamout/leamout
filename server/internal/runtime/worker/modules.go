@@ -137,6 +137,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
 		Calls:            callsService,
+		Database:         postgresClient.Pool(),
 		PlanAgentLimit:   planLimits.MaxVoiceAgents,
 	})
 	mediaNodes := medianodes.NewRegistry(redisClient)

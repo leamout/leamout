@@ -168,6 +168,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
 		Calls:            telephonyModule.Calls.Service,
+		Database:         postgresClient.Pool(),
 		PlanAgentLimit:   commercialModule.Limits.Service.MaxVoiceAgents,
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
