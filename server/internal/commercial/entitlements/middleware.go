@@ -13,7 +13,9 @@ type Middleware struct {
 }
 
 func NewMiddleware(service *Service) *Middleware {
-	return &Middleware{service: service}
+	return &Middleware{
+		service: service,
+	}
 }
 
 func (m *Middleware) Require(capability Capability) func(http.Handler) http.Handler {
@@ -25,6 +27,20 @@ func (m *Middleware) Require(capability Capability) func(http.Handler) http.Hand
 				return
 			}
 			if err := m.service.Require(r.Context(), organizationID, capability); err != nil {
+				httputil.Error(w, err)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// Data-access licensing is separate from runtime admission so expiry cannot
+// prevent a previously licensed customer from retrieving their audit history.
+func (m *Middleware) RequireSelfHostedDataFeature(feature string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if err := m.service.license.RequireDataFeature(feature); err != nil {
 				httputil.Error(w, err)
 				return
 			}

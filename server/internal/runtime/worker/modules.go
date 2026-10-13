@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/leamout/leamout/server/internal/commercial"
+	"github.com/leamout/leamout/server/internal/commercial/billing"
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/integrations/payments/stripe"
+
 	"github.com/leamout/leamout/server/internal/ai"
 	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
-	commercialplans "github.com/leamout/leamout/server/internal/commercial/plans"
-	commercialsubscriptions "github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
@@ -36,6 +39,7 @@ import (
 )
 
 type modules struct {
+	billingReconciliation   *billing.ReconciliationJob
 	emailDelivery           *email.Worker
 	postgres                *postgres.Client
 	redis                   *redisintegration.Client
@@ -58,6 +62,10 @@ type modules struct {
 }
 
 func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) (*modules, error) {
+	licenseService, err := licensing.NewService(cfg.Commercial)
+	if err != nil {
+		return nil, fmt.Errorf("initialize licensing: %w", err)
+	}
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -117,7 +125,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	routingService := routing.NewService(routingRepository, nil)
 	callsRepository := calls.NewRepository(queries, postgresClient.Pool())
 	callController := calling.NewController(freeSwitch)
-	admissionLimiter := calling.NewAdmissionLimiter(redisClient)
+	admissionLimiter := calling.NewAdmissionLimiterForDeployment(redisClient, cfg.Commercial.Mode, cfg.Commercial.DeploymentID)
 	callsService := calls.NewService(
 		callsRepository,
 		routingService,
@@ -126,13 +134,37 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		admissionLimiter,
 		metrics.New(redisClient),
 	)
-	planLimits := commerciallimits.NewService(
-		commercialplans.NewService(commercialplans.NewRepository(queries)),
-		commercialsubscriptions.NewService(
-			commercialsubscriptions.NewRepository(queries),
-		),
-		queries,
-	)
+	var billingJob *billing.ReconciliationJob
+	var planLimits *commerciallimits.Service
+	if licenseService.SelfHosted() {
+		planLimits = commerciallimits.NewService(nil, nil, queries)
+		planLimits.SetLicenseService(licenseService)
+	} else {
+		cloudCommercial := commercial.New(queries, commercial.Dependencies{
+			Stripe: stripe.New(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret),
+			StripePrices: map[string]string{
+				"developer": cfg.Stripe.DeveloperPriceID,
+				"pro":       cfg.Stripe.ProPriceID,
+				"scale":     cfg.Stripe.ScalePriceID,
+			},
+			FrontendURL: cfg.FrontendURL,
+		})
+		planLimits = cloudCommercial.Limits.Service
+		if cfg.Stripe.SecretKey != "" && cfg.Stripe.WebhookSecret != "" {
+			billingJob, err = billing.NewReconciliationJob(
+				billing.NewRepository(queries),
+				cloudCommercial.Billing.Service,
+				15*time.Minute,
+				func(ctx context.Context, err error) {
+					logger.Warn(ctx, "billing reconciliation failed", "error", err)
+				},
+			)
+			if err != nil {
+				closeDependencies()
+				return nil, err
+			}
+		}
+	}
 	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
 	callsService.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
 	aiModule := ai.New(queries, ai.Dependencies{
@@ -156,7 +188,9 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 
 	callConsumer := calls.NewConsumer(callsService)
-	sessionReconciliation := &sessionReconciliationJob{queries: queries}
+	sessionReconciliation := &sessionReconciliationJob{
+		queries: queries,
+	}
 
 	callReconciliation, err := calls.NewReconciliationJob(
 		callsRepository,
@@ -203,7 +237,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize recording reconciliation: %w", err)
 	}
 	retentionCleanup, err := retention.NewCleanupJob(
-		retention.NewRepository(queries),
+		retention.NewRepositoryForDeployment(queries, licenseService.SelfHosted()),
 		recordingsService,
 		retention.DefaultCleanupJobConfig(),
 	)
@@ -266,6 +300,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 	emailDelivery := email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
 	return &modules{
+		billingReconciliation:   billingJob,
 		emailDelivery:           emailDelivery,
 		postgres:                postgresClient,
 		redis:                   redisClient,

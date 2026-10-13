@@ -15,20 +15,28 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/media/session"
 	"github.com/leamout/leamout/server/internal/media/transport"
 )
 
 type handler struct {
-	config    Config
-	manager   *session.Manager
-	tokens    *transport.TokenService
-	websocket http.Handler
-	draining  atomic.Bool
+	license       *licensing.Service
+	nodeAllowance func(context.Context) error
+	config        Config
+	manager       *session.Manager
+	tokens        *transport.TokenService
+	websocket     http.Handler
+	draining      atomic.Bool
 }
 
 func newHandler(cfg Config, manager *session.Manager, tokens *transport.TokenService, websocketHandler http.Handler) *handler {
-	return &handler{config: cfg, manager: manager, tokens: tokens, websocket: websocketHandler}
+	return &handler{
+		config:    cfg,
+		manager:   manager,
+		tokens:    tokens,
+		websocket: websocketHandler,
+	}
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -109,6 +117,16 @@ func (h *handler) createSession(w http.ResponseWriter, r *http.Request) {
 	if !h.authorized(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
+	}
+	if h.license.SelfHosted() {
+		if _, err := h.license.RequireRuntime(); err != nil {
+			http.Error(w, "self-hosted license does not authorize new sessions", http.StatusPaymentRequired)
+			return
+		}
+		if h.nodeAllowance == nil || h.nodeAllowance(r.Context()) != nil {
+			http.Error(w, "licensed node capacity unavailable", http.StatusServiceUnavailable)
+			return
+		}
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
 	defer func() {
@@ -203,7 +221,9 @@ func (h *handler) controlSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer func() { _ = ws.CloseNow() }()
+	defer func() {
+		_ = ws.CloseNow()
+	}()
 
 	ctx := r.Context()
 	errs := make(chan error, 2)

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
@@ -13,6 +14,7 @@ import (
 )
 
 type Service struct {
+	license       *licensing.Service
 	plans         *plans.Service
 	subscriptions *subscriptions.Service
 	queries       *sqlc.Queries
@@ -20,16 +22,35 @@ type Service struct {
 }
 
 func NewService(plansService *plans.Service, subscriptionsService *subscriptions.Service, queries ...*sqlc.Queries) *Service {
-	s := &Service{plans: plansService, subscriptions: subscriptionsService, now: time.Now}
+	s := &Service{
+		plans:         plansService,
+		subscriptions: subscriptionsService,
+		now:           time.Now,
+	}
 	if len(queries) > 0 {
 		s.queries = queries[0]
 	}
 	return s
 }
 
+func (s *Service) SetLicenseService(service *licensing.Service) {
+	s.license = service
+}
+
 func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective, error) {
 	if organizationID == uuid.Nil {
 		return Effective{}, apperror.NewBadRequest("organization_id is required")
+	}
+	if s.license.SelfHosted() {
+		claims, err := s.license.RequireRuntime()
+		if err != nil {
+			return Effective{}, err
+		}
+		return Effective{
+			MaxConcurrentCalls: &claims.MaxConcurrentCalls,
+			PeriodStart:        claims.ValidFrom,
+			PeriodEnd:          claims.ExpiresAt,
+		}, nil
 	}
 	sub, err := s.subscriptions.Get(ctx, organizationID)
 	if err != nil {
@@ -92,6 +113,9 @@ func (s *Service) RetentionDays(ctx context.Context, organizationID uuid.UUID) (
 	if err != nil {
 		return 0, false, err
 	}
+	if value.RetentionDays == nil {
+		return 0, false, nil
+	}
 	return *value.RetentionDays, true, nil
 }
 
@@ -99,6 +123,9 @@ func (s *Service) MaxVoiceAgents(ctx context.Context, organizationID uuid.UUID) 
 	value, err := s.Get(ctx, organizationID)
 	if err != nil {
 		return 0, false, err
+	}
+	if value.MaxVoiceAgents == nil {
+		return 0, false, nil
 	}
 	return *value.MaxVoiceAgents, true, nil
 }
@@ -108,6 +135,9 @@ func (s *Service) MaxSIPTrunks(ctx context.Context, organizationID uuid.UUID) (i
 	if err != nil {
 		return 0, false, err
 	}
+	if value.MaxSIPTrunks == nil {
+		return 0, false, nil
+	}
 	return *value.MaxSIPTrunks, true, nil
 }
 
@@ -115,6 +145,13 @@ func (s *Service) RuntimeUsage(ctx context.Context, organizationID uuid.UUID) (R
 	limits, err := s.Get(ctx, organizationID)
 	if err != nil {
 		return RuntimeUsage{}, err
+	}
+	if limits.MonthlyRuntimeMinutes == nil {
+		return RuntimeUsage{
+			PeriodStart: limits.PeriodStart,
+			PeriodEnd:   limits.PeriodEnd,
+			Unlimited:   true,
+		}, nil
 	}
 	if s.queries == nil {
 		return RuntimeUsage{}, apperror.NewServiceUnavailable("runtime usage store unavailable", nil)
@@ -127,7 +164,12 @@ func (s *Service) RuntimeUsage(ctx context.Context, organizationID uuid.UUID) (R
 	if err != nil {
 		return RuntimeUsage{}, apperror.NewServiceUnavailable("read runtime usage", err)
 	}
-	return RuntimeUsage{PeriodStart: limits.PeriodStart, PeriodEnd: limits.PeriodEnd, UsedSeconds: used, AllowanceSeconds: *limits.MonthlyRuntimeMinutes * 60}, nil
+	return RuntimeUsage{
+		PeriodStart:      limits.PeriodStart,
+		PeriodEnd:        limits.PeriodEnd,
+		UsedSeconds:      used,
+		AllowanceSeconds: *limits.MonthlyRuntimeMinutes * 60,
+	}, nil
 }
 
 // Check only when admitting a NEW session. Do not terminate in-flight calls.
@@ -136,7 +178,7 @@ func (s *Service) RequireRuntimeAllowance(ctx context.Context, organizationID uu
 	if err != nil {
 		return err
 	}
-	if usage.UsedSeconds >= usage.AllowanceSeconds {
+	if !usage.Unlimited && usage.UsedSeconds >= usage.AllowanceSeconds {
 		return apperror.NewPaymentRequired("monthly Voice Agent runtime allowance exhausted")
 	}
 	return nil
@@ -151,6 +193,7 @@ func fromPlan(plan plans.Plan) Effective {
 		MaxSIPTrunks:          positiveLimit(plan.Limits[plans.LimitMaxSIPTrunks]),
 	}
 }
+
 func positiveLimit(value int64) *int64 {
 	if value < 1 {
 		return nil

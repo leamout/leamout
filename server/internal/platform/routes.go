@@ -29,7 +29,9 @@ func RegisterRoutes(
 	audit.RegisterRoutes(
 		router,
 		module.Audit.Handler,
-		organizationAccess("audit"),
+		func(next http.Handler) http.Handler {
+			return organizationAccess("audit")(entitlementsMiddleware.RequireSelfHostedDataFeature("audit_logging")(next))
+		},
 	)
 
 	storage.RegisterRoutes(

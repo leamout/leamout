@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
+
 	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 	"github.com/leamout/leamout/server/internal/media/engine/composable"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"
@@ -34,6 +36,10 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("media runtime context is required")
 	}
 	if err := cfg.Validate(); err != nil {
+		return err
+	}
+	licenseService, err := licensing.NewService(cfg.Commercial)
+	if err != nil {
 		return err
 	}
 	logger := logging.New().With("process", "media")
@@ -62,11 +68,25 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("initialize media WebSocket: %w", err)
 	}
 	handler := newHandler(cfg, manager, tokens, websockets)
+	handler.license = licenseService
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("listen for media: %w", err)
 	}
-	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
+	registration, err := startNodeRegistration(ctx, cfg, manager, logger)
+	if err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("register media node: %w", err)
+	}
+	defer registration.close(context.Background())
+	if licenseService.SelfHosted() {
+		handler.nodeAllowance = registration.requireLicenseNode
+	}
+
+	server := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	serverErr := make(chan error, 1)
 	go func() {
 		err := server.Serve(listener)
@@ -75,13 +95,6 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		}
 		serverErr <- err
 	}()
-
-	registration, err := startNodeRegistration(ctx, cfg, manager, logger)
-	if err != nil {
-		_ = server.Close()
-		return fmt.Errorf("register media node: %w", err)
-	}
-	defer registration.close(context.Background())
 
 	logger.Info(ctx, "media runtime started", "address", listener.Addr().String())
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
 )
 
 type MinIOConfig struct {
@@ -33,8 +34,9 @@ type AWSConfig struct {
 }
 
 type Config struct {
-	AWS    AWSConfig    `envPrefix:"AWS_"`
-	Stripe StripeConfig `envPrefix:"STRIPE_"`
+	Commercial licensing.Config
+	AWS        AWSConfig    `envPrefix:"AWS_"`
+	Stripe     StripeConfig `envPrefix:"STRIPE_"`
 
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	FrontendURL           string      `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
@@ -66,6 +68,9 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
+	if err := cfg.Commercial.Validate(); err != nil {
+		return Config{}, err
+	}
 
 	return cfg, nil
 }

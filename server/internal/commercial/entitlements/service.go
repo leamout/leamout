@@ -5,15 +5,23 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {
-	repo *Repository
+	license *licensing.Service
+	repo    *Repository
 }
 
 func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{
+		repo: repo,
+	}
+}
+
+func (s *Service) SetLicenseService(service *licensing.Service) {
+	s.license = service
 }
 
 func (s *Service) ListEffective(
@@ -48,6 +56,9 @@ func (s *Service) Enabled(
 	capability, err := normalizeCapability(capability)
 	if err != nil {
 		return false, err
+	}
+	if s.license.SelfHosted() {
+		return s.license.Enabled(ctx, string(capability))
 	}
 	enabled, err := s.repo.EffectiveEnabled(ctx, organizationID, capability)
 	if err != nil {
@@ -85,6 +96,9 @@ func (s *Service) Set(
 	capability, err := normalizeCapability(capability)
 	if err != nil {
 		return Entitlement{}, err
+	}
+	if s.license.SelfHosted() {
+		return Entitlement{}, apperror.NewForbidden("self-hosted features are managed by the signed license")
 	}
 	value, err := s.repo.Set(ctx, organizationID, capability, enabled)
 	if err != nil {
