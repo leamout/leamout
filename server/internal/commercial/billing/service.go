@@ -104,7 +104,9 @@ func (s *Service) Checkout(
 	if err != nil {
 		return SessionResponse{}, apperror.NewServiceUnavailable("create Stripe checkout session", err)
 	}
-	return SessionResponse{URL: session.URL}, nil
+	return SessionResponse{
+		URL: session.URL,
+	}, nil
 }
 
 func (s *Service) Portal(
@@ -140,7 +142,9 @@ func (s *Service) Portal(
 	if err != nil {
 		return SessionResponse{}, apperror.NewServiceUnavailable("create Stripe billing portal session", err)
 	}
-	return SessionResponse{URL: session.URL}, nil
+	return SessionResponse{
+		URL: session.URL,
+	}, nil
 }
 
 func (s *Service) Webhook(ctx context.Context, payload []byte, signature string) error {
@@ -274,7 +278,11 @@ func (s *Service) planCodeFromPrice(value stripeintegration.Subscription) (strin
 	if priceID == "" {
 		return "", apperror.NewBadRequest("Stripe subscription price is missing")
 	}
-	for _, code := range []string{"developer", "pro", "scale"} {
+	for _, code := range []string{
+		"developer",
+		"pro",
+		"scale",
+	} {
 		if expected := strings.TrimSpace(s.priceIDs[code]); expected != "" && expected == priceID {
 			return code, nil
 		}

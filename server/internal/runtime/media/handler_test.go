@@ -43,7 +43,10 @@ func TestHandlerCreatesAuthenticatedSessionAndUpdatesReadiness(t *testing.T) {
 		t.Fatalf("initial readiness status = %d", ready.Code)
 	}
 
-	format := session.AudioFormat{SampleRateHz: 16000, Channels: 1}
+	format := session.AudioFormat{
+		SampleRateHz: 16000,
+		Channels:     1,
+	}
 	sessionConfig := session.Config{
 		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
 		Engine: session.EngineEcho, InputFormat: format, OutputFormat: format,
@@ -142,7 +145,10 @@ func TestHandlerExposesMediaMetrics(t *testing.T) {
 	}
 	handler := newHandler(cfg, manager, tokens, http.NotFoundHandler())
 
-	format := session.AudioFormat{SampleRateHz: 16000, Channels: 1}
+	format := session.AudioFormat{
+		SampleRateHz: 16000,
+		Channels:     1,
+	}
 	sessionConfig := session.Config{
 		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
 		Engine: session.EngineEcho, InputFormat: format, OutputFormat: format,
@@ -177,11 +183,20 @@ func TestHandlerExposesMediaMetrics(t *testing.T) {
 func TestSelfHostedMediaRejectsUnlicensedNewSession(t *testing.T) {
 	cfg := validRuntimeConfig()
 	public, _, _ := ed25519.GenerateKey(rand.Reader)
-	license, err := licensing.NewService(licensing.Config{Mode: licensing.SelfHosted, DeploymentID: "deployment", File: filepath.Join(t.TempDir(), "missing"), PublicKeys: map[string]string{"issuer": base64.StdEncoding.EncodeToString(public)}})
+	license, err := licensing.NewService(licensing.Config{
+		Mode:         licensing.SelfHosted,
+		DeploymentID: "deployment",
+		File:         filepath.Join(t.TempDir(), "missing"),
+		PublicKeys: map[string]string{
+			"issuer": base64.StdEncoding.EncodeToString(public),
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	manager, err := session.NewManager(1, cfg.AttachTimeout, map[session.Engine]session.Starter{session.EngineEcho: echo.Engine{}})
+	manager, err := session.NewManager(1, cfg.AttachTimeout, map[session.Engine]session.Starter{
+		session.EngineEcho: echo.Engine{},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

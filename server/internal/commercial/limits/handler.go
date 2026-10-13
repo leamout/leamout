@@ -9,9 +9,16 @@ import (
 	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
-type Handler struct{ service *Service }
+type Handler struct {
+	service *Service
+}
 
-func NewHandler(service *Service) *Handler { return &Handler{service: service} }
+func NewHandler(service *Service) *Handler {
+	return &Handler{
+		service: service,
+	}
+}
+
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	id, ok := middleware.OrganizationIDFromContext(r.Context())
 	if !ok || id == uuid.Nil {

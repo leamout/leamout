@@ -15,10 +15,14 @@ type Service struct {
 }
 
 func NewService(repo *Repository) *Service {
-	return &Service{repo: repo}
+	return &Service{
+		repo: repo,
+	}
 }
 
-func (s *Service) SetLicenseService(service *licensing.Service) { s.license = service }
+func (s *Service) SetLicenseService(service *licensing.Service) {
+	s.license = service
+}
 
 func (s *Service) ListEffective(
 	ctx context.Context,

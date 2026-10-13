@@ -188,7 +188,9 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 
 	callConsumer := calls.NewConsumer(callsService)
-	sessionReconciliation := &sessionReconciliationJob{queries: queries}
+	sessionReconciliation := &sessionReconciliationJob{
+		queries: queries,
+	}
 
 	callReconciliation, err := calls.NewReconciliationJob(
 		callsRepository,

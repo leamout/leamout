@@ -22,14 +22,20 @@ type Service struct {
 }
 
 func NewService(plansService *plans.Service, subscriptionsService *subscriptions.Service, queries ...*sqlc.Queries) *Service {
-	s := &Service{plans: plansService, subscriptions: subscriptionsService, now: time.Now}
+	s := &Service{
+		plans:         plansService,
+		subscriptions: subscriptionsService,
+		now:           time.Now,
+	}
 	if len(queries) > 0 {
 		s.queries = queries[0]
 	}
 	return s
 }
 
-func (s *Service) SetLicenseService(service *licensing.Service) { s.license = service }
+func (s *Service) SetLicenseService(service *licensing.Service) {
+	s.license = service
+}
 
 func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective, error) {
 	if organizationID == uuid.Nil {
@@ -40,7 +46,11 @@ func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective,
 		if err != nil {
 			return Effective{}, err
 		}
-		return Effective{MaxConcurrentCalls: &claims.MaxConcurrentCalls, PeriodStart: claims.ValidFrom, PeriodEnd: claims.ExpiresAt}, nil
+		return Effective{
+			MaxConcurrentCalls: &claims.MaxConcurrentCalls,
+			PeriodStart:        claims.ValidFrom,
+			PeriodEnd:          claims.ExpiresAt,
+		}, nil
 	}
 	sub, err := s.subscriptions.Get(ctx, organizationID)
 	if err != nil {
@@ -137,7 +147,11 @@ func (s *Service) RuntimeUsage(ctx context.Context, organizationID uuid.UUID) (R
 		return RuntimeUsage{}, err
 	}
 	if limits.MonthlyRuntimeMinutes == nil {
-		return RuntimeUsage{PeriodStart: limits.PeriodStart, PeriodEnd: limits.PeriodEnd, Unlimited: true}, nil
+		return RuntimeUsage{
+			PeriodStart: limits.PeriodStart,
+			PeriodEnd:   limits.PeriodEnd,
+			Unlimited:   true,
+		}, nil
 	}
 	if s.queries == nil {
 		return RuntimeUsage{}, apperror.NewServiceUnavailable("runtime usage store unavailable", nil)
@@ -150,7 +164,12 @@ func (s *Service) RuntimeUsage(ctx context.Context, organizationID uuid.UUID) (R
 	if err != nil {
 		return RuntimeUsage{}, apperror.NewServiceUnavailable("read runtime usage", err)
 	}
-	return RuntimeUsage{PeriodStart: limits.PeriodStart, PeriodEnd: limits.PeriodEnd, UsedSeconds: used, AllowanceSeconds: *limits.MonthlyRuntimeMinutes * 60}, nil
+	return RuntimeUsage{
+		PeriodStart:      limits.PeriodStart,
+		PeriodEnd:        limits.PeriodEnd,
+		UsedSeconds:      used,
+		AllowanceSeconds: *limits.MonthlyRuntimeMinutes * 60,
+	}, nil
 }
 
 // Check only when admitting a NEW session. Do not terminate in-flight calls.

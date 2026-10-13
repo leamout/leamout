@@ -30,7 +30,9 @@ func NewChannelStore(client *redisintegration.Client) *ChannelStore {
 	if client == nil {
 		panic("calling: Redis client is required")
 	}
-	return &ChannelStore{client: client}
+	return &ChannelStore{
+		client: client,
+	}
 }
 
 func (s *ChannelStore) Bind(ctx context.Context, callID uuid.UUID, channelID string) error {
@@ -100,7 +102,9 @@ func (s *ChannelStore) Delete(ctx context.Context, callID uuid.UUID) error {
 		return err
 	}
 
-	keys := []string{channelKey(callID)}
+	keys := []string{
+		channelKey(callID),
+	}
 	if channelID = strings.TrimSpace(channelID); channelID != "" {
 		keys = append(keys, channelCallKey(channelID))
 	}
@@ -116,7 +120,9 @@ func NewAdmissionLimiter(client *redisintegration.Client) *AdmissionLimiter {
 	if client == nil {
 		panic("calling: Redis admission store is required")
 	}
-	return &AdmissionLimiter{client: client}
+	return &AdmissionLimiter{
+		client: client,
+	}
 }
 
 // Self-hosted concurrency is shared across every organization in the deployment.

@@ -13,7 +13,9 @@ type Middleware struct {
 }
 
 func NewMiddleware(service *Service) *Middleware {
-	return &Middleware{service: service}
+	return &Middleware{
+		service: service,
+	}
 }
 
 func (m *Middleware) Require(capability Capability) func(http.Handler) http.Handler {

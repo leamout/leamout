@@ -22,7 +22,10 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 }
 
 func NewRepositoryForDeployment(queries *sqlc.Queries, selfHosted bool) *Repository {
-	return &Repository{queries: queries, selfHosted: selfHosted}
+	return &Repository{
+		queries:    queries,
+		selfHosted: selfHosted,
+	}
 }
 
 func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]Policy, error) {
@@ -80,7 +83,10 @@ func (r *Repository) ListEffectiveRecordingRetention(
 		out := make([]EffectiveRecordingRetention, 0, len(rows))
 		for _, row := range rows {
 			if row.Resource == "recordings" {
-				out = append(out, EffectiveRecordingRetention{OrganizationID: row.OrganizationID, RetentionDays: row.RetentionDays})
+				out = append(out, EffectiveRecordingRetention{
+					OrganizationID: row.OrganizationID,
+					RetentionDays:  row.RetentionDays,
+				})
 			}
 		}
 		return out, nil

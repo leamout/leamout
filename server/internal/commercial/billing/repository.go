@@ -8,9 +8,15 @@ import (
 )
 
 // Repository pages through locally known Stripe subscriptions for reconciliation.
-type Repository struct{ queries *sqlc.Queries }
+type Repository struct {
+	queries *sqlc.Queries
+}
 
-func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }
+func NewRepository(queries *sqlc.Queries) *Repository {
+	return &Repository{
+		queries: queries,
+	}
+}
 
 func (r *Repository) ListReconciliationTargets(ctx context.Context, after uuid.UUID) ([]ReconciliationTarget, error) {
 	rows, err := r.queries.ListBillingReconciliationTargets(ctx, after)

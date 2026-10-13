@@ -31,7 +31,10 @@ func TestAdmissionLimiterValidatesArgumentsBeforeRedis(t *testing.T) {
 		context.Background(),
 		uuid.Nil,
 		"",
-		routing.Limits{MaxCPS: 1, MaxConcurrentCalls: 1},
+		routing.Limits{
+			MaxCPS:             1,
+			MaxConcurrentCalls: 1,
+		},
 	); err == nil {
 		t.Fatal("expected invalid admission identity error")
 	}
@@ -55,11 +58,15 @@ func TestSelfHostedAdmissionSharesDeploymentCapacity(t *testing.T) {
 	if cloud.organizationPrefix(first) == cloud.organizationPrefix(second) {
 		t.Fatal("Cloud organizations share capacity")
 	}
-	hosted := &AdmissionLimiter{deploymentID: "deployment"}
+	hosted := &AdmissionLimiter{
+		deploymentID: "deployment",
+	}
 	if hosted.organizationPrefix(first) != hosted.organizationPrefix(second) {
 		t.Fatal("self-hosted organizations can multiply licensed capacity")
 	}
-	if hosted.organizationPrefix(first) == (&AdmissionLimiter{deploymentID: "other"}).organizationPrefix(first) {
+	if hosted.organizationPrefix(first) == (&AdmissionLimiter{
+		deploymentID: "other",
+	}).organizationPrefix(first) {
 		t.Fatal("deployments share capacity")
 	}
 }

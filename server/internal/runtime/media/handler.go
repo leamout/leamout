@@ -31,7 +31,12 @@ type handler struct {
 }
 
 func newHandler(cfg Config, manager *session.Manager, tokens *transport.TokenService, websocketHandler http.Handler) *handler {
-	return &handler{config: cfg, manager: manager, tokens: tokens, websocket: websocketHandler}
+	return &handler{
+		config:    cfg,
+		manager:   manager,
+		tokens:    tokens,
+		websocket: websocketHandler,
+	}
 }
 
 func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +221,9 @@ func (h *handler) controlSession(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		return
 	}
-	defer func() { _ = ws.CloseNow() }()
+	defer func() {
+		_ = ws.CloseNow()
+	}()
 
 	ctx := r.Context()
 	errs := make(chan error, 2)

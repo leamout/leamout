@@ -19,14 +19,35 @@ import (
 func TestSelfHostedDoesNotReadCloudLimits(t *testing.T) {
 	public, private, _ := ed25519.GenerateKey(rand.Reader)
 	now := time.Now().UTC()
-	claims := licensing.Claims{Version: 1, LicenseID: "id", CustomerID: "customer", DeploymentID: "deployment", ValidFrom: now.Add(-time.Hour), ExpiresAt: now.Add(time.Hour), GraceUntil: now.Add(time.Hour), MaxConcurrentCalls: 50, MaxNodes: 3}
+	claims := licensing.Claims{
+		Version:            1,
+		LicenseID:          "id",
+		CustomerID:         "customer",
+		DeploymentID:       "deployment",
+		ValidFrom:          now.Add(-time.Hour),
+		ExpiresAt:          now.Add(time.Hour),
+		GraceUntil:         now.Add(time.Hour),
+		MaxConcurrentCalls: 50,
+		MaxNodes:           3,
+	}
 	payload, _ := json.Marshal(claims)
-	data, _ := json.Marshal(licensing.Document{KeyID: "key", Payload: base64.StdEncoding.EncodeToString(payload), Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(private, payload))})
+	data, _ := json.Marshal(licensing.Document{
+		KeyID:     "key",
+		Payload:   base64.StdEncoding.EncodeToString(payload),
+		Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(private, payload)),
+	})
 	path := filepath.Join(t.TempDir(), "license.json")
 	if err := os.WriteFile(path, data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	license, err := licensing.NewService(licensing.Config{Mode: licensing.SelfHosted, DeploymentID: "deployment", File: path, PublicKeys: map[string]string{"key": base64.StdEncoding.EncodeToString(public)}})
+	license, err := licensing.NewService(licensing.Config{
+		Mode:         licensing.SelfHosted,
+		DeploymentID: "deployment",
+		File:         path,
+		PublicKeys: map[string]string{
+			"key": base64.StdEncoding.EncodeToString(public),
+		},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +59,11 @@ func TestSelfHostedDoesNotReadCloudLimits(t *testing.T) {
 	if err != nil || !limited || limit != 50 {
 		t.Fatalf("concurrency=%d,%v,%v", limit, limited, err)
 	}
-	for _, resolve := range []func(context.Context, uuid.UUID) (int64, bool, error){service.RetentionDays, service.MaxVoiceAgents, service.MaxSIPTrunks} {
+	for _, resolve := range []func(context.Context, uuid.UUID) (int64, bool, error){
+		service.RetentionDays,
+		service.MaxVoiceAgents,
+		service.MaxSIPTrunks,
+	} {
 		_, limited, err := resolve(ctx, organization)
 		if err != nil || limited {
 			t.Fatalf("unexpected Cloud restriction: %v %v", limited, err)

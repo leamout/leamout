@@ -68,7 +68,11 @@ func issue(claimsPath, keyPath, keyID, output string) error {
 	if err != nil || len(key) != ed25519.PrivateKeySize {
 		return fmt.Errorf("private key must be a base64 Ed25519 private key")
 	}
-	doc := licensing.Document{KeyID: keyID, Payload: base64.StdEncoding.EncodeToString(payload), Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(ed25519.PrivateKey(key), payload))}
+	doc := licensing.Document{
+		KeyID:     keyID,
+		Payload:   base64.StdEncoding.EncodeToString(payload),
+		Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(ed25519.PrivateKey(key), payload)),
+	}
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
 		return err

@@ -34,25 +34,41 @@ func NewService(config Config) (*Service, error) {
 		keys[id] = key
 	}
 	config.PublicKeys = keys
-	return &Service{config: config, now: time.Now}, nil
+	return &Service{
+		config: config,
+		now:    time.Now,
+	}, nil
 }
 
-func (s *Service) SelfHosted() bool     { return s != nil && s.config.Mode == SelfHosted }
-func (s *Service) DeploymentID() string { return s.config.DeploymentID }
+func (s *Service) SelfHosted() bool {
+	return s != nil && s.config.Mode == SelfHosted
+}
+
+func (s *Service) DeploymentID() string {
+	return s.config.DeploymentID
+}
 
 // Read on each decision so atomic file replacement renews a running installation.
 // No Cloud billing or database dependency is involved.
 func (s *Service) Status() Status {
 	if !s.SelfHosted() {
-		return Status{Mode: Cloud, State: "cloud"}
+		return Status{
+			Mode:  Cloud,
+			State: "cloud",
+		}
 	}
-	status := Status{Mode: SelfHosted, State: "invalid"}
+	status := Status{
+		Mode:  SelfHosted,
+		State: "invalid",
+	}
 	file, err := os.Open(s.config.File)
 	if err != nil {
 		status.State = "missing"
 		return status
 	}
-	defer func() { _ = file.Close() }()
+	defer func() {
+		_ = file.Close()
+	}()
 	data, err := io.ReadAll(io.LimitReader(file, maxDocumentSize+1))
 	if err != nil || len(data) > maxDocumentSize {
 		return status

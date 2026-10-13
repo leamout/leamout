@@ -83,7 +83,10 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		handler.nodeAllowance = registration.requireLicenseNode
 	}
 
-	server := &http.Server{Handler: handler, ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
 	serverErr := make(chan error, 1)
 	go func() {
 		err := server.Serve(listener)

@@ -18,7 +18,11 @@ func signed(t *testing.T, claims Claims, private ed25519.PrivateKey) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := json.Marshal(Document{KeyID: "test", Payload: base64.StdEncoding.EncodeToString(payload), Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(private, payload))})
+	data, err := json.Marshal(Document{
+		KeyID:     "test",
+		Payload:   base64.StdEncoding.EncodeToString(payload),
+		Signature: base64.StdEncoding.EncodeToString(ed25519.Sign(private, payload)),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,14 +35,37 @@ func TestLicenseLifecycleAndAtomicRenewal(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC)
-	claims := Claims{Version: 1, LicenseID: "lic-1", CustomerID: "customer", DeploymentID: "deployment", ValidFrom: now, ExpiresAt: now.Add(time.Hour), GraceUntil: now.Add(2 * time.Hour), MaxConcurrentCalls: 50, MaxNodes: 3, Features: []string{"sso", "audit_logging"}}
+	claims := Claims{
+		Version:            1,
+		LicenseID:          "lic-1",
+		CustomerID:         "customer",
+		DeploymentID:       "deployment",
+		ValidFrom:          now,
+		ExpiresAt:          now.Add(time.Hour),
+		GraceUntil:         now.Add(2 * time.Hour),
+		MaxConcurrentCalls: 50,
+		MaxNodes:           3,
+		Features: []string{
+			"sso",
+			"audit_logging",
+		},
+	}
 	path := filepath.Join(t.TempDir(), "license.json")
-	config := Config{Mode: SelfHosted, DeploymentID: "deployment", File: path, PublicKeys: map[string]string{"test": base64.StdEncoding.EncodeToString(public)}}
+	config := Config{
+		Mode:         SelfHosted,
+		DeploymentID: "deployment",
+		File:         path,
+		PublicKeys: map[string]string{
+			"test": base64.StdEncoding.EncodeToString(public),
+		},
+	}
 	service, err := NewService(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	service.now = func() time.Time { return now }
+	service.now = func() time.Time {
+		return now
+	}
 	if got := service.Status().State; got != "missing" {
 		t.Fatalf("state = %s", got)
 	}
@@ -53,10 +80,31 @@ func TestLicenseLifecycleAndAtomicRenewal(t *testing.T) {
 		state   string
 		allowed bool
 	}{
-		{-time.Nanosecond, "not_yet_valid", false}, {0, "active", true}, {time.Hour, "grace", true}, {2 * time.Hour, "expired", false},
+		{
+			-time.Nanosecond,
+			"not_yet_valid",
+			false,
+		},
+		{
+			0,
+			"active",
+			true,
+		},
+		{
+			time.Hour,
+			"grace",
+			true,
+		},
+		{
+			2 * time.Hour,
+			"expired",
+			false,
+		},
 	} {
 		t.Run(tc.state, func(t *testing.T) {
-			service.now = func() time.Time { return now.Add(tc.offset) }
+			service.now = func() time.Time {
+				return now.Add(tc.offset)
+			}
 			if got := service.Status().State; got != tc.state {
 				t.Fatalf("state=%s, want=%s", got, tc.state)
 			}
@@ -108,20 +156,74 @@ func TestVerifyRejectsUntrustedClaims(t *testing.T) {
 	public, private, _ := ed25519.GenerateKey(rand.Reader)
 	_, other, _ := ed25519.GenerateKey(rand.Reader)
 	now := time.Now().UTC()
-	valid := Claims{Version: 1, LicenseID: "id", CustomerID: "customer", DeploymentID: "deployment", ValidFrom: now, ExpiresAt: now.Add(time.Hour), GraceUntil: now.Add(time.Hour), MaxConcurrentCalls: 1, MaxNodes: 1}
-	keys := map[string]string{"test": base64.StdEncoding.EncodeToString(public)}
+	valid := Claims{
+		Version:            1,
+		LicenseID:          "id",
+		CustomerID:         "customer",
+		DeploymentID:       "deployment",
+		ValidFrom:          now,
+		ExpiresAt:          now.Add(time.Hour),
+		GraceUntil:         now.Add(time.Hour),
+		MaxConcurrentCalls: 1,
+		MaxNodes:           1,
+	}
+	keys := map[string]string{
+		"test": base64.StdEncoding.EncodeToString(public),
+	}
 	for _, tc := range []struct {
 		name       string
 		edit       func(*Claims)
 		key        ed25519.PrivateKey
 		deployment string
 	}{
-		{"wrong signer", func(*Claims) {}, other, "deployment"},
-		{"wrong deployment", func(*Claims) {}, private, "other"},
-		{"unknown version", func(c *Claims) { c.Version = 2 }, private, "deployment"},
-		{"zero capacity", func(c *Claims) { c.MaxConcurrentCalls = 0 }, private, "deployment"},
-		{"unbounded grace", func(c *Claims) { c.GraceUntil = c.ExpiresAt.AddDate(0, 0, 31) }, private, "deployment"},
-		{"unknown feature", func(c *Claims) { c.Features = []string{"anything"} }, private, "deployment"},
+		{
+			"wrong signer",
+			func(*Claims) {
+			},
+			other,
+			"deployment",
+		},
+		{
+			"wrong deployment",
+			func(*Claims) {
+			},
+			private,
+			"other",
+		},
+		{
+			"unknown version",
+			func(c *Claims) {
+				c.Version = 2
+			},
+			private,
+			"deployment",
+		},
+		{
+			"zero capacity",
+			func(c *Claims) {
+				c.MaxConcurrentCalls = 0
+			},
+			private,
+			"deployment",
+		},
+		{
+			"unbounded grace",
+			func(c *Claims) {
+				c.GraceUntil = c.ExpiresAt.AddDate(0, 0, 31)
+			},
+			private,
+			"deployment",
+		},
+		{
+			"unknown feature",
+			func(c *Claims) {
+				c.Features = []string{
+					"anything",
+				}
+			},
+			private,
+			"deployment",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			c := valid
@@ -138,7 +240,22 @@ func TestVerifyRejectsUntrustedClaims(t *testing.T) {
 }
 
 func TestDeploymentConfig(t *testing.T) {
-	for _, config := range []Config{{Mode: "unknown"}, {Mode: SelfHosted}, {Mode: SelfHosted, DeploymentID: "deployment", File: "license", PublicKeys: map[string]string{"bad": "bad"}}} {
+	for _, config := range []Config{
+		{
+			Mode: "unknown",
+		},
+		{
+			Mode: SelfHosted,
+		},
+		{
+			Mode:         SelfHosted,
+			DeploymentID: "deployment",
+			File:         "license",
+			PublicKeys: map[string]string{
+				"bad": "bad",
+			},
+		},
+	} {
 		if _, err := NewService(config); err == nil {
 			t.Fatalf("invalid config accepted: %+v", config)
 		}
@@ -152,7 +269,9 @@ func TestDeploymentConfig(t *testing.T) {
 func TestPinnedKeyringCannotBeReplacedByEnvironment(t *testing.T) {
 	public, _, _ := ed25519.GenerateKey(rand.Reader)
 	original := BuildPublicKeys
-	t.Cleanup(func() { BuildPublicKeys = original })
+	t.Cleanup(func() {
+		BuildPublicKeys = original
+	})
 	BuildPublicKeys = "issuer:" + base64.StdEncoding.EncodeToString(public)
 	t.Setenv("LICENSE_PUBLIC_KEYS", "attacker:fake")
 	keys, err := (Config{}).keyring()
