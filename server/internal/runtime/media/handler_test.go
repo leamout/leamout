@@ -191,7 +191,7 @@ func TestSelfHostedMediaRejectsUnlicensedNewSession(t *testing.T) {
 	}
 	h := newHandler(cfg, manager, tokens, http.NotFoundHandler())
 	h.license = license
-	req := httptest.NewRequest(http.MethodPost, "/internal/v1/sessions", strings.NewReader(`{}`))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/v1/sessions", strings.NewReader(`{}`))
 	req.Header.Set("Authorization", "Bearer "+cfg.ControlToken)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -199,7 +199,7 @@ func TestSelfHostedMediaRejectsUnlicensedNewSession(t *testing.T) {
 		t.Fatalf("status=%d active=%d", rec.Code, manager.Active())
 	}
 	live := httptest.NewRecorder()
-	h.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/livez", nil))
+	h.ServeHTTP(live, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/livez", nil))
 	if live.Code != http.StatusOK {
 		t.Fatalf("liveness=%d", live.Code)
 	}

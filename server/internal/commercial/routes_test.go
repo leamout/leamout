@@ -36,7 +36,7 @@ func TestSelfHostedExcludesCloudRoutesAndProtectsLicenseStatus(t *testing.T) {
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			router.ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, nil))
+			router.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), tc.method, tc.path, nil))
 			if rec.Code != tc.code {
 				t.Fatalf("status=%d want=%d", rec.Code, tc.code)
 			}
