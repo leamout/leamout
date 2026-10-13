@@ -3,12 +3,10 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/netip"
 	"os"
 	"strings"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/leamout/leamout/server/internal/commercial/licensing"
 )
@@ -70,13 +68,7 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
-	if cfg.Commercial.Mode != licensing.SelfHosted {
-		if err := cfg.Polar.Validate(); err != nil {
-			return Config{}, err
-		}
-	}
-
-	if err := cfg.Commercial.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
 
@@ -117,18 +109,6 @@ func (c *Config) normalize() {
 	c.TrustedProxyCIDRs = normalizeStrings(c.TrustedProxyCIDRs)
 }
 
-func (c Config) TrustedProxyPrefixes() ([]netip.Prefix, error) {
-	result := make([]netip.Prefix, 0, len(c.TrustedProxyCIDRs))
-	for _, value := range c.TrustedProxyCIDRs {
-		prefix, err := netip.ParsePrefix(value)
-		if err != nil {
-			return nil, fmt.Errorf("parse trusted proxy CIDR %q: %w", value, err)
-		}
-		result = append(result, prefix.Masked())
-	}
-	return result, nil
-}
-
 func normalizeStrings(values []string) []string {
 	result := make([]string, 0, len(values))
 	for _, value := range values {
@@ -137,23 +117,4 @@ func normalizeStrings(values []string) []string {
 		}
 	}
 	return result
-}
-
-func (c PolarConfig) Validate() error {
-	if c.Environment != "production" && c.Environment != "sandbox" {
-		return fmt.Errorf("POLAR_ENVIRONMENT must be production or sandbox")
-	}
-	seen := make(map[uuid.UUID]bool)
-	for _, value := range []string{
-		c.DeveloperProductID,
-		c.ProProductID,
-		c.ScaleProductID,
-	} {
-		id, err := uuid.Parse(value)
-		if err != nil || id == uuid.Nil || seen[id] {
-			return fmt.Errorf("polar product IDs must be distinct nonempty UUIDs")
-		}
-		seen[id] = true
-	}
-	return nil
 }
