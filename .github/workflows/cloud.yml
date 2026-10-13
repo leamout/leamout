@@ -1,0 +1,22 @@
+name: Cloud private-beta offline validation
+
+on:
+  pull_request:
+    paths:
+      - "deploy/cloud/**"
+      - ".github/workflows/cloud.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: Validate Cloud Compose and Python preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Compile preflight
+        run: python3 -m py_compile deploy/cloud/preflight.py
+      - name: Validate Cloud Compose overlay
+        run: APP_ENV_FILE=../server/.env.example docker compose --env-file .env.example -f deploy/compose.yaml -f deploy/cloud/compose.yaml config --quiet
