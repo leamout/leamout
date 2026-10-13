@@ -69,9 +69,13 @@ AI-provider credentials, and may configure an external S3-compatible recording
 store. They are responsible for infrastructure, carrier, AI-provider, and
 storage costs.
 
-The software may be distributed as free/open-source or source-available
-software. The exact license is a separate product and legal decision and is not
-defined here.
+The Community implementation in this repository is Apache-2.0 licensed, and
+its core Voice Agent, telephony, BYOC/BYOA/BYOS, local identity and base access
+controls run without a commercial license. Enterprise contracts may license
+separately distributed proprietary extensions and provide support; they never
+relicense code already published under Apache 2.0.
+
+See [open-core.md](open-core.md) for edition and authentication boundaries.
 
 ## Leamout Cloud
 
@@ -118,8 +122,10 @@ the next subscription billing period. Monthly allowances must be enforced in
 the backend before these tiers are published. Recordings and storage require
 separate measured retention and storage budgets.
 
-Self-hosted capacity is operated and paid for by the customer and requires
-separate licensing terms, not automatically the Cloud subscription quotas.
+Self-hosted capacity is operated and paid for by the customer. The open-source
+core does not require activation or enforce commercial concurrent-call or
+media-node limits. A signed Enterprise license is optional and gates additional
+Enterprise features, not Community Voice Agent execution.
 
 ## Enterprise packaging
 

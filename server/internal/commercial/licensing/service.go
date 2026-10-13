@@ -57,6 +57,13 @@ func (s *Service) Status() Status {
 			State: "cloud",
 		}
 	}
+	// No license is required to operate the Apache-2.0 Community runtime.
+	if s.config.File == "" {
+		return Status{
+			Mode:  SelfHosted,
+			State: "community",
+		}
+	}
 	status := Status{
 		Mode:  SelfHosted,
 		State: "invalid",
@@ -103,12 +110,18 @@ func (s *Service) RequireRuntime() (Claims, error) {
 	return *status.Claims, nil
 }
 
+// Enabled is an optional Enterprise feature decision, not an admission check
+// for the Community voice runtime. An absent or invalid license fails closed
+// for Enterprise features without taking SIP, media or AI service offline.
 func (s *Service) Enabled(_ context.Context, feature string) (bool, error) {
-	claims, err := s.RequireRuntime()
-	if err != nil {
-		return false, err
+	if !s.SelfHosted() {
+		return false, nil
 	}
-	for _, enabled := range claims.Features {
+	status := s.Status()
+	if (status.State != "active" && status.State != "grace") || status.Claims == nil {
+		return false, nil
+	}
+	for _, enabled := range status.Claims.Features {
 		if enabled == feature {
 			return true, nil
 		}

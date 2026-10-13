@@ -56,7 +56,7 @@ func TestSelfHostedDoesNotReadCloudLimits(t *testing.T) {
 	ctx := context.Background()
 	organization := uuid.New()
 	limit, limited, err := service.MaxConcurrentCalls(ctx, organization)
-	if err != nil || !limited || limit != 50 {
+	if err != nil || limited || limit != 0 {
 		t.Fatalf("concurrency=%d,%v,%v", limit, limited, err)
 	}
 	for _, resolve := range []func(context.Context, uuid.UUID) (int64, bool, error){
@@ -79,10 +79,10 @@ func TestSelfHostedDoesNotReadCloudLimits(t *testing.T) {
 	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := service.MaxConcurrentCalls(ctx, organization); err == nil {
-		t.Fatal("unlicensed runtime admitted")
+	if value, limited, err := service.MaxConcurrentCalls(ctx, organization); err != nil || limited || value != 0 {
+		t.Fatalf("Community runtime must remain available: %v %v %v", value, limited, err)
 	}
-	if err := service.RequireRuntimeAllowance(ctx, organization); err == nil {
-		t.Fatal("unlicensed Voice Agent admitted")
+	if err := service.RequireRuntimeAllowance(ctx, organization); err != nil {
+		t.Fatalf("Community Voice Agent cannot depend on a commercial license: %v", err)
 	}
 }

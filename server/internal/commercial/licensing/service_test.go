@@ -70,7 +70,7 @@ func TestLicenseLifecycleAndAtomicRenewal(t *testing.T) {
 		t.Fatalf("state = %s", got)
 	}
 	if _, err := service.RequireRuntime(); err == nil {
-		t.Fatal("missing license authorized runtime")
+		t.Fatal("missing Enterprise license authorized premium features")
 	}
 	if err := os.WriteFile(path, signed(t, claims, private), 0600); err != nil {
 		t.Fatal(err)
@@ -148,7 +148,10 @@ func TestLicenseLifecycleAndAtomicRenewal(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := service.RequireRuntime(); err == nil {
-		t.Fatal("tampered license authorized runtime")
+		t.Fatal("tampered license authorized premium features")
+	}
+	if enabled, err := service.Enabled(context.Background(), "sso"); err != nil || enabled {
+		t.Fatalf("invalid Enterprise license must not grant SSO: enabled=%v err=%v", enabled, err)
 	}
 }
 
@@ -244,9 +247,7 @@ func TestDeploymentConfig(t *testing.T) {
 		{
 			Mode: "unknown",
 		},
-		{
-			Mode: SelfHosted,
-		},
+
 		{
 			Mode:         SelfHosted,
 			DeploymentID: "deployment",
@@ -281,5 +282,25 @@ func TestPinnedKeyringCannotBeReplacedByEnvironment(t *testing.T) {
 	BuildPublicKeys = "issuer:bad,issuer:bad"
 	if err := (Config{}).Validate(); err == nil {
 		t.Fatal("duplicate build key accepted")
+	}
+}
+
+// Community deployments must not depend on vendor-issued licenses.
+func TestCommunitySelfHostedNoLicense(t *testing.T) {
+	service, err := NewService(Config{Mode: SelfHosted})
+	if err != nil {
+		t.Fatalf("Community startup: %v", err)
+	}
+	if got := service.Status().State; got != "community" {
+		t.Fatalf("Community status = %q", got)
+	}
+	for _, feature := range []string{"sso", "scim", "advanced_rbac", "audit_logging"} {
+		enabled, err := service.Enabled(context.Background(), feature)
+		if err != nil || enabled {
+			t.Fatalf("Enterprise feature %q: enabled=%v err=%v", feature, enabled, err)
+		}
+	}
+	if err := service.RequireDataFeature("audit_logging"); err == nil {
+		t.Fatal("Community must not grant optional Enterprise audit access")
 	}
 }

@@ -72,10 +72,11 @@ Leamout provides:
 - recordings, events, webhooks, and observability;
 - Self-Hosted and Leamout Cloud deployment options.
 
-The same voice-agent platform underlies both options. Enterprise is optional
-commercial support, security, governance, deployment assistance, and
-contractual packaging for Cloud or Self-Hosted; it is not a separate product
-architecture.
+The same voice-agent platform underlies both deployment options. Self-Hosted
+Community is Apache-2.0 and requires **no license file or Leamout payment**.
+Enterprise is optional separately distributed commercial extensions, support,
+security, governance, and contractual packaging for either deployment;
+it is not a second runtime architecture. See [docs/open-core.md](docs/open-core.md).
 
 Leamout does not buy or resell carrier minutes, phone numbers, SMS, WhatsApp
 capacity, or managed carrier services.
@@ -379,8 +380,8 @@ for the checkout back button; success and return URLs must use the configured
 frontend origin. No undocumented provider idempotency header is assumed.
 
 Migration 034 creates the subscription schema with Polar as the supported billing
-provider. Self-hosted installations continue using their licenses without a Polar
-subscription or Cloud quotas.
+provider. Self-hosted Community runs without any Leamout license or Polar
+subscription. Signed licenses enable optional Enterprise extensions only.
 
 ## License
 
