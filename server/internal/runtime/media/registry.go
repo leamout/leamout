@@ -119,4 +119,3 @@ func (r *nodeRegistration) close(ctx context.Context) {
 	_ = r.registry.RemoveNode(ctx, r.nodeID)
 	_ = r.redis.Close()
 }
-
