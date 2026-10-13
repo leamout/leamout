@@ -24,6 +24,7 @@ type verifyOTPRequest struct {
 
 type setPasswordRequest struct {
 	Password string `json:"password"`
+	CurrentPassword string `json:"current_password,omitempty"`
 }
 
 // Responses

@@ -181,9 +181,17 @@ func (h *Handler) SetPassword(
 		return
 	}
 
+	principal, ok := authn.PrincipalFromContext(r.Context())
+	if !ok || principal.Credential.Type != authn.CredentialSession {
+		httputil.Error(w, apperror.NewUnauthorized("session authentication required"))
+		return
+	}
 	user, err := h.service.SetPassword(
 		r.Context(),
 		userID,
+		principal.Credential.ID,
+		principal.Assurance,
+		req.CurrentPassword,
 		req.Password,
 	)
 	if err != nil {
@@ -191,6 +199,8 @@ func (h *Handler) SetPassword(
 		return
 	}
 
+	// Password changes invalidate the old cookie and all other sessions.
+	session.ClearCookie(w, h.development, h.cookieDomain)
 	httputil.OK(
 		w,
 		authenticationResponse{

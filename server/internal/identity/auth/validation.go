@@ -70,9 +70,12 @@ func validateVerifyOTPRequest(req verifyOTPRequest) (uuid.UUID, string, error) {
 }
 
 func validateSetPasswordRequest(req setPasswordRequest) error {
-	if req.Password == "" {
-		return apperror.NewBadRequest("password is required")
-	}
+	return validateNewPassword(req.Password)
+}
 
+func validateNewPassword(value string) error {
+	if len(value) < 12 || len(value) > 1024 {
+		return apperror.NewBadRequest("password must be between 12 and 1024 bytes")
+	}
 	return nil
 }
