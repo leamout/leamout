@@ -18,3 +18,9 @@ Before public launch:
 - Review deployed analytics and cookie behavior before finalizing the cookie policy.
 
 No certifications, customer testimonials, uptime commitments, or provider-processing locations are assumed in this copy.
+
+## Pricing block
+
+`components/shadcn-space/blocks/pricing-01/pricing.tsx` adapts the supplied Shadcn Space pricing-01 design to the shared Base UI components, Hugeicons, and the Leamout plan catalog. It is used by `/pricing`; `/pricing-01` is a standalone, noindex preview. Both receive the configured console signup URL from their server page.
+
+The block uses Motion for entry animation and respects reduced-motion preferences. Cards are visible in server-rendered HTML before JavaScript runs. All styling uses existing theme tokens and Tailwind utilities; no additional global CSS is needed.
