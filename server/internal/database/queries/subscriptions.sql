@@ -48,9 +48,22 @@ DO UPDATE SET
     provider_customer_id = EXCLUDED.provider_customer_id,
     provider_subscription_id = EXCLUDED.provider_subscription_id,
     provider_event_created_at = EXCLUDED.provider_event_created_at
-WHERE subscriptions.provider_event_created_at IS NULL
-   OR EXCLUDED.provider_event_created_at IS NULL
-   OR EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
+WHERE (
+    subscriptions.provider_event_created_at IS NULL
+    OR (
+        EXCLUDED.provider_event_created_at IS NOT NULL
+        AND EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
+    )
+)
+AND (
+    subscriptions.provider_subscription_id IS NULL
+    OR subscriptions.provider_subscription_id = EXCLUDED.provider_subscription_id
+    OR subscriptions.status = 'canceled'
+)
+AND (
+    subscriptions.provider_customer_id IS NULL
+    OR subscriptions.provider_customer_id = EXCLUDED.provider_customer_id
+)
 RETURNING *;
 
 -- name: GetEffectiveOrganizationEntitlement :one

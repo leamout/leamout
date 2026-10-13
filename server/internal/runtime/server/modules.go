@@ -133,6 +133,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	stripeClient := stripe.New(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret)
 	commercialModule := commercial.New(queries, commercial.Dependencies{
 		Stripe: stripeClient,
+		FrontendURL: cfg.FrontendURL,
 		StripePrices: map[string]string{
 			"developer": cfg.Stripe.DeveloperPriceID,
 			"pro":       cfg.Stripe.ProPriceID,

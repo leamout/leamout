@@ -33,6 +33,7 @@ func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, apperror.NewBadRequest("invalid request body"))
 		return
 	}
+	req.IdempotencyKey = r.Header.Get("Idempotency-Key")
 	result, err := h.service.Checkout(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)

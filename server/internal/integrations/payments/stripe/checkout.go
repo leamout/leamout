@@ -11,6 +11,7 @@ type CheckoutParams struct {
 	CustomerID     string
 	OrganizationID string
 	PlanCode       string
+	IdempotencyKey string
 	SuccessURL     string
 	CancelURL      string
 }
@@ -54,7 +55,7 @@ func (c *Client) CreateCheckoutSession(ctx context.Context, params CheckoutParam
 	}
 
 	var session CheckoutSession
-	err := c.doForm(ctx, http.MethodPost, "/v1/checkout/sessions", values, &session)
+	err := c.doFormWithIdempotency(ctx, http.MethodPost, "/v1/checkout/sessions", values, &session, params.IdempotencyKey)
 	return session, err
 }
 

@@ -26,6 +26,7 @@ type BillingModule struct {
 type Dependencies struct {
 	Stripe       *stripeintegration.Client
 	StripePrices map[string]string
+	FrontendURL string
 }
 
 type PlansModule struct {
@@ -68,6 +69,7 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 		subscriptionsService,
 		deps.Stripe,
 		deps.StripePrices,
+		deps.FrontendURL,
 	)
 
 	entitlementsRepository := entitlements.NewRepository(queries)

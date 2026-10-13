@@ -2,6 +2,7 @@ package billing
 
 type CheckoutRequest struct {
 	PlanCode   string `json:"plan_code"`
+	IdempotencyKey string `json:"-"`
 	SuccessURL string `json:"success_url"`
 	CancelURL  string `json:"cancel_url"`
 }

@@ -122,9 +122,22 @@ DO UPDATE SET
     provider_customer_id = EXCLUDED.provider_customer_id,
     provider_subscription_id = EXCLUDED.provider_subscription_id,
     provider_event_created_at = EXCLUDED.provider_event_created_at
-WHERE subscriptions.provider_event_created_at IS NULL
-   OR EXCLUDED.provider_event_created_at IS NULL
-   OR EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
+WHERE (
+    subscriptions.provider_event_created_at IS NULL
+    OR (
+        EXCLUDED.provider_event_created_at IS NOT NULL
+        AND EXCLUDED.provider_event_created_at >= subscriptions.provider_event_created_at
+    )
+)
+AND (
+    subscriptions.provider_subscription_id IS NULL
+    OR subscriptions.provider_subscription_id = EXCLUDED.provider_subscription_id
+    OR subscriptions.status = 'canceled'
+)
+AND (
+    subscriptions.provider_customer_id IS NULL
+    OR subscriptions.provider_customer_id = EXCLUDED.provider_customer_id
+)
 RETURNING id, organization_id, plan_id, status, current_period_start, current_period_end, trial_ends_at, cancel_at_period_end, canceled_at, provider, provider_customer_id, provider_subscription_id, provider_event_created_at, created_at, updated_at
 `
 
