@@ -25,6 +25,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	httputil.OK(w, value)
 }
+
 func (h *Handler) RuntimeUsage(w http.ResponseWriter, r *http.Request) {
 	id, ok := middleware.OrganizationIDFromContext(r.Context())
 	if !ok || id == uuid.Nil {

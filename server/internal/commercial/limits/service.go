@@ -174,6 +174,7 @@ func fromPlan(plan plans.Plan) Effective {
 		MaxSIPTrunks:          positiveLimit(plan.Limits[plans.LimitMaxSIPTrunks]),
 	}
 }
+
 func positiveLimit(value int64) *int64 {
 	if value < 1 {
 		return nil

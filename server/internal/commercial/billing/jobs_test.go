@@ -64,6 +64,7 @@ func TestReconciliationPagesAndContinuesAfterProviderFailure(t *testing.T) {
 		t.Fatalf("pagination cursors=%v", repo.calls)
 	}
 }
+
 func TestReconciliationCancellationAndDatabaseFailure(t *testing.T) {
 	repo := &targetRepositoryStub{err: errors.New("database unavailable")}
 	service := &reconcilerStub{}

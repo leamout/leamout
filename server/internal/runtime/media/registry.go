@@ -141,6 +141,7 @@ func (r *nodeRegistration) close(ctx context.Context) {
 func (r *nodeRegistration) licenseNodePrefix() string {
 	return "commercial:license:nodes:" + r.license.DeploymentID()
 }
+
 func (r *nodeRegistration) requireLicenseNode(ctx context.Context) error {
 	claims, err := r.license.RequireRuntime()
 	if err != nil {

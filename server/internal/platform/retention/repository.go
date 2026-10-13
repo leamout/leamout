@@ -20,9 +20,11 @@ func NewRepository(queries *sqlc.Queries) *Repository {
 		queries: queries,
 	}
 }
+
 func NewRepositoryForDeployment(queries *sqlc.Queries, selfHosted bool) *Repository {
 	return &Repository{queries: queries, selfHosted: selfHosted}
 }
+
 func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]Policy, error) {
 	rows, err := r.queries.ListRetentionPolicies(ctx, organizationID)
 	if err != nil {
@@ -34,6 +36,7 @@ func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]Poli
 	}
 	return out, nil
 }
+
 func (r *Repository) Upsert(ctx context.Context, organizationID uuid.UUID, resource string, req UpsertRequest) (Policy, error) {
 	row, err := r.queries.UpsertRetentionPolicy(ctx, sqlc.UpsertRetentionPolicyParams{
 		OrganizationID: organizationID,
@@ -46,12 +49,14 @@ func (r *Repository) Upsert(ctx context.Context, organizationID uuid.UUID, resou
 	}
 	return fromRow(row), nil
 }
+
 func (r *Repository) Delete(ctx context.Context, organizationID uuid.UUID, resource string) error {
 	return r.queries.DeleteRetentionPolicy(ctx, sqlc.DeleteRetentionPolicyParams{
 		OrganizationID: organizationID,
 		Resource:       resource,
 	})
 }
+
 func (r *Repository) ListEnabled(ctx context.Context) ([]Policy, error) {
 	rows, err := r.queries.ListEnabledRetentionPolicies(ctx)
 	if err != nil {
@@ -63,6 +68,7 @@ func (r *Repository) ListEnabled(ctx context.Context) ([]Policy, error) {
 	}
 	return out, nil
 }
+
 func (r *Repository) ListEffectiveRecordingRetention(
 	ctx context.Context,
 ) ([]EffectiveRecordingRetention, error) {
@@ -103,6 +109,7 @@ func (r *Repository) ListExpiredRecordings(ctx context.Context, organizationID u
 		BatchSize: batchSize,
 	})
 }
+
 func fromRow(row sqlc.RetentionPolicy) Policy {
 	return Policy{
 		OrganizationID: row.OrganizationID,

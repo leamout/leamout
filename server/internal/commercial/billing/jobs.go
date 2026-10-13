@@ -11,6 +11,7 @@ import (
 type reconciliationRepository interface {
 	ListReconciliationTargets(context.Context, uuid.UUID) ([]ReconciliationTarget, error)
 }
+
 type subscriptionReconciler interface {
 	ReconcileSubscription(context.Context, ReconciliationTarget) error
 }
@@ -22,12 +23,23 @@ type ReconciliationJob struct {
 	report   func(context.Context, error)
 }
 
-func NewReconciliationJob(repo reconciliationRepository, service subscriptionReconciler, interval time.Duration, report func(context.Context, error)) (*ReconciliationJob, error) {
+func NewReconciliationJob(
+	repo reconciliationRepository,
+	service subscriptionReconciler,
+	interval time.Duration,
+	report func(context.Context, error),
+) (*ReconciliationJob, error) {
 	if repo == nil || service == nil || interval <= 0 || report == nil {
 		return nil, fmt.Errorf("billing reconciliation dependencies and positive interval required")
 	}
-	return &ReconciliationJob{repo: repo, service: service, interval: interval, report: report}, nil
+	return &ReconciliationJob{
+		repo:     repo,
+		service:  service,
+		interval: interval,
+		report:   report,
+	}, nil
 }
+
 func (j *ReconciliationJob) Run(ctx context.Context) error {
 	ticker := time.NewTicker(j.interval)
 	defer ticker.Stop()
@@ -42,6 +54,7 @@ func (j *ReconciliationJob) Run(ctx context.Context) error {
 		}
 	}
 }
+
 func (j *ReconciliationJob) reconcile(ctx context.Context) error {
 	cursor := uuid.Nil
 	for {
