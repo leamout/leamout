@@ -48,3 +48,18 @@ func TestAdmissionLimiterValidatesArgumentsBeforeRedis(t *testing.T) {
 		t.Fatal("expected invalid admission refresh error")
 	}
 }
+
+func TestSelfHostedAdmissionSharesDeploymentCapacity(t *testing.T) {
+	first, second := uuid.New(), uuid.New()
+	cloud := &AdmissionLimiter{}
+	if cloud.organizationPrefix(first) == cloud.organizationPrefix(second) {
+		t.Fatal("Cloud organizations share capacity")
+	}
+	hosted := &AdmissionLimiter{deploymentID: "deployment"}
+	if hosted.organizationPrefix(first) != hosted.organizationPrefix(second) {
+		t.Fatal("self-hosted organizations can multiply licensed capacity")
+	}
+	if hosted.organizationPrefix(first) == (&AdmissionLimiter{deploymentID: "other"}).organizationPrefix(first) {
+		t.Fatal("deployments share capacity")
+	}
+}

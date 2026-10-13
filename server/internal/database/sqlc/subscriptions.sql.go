@@ -30,6 +30,9 @@ LEFT JOIN entitlements oe
 LEFT JOIN subscriptions s
   ON s.organization_id = o.id
  AND s.status IN ('trialing', 'active')
+ AND s.current_period_start <= now()
+ AND s.current_period_end > now()
+ AND (s.status <> 'trialing' OR s.trial_ends_at IS NULL OR s.trial_ends_at > now())
 LEFT JOIN plans p
   ON p.id = s.plan_id
 WHERE o.id = $2

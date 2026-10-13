@@ -10,12 +10,18 @@ import (
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
-type Repository struct{ queries *sqlc.Queries }
+type Repository struct {
+	queries    *sqlc.Queries
+	selfHosted bool
+}
 
 func NewRepository(queries *sqlc.Queries) *Repository {
 	return &Repository{
 		queries: queries,
 	}
+}
+func NewRepositoryForDeployment(queries *sqlc.Queries, selfHosted bool) *Repository {
+	return &Repository{queries: queries, selfHosted: selfHosted}
 }
 func (r *Repository) List(ctx context.Context, organizationID uuid.UUID) ([]Policy, error) {
 	rows, err := r.queries.ListRetentionPolicies(ctx, organizationID)
@@ -60,6 +66,19 @@ func (r *Repository) ListEnabled(ctx context.Context) ([]Policy, error) {
 func (r *Repository) ListEffectiveRecordingRetention(
 	ctx context.Context,
 ) ([]EffectiveRecordingRetention, error) {
+	if r.selfHosted {
+		rows, err := r.queries.ListEnabledRetentionPolicies(ctx)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]EffectiveRecordingRetention, 0, len(rows))
+		for _, row := range rows {
+			if row.Resource == "recordings" {
+				out = append(out, EffectiveRecordingRetention{OrganizationID: row.OrganizationID, RetentionDays: row.RetentionDays})
+			}
+		}
+		return out, nil
+	}
 	rows, err := r.queries.ListEffectiveRecordingRetention(ctx)
 	if err != nil {
 		return nil, err

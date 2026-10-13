@@ -108,7 +108,8 @@ func (s *ChannelStore) Delete(ctx context.Context, callID uuid.UUID) error {
 }
 
 type AdmissionLimiter struct {
-	client *redisintegration.Client
+	deploymentID string
+	client       *redisintegration.Client
 }
 
 func NewAdmissionLimiter(client *redisintegration.Client) *AdmissionLimiter {
@@ -116,6 +117,22 @@ func NewAdmissionLimiter(client *redisintegration.Client) *AdmissionLimiter {
 		panic("calling: Redis admission store is required")
 	}
 	return &AdmissionLimiter{client: client}
+}
+
+// Self-hosted concurrency is shared across every organization in the deployment.
+func NewAdmissionLimiterForDeployment(client *redisintegration.Client, mode, deploymentID string) *AdmissionLimiter {
+	l := NewAdmissionLimiter(client)
+	if mode == "self_hosted" {
+		l.deploymentID = deploymentID
+	}
+	return l
+}
+
+func (l *AdmissionLimiter) organizationPrefix(id uuid.UUID) string {
+	if l.deploymentID != "" {
+		return "telecom:admission:deployment:" + l.deploymentID
+	}
+	return organizationAdmissionPrefix(id)
 }
 
 func (l *AdmissionLimiter) Acquire(
@@ -218,7 +235,7 @@ func (l *AdmissionLimiter) AcquireOrganization(
 
 	allowed, err := l.client.AcquireConcurrentLease(
 		ctx,
-		organizationAdmissionPrefix(organizationID),
+		l.organizationPrefix(organizationID),
 		leaseID,
 		maxConcurrent,
 		callAdmissionLeaseTTL,
@@ -243,7 +260,7 @@ func (l *AdmissionLimiter) BindOrganization(
 	}
 	return l.client.BindCallLease(
 		ctx,
-		organizationAdmissionPrefix(organizationID),
+		l.organizationPrefix(organizationID),
 		leaseID,
 		callID.String(),
 	)
@@ -259,7 +276,7 @@ func (l *AdmissionLimiter) ReleaseOrganization(
 	}
 	return l.client.ReleaseCallLease(
 		ctx,
-		organizationAdmissionPrefix(organizationID),
+		l.organizationPrefix(organizationID),
 		callOrLeaseID,
 	)
 }
@@ -273,7 +290,7 @@ func (l *AdmissionLimiter) RefreshOrganization(
 	}
 	return l.client.RefreshCallLease(
 		ctx,
-		organizationAdmissionPrefix(organizationID),
+		l.organizationPrefix(organizationID),
 		callID.String(),
 		callAdmissionLeaseTTL,
 	)

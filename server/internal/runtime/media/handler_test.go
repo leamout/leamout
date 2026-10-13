@@ -3,12 +3,18 @@ package media
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"
@@ -165,5 +171,36 @@ func TestHandlerExposesMediaMetrics(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("metrics body missing %q: %s", want, body)
 		}
+	}
+}
+
+func TestSelfHostedMediaRejectsUnlicensedNewSession(t *testing.T) {
+	cfg := validRuntimeConfig()
+	public, _, _ := ed25519.GenerateKey(rand.Reader)
+	license, err := licensing.NewService(licensing.Config{Mode: licensing.SelfHosted, DeploymentID: "deployment", File: filepath.Join(t.TempDir(), "missing"), PublicKeys: map[string]string{"issuer": base64.StdEncoding.EncodeToString(public)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager, err := session.NewManager(1, cfg.AttachTimeout, map[session.Engine]session.Starter{session.EngineEcho: echo.Engine{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens, err := transport.NewTokenService(cfg.TokenSecret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newHandler(cfg, manager, tokens, http.NotFoundHandler())
+	h.license = license
+	req := httptest.NewRequest(http.MethodPost, "/internal/v1/sessions", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "Bearer "+cfg.ControlToken)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusPaymentRequired || manager.Active() != 0 {
+		t.Fatalf("status=%d active=%d", rec.Code, manager.Active())
+	}
+	live := httptest.NewRecorder()
+	h.ServeHTTP(live, httptest.NewRequest(http.MethodGet, "/livez", nil))
+	if live.Code != http.StatusOK {
+		t.Fatalf("liveness=%d", live.Code)
 	}
 }

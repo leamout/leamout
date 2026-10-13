@@ -299,3 +299,20 @@ func (s *Service) validateRedirects(values ...string) error {
 	}
 	return nil
 }
+
+// ReconcileSubscription repairs missed webhooks from authoritative provider state.
+// Timestamp the read before the request so a later provider event wins in SQL.
+func (s *Service) ReconcileSubscription(ctx context.Context, target ReconciliationTarget) error {
+	if s.stripe == nil || !s.stripe.Configured() {
+		return apperror.NewServiceUnavailable("Stripe billing is not configured", nil)
+	}
+	observedAt := time.Now().UTC().Unix()
+	value, err := s.stripe.GetSubscription(ctx, target.SubscriptionID)
+	if err != nil {
+		return err
+	}
+	if value.ID != target.SubscriptionID || value.Customer != target.CustomerID || value.Metadata["organization_id"] != target.OrganizationID.String() {
+		return apperror.NewConflict("Stripe subscription identity does not match local subscription")
+	}
+	return s.syncStripeSubscription(ctx, observedAt, value)
+}

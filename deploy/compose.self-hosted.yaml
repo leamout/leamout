@@ -1,0 +1,27 @@
+# Overlay on compose.yaml. Customers should use issuer-built images; build args
+# are for Leamout's release process and contain public verification keys only.
+services:
+  server:
+    build:
+      args:
+        LICENSE_PUBLIC_KEYS: ${LICENSE_PUBLIC_KEYS:?Issuer public keyring is required at build time}
+    environment: &license-environment
+      DEPLOYMENT_MODE: self_hosted
+      LICENSE_DEPLOYMENT_ID: ${LICENSE_DEPLOYMENT_ID:?Deployment ID is required}
+      LICENSE_FILE: /leamout/licenses/license.json
+    volumes: &license-volumes
+      - ${LICENSE_DIRECTORY:?License directory is required}:/leamout/licenses:ro
+  worker:
+    build:
+      args:
+        LICENSE_PUBLIC_KEYS: ${LICENSE_PUBLIC_KEYS:?Issuer public keyring is required at build time}
+    environment: *license-environment
+    volumes: *license-volumes
+  media:
+    build:
+      args:
+        LICENSE_PUBLIC_KEYS: ${LICENSE_PUBLIC_KEYS:?Issuer public keyring is required at build time}
+    environment:
+      <<: *license-environment
+      MEDIA_NODE_ID: ${MEDIA_NODE_ID:-media-1}
+    volumes: *license-volumes
