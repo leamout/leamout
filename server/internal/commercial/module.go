@@ -8,7 +8,7 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
-	stripeintegration "github.com/leamout/leamout/server/internal/integrations/payments/stripe"
+	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
 )
 
 type Module struct {
@@ -26,10 +26,10 @@ type BillingModule struct {
 }
 
 type Dependencies struct {
-	License      *licensing.Service
-	Stripe       *stripeintegration.Client
-	StripePrices map[string]string
-	FrontendURL  string
+	License       *licensing.Service
+	Polar         *polarintegration.Client
+	PolarProducts map[string]string
+	FrontendURL   string
 }
 
 type PlansModule struct {
@@ -72,8 +72,8 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	billingService := billing.NewService(
 		plansService,
 		subscriptionsService,
-		deps.Stripe,
-		deps.StripePrices,
+		deps.Polar,
+		deps.PolarProducts,
 		deps.FrontendURL,
 	)
 

@@ -17,7 +17,7 @@ SELECT
     COALESCE(provider_subscription_id, '')::TEXT AS subscription_id,
     COALESCE(provider_customer_id, '')::TEXT AS customer_id
 FROM subscriptions
-WHERE provider = 'stripe'
+WHERE provider = 'polar'
   AND provider_subscription_id IS NOT NULL
   AND provider_customer_id IS NOT NULL
   AND organization_id > $1

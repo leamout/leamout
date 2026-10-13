@@ -7,7 +7,7 @@ import (
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
-// Repository pages through locally known Stripe subscriptions for reconciliation.
+// Repository pages through locally known Polar subscriptions for reconciliation.
 type Repository struct {
 	queries *sqlc.Queries
 }

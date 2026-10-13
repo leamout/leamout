@@ -17,10 +17,14 @@ import (
 
 const maxIdempotentRequestBody = 1 << 20
 
-type IdempotencyMiddleware struct{ service *idempotency.Service }
+type IdempotencyMiddleware struct {
+	service *idempotency.Service
+}
 
 func NewIdempotencyMiddleware(service *idempotency.Service) *IdempotencyMiddleware {
-	return &IdempotencyMiddleware{service: service}
+	return &IdempotencyMiddleware{
+		service: service,
+	}
 }
 
 // Handle applies idempotency when the caller supplies a key. It preserves
@@ -30,7 +34,7 @@ func (m *IdempotencyMiddleware) Handle(next http.Handler) http.Handler {
 }
 
 // HandleRequired rejects mutations without an Idempotency-Key before invoking
-// the handler. Use for operations such as creating a Stripe Checkout session.
+// the handler. Use for operations such as creating a Polar Checkout session.
 func (m *IdempotencyMiddleware) HandleRequired(next http.Handler) http.Handler {
 	return m.handle(next, true)
 }
@@ -160,10 +164,15 @@ type bufferedResponseWriter struct {
 }
 
 func newBufferedResponseWriter() *bufferedResponseWriter {
-	return &bufferedResponseWriter{header: make(http.Header), status: http.StatusOK}
+	return &bufferedResponseWriter{
+		header: make(http.Header),
+		status: http.StatusOK,
+	}
 }
 
-func (w *bufferedResponseWriter) Header() http.Header { return w.header }
+func (w *bufferedResponseWriter) Header() http.Header {
+	return w.header
+}
 
 func (w *bufferedResponseWriter) WriteHeader(status int) {
 	if w.wroteHeader {

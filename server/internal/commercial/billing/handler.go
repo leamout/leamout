@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/platform/idempotency"
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
@@ -19,7 +18,9 @@ type Handler struct {
 }
 
 func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+	return &Handler{
+		service: service,
+	}
 }
 
 func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +35,6 @@ func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, apperror.NewBadRequest("invalid request body"))
 		return
 	}
-	req.IdempotencyKey = r.Header.Get(idempotency.Header)
 	result, err := h.service.Checkout(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)
@@ -63,16 +63,18 @@ func (h *Handler) Portal(w http.ResponseWriter, r *http.Request) {
 	httputil.OK(w, result)
 }
 
-func (h *Handler) StripeWebhook(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PolarWebhook(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxWebhookBodyBytes)
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
-		httputil.Error(w, apperror.NewBadRequest("invalid Stripe webhook body"))
+		httputil.Error(w, apperror.NewBadRequest("invalid Polar webhook body"))
 		return
 	}
-	if err := h.service.Webhook(r.Context(), payload, r.Header.Get("Stripe-Signature")); err != nil {
+	if err := h.service.Webhook(r.Context(), payload, r.Header); err != nil {
 		httputil.Error(w, err)
 		return
 	}
-	httputil.OK(w, map[string]bool{"received": true})
+	httputil.OK(w, map[string]bool{
+		"received": true,
+	})
 }

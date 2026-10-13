@@ -3,10 +3,9 @@ package billing
 import "github.com/google/uuid"
 
 type CheckoutRequest struct {
-	PlanCode       string `json:"plan_code"`
-	IdempotencyKey string `json:"-"`
-	SuccessURL     string `json:"success_url"`
-	CancelURL      string `json:"cancel_url"`
+	PlanCode   string `json:"plan_code"`
+	SuccessURL string `json:"success_url"`
+	CancelURL  string `json:"cancel_url"`
 }
 
 type PortalRequest struct {

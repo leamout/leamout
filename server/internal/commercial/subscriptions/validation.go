@@ -15,7 +15,7 @@ func validateSync(req SyncRequest) error {
 		return apperror.NewBadRequest("unsupported subscription status")
 	}
 	if req.Provider != nil {
-		if *req.Provider != ProviderStripe {
+		if *req.Provider != ProviderPolar {
 			return apperror.NewBadRequest("unsupported subscription provider")
 		}
 		if req.ProviderCustomerID == nil ||

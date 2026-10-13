@@ -13,7 +13,7 @@ const (
 	StatusCanceled   = "canceled"
 	StatusIncomplete = "incomplete"
 
-	ProviderStripe = "stripe"
+	ProviderPolar = "polar"
 )
 
 type Subscription struct {
