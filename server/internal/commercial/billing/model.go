@@ -1,5 +1,7 @@
 package billing
 
+import "github.com/google/uuid"
+
 type CheckoutRequest struct {
 	PlanCode       string `json:"plan_code"`
 	IdempotencyKey string `json:"-"`
@@ -13,4 +15,10 @@ type PortalRequest struct {
 
 type SessionResponse struct {
 	URL string `json:"url"`
+}
+
+type ReconciliationTarget struct {
+	OrganizationID uuid.UUID
+	SubscriptionID string
+	CustomerID     string
 }

@@ -8,31 +8,22 @@ import (
 )
 
 // Repository pages through locally known Stripe subscriptions for reconciliation.
-type Repository struct{ db sqlc.DBTX }
+type Repository struct{ queries *sqlc.Queries }
 
-func NewRepository(db sqlc.DBTX) *Repository { return &Repository{db: db} }
-
-type ReconciliationTarget struct {
-	OrganizationID uuid.UUID
-	SubscriptionID string
-	CustomerID     string
-}
+func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }
 
 func (r *Repository) ListReconciliationTargets(ctx context.Context, after uuid.UUID) ([]ReconciliationTarget, error) {
-	rows, err := r.db.Query(ctx, `SELECT organization_id, provider_subscription_id, provider_customer_id FROM subscriptions
- WHERE provider = 'stripe' AND provider_subscription_id IS NOT NULL AND provider_customer_id IS NOT NULL
- AND organization_id > $1 ORDER BY organization_id LIMIT 100`, after)
+	rows, err := r.queries.ListBillingReconciliationTargets(ctx, after)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	result := make([]ReconciliationTarget, 0, 100)
-	for rows.Next() {
-		var value ReconciliationTarget
-		if err := rows.Scan(&value.OrganizationID, &value.SubscriptionID, &value.CustomerID); err != nil {
-			return nil, err
-		}
-		result = append(result, value)
+	result := make([]ReconciliationTarget, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, ReconciliationTarget{
+			OrganizationID: row.OrganizationID,
+			SubscriptionID: row.SubscriptionID,
+			CustomerID:     row.CustomerID,
+		})
 	}
-	return result, rows.Err()
+	return result, nil
 }

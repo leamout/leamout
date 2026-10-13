@@ -147,7 +147,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		})
 		planLimits = cloudCommercial.Limits.Service
 		if cfg.Stripe.SecretKey != "" && cfg.Stripe.WebhookSecret != "" {
-			billingJob, err = billing.NewReconciliationJob(billing.NewRepository(postgresClient.Pool()), cloudCommercial.Billing.Service, 15*time.Minute, func(ctx context.Context, err error) { logger.Warn(ctx, "billing reconciliation failed", "error", err) })
+			billingJob, err = billing.NewReconciliationJob(billing.NewRepository(queries), cloudCommercial.Billing.Service, 15*time.Minute, func(ctx context.Context, err error) { logger.Warn(ctx, "billing reconciliation failed", "error", err) })
 			if err != nil {
 				closeDependencies()
 				return nil, err
