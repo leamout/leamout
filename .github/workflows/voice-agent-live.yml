@@ -1,0 +1,22 @@
+name: Validate live Voice Agent runner (offline)
+
+on:
+  pull_request:
+    paths:
+      - "tests/voice-agent-live/**"
+      - ".github/workflows/voice-agent-live.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Compile manual runner
+        run: python3 -m py_compile tests/voice-agent-live/run.py tests/voice-agent-live/test_run.py
+      - name: Test opt-in safety and timestamp checks
+        run: python3 -m unittest discover -s tests/voice-agent-live -p 'test_*.py' -v
