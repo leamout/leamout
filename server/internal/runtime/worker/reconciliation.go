@@ -18,7 +18,7 @@ type sessionReconciliationJob struct {
 
 func (j *sessionReconciliationJob) Reconcile(ctx context.Context) (int64, error) {
 	if j == nil || j.queries == nil {
-		return 0, fmt.Errorf("Voice Agent session reconciliation store is unavailable")
+		return 0, fmt.Errorf("voice agent session reconciliation store is unavailable")
 	}
 	updated, err := j.queries.ReconcileTerminatedVoiceAgentSessions(ctx)
 	if err != nil {
