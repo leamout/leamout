@@ -10,10 +10,11 @@ func RegisterRoutes(
 	router chi.Router,
 	handler *Handler,
 	auth func(http.Handler) http.Handler,
+	idempotency func(http.Handler) http.Handler,
 ) {
 	router.Route("/billing", func(r chi.Router) {
 		r.Use(auth)
-		r.Post("/checkout", handler.Checkout)
+		r.With(idempotency).Post("/checkout", handler.Checkout)
 		r.Post("/portal", handler.Portal)
 	})
 

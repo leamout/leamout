@@ -2,6 +2,9 @@ package billing
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"net/url"
 	"strings"
 	"time"
 
@@ -19,6 +22,7 @@ type Service struct {
 	subscriptions *subscriptions.Service
 	stripe        *stripeintegration.Client
 	priceIDs      map[string]string
+	frontendURL   string
 }
 
 func NewService(
@@ -26,12 +30,18 @@ func NewService(
 	subscriptionsService *subscriptions.Service,
 	stripeClient *stripeintegration.Client,
 	priceIDs map[string]string,
+	frontendURL ...string,
 ) *Service {
+	var origin string
+	if len(frontendURL) > 0 {
+		origin = frontendURL[0]
+	}
 	return &Service{
 		plans:         plansService,
 		subscriptions: subscriptionsService,
 		stripe:        stripeClient,
 		priceIDs:      priceIDs,
+		frontendURL:   origin,
 	}
 }
 
@@ -55,6 +65,9 @@ func (s *Service) Checkout(
 		return SessionResponse{}, apperror.NewBadRequest("plan is not available for Stripe checkout")
 	}
 
+	if err := s.validateRedirects(req.SuccessURL, req.CancelURL); err != nil {
+		return SessionResponse{}, err
+	}
 	priceID := strings.TrimSpace(s.priceIDs[plan.Code])
 	if priceID == "" {
 		return SessionResponse{}, apperror.NewServiceUnavailable("Stripe price is not configured for this plan", nil)
@@ -78,7 +91,9 @@ func (s *Service) Checkout(
 		}
 	}
 
+	digest := sha256.Sum256([]byte(organizationID.String() + ":" + req.IdempotencyKey))
 	session, err := s.stripe.CreateCheckoutSession(ctx, stripeintegration.CheckoutParams{
+		IdempotencyKey: "leamout-checkout-" + hex.EncodeToString(digest[:]),
 		PriceID:        priceID,
 		CustomerID:     customerID,
 		OrganizationID: organizationID.String(),
@@ -115,6 +130,9 @@ func (s *Service) Portal(
 		return SessionResponse{}, apperror.NewBadRequest("Stripe billing portal is unavailable for this organization")
 	}
 
+	if err := s.validateRedirects(req.ReturnURL); err != nil {
+		return SessionResponse{}, err
+	}
 	session, err := s.stripe.CreatePortalSession(ctx, stripeintegration.PortalParams{
 		CustomerID: *existing.ProviderCustomerID,
 		ReturnURL:  req.ReturnURL,
@@ -176,12 +194,22 @@ func (s *Service) syncStripeSubscription(
 		return apperror.NewBadRequest("Stripe subscription is missing organization metadata")
 	}
 
-	plan, err := s.plans.GetByCode(ctx, strings.TrimSpace(value.Metadata["plan_code"]))
+	planCode, err := s.planCodeFromPrice(value)
+	if err != nil {
+		return err
+	}
+	plan, err := s.plans.GetByCode(ctx, planCode)
 	if err != nil {
 		return err
 	}
 
+	if value.ID == "" || value.Customer == "" || eventCreated <= 0 {
+		return apperror.NewBadRequest("Stripe subscription identity or event timestamp is missing")
+	}
 	periodStart, periodEnd := value.CurrentPeriod()
+	if periodStart <= 0 || periodEnd <= periodStart {
+		return apperror.NewBadRequest("Stripe subscription period is invalid")
+	}
 	_, err = s.subscriptions.Sync(ctx, organizationID, subscriptions.SyncRequest{
 		PlanID:                 plan.ID,
 		Status:                 stripeStatus(value.Status),
@@ -236,4 +264,38 @@ func stringPtr(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func (s *Service) planCodeFromPrice(value stripeintegration.Subscription) (string, error) {
+	if len(value.Items.Data) != 1 {
+		return "", apperror.NewBadRequest("Stripe subscription must contain exactly one price")
+	}
+	priceID := strings.TrimSpace(value.Items.Data[0].Price.ID)
+	if priceID == "" {
+		return "", apperror.NewBadRequest("Stripe subscription price is missing")
+	}
+	for _, code := range []string{"developer", "pro", "scale"} {
+		if expected := strings.TrimSpace(s.priceIDs[code]); expected != "" && expected == priceID {
+			return code, nil
+		}
+	}
+	return "", apperror.NewBadRequest("Stripe subscription price is not recognized")
+}
+
+// validateRedirects prevents authenticated clients from using Stripe checkout
+// and portal links as open redirects to attacker-controlled websites.
+func (s *Service) validateRedirects(values ...string) error {
+	trusted, err := url.Parse(strings.TrimSpace(s.frontendURL))
+	if err != nil || trusted.Host == "" || (trusted.Scheme != "https" && trusted.Scheme != "http") || trusted.User != nil {
+		return apperror.NewServiceUnavailable("billing frontend origin is not configured", nil)
+	}
+	for _, raw := range values {
+		target, parseErr := url.Parse(strings.TrimSpace(raw))
+		if parseErr != nil || !target.IsAbs() || target.User != nil ||
+			target.Scheme != trusted.Scheme || !strings.EqualFold(target.Host, trusted.Host) ||
+			strings.HasPrefix(target.Path, "//") {
+			return apperror.NewBadRequest("billing redirect URL must use the configured frontend origin")
+		}
+	}
+	return nil
 }

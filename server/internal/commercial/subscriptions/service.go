@@ -51,6 +51,17 @@ func (s *Service) Sync(
 		id = existing.ID
 	}
 	value, err := s.repo.Upsert(ctx, id, organizationID, req)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Out-of-order or conflicting provider events are no-ops.
+		current, readErr := s.Get(ctx, organizationID)
+		if readErr != nil {
+			return Subscription{}, readErr
+		}
+		if current != nil {
+			return *current, nil
+		}
+		return Subscription{}, apperror.NewServiceUnavailable("subscription synchronization race", err)
+	}
 	if err != nil {
 		return Subscription{}, apperror.NewInternal("sync organization subscription", err)
 	}

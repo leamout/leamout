@@ -34,6 +34,16 @@ func (c *Client) Configured() bool {
 }
 
 func (c *Client) doForm(ctx context.Context, method, path string, values url.Values, out any) error {
+	return c.doFormWithIdempotency(ctx, method, path, values, out, "")
+}
+
+func (c *Client) doFormWithIdempotency(
+	ctx context.Context,
+	method, path string,
+	values url.Values,
+	out any,
+	idempotencyKey string,
+) error {
 	if c == nil || c.secretKey == "" {
 		return fmt.Errorf("stripe secret key is not configured")
 	}
@@ -48,6 +58,9 @@ func (c *Client) doForm(ctx context.Context, method, path string, values url.Val
 		return fmt.Errorf("create Stripe request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.secretKey)
+	if idempotencyKey != "" {
+		req.Header.Set("Idempotency-Key", idempotencyKey)
+	}
 	if values != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}

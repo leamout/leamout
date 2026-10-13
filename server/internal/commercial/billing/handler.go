@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/platform/idempotency"
 	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
@@ -33,6 +34,7 @@ func (h *Handler) Checkout(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, apperror.NewBadRequest("invalid request body"))
 		return
 	}
+	req.IdempotencyKey = r.Header.Get(idempotency.Header)
 	result, err := h.service.Checkout(r.Context(), organizationID, req)
 	if err != nil {
 		httputil.Error(w, err)
