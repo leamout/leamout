@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/internal/platform/idempotency"
+	"github.com/leamout/leamout/server/internal/platform/middleware"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/httputil"
 )
