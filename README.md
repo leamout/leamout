@@ -365,13 +365,8 @@ local request-replay middleware. `cancel_url` is passed as Polar's `return_url`
 for the checkout back button; success and return URLs must use the configured
 frontend origin. No undocumented provider idempotency header is assumed.
 
-Apply migration 035 before deploying. Historical migrations and billing identities
-are retained. Existing active legacy-provider subscriptions need an explicit
-cancellation/customer cutover before a Polar subscription can replace them; this
-change does not cancel external contracts or relabel old customer IDs. Once a
-legacy subscription is canceled locally, a verified Polar subscription may replace
-its provider identity. The old integration, configuration and webhook route are
-removed. Self-hosted installations continue using their licenses without a Polar
+Migration 034 creates the subscription schema with Polar as the supported billing
+provider. Self-hosted installations continue using their licenses without a Polar
 subscription or Cloud quotas.
 
 ## License

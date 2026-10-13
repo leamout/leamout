@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
             OR current_period_end > current_period_start
         ),
     CONSTRAINT chk_subscriptions_provider
-        CHECK (provider IS NULL OR provider = 'stripe')
+        CHECK (provider IS NULL OR provider = 'polar')
 );
 
 CREATE INDEX IF NOT EXISTS idx_subscriptions_plan
