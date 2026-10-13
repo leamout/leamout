@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     current_period_start TIMESTAMPTZ,
     current_period_end TIMESTAMPTZ,
     trial_ends_at TIMESTAMPTZ,
+    past_due_at TIMESTAMPTZ,
+    grace_ends_at TIMESTAMPTZ,
     cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
     canceled_at TIMESTAMPTZ,
     provider TEXT,
@@ -31,6 +33,16 @@ CREATE TABLE IF NOT EXISTS subscriptions (
             current_period_end IS NULL
             OR current_period_start IS NULL
             OR current_period_end > current_period_start
+        ),
+    CONSTRAINT chk_subscriptions_payment_grace
+        CHECK (
+            (past_due_at IS NULL AND grace_ends_at IS NULL)
+            OR (
+                status = 'past_due'
+                AND past_due_at IS NOT NULL
+                AND grace_ends_at IS NOT NULL
+                AND grace_ends_at >= past_due_at
+            )
         ),
     CONSTRAINT chk_subscriptions_provider
         CHECK (provider IS NULL OR provider = 'polar')

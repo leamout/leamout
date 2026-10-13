@@ -28,6 +28,7 @@ import { useState } from "react";
 
 const pages = [
   "Organization",
+  "Billing",
   "Members",
   "Profile",
   "Security",

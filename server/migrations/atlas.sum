@@ -1,4 +1,4 @@
-h1:8ocioEm+gmdE4e/F8JT+suwsVbI76Bkex/JXcFhVtyM=
+h1:Q/Yr5FGsSICdZL7YYsjF8DD5MM8hnpsrmznHIbgJk/I=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:w8z6z5sqnmtExCGa63iYl2ssG9rgXX8m3VPqvb1z4jo=
 003_create_authentication.sql h1:6R8fm0zInr9A/OW74oYTBLpPYHRf3dpVjw13qyjdd7E=
@@ -32,4 +32,5 @@ h1:8ocioEm+gmdE4e/F8JT+suwsVbI76Bkex/JXcFhVtyM=
 031_create_network_policies.sql h1:IsO1PQAt+H1bRC3RiavbPijIKQuAD9JaMPGGDtJucUQ=
 032_create_email_deliveries.sql h1:XHWk5mM9QnFG+O0QSplBIWp0qkv2VsThleMuMdZr/SE=
 033_create_plans.sql h1:ZHKNY+zFJ8EEAGZ5lwNmgSfu5NRaFJW4ChhP/NUgvG0=
-034_create_subscriptions.sql h1:AvmVFnAzYnQGN8GSg51aeI5LrDrq5o1x0q+St4A30D8=
+034_create_subscriptions.sql h1:vVqwxZMsA8Qe1xrqVYHYElaX7bsnoPshPwX9GYlf4F8=
+035_create_billing_webhook_events.sql h1:vbi7Jnv7Q0XoNI3EhP3lPkQQ35gZ15o505rp/xhQMfI=

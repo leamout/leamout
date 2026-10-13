@@ -141,6 +141,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		polarClient = polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment)
 	}
 	commercialModule := commercial.New(queries, commercial.Dependencies{
+		Database:    postgresClient.Pool(),
 		License:     licenseService,
 		Polar:       polarClient,
 		FrontendURL: cfg.FrontendURL,

@@ -24,6 +24,8 @@ type Subscription struct {
 	CurrentPeriodStart     *time.Time
 	CurrentPeriodEnd       *time.Time
 	TrialEndsAt            *time.Time
+	PastDueAt              *time.Time
+	GraceEndsAt            *time.Time
 	CancelAtPeriodEnd      bool
 	CanceledAt             *time.Time
 	Provider               *string
@@ -40,6 +42,8 @@ type SyncRequest struct {
 	CurrentPeriodStart     *time.Time
 	CurrentPeriodEnd       *time.Time
 	TrialEndsAt            *time.Time
+	PastDueAt              *time.Time
+	GraceEndsAt            *time.Time
 	CancelAtPeriodEnd      bool
 	CanceledAt             *time.Time
 	Provider               *string
@@ -56,6 +60,8 @@ type Response struct {
 	CurrentPeriodStart     *time.Time `json:"current_period_start,omitempty"`
 	CurrentPeriodEnd       *time.Time `json:"current_period_end,omitempty"`
 	TrialEndsAt            *time.Time `json:"trial_ends_at,omitempty"`
+	PastDueAt              *time.Time `json:"past_due_at,omitempty"`
+	GraceEndsAt            *time.Time `json:"grace_ends_at,omitempty"`
 	CancelAtPeriodEnd      bool       `json:"cancel_at_period_end"`
 	CanceledAt             *time.Time `json:"canceled_at,omitempty"`
 	Provider               *string    `json:"provider,omitempty"`
@@ -74,6 +80,8 @@ func response(value Subscription) Response {
 		CurrentPeriodStart:     value.CurrentPeriodStart,
 		CurrentPeriodEnd:       value.CurrentPeriodEnd,
 		TrialEndsAt:            value.TrialEndsAt,
+		PastDueAt:              value.PastDueAt,
+		GraceEndsAt:            value.GraceEndsAt,
 		CancelAtPeriodEnd:      value.CancelAtPeriodEnd,
 		CanceledAt:             value.CanceledAt,
 		Provider:               value.Provider,

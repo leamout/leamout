@@ -40,6 +40,7 @@ import (
 
 type modules struct {
 	billingReconciliation   *billing.ReconciliationJob
+	billingWebhooks         *billing.WebhookJob
 	emailDelivery           *email.Worker
 	postgres                *postgres.Client
 	redis                   *redisintegration.Client
@@ -135,13 +136,16 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		metrics.New(redisClient),
 	)
 	var billingJob *billing.ReconciliationJob
+	var billingWebhookJob *billing.WebhookJob
 	var planLimits *commerciallimits.Service
 	if licenseService.SelfHosted() {
 		planLimits = commerciallimits.NewService(nil, nil, queries)
 		planLimits.SetLicenseService(licenseService)
 	} else {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
-			Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			Database: postgresClient.Pool(),
+			License:  licenseService,
+			Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
 				"pro":       cfg.Polar.ProProductID,
@@ -151,12 +155,24 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		})
 		planLimits = cloudCommercial.Limits.Service
 		if cfg.Polar.AccessToken != "" && cfg.Polar.WebhookSecret != "" {
+			billingRepository := billing.NewRepository(queries, postgresClient.Pool())
 			billingJob, err = billing.NewReconciliationJob(
-				billing.NewRepository(queries),
+				billingRepository,
 				cloudCommercial.Billing.Service,
 				15*time.Minute,
 				func(ctx context.Context, err error) {
 					logger.Warn(ctx, "billing reconciliation failed", "error", err)
+				},
+			)
+			if err != nil {
+				closeDependencies()
+				return nil, err
+			}
+			billingWebhookJob, err = billing.NewWebhookJob(
+				billingRepository,
+				cloudCommercial.Billing.Service,
+				func(ctx context.Context, err error) {
+					logger.Warn(ctx, "billing webhook processing failed", "error", err)
 				},
 			)
 			if err != nil {
@@ -301,6 +317,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	emailDelivery := email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
 	return &modules{
 		billingReconciliation:   billingJob,
+		billingWebhooks:         billingWebhookJob,
 		emailDelivery:           emailDelivery,
 		postgres:                postgresClient,
 		redis:                   redisClient,

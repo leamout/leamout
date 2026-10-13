@@ -63,10 +63,20 @@ WITH effective_plans AS (
     FROM organizations AS o
     LEFT JOIN subscriptions AS s
       ON s.organization_id = o.id
-     AND s.status IN ('trialing', 'active')
- AND s.current_period_start <= now()
- AND s.current_period_end > now()
- AND (s.status <> 'trialing' OR s.trial_ends_at IS NULL OR s.trial_ends_at > now())
+     AND s.current_period_start <= now()
+     AND s.current_period_end > s.current_period_start
+     AND (
+         (
+             s.status IN ('trialing', 'active')
+             AND s.current_period_end > now()
+             AND (s.status <> 'trialing' OR s.trial_ends_at IS NULL OR s.trial_ends_at > now())
+         )
+         OR (
+             s.status = 'past_due'
+             AND s.past_due_at <= now()
+             AND s.grace_ends_at > now()
+         )
+     )
     LEFT JOIN plans AS active_plan
       ON active_plan.id = s.plan_id
     CROSS JOIN plans AS free_plan

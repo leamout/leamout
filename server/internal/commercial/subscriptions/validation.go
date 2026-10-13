@@ -14,6 +14,14 @@ func validateSync(req SyncRequest) error {
 	default:
 		return apperror.NewBadRequest("unsupported subscription status")
 	}
+	if req.PastDueAt != nil || req.GraceEndsAt != nil {
+		if req.Status != StatusPastDue || req.PastDueAt == nil || req.GraceEndsAt == nil {
+			return apperror.NewBadRequest("payment grace requires past_due status and both timestamps")
+		}
+		if req.GraceEndsAt.Before(*req.PastDueAt) {
+			return apperror.NewBadRequest("grace_ends_at must not be before past_due_at")
+		}
+	}
 	if req.Provider != nil {
 		if *req.Provider != ProviderPolar {
 			return apperror.NewBadRequest("unsupported subscription provider")

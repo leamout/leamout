@@ -1,6 +1,7 @@
 package commercial
 
 import (
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/entitlements"
 	"github.com/leamout/leamout/server/internal/commercial/licensing"
@@ -26,6 +27,7 @@ type BillingModule struct {
 }
 
 type Dependencies struct {
+	Database      *pgxpool.Pool
 	License       *licensing.Service
 	Polar         *polarintegration.Client
 	PolarProducts map[string]string
@@ -76,6 +78,9 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 		deps.PolarProducts,
 		deps.FrontendURL,
 	)
+
+	billingService.SetRepository(billing.NewRepository(queries, deps.Database))
+	billingService.SetStatusDependencies(deps.License, limitsService)
 
 	entitlementsRepository := entitlements.NewRepository(queries)
 	entitlementsService := entitlements.NewService(entitlementsRepository)

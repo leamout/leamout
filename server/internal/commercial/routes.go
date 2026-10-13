@@ -18,6 +18,7 @@ func RegisterRoutes(
 	organizationAccess func(string) func(http.Handler) http.Handler,
 	idempotency func(http.Handler) http.Handler,
 ) {
+	router.With(organizationAccess("commercial")).Get("/billing/status", module.Billing.Handler.Status)
 	limits.RegisterRoutes(router, limits.NewHandler(module.Limits.Service), organizationAccess("commercial"))
 	if module.License.SelfHosted() {
 		licensing.RegisterRoutes(router, licensing.NewHandler(module.License), organizationAccess("commercial"))

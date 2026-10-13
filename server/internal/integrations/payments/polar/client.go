@@ -39,8 +39,31 @@ func New(accessToken, webhookSecret, environment string) *Client {
 	}
 }
 
+// NewWithHTTPClient allows callers to supply transport configuration while
+// retaining the standard API hosts, request timeout, and redirect protection.
+func NewWithHTTPClient(accessToken, webhookSecret, environment string, httpClient *http.Client) *Client {
+	c := New(accessToken, webhookSecret, environment)
+	if httpClient == nil {
+		return c
+	}
+	configuredClient := *httpClient
+	configuredClient.CheckRedirect = c.httpClient.CheckRedirect
+	if configuredClient.Timeout == 0 {
+		configuredClient.Timeout = c.httpClient.Timeout
+	}
+	c.httpClient = &configuredClient
+	return c
+}
+
 func (c *Client) Configured() bool {
 	return c != nil && c.accessToken != "" && c.webhookSecret != ""
+}
+
+func (c *Client) Environment() string {
+	if c != nil && c.baseURL == "https://sandbox-api.polar.sh" {
+		return "sandbox"
+	}
+	return "production"
 }
 
 func (c *Client) doJSON(ctx context.Context, method, path string, input, output any) error {
@@ -73,7 +96,9 @@ func (c *Client) doJSON(ctx context.Context, method, path string, input, output 
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("polar request failed with status %d", resp.StatusCode)
+		return &APIError{
+			StatusCode: resp.StatusCode,
+		}
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(output); err != nil {
 		return fmt.Errorf("decode Polar response: %w", err)
