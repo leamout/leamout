@@ -91,23 +91,66 @@ SET
     interruption_count = sqlc.arg(interruption_count),
     first_response_latency_ms = sqlc.narg(first_response_latency_ms),
     avg_turn_latency_ms = sqlc.narg(avg_turn_latency_ms),
-    ended_at = sqlc.arg(ended_at),
+    ended_at = GREATEST(session.started_at, sqlc.arg(ended_at)::timestamptz),
+    media_ended_at = CASE
+        WHEN session.media_started_at IS NULL THEN NULL
+        ELSE GREATEST(
+            session.media_started_at,
+            LEAST(COALESCE(session.media_ended_at, sqlc.arg(ended_at)::timestamptz),
+                  GREATEST(session.started_at, sqlc.arg(ended_at)::timestamptz))
+        )
+    END,
     updated_at = NOW()
 WHERE session.id = sqlc.arg(id)
   AND session.organization_id = sqlc.arg(organization_id)
   AND session.state = 'active'
 RETURNING session.*;
 
+-- name: MarkVoiceAgentMediaStarted :one
+-- Called after an audio fork and clock are running. Repeated events do not
+-- reset the authoritative start timestamp.
+UPDATE voice_agent_sessions AS session
+SET media_started_at = COALESCE(session.media_started_at, GREATEST(session.started_at, NOW())),
+    updated_at = NOW()
+WHERE session.id = sqlc.arg(id)
+  AND session.organization_id = sqlc.arg(organization_id)
+  AND session.state = 'active'
+RETURNING session.media_started_at;
+
+-- name: ReconcileTerminatedVoiceAgentSessions :execrows
+-- Terminal calls provide a durable bound for sessions left active by a worker
+-- crash or missed event. This update is idempotent and tenant-scoped.
+UPDATE voice_agent_sessions AS session
+SET state = calls.state,
+    ended_at = GREATEST(session.started_at, calls.ended_at),
+    media_ended_at = CASE WHEN session.media_started_at IS NOT NULL
+        THEN GREATEST(session.media_started_at,
+                      LEAST(COALESCE(session.media_ended_at, calls.ended_at), calls.ended_at))
+        ELSE NULL END,
+    updated_at = NOW()
+FROM calls
+WHERE calls.id = session.call_id
+  AND calls.organization_id = session.organization_id
+  AND calls.state IN ('completed', 'failed', 'cancelled')
+  AND calls.ended_at IS NOT NULL
+  AND session.state = 'active';
+
 -- name: GetOrganizationRuntimeUsedSeconds :one
--- Count each persisted Voice Agent session's overlap with the billing window.
--- A session spanning two periods contributes only the overlapping seconds.
+-- Count only confirmed media attachment time, excluding session setup.
+-- Intersect the audio interval with the requested subscription period. A
+-- terminal call bounds unfinished sessions even before reconciliation runs.
 SELECT COALESCE(SUM(
     GREATEST(0, CEIL(EXTRACT(EPOCH FROM
-        LEAST(COALESCE(ended_at, CURRENT_TIMESTAMP), sqlc.arg(period_end)::timestamptz)
-        - GREATEST(started_at, sqlc.arg(period_start)::timestamptz)
+        LEAST(COALESCE(session.media_ended_at, calls.ended_at, CURRENT_TIMESTAMP),
+              sqlc.arg(period_end)::timestamptz)
+        - GREATEST(session.media_started_at, sqlc.arg(period_start)::timestamptz)
     )))::bigint
 ), 0)::bigint AS used_seconds
-FROM voice_agent_sessions
-WHERE organization_id = sqlc.arg(organization_id)
-  AND started_at < sqlc.arg(period_end)::timestamptz
-  AND (ended_at IS NULL OR ended_at > sqlc.arg(period_start)::timestamptz);
+FROM voice_agent_sessions AS session
+JOIN calls ON calls.id = session.call_id
+          AND calls.organization_id = session.organization_id
+WHERE session.organization_id = sqlc.arg(organization_id)
+  AND session.media_started_at IS NOT NULL
+  AND session.media_started_at < sqlc.arg(period_end)::timestamptz
+  AND (session.media_ended_at IS NULL
+       OR session.media_ended_at > sqlc.arg(period_start)::timestamptz);

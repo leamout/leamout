@@ -240,6 +240,14 @@ func (db *lifecycleDB) QueryRow(_ context.Context, query string, args ...interfa
 			UpdatedAt:             now,
 		}
 		return lifecycleRow{values: voiceAgentSessionValues(*db.session)}
+	case strings.Contains(query, "-- name: MarkVoiceAgentMediaStarted"):
+		if db.session == nil || db.session.State != "active" {
+			return lifecycleRow{err: pgx.ErrNoRows}
+		}
+		if !db.session.MediaStartedAt.Valid {
+			db.session.MediaStartedAt = pgTimestamp(time.Now().UTC())
+		}
+		return lifecycleRow{values: []interface{}{db.session.MediaStartedAt}}
 	case strings.Contains(query, "-- name: CompleteVoiceAgentSession"):
 		if db.session == nil || db.session.State != "active" {
 			return lifecycleRow{err: pgx.ErrNoRows}
@@ -251,6 +259,9 @@ func (db *lifecycleDB) QueryRow(_ context.Context, query string, args ...interfa
 		db.session.FirstResponseLatencyMs, _ = args[3].(*int32)
 		db.session.AvgTurnLatencyMs, _ = args[4].(*int32)
 		db.session.EndedAt = args[5].(pgtype.Timestamptz)
+		if db.session.MediaStartedAt.Valid {
+			db.session.MediaEndedAt = db.session.EndedAt
+		}
 		db.session.UpdatedAt = db.session.EndedAt
 		return lifecycleRow{values: voiceAgentSessionValues(*db.session)}
 	default:
@@ -350,6 +361,8 @@ func voiceAgentSessionValues(record sqlc.VoiceAgentSession) []interface{} {
 		record.EndedAt,
 		record.CreatedAt,
 		record.UpdatedAt,
+		record.MediaStartedAt,
+		record.MediaEndedAt,
 	}
 }
 

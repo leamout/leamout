@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS voice_agent_sessions (
     ended_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- Media runtime accounting starts only after FreeSWITCH audio attachment.
+    media_started_at TIMESTAMPTZ,
+    media_ended_at TIMESTAMPTZ,
 
     CONSTRAINT uq_voice_agent_sessions_id_organization UNIQUE (id, organization_id),
 
@@ -47,6 +50,15 @@ CREATE TABLE IF NOT EXISTS voice_agent_sessions (
         CHECK (avg_turn_latency_ms IS NULL OR avg_turn_latency_ms >= 0),
     CONSTRAINT chk_voice_agent_sessions_timestamps
         CHECK (ended_at IS NULL OR ended_at >= started_at),
+    CONSTRAINT chk_voice_agent_sessions_media_timestamps
+        CHECK (
+            (media_started_at IS NULL AND media_ended_at IS NULL)
+            OR (media_started_at IS NOT NULL
+                AND media_started_at >= started_at
+                AND (media_ended_at IS NULL OR media_ended_at >= media_started_at))
+        ),
+    CONSTRAINT chk_voice_agent_sessions_media_ended
+        CHECK (media_ended_at IS NULL OR ended_at IS NOT NULL),
     CONSTRAINT chk_voice_agent_sessions_lifecycle
         CHECK (
             (state = 'active' AND ended_at IS NULL)
@@ -61,6 +73,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_voice_agent_sessions_active_call
 
 CREATE INDEX IF NOT EXISTS idx_voice_agent_sessions_organization_agent
     ON voice_agent_sessions (organization_id, voice_agent_id, started_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_voice_agent_sessions_active_reconcile
+    ON voice_agent_sessions (call_id)
+    WHERE state = 'active';
+
+CREATE INDEX IF NOT EXISTS idx_voice_agent_sessions_usage
+    ON voice_agent_sessions (organization_id, media_started_at)
+    WHERE media_started_at IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_voice_agent_sessions_call
     ON voice_agent_sessions (call_id, started_at DESC);
