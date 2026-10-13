@@ -1,6 +1,6 @@
 import { Button } from "@leamout/ui/components/button";
 import Link from "next/link";
-import Pricing from "@/components/shadcn-space/blocks/pricing-01/pricing";
+import Pricing from "@/components/marketing/pricing";
 import { constructMetadata } from "@/lib/metadata";
 import { consoleURL } from "@/lib/site";
 
