@@ -1,4 +1,6 @@
-import { MarketingActions } from "@/components/actions";
+import { Button } from "@leamout/ui/components/button";
+import Link from "next/link";
+import { consoleURL } from "@/lib/site";
 
 export function HomeCallToAction() {
   return (
@@ -9,7 +11,23 @@ export function HomeCallToAction() {
       <p className="mb-7 mt-4 text-muted-foreground">
         Start with your own carrier and AI provider. Keep control as you grow.
       </p>
-      <MarketingActions />
+      <div className="flex flex-wrap gap-3">
+        <Button
+          size="lg"
+          nativeButton={false}
+          render={<a href={`${consoleURL}/create-account`} />}
+        >
+          Get started
+        </Button>
+        <Button
+          size="lg"
+          variant="outline"
+          nativeButton={false}
+          render={<Link href="/docs" />}
+        >
+          Read documentation
+        </Button>
+      </div>
     </section>
   );
 }
