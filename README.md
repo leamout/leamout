@@ -328,6 +328,65 @@ To validate examples without creating deployment files, run
 `APP_ENV_FILE=../server/.env.example docker compose --env-file .env.example -f deploy/compose.yaml config --quiet`.
 Keep both environment files private. No `.env` file is copied into the image.
 
+## Signing self-hosted licenses and releases
+
+License signing and image signing use separate trust systems. Generate an Ed25519
+license key on a protected issuance machine; keep the private key outside GitHub
+Actions, source control, and customer images:
+
+```sh
+cd server
+go run ./cmd/license -generate-key -output /secure/issuer-2026.private.key
+```
+
+The command prints the public key only and creates the private file with mode 0600.
+Keep an encrypted backup with restricted access. Use `-claims`, `-private-key`,
+`-key-id`, and `-output` to issue customer license files locally. The key ID must
+contain only letters, digits, underscores, or hyphens, start with a letter or digit,
+and be at most 64 characters. Never configure a private key as a release input.
+
+Create the GitHub Actions environment `self-hosted-release`, restrict deployments
+to release tags, and configure required reviewers. Set its **variable**
+`LICENSE_PUBLIC_KEYS` to `issuer-2026:BASE64_PUBLIC_KEY`. Multiple public keys use
+comma-separated entries. You can check this value before configuring it:
+
+```sh
+go run ./cmd/license -check-keyring -public-keys 'issuer-2026:BASE64_PUBLIC_KEY'
+```
+
+After merging the signing workflow, publish a GitHub release with a version tag
+such as `v1.0.0` pointing to a commit on main. The workflow rejects missing,
+malformed, duplicate, or private-key inputs before building. It publishes amd64
+images at `ghcr.io/leamout/leamout-self-hosted/runtime` and
+`ghcr.io/leamout/leamout-self-hosted/migrate`. The runtime image contains the API,
+worker, and media binaries with the issuer public keys pinned at build time.
+The migration image contains schema tooling and does not perform license checks.
+
+Cosign uses the release workflow's GitHub OIDC identity to sign each published
+image digest and immediately verify it. No long-lived image-signing key is stored
+in GitHub. Build provenance and SBOM attestations are emitted by Buildx. The job
+summary and artifacts list verified image digests; a failed signing step must not
+be treated as a successful release, even if its image tag was already uploaded.
+Do not rerun a version tag with different source or public keys: use a new version.
+
+Customers should verify the exact digest before deployment:
+
+```sh
+cosign verify 'ghcr.io/leamout/leamout-self-hosted/runtime@sha256:DIGEST' \
+  --certificate-identity 'https://github.com/leamout/leamout/.github/workflows/release-self-hosted.yml@refs/tags/v1.0.0' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+```
+
+Use the same verification for the migration image. Deploy the verified digest,
+not a mutable tag. Registry visibility/access must be configured separately for
+customer distribution. Image signature verification is an installation step;
+the runtime does not automatically verify its own container signature.
+
+For rotation, first release binaries trusting both old and new public keys, then
+issue licenses with the new private key. Retain the old public key until customers
+have renewed and upgraded. If a license key is compromised, stop issuance with it
+and ship a replacement keyring; offline installations cannot be remotely revoked.
+
 ## License
 
 The software in this repository is licensed under the [Apache License 2.0](LICENSE).

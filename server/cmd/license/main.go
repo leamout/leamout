@@ -21,7 +21,20 @@ func main() {
 	keyID := flag.String("key-id", "", "signing key ID")
 	output := flag.String("output", "", "new signed license file (must not exist)")
 	generate := flag.Bool("generate-key", false, "generate a new issuer private key at -output; prints public key only")
+	checkKeyring := flag.Bool("check-keyring", false, "validate release public keyring without issuing a license")
+	publicKeys := flag.String("public-keys", "", "comma-separated key-id:base64-public-key entries")
 	flag.Parse()
+	if *checkKeyring {
+		if *generate {
+			_, _ = fmt.Fprintln(os.Stderr, "check-keyring and generate-key are mutually exclusive")
+			os.Exit(1)
+		}
+		if err := licensing.ValidatePublicKeyring(*publicKeys); err != nil {
+			_, _ = fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if *generate {
 		if err := generateKey(*output); err != nil {
 			_, _ = fmt.Fprintln(os.Stderr, err)
@@ -68,6 +81,11 @@ func issue(claimsPath, keyPath, keyID, output string) error {
 	if err != nil || len(key) != ed25519.PrivateKeySize {
 		return fmt.Errorf("private key must be a base64 Ed25519 private key")
 	}
+	publicKey := ed25519.PrivateKey(key).Public().(ed25519.PublicKey)
+	if err := licensing.ValidatePublicKeyring(keyID + ":" + base64.StdEncoding.EncodeToString(publicKey)); err != nil {
+		return err
+	}
+
 	doc := licensing.Document{
 		KeyID:     keyID,
 		Payload:   base64.StdEncoding.EncodeToString(payload),

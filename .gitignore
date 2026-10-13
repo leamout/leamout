@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Offline license issuance keys (never distribute or commit).
+*.private.key
+
 # Generated TLS certificates
 deploy/*/certs/*.pem
 

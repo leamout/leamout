@@ -7,25 +7,43 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 )
+
+var signingKeyIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
 func (c Config) keyring() (map[string]string, error) {
 	if len(c.PublicKeys) > 0 {
 		return c.PublicKeys, nil
 	}
-	keys := map[string]string{}
 	if BuildPublicKeys == "" {
-		return keys, nil
+		return map[string]string{}, nil
 	}
-	for _, entry := range strings.Split(BuildPublicKeys, ",") {
+	return parsePublicKeyring(BuildPublicKeys)
+}
+
+func parsePublicKeyring(value string) (map[string]string, error) {
+	keys := make(map[string]string)
+	for _, entry := range strings.Split(value, ",") {
 		parts := strings.SplitN(entry, ":", 2)
-		if len(parts) != 2 || parts[0] == "" || keys[parts[0]] != "" {
-			return nil, fmt.Errorf("invalid build-time license keyring")
+		if len(parts) != 2 || !signingKeyIDPattern.MatchString(parts[0]) || keys[parts[0]] != "" {
+			return nil, fmt.Errorf("invalid license public keyring")
+		}
+		key, err := base64.StdEncoding.DecodeString(parts[1])
+		if err != nil || len(key) != ed25519.PublicKeySize {
+			return nil, fmt.Errorf("invalid license public key %q", parts[0])
 		}
 		keys[parts[0]] = parts[1]
 	}
 	return keys, nil
+}
+
+// ValidatePublicKeyring checks release inputs before passing them to the linker.
+// Only public Ed25519 keys are accepted; private keys and empty keyrings fail.
+func ValidatePublicKeyring(value string) error {
+	_, err := parsePublicKeyring(value)
+	return err
 }
 
 func (c Config) Validate() error {
@@ -41,7 +59,7 @@ func (c Config) Validate() error {
 	}
 	for id, encoded := range keys {
 		key, err := base64.StdEncoding.DecodeString(encoded)
-		if id == "" || err != nil || len(key) != ed25519.PublicKeySize {
+		if !signingKeyIDPattern.MatchString(id) || err != nil || len(key) != ed25519.PublicKeySize {
 			return fmt.Errorf("invalid license public key %q", id)
 		}
 	}

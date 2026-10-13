@@ -283,3 +283,33 @@ func TestPinnedKeyringCannotBeReplacedByEnvironment(t *testing.T) {
 		t.Fatal("duplicate build key accepted")
 	}
 }
+
+func TestReleasePublicKeyringValidation(t *testing.T) {
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded := base64.StdEncoding.EncodeToString(public)
+	for _, value := range []string{
+		"issuer-2026:" + encoded,
+		"issuer-2026:" + encoded + ",issuer-2027:" + encoded,
+	} {
+		if err := ValidatePublicKeyring(value); err != nil {
+			t.Fatalf("valid public keyring rejected: %v", err)
+		}
+	}
+	for _, value := range []string{
+		"",
+		"issuer-2026:invalid",
+		"issuer-2026:" + base64.StdEncoding.EncodeToString(private),
+		"issuer-2026:" + encoded + ",issuer-2026:" + encoded,
+		"issuer with spaces:" + encoded,
+		"issuer\n2026:" + encoded,
+		"-X:" + encoded,
+		"issuer-2026:" + encoded + ",",
+	} {
+		if err := ValidatePublicKeyring(value); err == nil {
+			t.Fatal("invalid release keyring accepted")
+		}
+	}
+}
