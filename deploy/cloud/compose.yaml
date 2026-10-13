@@ -1,0 +1,22 @@
+# Private-beta overlay. The generic Compose stack remains unchanged for acceptance tests.
+services:
+  server:
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  worker:
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/readyz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  caddy:
+    depends_on:
+      server:
+        condition: service_healthy
