@@ -202,7 +202,7 @@ func TestBillingAcceptanceLifecycle(t *testing.T) {
 	if status.Subscription == nil || status.Subscription.GraceEndsAt == nil {
 		t.Fatal("failed payment did not persist a grace deadline")
 	}
-	wantGraceEnd := pastDueAt.AddDate(0, 0, 7)
+	wantGraceEnd := pastDueAt.AddDate(0, 0, 3)
 	if !status.Subscription.GraceEndsAt.Equal(wantGraceEnd) || status.Plan == nil || status.Plan.Code != "developer" {
 		t.Fatalf("grace status = %#v, want Developer through %s", status, wantGraceEnd)
 	}
@@ -392,7 +392,6 @@ func newBillingAcceptance(t *testing.T) *billingAcceptance {
 		t.Fatal(err)
 	}
 	queries := sqlc.New(pool)
-	graceDays := 7
 	plansService := plans.NewService(plans.NewRepository(queries))
 	subscriptionsService := subscriptions.NewService(subscriptions.NewRepository(queries))
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
@@ -409,7 +408,6 @@ func newBillingAcceptance(t *testing.T) *billingAcceptance {
 		"https://console.example.test",
 	)
 	billingService.SetRepository(NewRepository(queries, pool))
-	billingService.SetPaymentGraceDays(graceDays)
 	billingService.SetStatusDependencies(licenseService, limitsService)
 	repository := NewRepository(queries, pool)
 	worker, err := NewWebhookJob(

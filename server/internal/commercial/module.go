@@ -27,12 +27,11 @@ type BillingModule struct {
 }
 
 type Dependencies struct {
-	Database         *pgxpool.Pool
-	PaymentGraceDays *int
-	License          *licensing.Service
-	Polar            *polarintegration.Client
-	PolarProducts    map[string]string
-	FrontendURL      string
+	Database      *pgxpool.Pool
+	License       *licensing.Service
+	Polar         *polarintegration.Client
+	PolarProducts map[string]string
+	FrontendURL   string
 }
 
 type PlansModule struct {
@@ -82,9 +81,6 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 
 	billingService.SetRepository(billing.NewRepository(queries, deps.Database))
 	billingService.SetStatusDependencies(deps.License, limitsService)
-	if deps.PaymentGraceDays != nil {
-		billingService.SetPaymentGraceDays(*deps.PaymentGraceDays)
-	}
 
 	entitlementsRepository := entitlements.NewRepository(queries)
 	entitlementsService := entitlements.NewService(entitlementsRepository)

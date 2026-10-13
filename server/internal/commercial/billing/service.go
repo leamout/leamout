@@ -25,15 +25,14 @@ import (
 const providerPolar = "polar"
 
 type Service struct {
-	repo             *Repository
-	license          *licensing.Service
-	limits           *limits.Service
-	paymentGraceDays int
-	plans            *plans.Service
-	subscriptions    *subscriptions.Service
-	polar            *polarintegration.Client
-	productIDs       map[string]string
-	frontendURL      string
+	repo          *Repository
+	license       *licensing.Service
+	limits        *limits.Service
+	plans         *plans.Service
+	subscriptions *subscriptions.Service
+	polar         *polarintegration.Client
+	productIDs    map[string]string
+	frontendURL   string
 }
 
 func NewService(
@@ -48,12 +47,11 @@ func NewService(
 		origin = frontendURL[0]
 	}
 	return &Service{
-		plans:            plansService,
-		subscriptions:    subscriptionsService,
-		polar:            polarClient,
-		productIDs:       productIDs,
-		frontendURL:      origin,
-		paymentGraceDays: 7,
+		plans:         plansService,
+		subscriptions: subscriptionsService,
+		polar:         polarClient,
+		productIDs:    productIDs,
+		frontendURL:   origin,
 	}
 }
 
@@ -154,10 +152,6 @@ func (s *Service) SetRepository(repo *Repository) {
 	s.repo = repo
 }
 
-func (s *Service) SetPaymentGraceDays(days int) {
-	s.paymentGraceDays = days
-}
-
 func (s *Service) SetStatusDependencies(license *licensing.Service, limitsService *limits.Service) {
 	s.license = license
 	s.limits = limitsService
@@ -245,7 +239,7 @@ func (s *Service) syncPolarSubscription(
 			if value.PastDueAt != nil {
 				start = value.PastDueAt.UTC()
 			}
-			end := start.AddDate(0, 0, s.paymentGraceDays)
+			end := start.AddDate(0, 0, 3)
 			pastDueAt, graceEndsAt = &start, &end
 		}
 	}

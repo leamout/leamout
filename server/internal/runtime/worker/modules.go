@@ -143,10 +143,9 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		planLimits.SetLicenseService(licenseService)
 	} else {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
-			Database:         postgresClient.Pool(),
-			PaymentGraceDays: &cfg.Polar.PaymentGraceDays,
-			License:          licenseService,
-			Polar:            polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			Database: postgresClient.Pool(),
+			License:  licenseService,
+			Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
 				"pro":       cfg.Polar.ProProductID,

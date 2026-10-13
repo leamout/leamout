@@ -18,9 +18,6 @@ func (c Config) Validate() error {
 }
 
 func (c PolarConfig) Validate() error {
-	if c.PaymentGraceDays < 0 || c.PaymentGraceDays > 21 {
-		return fmt.Errorf("POLAR_PAYMENT_GRACE_DAYS must be between 0 and 21")
-	}
 	if c.Environment != "production" && c.Environment != "sandbox" {
 		return fmt.Errorf("POLAR_ENVIRONMENT must be production or sandbox")
 	}
