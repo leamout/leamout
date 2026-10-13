@@ -26,7 +26,7 @@ type BillingModule struct {
 type Dependencies struct {
 	Stripe       *stripeintegration.Client
 	StripePrices map[string]string
-	FrontendURL string
+	FrontendURL  string
 }
 
 type PlansModule struct {

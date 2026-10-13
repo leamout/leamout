@@ -1,10 +1,10 @@
 package billing
 
 type CheckoutRequest struct {
-	PlanCode   string `json:"plan_code"`
+	PlanCode       string `json:"plan_code"`
 	IdempotencyKey string `json:"-"`
-	SuccessURL string `json:"success_url"`
-	CancelURL  string `json:"cancel_url"`
+	SuccessURL     string `json:"success_url"`
+	CancelURL      string `json:"cancel_url"`
 }
 
 type PortalRequest struct {
