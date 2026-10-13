@@ -23,10 +23,30 @@ func NewIdempotencyMiddleware(service *idempotency.Service) *IdempotencyMiddlewa
 	return &IdempotencyMiddleware{service: service}
 }
 
+// Handle applies idempotency when the caller supplies a key. It preserves
+// existing optional-key behavior for routes that have not required it.
 func (m *IdempotencyMiddleware) Handle(next http.Handler) http.Handler {
+	return m.handle(next, false)
+}
+
+// HandleRequired rejects mutations without an Idempotency-Key before invoking
+// the handler. Use for operations such as creating a Stripe Checkout session.
+func (m *IdempotencyMiddleware) HandleRequired(next http.Handler) http.Handler {
+	return m.handle(next, true)
+}
+
+func (m *IdempotencyMiddleware) handle(next http.Handler, required bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !mutationMethod(r.Method) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		key := strings.TrimSpace(r.Header.Get(idempotency.Header))
-		if key == "" || !mutationMethod(r.Method) {
+		if key == "" {
+			if required {
+				httputil.Error(w, apperror.NewBadRequest("Idempotency-Key header is required"))
+				return
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -35,6 +55,7 @@ func (m *IdempotencyMiddleware) Handle(next http.Handler) http.Handler {
 			return
 		}
 		w.Header().Set(idempotency.Header, key)
+		r.Header.Set(idempotency.Header, key)
 		scope, ok := idempotencyScope(r)
 		if !ok {
 			httputil.Error(w, apperror.NewUnauthorized("authenticated idempotency scope required"))

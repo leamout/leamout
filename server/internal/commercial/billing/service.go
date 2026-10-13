@@ -68,9 +68,6 @@ func (s *Service) Checkout(
 	if err := s.validateRedirects(req.SuccessURL, req.CancelURL); err != nil {
 		return SessionResponse{}, err
 	}
-	if strings.TrimSpace(req.IdempotencyKey) == "" {
-		return SessionResponse{}, apperror.NewBadRequest("Idempotency-Key is required for checkout")
-	}
 	priceID := strings.TrimSpace(s.priceIDs[plan.Code])
 	if priceID == "" {
 		return SessionResponse{}, apperror.NewServiceUnavailable("Stripe price is not configured for this plan", nil)
