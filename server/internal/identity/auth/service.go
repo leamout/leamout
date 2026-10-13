@@ -191,7 +191,7 @@ func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, sessionID u
 		return sqlc.User{}, apperror.NewUnauthorized("current password required")
 	}
 	user, err = queries.SetUserPassword(ctx, sqlc.SetUserPasswordParams{
-		ID: userID,
+		ID:           userID,
 		PasswordHash: &hash,
 	})
 	if err != nil {
