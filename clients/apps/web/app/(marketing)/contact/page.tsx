@@ -1,3 +1,6 @@
+import { ContactOptions } from "@/components/contact/contact-options";
+import { EnterpriseInquiries } from "@/components/contact/enterprise-inquiries";
+import { ContactIntro } from "@/components/contact/intro";
 import { constructMetadata } from "@/lib/metadata";
 
 export const metadata = constructMetadata({
@@ -7,6 +10,12 @@ export const metadata = constructMetadata({
   path: "/contact",
 });
 
-export default function page() {
-  return <div>Contact page</div>;
+export default function ContactPage() {
+  return (
+    <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+      <ContactIntro />
+      <ContactOptions />
+      <EnterpriseInquiries />
+    </div>
+  );
 }

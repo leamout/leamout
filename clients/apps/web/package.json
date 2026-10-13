@@ -12,10 +12,13 @@
   },
   "dependencies": {
     "@base-ui/react": "1.6.0",
+    "@hugeicons/core-free-icons": "^4.3.5",
+    "@hugeicons/react": "^1.1.10",
     "@leamout/ui": "workspace:*",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "cn": "^0.4.0",
+    "motion": "^14.1.0",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",

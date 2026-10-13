@@ -1,3 +1,6 @@
+import { Implementation } from "@/components/security/implementation";
+import { SecurityIntro } from "@/components/security/intro";
+import { SecurityControls } from "@/components/security/security-controls";
 import { constructMetadata } from "@/lib/metadata";
 
 export const metadata = constructMetadata({
@@ -7,6 +10,12 @@ export const metadata = constructMetadata({
   path: "/security",
 });
 
-export default function page() {
-  return <div>Security page</div>;
+export default function SecurityPage() {
+  return (
+    <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+      <SecurityIntro />
+      <SecurityControls />
+      <Implementation />
+    </div>
+  );
 }
