@@ -8,6 +8,12 @@ are not implemented and are not acceptance requirements.
 
 - `byoc-v1`: customer-owned carrier onboarding and SIP routing.
 
+## Cloud billing
+
+- `billing-v1`: durable Polar webhooks, subscription lifecycle, failed-payment
+  grace, and Customer State recovery against a local provider contract. Includes
+  optional read-only sandbox configuration checks and a manual payment checklist.
+
 ## Core voice architecture
 
 - `voice-v1`: programmable voice across OpenSIPS, FreeSWITCH, RTPengine, and

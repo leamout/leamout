@@ -62,6 +62,25 @@ type AuthTransaction struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type BillingWebhookEvent struct {
+	ID             uuid.UUID          `db:"id" json:"id"`
+	Provider       string             `db:"provider" json:"provider"`
+	Environment    string             `db:"environment" json:"environment"`
+	EventID        string             `db:"event_id" json:"event_id"`
+	EventType      string             `db:"event_type" json:"event_type"`
+	EventCreatedAt pgtype.Timestamptz `db:"event_created_at" json:"event_created_at"`
+	Payload        []byte             `db:"payload" json:"payload"`
+	PayloadHash    string             `db:"payload_hash" json:"payload_hash"`
+	Status         string             `db:"status" json:"status"`
+	Attempts       int32              `db:"attempts" json:"attempts"`
+	AvailableAt    pgtype.Timestamptz `db:"available_at" json:"available_at"`
+	LockedAt       pgtype.Timestamptz `db:"locked_at" json:"locked_at"`
+	LeaseToken     *uuid.UUID         `db:"lease_token" json:"lease_token"`
+	ReceivedAt     pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	ProcessedAt    pgtype.Timestamptz `db:"processed_at" json:"processed_at"`
+	LastError      *string            `db:"last_error" json:"last_error"`
+}
+
 type Call struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
@@ -376,6 +395,8 @@ type Subscription struct {
 	CurrentPeriodStart     pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
 	CurrentPeriodEnd       pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
 	TrialEndsAt            pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
+	PastDueAt              pgtype.Timestamptz `db:"past_due_at" json:"past_due_at"`
+	GraceEndsAt            pgtype.Timestamptz `db:"grace_ends_at" json:"grace_ends_at"`
 	CancelAtPeriodEnd      bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
 	CanceledAt             pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
 	Provider               *string            `db:"provider" json:"provider"`

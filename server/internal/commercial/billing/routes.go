@@ -16,6 +16,7 @@ func RegisterRoutes(
 		r.Use(auth)
 		r.With(idempotency).Post("/checkout", handler.Checkout)
 		r.Post("/portal", handler.Portal)
+		r.Post("/reconcile", handler.Reconcile)
 	})
 
 	// Polar authenticates the raw body with Standard Webhooks headers.

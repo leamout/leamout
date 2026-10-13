@@ -22,17 +22,27 @@ export async function api<T>(
     method?: "GET" | "POST" | "DELETE";
     body?: unknown;
     signal?: AbortSignal;
+    organizationId?: string;
+    idempotencyKey?: string;
   } = {},
 ): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (options.organizationId) {
+    headers["X-Organization-ID"] = options.organizationId;
+  }
+  if (options.idempotencyKey) {
+    headers["Idempotency-Key"] = options.idempotencyKey;
+  }
+
   const response = await fetch(`/api/v1${path}`, {
     method: options.method ?? "GET",
     credentials: "same-origin",
     cache: "no-store",
     signal: options.signal,
-    headers:
-      options.body === undefined
-        ? undefined
-        : { "Content-Type": "application/json" },
+    headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
   });
 

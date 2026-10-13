@@ -2,11 +2,20 @@ package billing
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/commercial/limits"
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
@@ -18,11 +27,15 @@ import (
 const providerPolar = "polar"
 
 type Service struct {
-	plans         *plans.Service
-	subscriptions *subscriptions.Service
-	polar         *polarintegration.Client
-	productIDs    map[string]string
-	frontendURL   string
+	repo             *Repository
+	license          *licensing.Service
+	limits           *limits.Service
+	paymentGraceDays int
+	plans            *plans.Service
+	subscriptions    *subscriptions.Service
+	polar            *polarintegration.Client
+	productIDs       map[string]string
+	frontendURL      string
 }
 
 func NewService(
@@ -37,11 +50,12 @@ func NewService(
 		origin = frontendURL[0]
 	}
 	return &Service{
-		plans:         plansService,
-		subscriptions: subscriptionsService,
-		polar:         polarClient,
-		productIDs:    productIDs,
-		frontendURL:   origin,
+		plans:            plansService,
+		subscriptions:    subscriptionsService,
+		polar:            polarClient,
+		productIDs:       productIDs,
+		frontendURL:      origin,
+		paymentGraceDays: 7,
 	}
 }
 
@@ -138,14 +152,52 @@ func (s *Service) Portal(
 	}, nil
 }
 
+func (s *Service) SetRepository(repo *Repository) {
+	s.repo = repo
+}
+
+func (s *Service) SetPaymentGraceDays(days int) {
+	s.paymentGraceDays = days
+}
+
+func (s *Service) SetStatusDependencies(license *licensing.Service, limitsService *limits.Service) {
+	s.license = license
+	s.limits = limitsService
+}
+
+// Verify first, then acknowledge only after durable insertion. Retries retain
+// the original receipt; reusing an event ID for different bytes is rejected.
 func (s *Service) Webhook(ctx context.Context, payload []byte, headers http.Header) error {
-	if s.polar == nil || !s.polar.Configured() {
-		return apperror.NewServiceUnavailable("Polar billing is not configured", nil)
+	if s.license.SelfHosted() || s.polar == nil || !s.polar.Configured() || s.repo == nil {
+		return apperror.NewServiceUnavailable("Polar webhook inbox is not configured", nil)
 	}
 	event, err := s.polar.ParseWebhook(payload, headers)
 	if err != nil {
 		return apperror.NewBadRequest("invalid Polar webhook")
 	}
+	id := headers.Get("webhook-id")
+	if len(id) > 256 || len(event.Type) > 128 {
+		return apperror.NewBadRequest("Polar webhook identity is too long")
+	}
+	digest := sha256.Sum256(payload)
+	_, err = s.repo.queries.InsertBillingWebhookEvent(ctx, sqlc.InsertBillingWebhookEventParams{
+		Environment:    s.polar.Environment(),
+		EventID:        id,
+		EventType:      event.Type,
+		EventCreatedAt: pgconv.TimeToTimestamptz(event.Timestamp),
+		Payload:        payload,
+		PayloadHash:    hex.EncodeToString(digest[:]),
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperror.NewConflict("Polar event ID was reused with different content")
+	}
+	if err != nil {
+		return apperror.NewServiceUnavailable("save Polar webhook receipt", err)
+	}
+	return nil
+}
+
+func (s *Service) processEvent(ctx context.Context, event polarintegration.Event) (bool, error) {
 	switch event.Type {
 	case "subscription.created", "subscription.updated", "subscription.active",
 		"subscription.canceled", "subscription.uncanceled", "subscription.cycled",
@@ -153,11 +205,28 @@ func (s *Service) Webhook(ctx context.Context, payload []byte, headers http.Head
 		"subscription.resumed", "subscription.migrated":
 		var value polarintegration.Subscription
 		if err := json.Unmarshal(event.Data, &value); err != nil {
-			return apperror.NewBadRequest("invalid Polar subscription event")
+			return false, apperror.NewBadRequest("invalid Polar subscription event")
 		}
-		return s.syncPolarSubscription(ctx, event.Timestamp, value)
+		id, err := uuid.Parse(value.ProductID)
+		if err != nil || id == uuid.Nil {
+			return false, apperror.NewBadRequest("Polar subscription product identity is missing")
+		}
+		if _, err := s.planCodeFromProduct(value); err != nil {
+			return true, nil
+		}
+		return false, s.syncPolarSubscription(ctx, event.Timestamp, value)
+	case "customer.state_changed":
+		var state polarintegration.CustomerState
+		if err := json.Unmarshal(event.Data, &state); err != nil {
+			return false, apperror.NewBadRequest("invalid Polar customer state event")
+		}
+		id, err := uuid.Parse(state.ExternalID)
+		if err != nil || id == uuid.Nil {
+			return true, nil
+		}
+		return false, s.RecoverOrganization(ctx, id)
 	default:
-		return nil
+		return true, nil
 	}
 }
 
@@ -193,9 +262,33 @@ func (s *Service) syncPolarSubscription(
 	if periodStart.IsZero() || !periodEnd.After(periodStart) {
 		return apperror.NewBadRequest("Polar subscription period is invalid")
 	}
+	var pastDueAt, graceEndsAt *time.Time
+	if value.Status == "past_due" {
+		existing, err := s.subscriptions.Get(ctx, organizationID)
+		if err != nil {
+			return err
+		}
+		if existing != nil &&
+			existing.Status == subscriptions.StatusPastDue &&
+			existing.ProviderSubscriptionID != nil &&
+			*existing.ProviderSubscriptionID == value.ID &&
+			existing.PastDueAt != nil &&
+			existing.GraceEndsAt != nil {
+			pastDueAt, graceEndsAt = existing.PastDueAt, existing.GraceEndsAt
+		} else {
+			start := eventCreated.UTC()
+			if value.PastDueAt != nil {
+				start = value.PastDueAt.UTC()
+			}
+			end := start.AddDate(0, 0, s.paymentGraceDays)
+			pastDueAt, graceEndsAt = &start, &end
+		}
+	}
 	_, err = s.subscriptions.Sync(ctx, organizationID, subscriptions.SyncRequest{
 		PlanID:                 plan.ID,
 		Status:                 polarStatus(value.Status),
+		PastDueAt:              pastDueAt,
+		GraceEndsAt:            graceEndsAt,
 		CurrentPeriodStart:     &periodStart,
 		CurrentPeriodEnd:       &periodEnd,
 		TrialEndsAt:            value.TrialEnd,
@@ -219,10 +312,14 @@ func polarStatus(status string) string {
 		return subscriptions.StatusCanceled
 	case "incomplete":
 		return subscriptions.StatusIncomplete
-	case "past_due", "unpaid", "paused":
+	case "past_due":
 		return subscriptions.StatusPastDue
+	case "unpaid":
+		return subscriptions.StatusCanceled
+	case "paused":
+		return subscriptions.StatusIncomplete
 	default:
-		return subscriptions.StatusPastDue
+		return subscriptions.StatusIncomplete
 	}
 }
 
@@ -269,16 +366,86 @@ func (s *Service) validateRedirects(values ...string) error {
 // ReconcileSubscription repairs missed webhooks from authoritative provider state.
 // Timestamp the read before the request so a later provider event wins in SQL.
 func (s *Service) ReconcileSubscription(ctx context.Context, target ReconciliationTarget) error {
-	if s.polar == nil || !s.polar.Configured() {
+	return s.RecoverOrganization(ctx, target.OrganizationID)
+}
+
+// Customer State discovers initial purchases, but excludes past-due customers.
+// Always fetch a known subscription as well, including when state is empty.
+func (s *Service) RecoverOrganization(ctx context.Context, organizationID uuid.UUID) error {
+	if s.license.SelfHosted() || s.polar == nil || !s.polar.Configured() {
 		return apperror.NewServiceUnavailable("Polar billing is not configured", nil)
 	}
-	observedAt := time.Now().UTC()
-	value, err := s.polar.GetSubscription(ctx, target.SubscriptionID)
+	existing, err := s.subscriptions.Get(ctx, organizationID)
 	if err != nil {
 		return err
 	}
-	if value.ID != target.SubscriptionID || value.CustomerID != target.CustomerID || value.Customer.ExternalID != target.OrganizationID.String() {
-		return apperror.NewConflict("Polar subscription identity does not match local subscription")
+	observedAt := time.Now().UTC()
+	state, err := s.polar.GetCustomerStateByExternalID(ctx, organizationID.String())
+	if errors.Is(err, polarintegration.ErrNotFound) && existing == nil {
+		return nil
 	}
-	return s.syncPolarSubscription(ctx, observedAt, value)
+	if err != nil {
+		return err
+	}
+	var candidate *polarintegration.CustomerStateSubscription
+	for i := range state.ActiveSubscriptions {
+		value := &state.ActiveSubscriptions[i]
+		candidateSubscription := polarintegration.Subscription{
+			ProductID: value.ProductID,
+		}
+		if _, err := s.planCodeFromProduct(candidateSubscription); err != nil {
+			continue
+		}
+		if candidate != nil && candidate.ID != value.ID {
+			return apperror.NewConflict("multiple Leamout subscriptions require review")
+		}
+		candidate = value
+	}
+	// First retire/refresh the previous identity. Never replace a live different
+	// subscription silently, even if the provider reports another purchase.
+	if existing != nil &&
+		existing.ProviderSubscriptionID != nil &&
+		existing.Provider != nil &&
+		*existing.Provider == providerPolar {
+		value, err := s.polar.GetSubscription(ctx, *existing.ProviderSubscriptionID)
+		if err != nil {
+			return err
+		}
+		if value.Customer.ExternalID != organizationID.String() ||
+			value.CustomerID != state.ID ||
+			existing.ProviderCustomerID == nil ||
+			value.CustomerID != *existing.ProviderCustomerID {
+			return apperror.NewConflict("Polar subscription ownership does not match local organization")
+		}
+		timestamp := observedAt
+		if value.ModifiedAt != nil {
+			timestamp = value.ModifiedAt.UTC()
+		}
+		if err := s.syncPolarSubscription(ctx, timestamp, value); err != nil {
+			return err
+		}
+		if candidate == nil || candidate.ID == value.ID {
+			return nil
+		}
+		if value.Status != "canceled" {
+			return apperror.NewConflict("active Leamout subscription cannot be replaced")
+		}
+	}
+	if candidate == nil {
+		return nil
+	}
+	value, err := s.polar.GetSubscription(ctx, candidate.ID)
+	if err != nil {
+		return err
+	}
+	if value.ID != candidate.ID ||
+		value.CustomerID != state.ID ||
+		value.Customer.ExternalID != organizationID.String() {
+		return apperror.NewConflict("Polar recovered subscription ownership does not match organization")
+	}
+	timestamp := observedAt
+	if value.ModifiedAt != nil {
+		timestamp = value.ModifiedAt.UTC()
+	}
+	return s.syncPolarSubscription(ctx, timestamp, value)
 }

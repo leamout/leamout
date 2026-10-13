@@ -196,6 +196,9 @@ func runWorkloads(ctx context.Context, logger *logging.Logger, modules *modules)
 	if modules.billingReconciliation != nil {
 		run("billing reconciliation", modules.billingReconciliation.Run)
 	}
+	if modules.billingWebhooks != nil {
+		run("billing webhook processing", modules.billingWebhooks.Run)
+	}
 	run("email delivery", modules.emailDelivery.Run)
 	run("outbox publisher", modules.outbox.Run)
 	run("webhook consumer", modules.webhookConsumer.Run)

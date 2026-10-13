@@ -63,6 +63,9 @@ func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective,
 	if valid {
 		plan, err = s.plans.GetByID(ctx, sub.PlanID)
 		start, end = sub.CurrentPeriodStart.UTC(), sub.CurrentPeriodEnd.UTC()
+		if sub.Status == subscriptions.StatusPastDue && sub.GraceEndsAt.After(end) {
+			end = sub.GraceEndsAt.UTC()
+		}
 	} else {
 		plan, err = s.plans.GetByCode(ctx, "free")
 	}
@@ -79,16 +82,7 @@ func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective,
 }
 
 func subscriptionPeriodActive(sub *subscriptions.Subscription, now time.Time) bool {
-	if sub == nil || (sub.Status != subscriptions.StatusActive && sub.Status != subscriptions.StatusTrialing) {
-		return false
-	}
-	if sub.CurrentPeriodStart == nil || sub.CurrentPeriodEnd == nil || now.Before(*sub.CurrentPeriodStart) || !now.Before(*sub.CurrentPeriodEnd) {
-		return false
-	}
-	if sub.Status == subscriptions.StatusTrialing && sub.TrialEndsAt != nil && !now.Before(*sub.TrialEndsAt) {
-		return false
-	}
-	return true
+	return subscriptions.PaidAccessActive(sub, now)
 }
 
 func calendarMonth(now time.Time) (time.Time, time.Time) {

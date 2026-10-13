@@ -74,7 +74,39 @@ func (h *Handler) PolarWebhook(w http.ResponseWriter, r *http.Request) {
 		httputil.Error(w, err)
 		return
 	}
-	httputil.OK(w, map[string]bool{
+	httputil.Accepted(w, map[string]bool{
 		"received": true,
 	})
+}
+
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
+	organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
+	if !ok || organizationID == uuid.Nil {
+		httputil.Error(w, apperror.NewBadRequest("organization context required"))
+		return
+	}
+	result, err := h.service.Status(r.Context(), organizationID)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, result)
+}
+
+func (h *Handler) Reconcile(w http.ResponseWriter, r *http.Request) {
+	organizationID, ok := middleware.OrganizationIDFromContext(r.Context())
+	if !ok || organizationID == uuid.Nil {
+		httputil.Error(w, apperror.NewBadRequest("organization context required"))
+		return
+	}
+	if err := h.service.RecoverOrganization(r.Context(), organizationID); err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	result, err := h.service.Status(r.Context(), organizationID)
+	if err != nil {
+		httputil.Error(w, err)
+		return
+	}
+	httputil.OK(w, result)
 }

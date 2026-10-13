@@ -48,30 +48,144 @@ func TestFromPlanRejectsMissingLimits(t *testing.T) {
 
 func TestSubscriptionPeriodActive(t *testing.T) {
 	t.Parallel()
+
 	now := time.Date(2026, time.October, 12, 12, 0, 0, 0, time.UTC)
-	start, end := now.Add(-time.Hour), now.Add(time.Hour)
+	start := now.Add(-time.Hour)
+	end := now.Add(time.Hour)
+	pastDue := now.Add(-24 * time.Hour)
+	graceEnd := pastDue.AddDate(0, 0, 7)
+	expiredPeriod := now.Add(-time.Minute)
 	cases := []struct {
 		name         string
 		subscription *subscriptions.Subscription
 		want         bool
 	}{
-		{"missing", nil, false},
-		{"active", &subscriptions.Subscription{
-			Status: subscriptions.StatusActive, CurrentPeriodStart: &start, CurrentPeriodEnd: &end,
-		}, true},
-		{"expired", &subscriptions.Subscription{
-			Status: subscriptions.StatusActive, CurrentPeriodStart: &start, CurrentPeriodEnd: &now,
-		}, false},
-		{"past_due", &subscriptions.Subscription{
-			Status: subscriptions.StatusPastDue, CurrentPeriodStart: &start, CurrentPeriodEnd: &end,
-		}, false},
-		{"trial", &subscriptions.Subscription{
-			Status: subscriptions.StatusTrialing, CurrentPeriodStart: &start, CurrentPeriodEnd: &end, TrialEndsAt: &end,
-		}, true},
-		{"trial_ended", &subscriptions.Subscription{
-			Status: subscriptions.StatusTrialing, CurrentPeriodStart: &start, CurrentPeriodEnd: &end, TrialEndsAt: &now,
-		}, false},
-		{"missing_period", &subscriptions.Subscription{Status: subscriptions.StatusActive}, false},
+		{
+			name: "missing",
+		},
+		{
+			name: "active",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusActive,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+			},
+			want: true,
+		},
+		{
+			name: "expired",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusActive,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &now,
+			},
+		},
+		{
+			name: "past_due_without_grace",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+			},
+		},
+		{
+			name: "past_due_during_grace",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				PastDueAt:          &pastDue,
+				GraceEndsAt:        &graceEnd,
+			},
+			want: true,
+		},
+		{
+			name: "grace_continues_after_provider_period_ends",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &expiredPeriod,
+				PastDueAt:          &pastDue,
+				GraceEndsAt:        &graceEnd,
+			},
+			want: true,
+		},
+		{
+			name: "grace_start_inclusive",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				PastDueAt:          &now,
+				GraceEndsAt:        &graceEnd,
+			},
+			want: true,
+		},
+		{
+			name: "grace_end_exclusive",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				PastDueAt:          &pastDue,
+				GraceEndsAt:        &now,
+			},
+		},
+		{
+			name: "future_delinquency_does_not_grant_access",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				PastDueAt:          &end,
+				GraceEndsAt:        &graceEnd,
+			},
+		},
+		{
+			name: "future_period_does_not_grant_grace",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusPastDue,
+				CurrentPeriodStart: &end,
+				CurrentPeriodEnd:   &graceEnd,
+				PastDueAt:          &pastDue,
+				GraceEndsAt:        &graceEnd,
+			},
+		},
+		{
+			name: "cancellation_overrides_grace",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusCanceled,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				PastDueAt:          &pastDue,
+				GraceEndsAt:        &graceEnd,
+			},
+		},
+		{
+			name: "trial",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusTrialing,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				TrialEndsAt:        &end,
+			},
+			want: true,
+		},
+		{
+			name: "trial_ended",
+			subscription: &subscriptions.Subscription{
+				Status:             subscriptions.StatusTrialing,
+				CurrentPeriodStart: &start,
+				CurrentPeriodEnd:   &end,
+				TrialEndsAt:        &now,
+			},
+		},
+		{
+			name: "missing_period",
+			subscription: &subscriptions.Subscription{
+				Status: subscriptions.StatusActive,
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

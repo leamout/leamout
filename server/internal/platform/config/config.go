@@ -17,6 +17,7 @@ type MinIOConfig struct {
 }
 
 type PolarConfig struct {
+	PaymentGraceDays   int    `env:"PAYMENT_GRACE_DAYS" envDefault:"7"`
 	Environment        string `env:"ENVIRONMENT" envDefault:"production"`
 	AccessToken        string `env:"ACCESS_TOKEN"`
 	WebhookSecret      string `env:"WEBHOOK_SECRET"`

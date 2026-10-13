@@ -1,0 +1,64 @@
+name: Polar billing acceptance
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "server/internal/commercial/**"
+      - "server/internal/database/**"
+      - "server/internal/integrations/payments/polar/**"
+      - "server/internal/platform/config/**"
+      - "server/migrations/**"
+      - "server/go.mod"
+      - "server/go.sum"
+      - "tests/billing-v1/**"
+      - ".github/workflows/billing-acceptance.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: billing-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Polar lifecycle and webhook recovery contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: leamout_billing_acceptance
+          POSTGRES_USER: leamout
+          POSTGRES_PASSWORD: billing-acceptance-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U leamout -d leamout_billing_acceptance"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Validate acceptance scripts
+        run: |
+          sh -n tests/billing-v1/run.sh
+          python3 -m py_compile tests/billing-v1/sandbox.py
+
+      - name: Run billing contract acceptance
+        env:
+          BILLING_TEST_DATABASE_URL: postgres://leamout:billing-acceptance-only@127.0.0.1:5432/leamout_billing_acceptance?sslmode=disable
+        run: sh tests/billing-v1/run.sh

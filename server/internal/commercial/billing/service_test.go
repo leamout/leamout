@@ -140,7 +140,7 @@ func TestPolarSubscriptionStatusMapping(t *testing.T) {
 		},
 		{
 			"paused",
-			"past_due",
+			"incomplete",
 		},
 		{
 			"past_due",
@@ -148,7 +148,7 @@ func TestPolarSubscriptionStatusMapping(t *testing.T) {
 		},
 		{
 			"unknown",
-			"past_due",
+			"incomplete",
 		},
 	} {
 		if got := polarStatus(tc.providerStatus); got != tc.expected {

@@ -3,6 +3,7 @@ package subscriptions
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -66,4 +67,28 @@ func (s *Service) Sync(
 		return Subscription{}, apperror.NewInternal("sync organization subscription", err)
 	}
 	return value, nil
+}
+
+// PaidAccessActive applies Leamout's payment policy independently of Polar's
+// benefit grace period. Past-due access ends at the persisted grace deadline,
+// including when the provider's last paid period has already ended.
+func PaidAccessActive(sub *Subscription, now time.Time) bool {
+	if sub == nil || sub.CurrentPeriodStart == nil || sub.CurrentPeriodEnd == nil {
+		return false
+	}
+	if now.Before(*sub.CurrentPeriodStart) || !sub.CurrentPeriodEnd.After(*sub.CurrentPeriodStart) {
+		return false
+	}
+	switch sub.Status {
+	case StatusActive:
+		return now.Before(*sub.CurrentPeriodEnd)
+	case StatusTrialing:
+		return now.Before(*sub.CurrentPeriodEnd) &&
+			(sub.TrialEndsAt == nil || now.Before(*sub.TrialEndsAt))
+	case StatusPastDue:
+		return sub.PastDueAt != nil && !now.Before(*sub.PastDueAt) &&
+			sub.GraceEndsAt != nil && now.Before(*sub.GraceEndsAt)
+	default:
+		return false
+	}
 }
