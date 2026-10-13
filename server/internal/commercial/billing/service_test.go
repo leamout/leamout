@@ -2,60 +2,115 @@ package billing
 
 import (
 	"testing"
+	"time"
 
-	stripeintegration "github.com/leamout/leamout/server/internal/integrations/payments/stripe"
+	"github.com/google/uuid"
+
+	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
 )
 
-func TestPlanCodeFromStripePrice(t *testing.T) {
+func TestPlanCodeFromPolarProduct(t *testing.T) {
 	t.Parallel()
-	service := &Service{priceIDs: map[string]string{
-		"developer": "price_dev", "pro": "price_pro", "scale": "price_scale",
-	}}
+	service := &Service{
+		productIDs: map[string]string{
+			"developer": polarintegration.DeveloperProductID,
+			"pro":       polarintegration.ProProductID,
+			"scale":     polarintegration.ScaleProductID,
+		},
+	}
 	for _, tc := range []struct {
-		name, price, want string
-		valid             bool
+		name      string
+		productID string
+		want      string
+		valid     bool
 	}{
-		{"developer", "price_dev", "developer", true},
-		{"pro", "price_pro", "pro", true},
-		{"scale", "price_scale", "scale", true},
-		{"unknown", "price_other", "", false},
-		{"missing", "", "", false},
+		{
+			"developer",
+			polarintegration.DeveloperProductID,
+			"developer",
+			true,
+		},
+		{
+			"pro",
+			polarintegration.ProProductID,
+			"pro",
+			true,
+		},
+		{
+			"scale",
+			polarintegration.ScaleProductID,
+			"scale",
+			true,
+		},
+		{
+			"unknown",
+			"other",
+			"",
+			false,
+		},
+		{
+			"missing",
+			"",
+			"",
+			false,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var subscription stripeintegration.Subscription
-			subscription.Items.Data = []stripeintegration.SubscriptionItem{{}}
-			subscription.Items.Data[0].Price.ID = tc.price
-			got, err := service.planCodeFromPrice(subscription)
+			subscription := polarintegration.Subscription{
+				ProductID: tc.productID,
+				Metadata: map[string]any{
+					"plan_code": "scale",
+				},
+			}
+			got, err := service.planCodeFromProduct(subscription)
 			if (err == nil) != tc.valid || got != tc.want {
-				t.Fatalf("got %q, err %v; want %q, valid %v", got, err, tc.want, tc.valid)
+				t.Fatalf("got %q, error %v; want %q, valid %v", got, err, tc.want, tc.valid)
 			}
 		})
-	}
-	var empty stripeintegration.Subscription
-	if _, err := service.planCodeFromPrice(empty); err == nil {
-		t.Fatal("expected empty subscription rejection")
-	}
-	empty.Items.Data = []stripeintegration.SubscriptionItem{{}, {}}
-	if _, err := service.planCodeFromPrice(empty); err == nil {
-		t.Fatal("expected multi-price subscription rejection")
 	}
 }
 
 func TestBillingRedirectOrigin(t *testing.T) {
 	t.Parallel()
-	service := &Service{frontendURL: "https://leamout.com"}
+	service := &Service{
+		frontendURL: "https://leamout.com",
+	}
 	for _, tc := range []struct {
 		url   string
 		valid bool
 	}{
-		{"https://leamout.com/billing/success", true},
-		{"https://LEAMOUT.com/billing/cancel?next=ok", true},
-		{"https://evil.example/capture", false},
-		{"http://leamout.com/billing", false},
-		{"https://leamout.com.evil.example", false},
-		{"https://leamout.com@evil.example", false},
-		{"//leamout.com", false},
-		{"/billing", false},
+		{
+			"https://leamout.com/billing/success",
+			true,
+		},
+		{
+			"https://LEAMOUT.com/billing/cancel?next=ok",
+			true,
+		},
+		{
+			"https://evil.example/capture",
+			false,
+		},
+		{
+			"http://leamout.com/billing",
+			false,
+		},
+		{
+			"https://leamout.com.evil.example",
+			false,
+		},
+		{
+			"https://leamout.com@evil.example",
+			false,
+		},
+		{
+			"//leamout.com",
+			false,
+		},
+		{
+			"/billing",
+			false,
+		},
 	} {
 		t.Run(tc.url, func(t *testing.T) {
 			err := service.validateRedirects(tc.url)
@@ -63,5 +118,77 @@ func TestBillingRedirectOrigin(t *testing.T) {
 				t.Fatalf("URL %q: err=%v, valid=%v", tc.url, err, tc.valid)
 			}
 		})
+	}
+}
+
+func TestPolarSubscriptionStatusMapping(t *testing.T) {
+	for _, tc := range []struct {
+		providerStatus string
+		expected       string
+	}{
+		{
+			"active",
+			"active",
+		},
+		{
+			"trialing",
+			"trialing",
+		},
+		{
+			"canceled",
+			"canceled",
+		},
+		{
+			"paused",
+			"past_due",
+		},
+		{
+			"past_due",
+			"past_due",
+		},
+		{
+			"unknown",
+			"past_due",
+		},
+	} {
+		if got := polarStatus(tc.providerStatus); got != tc.expected {
+			t.Fatalf("status %q resolved to %q", tc.providerStatus, got)
+		}
+	}
+}
+
+func TestPolarSyncRejectsConflictingCustomerOwnershipBeforeDatabaseAccess(t *testing.T) {
+	service := &Service{}
+	organizationID := uuid.New().String()
+	customerID := uuid.New().String()
+	for _, value := range []polarintegration.Subscription{
+		{
+			CustomerID: customerID,
+			Customer: polarintegration.Customer{
+				ID:         customerID,
+				ExternalID: "invalid-organization",
+			},
+		},
+		{
+			CustomerID: customerID,
+			Customer: polarintegration.Customer{
+				ID:         customerID,
+				ExternalID: organizationID,
+			},
+			Metadata: map[string]any{
+				"organization_id": uuid.New().String(),
+			},
+		},
+		{
+			CustomerID: customerID,
+			Customer: polarintegration.Customer{
+				ID:         uuid.New().String(),
+				ExternalID: organizationID,
+			},
+		},
+	} {
+		if err := service.syncPolarSubscription(t.Context(), time.Now().UTC(), value); err == nil {
+			t.Fatal("conflicting Polar customer ownership accepted")
+		}
 	}
 }

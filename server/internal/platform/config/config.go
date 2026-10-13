@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"net/netip"
 	"os"
 	"strings"
 
@@ -17,12 +16,13 @@ type MinIOConfig struct {
 	SecretKey string `env:"APP_SECRET_KEY,required"`
 }
 
-type StripeConfig struct {
-	SecretKey        string `env:"SECRET_KEY"`
-	WebhookSecret    string `env:"WEBHOOK_SECRET"`
-	DeveloperPriceID string `env:"DEVELOPER_PRICE_ID"`
-	ProPriceID       string `env:"PRO_PRICE_ID"`
-	ScalePriceID     string `env:"SCALE_PRICE_ID"`
+type PolarConfig struct {
+	Environment        string `env:"ENVIRONMENT" envDefault:"production"`
+	AccessToken        string `env:"ACCESS_TOKEN"`
+	WebhookSecret      string `env:"WEBHOOK_SECRET"`
+	DeveloperProductID string `env:"DEVELOPER_PRODUCT_ID" envDefault:"58ff657a-74d9-4342-89c4-2a3b784c6965"`
+	ProProductID       string `env:"PRO_PRODUCT_ID" envDefault:"da5b3818-e92e-4b09-afad-ae61895f05db"`
+	ScaleProductID     string `env:"SCALE_PRODUCT_ID" envDefault:"a3023020-9822-4835-9509-1635c7d35f63"`
 }
 
 type AWSConfig struct {
@@ -35,8 +35,8 @@ type AWSConfig struct {
 
 type Config struct {
 	Commercial licensing.Config
-	AWS        AWSConfig    `envPrefix:"AWS_"`
-	Stripe     StripeConfig `envPrefix:"STRIPE_"`
+	AWS        AWSConfig   `envPrefix:"AWS_"`
+	Polar      PolarConfig `envPrefix:"POLAR_"`
 
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	FrontendURL           string      `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
@@ -68,7 +68,7 @@ func Load() (Config, error) {
 	}
 
 	cfg.normalize()
-	if err := cfg.Commercial.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
 
@@ -83,11 +83,12 @@ func (c *Config) normalize() {
 	c.AWS.Region = strings.TrimSpace(c.AWS.Region)
 	c.AWS.FromEmail = strings.TrimSpace(c.AWS.FromEmail)
 	c.AWS.ConfigurationSet = strings.TrimSpace(c.AWS.ConfigurationSet)
-	c.Stripe.SecretKey = strings.TrimSpace(c.Stripe.SecretKey)
-	c.Stripe.WebhookSecret = strings.TrimSpace(c.Stripe.WebhookSecret)
-	c.Stripe.DeveloperPriceID = strings.TrimSpace(c.Stripe.DeveloperPriceID)
-	c.Stripe.ProPriceID = strings.TrimSpace(c.Stripe.ProPriceID)
-	c.Stripe.ScalePriceID = strings.TrimSpace(c.Stripe.ScalePriceID)
+	c.Polar.Environment = strings.TrimSpace(c.Polar.Environment)
+	c.Polar.AccessToken = strings.TrimSpace(c.Polar.AccessToken)
+	c.Polar.WebhookSecret = strings.TrimSpace(c.Polar.WebhookSecret)
+	c.Polar.DeveloperProductID = strings.TrimSpace(c.Polar.DeveloperProductID)
+	c.Polar.ProProductID = strings.TrimSpace(c.Polar.ProProductID)
+	c.Polar.ScaleProductID = strings.TrimSpace(c.Polar.ScaleProductID)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
 	c.FrontendURL = strings.TrimRight(strings.TrimSpace(c.FrontendURL), "/")
@@ -106,18 +107,6 @@ func (c *Config) normalize() {
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
 	c.TrustedProxyCIDRs = normalizeStrings(c.TrustedProxyCIDRs)
-}
-
-func (c Config) TrustedProxyPrefixes() ([]netip.Prefix, error) {
-	result := make([]netip.Prefix, 0, len(c.TrustedProxyCIDRs))
-	for _, value := range c.TrustedProxyCIDRs {
-		prefix, err := netip.ParsePrefix(value)
-		if err != nil {
-			return nil, fmt.Errorf("parse trusted proxy CIDR %q: %w", value, err)
-		}
-		result = append(result, prefix.Masked())
-	}
-	return result, nil
 }
 
 func normalizeStrings(values []string) []string {

@@ -2,8 +2,8 @@ package billing
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -11,25 +11,25 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
-	stripeintegration "github.com/leamout/leamout/server/internal/integrations/payments/stripe"
+	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
-const providerStripe = "stripe"
+const providerPolar = "polar"
 
 type Service struct {
 	plans         *plans.Service
 	subscriptions *subscriptions.Service
-	stripe        *stripeintegration.Client
-	priceIDs      map[string]string
+	polar         *polarintegration.Client
+	productIDs    map[string]string
 	frontendURL   string
 }
 
 func NewService(
 	plansService *plans.Service,
 	subscriptionsService *subscriptions.Service,
-	stripeClient *stripeintegration.Client,
-	priceIDs map[string]string,
+	polarClient *polarintegration.Client,
+	productIDs map[string]string,
 	frontendURL ...string,
 ) *Service {
 	var origin string
@@ -39,8 +39,8 @@ func NewService(
 	return &Service{
 		plans:         plansService,
 		subscriptions: subscriptionsService,
-		stripe:        stripeClient,
-		priceIDs:      priceIDs,
+		polar:         polarClient,
+		productIDs:    productIDs,
 		frontendURL:   origin,
 	}
 }
@@ -53,8 +53,8 @@ func (s *Service) Checkout(
 	if organizationID == uuid.Nil {
 		return SessionResponse{}, apperror.NewBadRequest("organization context required")
 	}
-	if s.stripe == nil || !s.stripe.Configured() {
-		return SessionResponse{}, apperror.NewServiceUnavailable("Stripe billing is not configured", nil)
+	if s.polar == nil || !s.polar.Configured() {
+		return SessionResponse{}, apperror.NewServiceUnavailable("Polar billing is not configured", nil)
 	}
 
 	plan, err := s.plans.GetByCode(ctx, strings.TrimSpace(req.PlanCode))
@@ -62,15 +62,15 @@ func (s *Service) Checkout(
 		return SessionResponse{}, err
 	}
 	if plan.PricingType != plans.PricingTypeFixed || plan.AmountMinor == nil || *plan.AmountMinor == 0 {
-		return SessionResponse{}, apperror.NewBadRequest("plan is not available for Stripe checkout")
+		return SessionResponse{}, apperror.NewBadRequest("plan is not available for Polar checkout")
 	}
 
 	if err := s.validateRedirects(req.SuccessURL, req.CancelURL); err != nil {
 		return SessionResponse{}, err
 	}
-	priceID := strings.TrimSpace(s.priceIDs[plan.Code])
-	if priceID == "" {
-		return SessionResponse{}, apperror.NewServiceUnavailable("Stripe price is not configured for this plan", nil)
+	productID := strings.TrimSpace(s.productIDs[plan.Code])
+	if productID == "" {
+		return SessionResponse{}, apperror.NewServiceUnavailable("Polar product is not configured for this plan", nil)
 	}
 
 	existing, err := s.subscriptions.Get(ctx, organizationID)
@@ -78,31 +78,22 @@ func (s *Service) Checkout(
 		return SessionResponse{}, err
 	}
 
-	customerID := ""
 	if existing != nil {
-		if existing.Provider != nil &&
-			*existing.Provider == providerStripe &&
-			existing.ProviderCustomerID != nil {
-			customerID = *existing.ProviderCustomerID
-		}
 		if existing.ProviderSubscriptionID != nil &&
 			existing.Status != subscriptions.StatusCanceled {
 			return SessionResponse{}, apperror.NewConflict("organization already has an active billing subscription")
 		}
 	}
 
-	digest := sha256.Sum256([]byte(organizationID.String() + ":" + req.IdempotencyKey))
-	session, err := s.stripe.CreateCheckoutSession(ctx, stripeintegration.CheckoutParams{
-		IdempotencyKey: "leamout-checkout-" + hex.EncodeToString(digest[:]),
-		PriceID:        priceID,
-		CustomerID:     customerID,
+	session, err := s.polar.CreateCheckoutSession(ctx, polarintegration.CheckoutParams{
+		ProductID:      productID,
 		OrganizationID: organizationID.String(),
 		PlanCode:       plan.Code,
 		SuccessURL:     req.SuccessURL,
-		CancelURL:      req.CancelURL,
+		ReturnURL:      req.CancelURL,
 	})
 	if err != nil {
-		return SessionResponse{}, apperror.NewServiceUnavailable("create Stripe checkout session", err)
+		return SessionResponse{}, apperror.NewServiceUnavailable("create Polar checkout session", err)
 	}
 	return SessionResponse{
 		URL: session.URL,
@@ -117,8 +108,8 @@ func (s *Service) Portal(
 	if organizationID == uuid.Nil {
 		return SessionResponse{}, apperror.NewBadRequest("organization context required")
 	}
-	if s.stripe == nil || !s.stripe.Configured() {
-		return SessionResponse{}, apperror.NewServiceUnavailable("Stripe billing is not configured", nil)
+	if s.polar == nil || !s.polar.Configured() {
+		return SessionResponse{}, apperror.NewServiceUnavailable("Polar billing is not configured", nil)
 	}
 
 	existing, err := s.subscriptions.Get(ctx, organizationID)
@@ -127,78 +118,66 @@ func (s *Service) Portal(
 	}
 	if existing == nil ||
 		existing.Provider == nil ||
-		*existing.Provider != providerStripe ||
+		*existing.Provider != providerPolar ||
 		existing.ProviderCustomerID == nil {
-		return SessionResponse{}, apperror.NewBadRequest("Stripe billing portal is unavailable for this organization")
+		return SessionResponse{}, apperror.NewBadRequest("Polar billing portal is unavailable for this organization")
 	}
 
 	if err := s.validateRedirects(req.ReturnURL); err != nil {
 		return SessionResponse{}, err
 	}
-	session, err := s.stripe.CreatePortalSession(ctx, stripeintegration.PortalParams{
+	session, err := s.polar.CreatePortalSession(ctx, polarintegration.PortalParams{
 		CustomerID: *existing.ProviderCustomerID,
 		ReturnURL:  req.ReturnURL,
 	})
 	if err != nil {
-		return SessionResponse{}, apperror.NewServiceUnavailable("create Stripe billing portal session", err)
+		return SessionResponse{}, apperror.NewServiceUnavailable("create Polar billing portal session", err)
 	}
 	return SessionResponse{
 		URL: session.URL,
 	}, nil
 }
 
-func (s *Service) Webhook(ctx context.Context, payload []byte, signature string) error {
-	if s.stripe == nil || !s.stripe.Configured() {
-		return apperror.NewServiceUnavailable("Stripe billing is not configured", nil)
+func (s *Service) Webhook(ctx context.Context, payload []byte, headers http.Header) error {
+	if s.polar == nil || !s.polar.Configured() {
+		return apperror.NewServiceUnavailable("Polar billing is not configured", nil)
 	}
-
-	event, err := s.stripe.ParseWebhook(payload, signature)
+	event, err := s.polar.ParseWebhook(payload, headers)
 	if err != nil {
-		return apperror.NewBadRequest("invalid Stripe webhook")
+		return apperror.NewBadRequest("invalid Polar webhook")
 	}
-
 	switch event.Type {
-	case "checkout.session.completed":
-		session, decodeErr := stripeintegration.DecodeEventObject[stripeintegration.CheckoutSession](event)
-		if decodeErr != nil {
-			return apperror.NewBadRequest("invalid Stripe checkout event")
+	case "subscription.created", "subscription.updated", "subscription.active",
+		"subscription.canceled", "subscription.uncanceled", "subscription.cycled",
+		"subscription.revoked", "subscription.past_due", "subscription.paused",
+		"subscription.resumed", "subscription.migrated":
+		var value polarintegration.Subscription
+		if err := json.Unmarshal(event.Data, &value); err != nil {
+			return apperror.NewBadRequest("invalid Polar subscription event")
 		}
-		if session.Subscription == "" {
-			return nil
-		}
-		subscription, getErr := s.stripe.GetSubscription(ctx, session.Subscription)
-		if getErr != nil {
-			return apperror.NewServiceUnavailable("retrieve Stripe subscription", getErr)
-		}
-		if len(subscription.Metadata) == 0 {
-			subscription.Metadata = session.Metadata
-		}
-		return s.syncStripeSubscription(ctx, event.Created, subscription)
-
-	case "customer.subscription.created",
-		"customer.subscription.updated",
-		"customer.subscription.deleted":
-		subscription, decodeErr := stripeintegration.DecodeEventObject[stripeintegration.Subscription](event)
-		if decodeErr != nil {
-			return apperror.NewBadRequest("invalid Stripe subscription event")
-		}
-		return s.syncStripeSubscription(ctx, event.Created, subscription)
+		return s.syncPolarSubscription(ctx, event.Timestamp, value)
 	default:
 		return nil
 	}
 }
 
-func (s *Service) syncStripeSubscription(
+func (s *Service) syncPolarSubscription(
 	ctx context.Context,
-	eventCreated int64,
-	value stripeintegration.Subscription,
+	eventCreated time.Time,
+	value polarintegration.Subscription,
 ) error {
-	organizationID, err := uuid.Parse(strings.TrimSpace(value.Metadata["organization_id"]))
+	organizationID, err := uuid.Parse(strings.TrimSpace(value.Customer.ExternalID))
 	if err != nil || organizationID == uuid.Nil {
-		return apperror.NewBadRequest("Stripe subscription is missing organization metadata")
+		return apperror.NewBadRequest("Polar subscription is missing organization metadata")
 	}
 
-	planCode, err := s.planCodeFromPrice(value)
+	if metadataID, ok := value.Metadata["organization_id"]; ok && metadataID != organizationID.String() {
+		return apperror.NewBadRequest("Polar subscription organization metadata does not match customer")
+	}
+	if value.Customer.ID != value.CustomerID {
+		return apperror.NewBadRequest("Polar subscription customer identity does not match")
+	}
+	planCode, err := s.planCodeFromProduct(value)
 	if err != nil {
 		return err
 	}
@@ -207,36 +186,36 @@ func (s *Service) syncStripeSubscription(
 		return err
 	}
 
-	if value.ID == "" || value.Customer == "" || eventCreated <= 0 {
-		return apperror.NewBadRequest("Stripe subscription identity or event timestamp is missing")
+	if value.ID == "" || value.CustomerID == "" || eventCreated.IsZero() {
+		return apperror.NewBadRequest("Polar subscription identity or event timestamp is missing")
 	}
-	periodStart, periodEnd := value.CurrentPeriod()
-	if periodStart <= 0 || periodEnd <= periodStart {
-		return apperror.NewBadRequest("Stripe subscription period is invalid")
+	periodStart, periodEnd := value.CurrentPeriodStart, value.CurrentPeriodEnd
+	if periodStart.IsZero() || !periodEnd.After(periodStart) {
+		return apperror.NewBadRequest("Polar subscription period is invalid")
 	}
 	_, err = s.subscriptions.Sync(ctx, organizationID, subscriptions.SyncRequest{
 		PlanID:                 plan.ID,
-		Status:                 stripeStatus(value.Status),
-		CurrentPeriodStart:     unixTimePtr(periodStart),
-		CurrentPeriodEnd:       unixTimePtr(periodEnd),
-		TrialEndsAt:            unixTimePtrValue(value.TrialEnd),
+		Status:                 polarStatus(value.Status),
+		CurrentPeriodStart:     &periodStart,
+		CurrentPeriodEnd:       &periodEnd,
+		TrialEndsAt:            value.TrialEnd,
 		CancelAtPeriodEnd:      value.CancelAtPeriodEnd,
-		CanceledAt:             unixTimePtrValue(value.CanceledAt),
-		Provider:               stringPtr(providerStripe),
-		ProviderCustomerID:     stringPtr(value.Customer),
+		CanceledAt:             value.CanceledAt,
+		Provider:               stringPtr(providerPolar),
+		ProviderCustomerID:     stringPtr(value.CustomerID),
 		ProviderSubscriptionID: stringPtr(value.ID),
-		ProviderEventCreatedAt: unixTimePtr(eventCreated),
+		ProviderEventCreatedAt: &eventCreated,
 	})
 	return err
 }
 
-func stripeStatus(status string) string {
+func polarStatus(status string) string {
 	switch status {
 	case "trialing":
 		return subscriptions.StatusTrialing
 	case "active":
 		return subscriptions.StatusActive
-	case "canceled", "incomplete_expired":
+	case "canceled":
 		return subscriptions.StatusCanceled
 	case "incomplete":
 		return subscriptions.StatusIncomplete
@@ -247,21 +226,6 @@ func stripeStatus(status string) string {
 	}
 }
 
-func unixTimePtr(value int64) *time.Time {
-	if value <= 0 {
-		return nil
-	}
-	result := time.Unix(value, 0).UTC()
-	return &result
-}
-
-func unixTimePtrValue(value *int64) *time.Time {
-	if value == nil {
-		return nil
-	}
-	return unixTimePtr(*value)
-}
-
 func stringPtr(value string) *string {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -270,27 +234,21 @@ func stringPtr(value string) *string {
 	return &value
 }
 
-func (s *Service) planCodeFromPrice(value stripeintegration.Subscription) (string, error) {
-	if len(value.Items.Data) != 1 {
-		return "", apperror.NewBadRequest("Stripe subscription must contain exactly one price")
-	}
-	priceID := strings.TrimSpace(value.Items.Data[0].Price.ID)
-	if priceID == "" {
-		return "", apperror.NewBadRequest("Stripe subscription price is missing")
-	}
+func (s *Service) planCodeFromProduct(value polarintegration.Subscription) (string, error) {
+	productID := value.ProductID
 	for _, code := range []string{
 		"developer",
 		"pro",
 		"scale",
 	} {
-		if expected := strings.TrimSpace(s.priceIDs[code]); expected != "" && expected == priceID {
+		if expected := strings.TrimSpace(s.productIDs[code]); expected != "" && expected == productID {
 			return code, nil
 		}
 	}
-	return "", apperror.NewBadRequest("Stripe subscription price is not recognized")
+	return "", apperror.NewBadRequest("Polar subscription product is not recognized")
 }
 
-// validateRedirects prevents authenticated clients from using Stripe checkout
+// validateRedirects prevents authenticated clients from using Polar checkout
 // and portal links as open redirects to attacker-controlled websites.
 func (s *Service) validateRedirects(values ...string) error {
 	trusted, err := url.Parse(strings.TrimSpace(s.frontendURL))
@@ -311,16 +269,16 @@ func (s *Service) validateRedirects(values ...string) error {
 // ReconcileSubscription repairs missed webhooks from authoritative provider state.
 // Timestamp the read before the request so a later provider event wins in SQL.
 func (s *Service) ReconcileSubscription(ctx context.Context, target ReconciliationTarget) error {
-	if s.stripe == nil || !s.stripe.Configured() {
-		return apperror.NewServiceUnavailable("Stripe billing is not configured", nil)
+	if s.polar == nil || !s.polar.Configured() {
+		return apperror.NewServiceUnavailable("Polar billing is not configured", nil)
 	}
-	observedAt := time.Now().UTC().Unix()
-	value, err := s.stripe.GetSubscription(ctx, target.SubscriptionID)
+	observedAt := time.Now().UTC()
+	value, err := s.polar.GetSubscription(ctx, target.SubscriptionID)
 	if err != nil {
 		return err
 	}
-	if value.ID != target.SubscriptionID || value.Customer != target.CustomerID || value.Metadata["organization_id"] != target.OrganizationID.String() {
-		return apperror.NewConflict("Stripe subscription identity does not match local subscription")
+	if value.ID != target.SubscriptionID || value.CustomerID != target.CustomerID || value.Customer.ExternalID != target.OrganizationID.String() {
+		return apperror.NewConflict("Polar subscription identity does not match local subscription")
 	}
-	return s.syncStripeSubscription(ctx, observedAt, value)
+	return s.syncPolarSubscription(ctx, observedAt, value)
 }

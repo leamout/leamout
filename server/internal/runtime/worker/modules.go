@@ -8,7 +8,7 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/licensing"
-	"github.com/leamout/leamout/server/internal/integrations/payments/stripe"
+	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 
 	"github.com/leamout/leamout/server/internal/ai"
 	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
@@ -141,16 +141,16 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		planLimits.SetLicenseService(licenseService)
 	} else {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
-			Stripe: stripe.New(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret),
-			StripePrices: map[string]string{
-				"developer": cfg.Stripe.DeveloperPriceID,
-				"pro":       cfg.Stripe.ProPriceID,
-				"scale":     cfg.Stripe.ScalePriceID,
+			Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			PolarProducts: map[string]string{
+				"developer": cfg.Polar.DeveloperProductID,
+				"pro":       cfg.Polar.ProProductID,
+				"scale":     cfg.Polar.ScaleProductID,
 			},
 			FrontendURL: cfg.FrontendURL,
 		})
 		planLimits = cloudCommercial.Limits.Service
-		if cfg.Stripe.SecretKey != "" && cfg.Stripe.WebhookSecret != "" {
+		if cfg.Polar.AccessToken != "" && cfg.Polar.WebhookSecret != "" {
 			billingJob, err = billing.NewReconciliationJob(
 				billing.NewRepository(queries),
 				cloudCommercial.Billing.Service,

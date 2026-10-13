@@ -13,7 +13,7 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
-	"github.com/leamout/leamout/server/internal/integrations/payments/stripe"
+	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
 	"github.com/leamout/leamout/server/internal/platform"
@@ -136,18 +136,18 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		credentialCipher,
 		trustedProxies,
 	)
-	var stripeClient *stripe.Client
+	var polarClient *polar.Client
 	if !licenseService.SelfHosted() {
-		stripeClient = stripe.New(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret)
+		polarClient = polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment)
 	}
 	commercialModule := commercial.New(queries, commercial.Dependencies{
 		License:     licenseService,
-		Stripe:      stripeClient,
+		Polar:       polarClient,
 		FrontendURL: cfg.FrontendURL,
-		StripePrices: map[string]string{
-			"developer": cfg.Stripe.DeveloperPriceID,
-			"pro":       cfg.Stripe.ProPriceID,
-			"scale":     cfg.Stripe.ScalePriceID,
+		PolarProducts: map[string]string{
+			"developer": cfg.Polar.DeveloperProductID,
+			"pro":       cfg.Polar.ProProductID,
+			"scale":     cfg.Polar.ScaleProductID,
 		},
 	})
 	platformModule.Retention.Service.SetPlanRetentionResolver(

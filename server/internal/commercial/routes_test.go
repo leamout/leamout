@@ -56,7 +56,7 @@ func TestSelfHostedExcludesCloudRoutesAndProtectsLicenseStatus(t *testing.T) {
 		},
 		{
 			http.MethodPost,
-			"/webhooks/stripe",
+			"/webhooks/polar",
 			404,
 		},
 		{

@@ -18,6 +18,6 @@ func RegisterRoutes(
 		r.Post("/portal", handler.Portal)
 	})
 
-	// Stripe authenticates this endpoint with the Stripe-Signature header.
-	router.Post("/webhooks/stripe", handler.StripeWebhook)
+	// Polar authenticates the raw body with Standard Webhooks headers.
+	router.Post("/webhooks/polar", handler.PolarWebhook)
 }
