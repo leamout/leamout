@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"time"
 
-
 	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 	"github.com/leamout/leamout/server/internal/media/engine/composable"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"

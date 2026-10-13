@@ -20,11 +20,11 @@ import (
 )
 
 type handler struct {
-	config        Config
-	manager       *session.Manager
-	tokens        *transport.TokenService
-	websocket     http.Handler
-	draining      atomic.Bool
+	config    Config
+	manager   *session.Manager
+	tokens    *transport.TokenService
+	websocket http.Handler
+	draining  atomic.Bool
 }
 
 func newHandler(cfg Config, manager *session.Manager, tokens *transport.TokenService, websocketHandler http.Handler) *handler {
