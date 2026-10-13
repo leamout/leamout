@@ -113,7 +113,7 @@ func TestBillingRedirectOrigin(t *testing.T) {
 		},
 	} {
 		t.Run(tc.url, func(t *testing.T) {
-			err := service.validateRedirects(tc.url)
+			err := validateRedirects(service.frontendURL, tc.url)
 			if (err == nil) != tc.valid {
 				t.Fatalf("URL %q: err=%v, valid=%v", tc.url, err, tc.valid)
 			}

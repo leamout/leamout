@@ -4,10 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -79,7 +77,7 @@ func (s *Service) Checkout(
 		return SessionResponse{}, apperror.NewBadRequest("plan is not available for Polar checkout")
 	}
 
-	if err := s.validateRedirects(req.SuccessURL, req.CancelURL); err != nil {
+	if err := validateRedirects(s.frontendURL, req.SuccessURL, req.CancelURL); err != nil {
 		return SessionResponse{}, err
 	}
 	productID := strings.TrimSpace(s.productIDs[plan.Code])
@@ -137,7 +135,7 @@ func (s *Service) Portal(
 		return SessionResponse{}, apperror.NewBadRequest("Polar billing portal is unavailable for this organization")
 	}
 
-	if err := s.validateRedirects(req.ReturnURL); err != nil {
+	if err := validateRedirects(s.frontendURL, req.ReturnURL); err != nil {
 		return SessionResponse{}, err
 	}
 	session, err := s.polar.CreatePortalSession(ctx, polarintegration.PortalParams{
@@ -195,39 +193,6 @@ func (s *Service) Webhook(ctx context.Context, payload []byte, headers http.Head
 		return apperror.NewServiceUnavailable("save Polar webhook receipt", err)
 	}
 	return nil
-}
-
-func (s *Service) processEvent(ctx context.Context, event polarintegration.Event) (bool, error) {
-	switch event.Type {
-	case "subscription.created", "subscription.updated", "subscription.active",
-		"subscription.canceled", "subscription.uncanceled", "subscription.cycled",
-		"subscription.revoked", "subscription.past_due", "subscription.paused",
-		"subscription.resumed", "subscription.migrated":
-		var value polarintegration.Subscription
-		if err := json.Unmarshal(event.Data, &value); err != nil {
-			return false, apperror.NewBadRequest("invalid Polar subscription event")
-		}
-		id, err := uuid.Parse(value.ProductID)
-		if err != nil || id == uuid.Nil {
-			return false, apperror.NewBadRequest("Polar subscription product identity is missing")
-		}
-		if _, err := s.planCodeFromProduct(value); err != nil {
-			return true, nil
-		}
-		return false, s.syncPolarSubscription(ctx, event.Timestamp, value)
-	case "customer.state_changed":
-		var state polarintegration.CustomerState
-		if err := json.Unmarshal(event.Data, &state); err != nil {
-			return false, apperror.NewBadRequest("invalid Polar customer state event")
-		}
-		id, err := uuid.Parse(state.ExternalID)
-		if err != nil || id == uuid.Nil {
-			return true, nil
-		}
-		return false, s.RecoverOrganization(ctx, id)
-	default:
-		return true, nil
-	}
 }
 
 func (s *Service) syncPolarSubscription(
@@ -345,24 +310,6 @@ func (s *Service) planCodeFromProduct(value polarintegration.Subscription) (stri
 	return "", apperror.NewBadRequest("Polar subscription product is not recognized")
 }
 
-// validateRedirects prevents authenticated clients from using Polar checkout
-// and portal links as open redirects to attacker-controlled websites.
-func (s *Service) validateRedirects(values ...string) error {
-	trusted, err := url.Parse(strings.TrimSpace(s.frontendURL))
-	if err != nil || trusted.Host == "" || (trusted.Scheme != "https" && trusted.Scheme != "http") || trusted.User != nil {
-		return apperror.NewServiceUnavailable("billing frontend origin is not configured", nil)
-	}
-	for _, raw := range values {
-		target, parseErr := url.Parse(strings.TrimSpace(raw))
-		if parseErr != nil || !target.IsAbs() || target.User != nil ||
-			target.Scheme != trusted.Scheme || !strings.EqualFold(target.Host, trusted.Host) ||
-			strings.HasPrefix(target.Path, "//") {
-			return apperror.NewBadRequest("billing redirect URL must use the configured frontend origin")
-		}
-	}
-	return nil
-}
-
 // ReconcileSubscription repairs missed webhooks from authoritative provider state.
 // Timestamp the read before the request so a later provider event wins in SQL.
 func (s *Service) ReconcileSubscription(ctx context.Context, target ReconciliationTarget) error {
@@ -448,4 +395,78 @@ func (s *Service) RecoverOrganization(ctx context.Context, organizationID uuid.U
 		timestamp = value.ModifiedAt.UTC()
 	}
 	return s.syncPolarSubscription(ctx, timestamp, value)
+}
+
+func (s *Service) Status(ctx context.Context, organizationID uuid.UUID) (Status, error) {
+	if organizationID == uuid.Nil {
+		return Status{}, apperror.NewBadRequest("organization context required")
+	}
+	result := Status{
+		DeploymentMode:    licensing.Cloud,
+		BillingConfigured: s.polar.Configured(),
+	}
+	if s.license.SelfHosted() {
+		result.DeploymentMode = licensing.SelfHosted
+		result.BillingConfigured = false
+		status := s.license.Status()
+		result.License = &status
+		result.Usage.Unlimited = true
+		if status.Claims != nil {
+			result.Limits = limits.Effective{
+				MaxConcurrentCalls: &status.Claims.MaxConcurrentCalls,
+				PeriodStart:        status.Claims.ValidFrom,
+				PeriodEnd:          status.Claims.ExpiresAt,
+			}
+		}
+		return result, nil
+	}
+	sub, err := s.subscriptions.Get(ctx, organizationID)
+	if err != nil {
+		return Status{}, err
+	}
+	planCode := "free"
+	plan, err := s.plans.GetByCode(ctx, planCode)
+	if err != nil {
+		return Status{}, err
+	}
+	if subscriptions.PaidAccessActive(sub, time.Now().UTC()) {
+		plan, err = s.plans.GetByID(ctx, sub.PlanID)
+		if err != nil {
+			return Status{}, err
+		}
+	}
+	result.Plan = &PlanSummary{
+		Code:            plan.Code,
+		Name:            plan.Name,
+		Currency:        plan.Currency,
+		AmountMinor:     plan.AmountMinor,
+		BillingInterval: plan.BillingInterval,
+	}
+	if sub != nil {
+		result.Subscription = &SubscriptionSummary{
+			Status:            sub.Status,
+			CurrentPeriodEnd:  sub.CurrentPeriodEnd,
+			CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
+			PastDueAt:         sub.PastDueAt,
+			GraceEndsAt:       sub.GraceEndsAt,
+			Provider:          sub.Provider,
+		}
+		result.PortalAvailable = result.BillingConfigured &&
+			sub.Provider != nil &&
+			*sub.Provider == providerPolar &&
+			sub.ProviderCustomerID != nil
+	}
+	result.CheckoutAvailable = result.BillingConfigured &&
+		(sub == nil ||
+			sub.ProviderSubscriptionID == nil ||
+			sub.Status == subscriptions.StatusCanceled)
+	if s.limits == nil {
+		return Status{}, apperror.NewServiceUnavailable("billing limit resolver is unavailable", nil)
+	}
+	result.Limits, err = s.limits.Get(ctx, organizationID)
+	if err != nil {
+		return Status{}, err
+	}
+	result.Usage, err = s.limits.RuntimeUsage(ctx, organizationID)
+	return result, err
 }

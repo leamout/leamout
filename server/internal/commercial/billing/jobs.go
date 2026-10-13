@@ -2,7 +2,6 @@ package billing
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
-	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -132,17 +130,12 @@ func (j *WebhookJob) process(ctx context.Context, id, lease uuid.UUID) error {
 		return fmt.Errorf("lock billing webhook receipt: %w", err)
 	}
 
-	var event polarintegration.Event
-	if err := json.Unmarshal(receipt.Payload, &event); err != nil {
-		return apperror.NewBadRequest("invalid stored Polar webhook")
-	}
-
 	transactionalService := *j.service
 	transactionalService.repo = j.repo.WithTx(tx)
 	transactionalService.subscriptions = subscriptions.NewService(
 		subscriptions.NewRepository(queries),
 	)
-	ignored, err := transactionalService.processEvent(ctx, event)
+	ignored, err := NewConsumer(&transactionalService).Handle(ctx, receipt.Payload)
 	if err != nil {
 		return err
 	}
