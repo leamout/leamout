@@ -3,13 +3,9 @@ package media
 import (
 	"bytes"
 	"context"
-	"crypto/ed25519"
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -180,20 +176,20 @@ func TestHandlerExposesMediaMetrics(t *testing.T) {
 	}
 }
 
-func TestSelfHostedMediaRejectsUnlicensedNewSession(t *testing.T) {
+func TestCommunitySelfHostedMediaStartsSessionsWithoutLicense(t *testing.T) {
 	cfg := validRuntimeConfig()
-	public, _, _ := ed25519.GenerateKey(rand.Reader)
-	license, err := licensing.NewService(licensing.Config{
-		Mode:         licensing.SelfHosted,
-		DeploymentID: "deployment",
-		File:         filepath.Join(t.TempDir(), "missing"),
-		PublicKeys: map[string]string{
-			"issuer": base64.StdEncoding.EncodeToString(public),
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
+	cfg.Commercial.Mode = licensing.SelfHosted
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Community Self-Hosted config validation: %v", err)
 	}
+	license, err := licensing.NewService(cfg.Commercial)
+	if err != nil {
+		t.Fatalf("Community license initialization: %v", err)
+	}
+	if status := license.Status(); status.State != "community" {
+		t.Fatalf("license state = %q, want community", status.State)
+	}
+
 	manager, err := session.NewManager(1, cfg.AttachTimeout, map[session.Engine]session.Starter{
 		session.EngineEcho: echo.Engine{},
 	})
@@ -205,17 +201,35 @@ func TestSelfHostedMediaRejectsUnlicensedNewSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := newHandler(cfg, manager, tokens, http.NotFoundHandler())
-	h.license = license
-	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/v1/sessions", strings.NewReader(`{}`))
+	audio := session.AudioFormat{SampleRateHz: 16000, Channels: 1}
+	call := session.Config{
+		ID: uuid.New(), OrganizationID: uuid.New(), CallID: uuid.New(), ChannelID: uuid.New(),
+		Engine: session.EngineEcho, InputFormat: audio, OutputFormat: audio,
+	}
+	payload, err := json.Marshal(call)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	unauthorized := httptest.NewRecorder()
+	h.ServeHTTP(unauthorized, httptest.NewRequestWithContext(
+		t.Context(), http.MethodPost, "/internal/v1/sessions", bytes.NewReader(payload),
+	))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthenticated status = %d, want %d", unauthorized.Code, http.StatusUnauthorized)
+	}
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/internal/v1/sessions", bytes.NewReader(payload))
 	req.Header.Set("Authorization", "Bearer "+cfg.ControlToken)
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
-	if rec.Code != http.StatusPaymentRequired || manager.Active() != 0 {
-		t.Fatalf("status=%d active=%d", rec.Code, manager.Active())
+	if rec.Code != http.StatusCreated || manager.Active() != 1 {
+		t.Fatalf("Community session status=%d active=%d body=%s", rec.Code, manager.Active(), rec.Body.String())
 	}
+
 	live := httptest.NewRecorder()
 	h.ServeHTTP(live, httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/livez", nil))
 	if live.Code != http.StatusOK {
-		t.Fatalf("liveness=%d", live.Code)
+		t.Fatalf("liveness = %d, want %d", live.Code, http.StatusOK)
 	}
 }
