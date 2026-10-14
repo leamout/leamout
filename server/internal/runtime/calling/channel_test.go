@@ -52,21 +52,22 @@ func TestAdmissionLimiterValidatesArgumentsBeforeRedis(t *testing.T) {
 	}
 }
 
-func TestSelfHostedAdmissionSharesDeploymentCapacity(t *testing.T) {
+func TestOrganizationAdmissionPrefixIsTenantScoped(t *testing.T) {
 	first, second := uuid.New(), uuid.New()
-	cloud := &AdmissionLimiter{}
-	if cloud.organizationPrefix(first) == cloud.organizationPrefix(second) {
-		t.Fatal("Cloud organizations share capacity")
+
+	firstKey := organizationAdmissionPrefix(first)
+	secondKey := organizationAdmissionPrefix(second)
+
+	if firstKey != "telecom:admission:organization:"+first.String() {
+		t.Fatalf("organization admission key = %q", firstKey)
 	}
-	hosted := &AdmissionLimiter{
-		deploymentID: "deployment",
+	if firstKey == secondKey {
+		t.Fatal("different organizations must never share admission capacity")
 	}
-	if hosted.organizationPrefix(first) != hosted.organizationPrefix(second) {
-		t.Fatal("self-hosted organizations can multiply licensed capacity")
+	if firstKey != organizationAdmissionPrefix(first) {
+		t.Fatal("organization admission keys must remain stable")
 	}
-	if hosted.organizationPrefix(first) == (&AdmissionLimiter{
-		deploymentID: "other",
-	}).organizationPrefix(first) {
-		t.Fatal("deployments share capacity")
+	if firstKey == admissionPrefix(first) {
+		t.Fatal("organization admission and trunk keys must remain separate")
 	}
 }
