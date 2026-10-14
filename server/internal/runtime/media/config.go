@@ -62,9 +62,6 @@ func (c Config) Validate() error {
 	if err := c.Commercial.Validate(); err != nil {
 		return err
 	}
-	if c.Commercial.Mode == licensing.SelfHosted && c.RedisURL == "" {
-		return fmt.Errorf("self-hosted media requires Redis for licensed node leases")
-	}
 	if strings.TrimSpace(c.ListenAddress) == "" {
 		return fmt.Errorf("media listen address is required")
 	}

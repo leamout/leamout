@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
-
 	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 	"github.com/leamout/leamout/server/internal/media/engine/composable"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"
@@ -36,10 +34,6 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("media runtime context is required")
 	}
 	if err := cfg.Validate(); err != nil {
-		return err
-	}
-	licenseService, err := licensing.NewService(cfg.Commercial)
-	if err != nil {
 		return err
 	}
 	logger := logging.New().With("process", "media")
@@ -68,7 +62,6 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("initialize media WebSocket: %w", err)
 	}
 	handler := newHandler(cfg, manager, tokens, websockets)
-	handler.license = licenseService
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", cfg.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("listen for media: %w", err)
@@ -79,9 +72,6 @@ func RunWithConfig(ctx context.Context, cfg Config) error {
 		return fmt.Errorf("register media node: %w", err)
 	}
 	defer registration.close(context.Background())
-	if licenseService.SelfHosted() {
-		handler.nodeAllowance = registration.requireLicenseNode
-	}
 
 	server := &http.Server{
 		Handler:           handler,

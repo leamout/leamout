@@ -405,13 +405,9 @@ func (s *Service) Status(ctx context.Context, organizationID uuid.UUID) (Status,
 		status := s.license.Status()
 		result.License = &status
 		result.Usage.Unlimited = true
-		if status.Claims != nil {
-			result.Limits = limits.Effective{
-				MaxConcurrentCalls: &status.Claims.MaxConcurrentCalls,
-				PeriodStart:        status.Claims.ValidFrom,
-				PeriodEnd:          status.Claims.ExpiresAt,
-			}
-		}
+		// Self-Hosted Community capacity is operator-managed and unlimited by
+		// the commercial licensing system. Enterprise claims gate extensions.
+		result.Limits = limits.Effective{}
 		return result, nil
 	}
 	sub, err := s.subscriptions.Get(ctx, organizationID)

@@ -48,7 +48,7 @@ export function CreateAccountPasswordForm() {
       client.clear();
       form.reset();
       save(null);
-      router.replace("/");
+      router.replace("/log-in");
     } catch (error) {
       setNotice(errorMessage(error));
     }

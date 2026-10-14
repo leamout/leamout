@@ -42,15 +42,9 @@ func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective,
 		return Effective{}, apperror.NewBadRequest("organization_id is required")
 	}
 	if s.license.SelfHosted() {
-		claims, err := s.license.RequireRuntime()
-		if err != nil {
-			return Effective{}, err
-		}
-		return Effective{
-			MaxConcurrentCalls: &claims.MaxConcurrentCalls,
-			PeriodStart:        claims.ValidFrom,
-			PeriodEnd:          claims.ExpiresAt,
-		}, nil
+		// Community and Enterprise operate the same Apache-2.0 runtime.
+		// No commercial license can impose a core telephony or AI quota.
+		return Effective{}, nil
 	}
 	sub, err := s.subscriptions.Get(ctx, organizationID)
 	if err != nil {
@@ -98,6 +92,9 @@ func (s *Service) MaxConcurrentCalls(ctx context.Context, organizationID uuid.UU
 	value, err := s.Get(ctx, organizationID)
 	if err != nil {
 		return 0, false, err
+	}
+	if value.MaxConcurrentCalls == nil {
+		return 0, false, nil
 	}
 	return *value.MaxConcurrentCalls, true, nil
 }

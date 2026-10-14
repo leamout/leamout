@@ -14,7 +14,7 @@ export const verificationSchema = z.object({
 
 export const newPasswordSchema = z
   .object({
-    password: z.string().min(1, "Enter a new password."),
+    password: z.string().min(12, "Use at least 12 characters.").max(1024, "Password is too long."),
     confirmation: z.string().min(1, "Confirm your password."),
   })
   .refine((values) => values.password === values.confirmation, {

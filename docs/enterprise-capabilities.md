@@ -3,7 +3,13 @@
 Enterprise is optional commercial packaging for Leamout Self-Hosted or
 Leamout Cloud. It is not a deployment model, separate control plane, or runtime
 architecture. Enterprise capabilities use the same organization, application,
-Media Runtime, and Agent Runtime boundaries as every other Leamout deployment.
+Media Runtime, and Agent Runtime boundaries as Community deployments.
+
+**Licensing boundary:** This public repository is already Apache-2.0.
+Existing SSO, SCIM, retention, networking and authz source code stays
+Apache-2.0. Commercializing those exact files via an entitlement flag does not
+relicense them. New proprietary capabilities, packaging and support must be
+defined as separately distributed work. See [open-core.md](open-core.md).
 
 ## Package ownership
 

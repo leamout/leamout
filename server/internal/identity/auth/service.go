@@ -13,6 +13,7 @@ import (
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/platform/email"
+	"github.com/leamout/leamout/server/internal/security/authn"
 	"github.com/leamout/leamout/server/internal/security/otp"
 	"github.com/leamout/leamout/server/internal/security/password"
 	"github.com/leamout/leamout/server/internal/security/token"
@@ -140,13 +141,19 @@ func (s *Service) loginWithPassword(ctx context.Context, transactionID uuid.UUID
 	return user, nil
 }
 
-func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, value string) (sqlc.User, error) {
+func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, sessionID uuid.UUID, assurance authn.AssuranceLevel, currentPassword, value string) (sqlc.User, error) {
 	if s.emails != nil && s.recoveryURL == "" {
 		return sqlc.User{}, apperror.NewServiceUnavailable("password notification URL is not configured", nil)
 	}
 
-	if userID == uuid.Nil {
-		return sqlc.User{}, apperror.NewUnauthorized("authentication required")
+	if userID == uuid.Nil || sessionID == uuid.Nil {
+		return sqlc.User{}, apperror.NewUnauthorized("session authentication required")
+	}
+	if err := validateNewPassword(value); err != nil {
+		return sqlc.User{}, err
+	}
+	if s.pool == nil || s.emails == nil {
+		return sqlc.User{}, apperror.NewServiceUnavailable("secure password enrollment requires database and email services", nil)
 	}
 
 	hash, err := password.Hash(value)
@@ -154,28 +161,46 @@ func (s *Service) SetPassword(ctx context.Context, userID uuid.UUID, value strin
 		return sqlc.User{}, apperror.NewInternal("failed to hash password", err)
 	}
 
-	params := sqlc.SetUserPasswordParams{
-		ID:           userID,
-		PasswordHash: &hash,
-	}
-	if s.pool == nil || s.emails == nil {
-		return s.repo.SetUserPassword(ctx, params)
-	}
-
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return sqlc.User{}, err
 	}
-
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
 
-	user, err := sqlc.New(tx).SetUserPassword(ctx, params)
+	queries := sqlc.New(tx)
+	user, err := queries.GetUserByID(ctx, userID)
+	if err != nil {
+		return sqlc.User{}, apperror.NewUnauthorized("authentication required")
+	}
+	// Initial enrollment must follow recent email verification. Existing
+	// passwords require proof of the current secret, not only a cookie.
+	if user.PasswordHash == nil || *user.PasswordHash == "" {
+		if assurance != authn.AssuranceOTP {
+			return sqlc.User{}, apperror.NewUnauthorized("recent email verification required to enroll password")
+		}
+		verifiedSession, err := queries.GetSessionByID(ctx, sessionID)
+		if err != nil || verifiedSession.UserID != userID ||
+			!verifiedSession.CreatedAt.Valid ||
+			time.Since(verifiedSession.CreatedAt.Time) > 10*time.Minute ||
+			time.Until(verifiedSession.CreatedAt.Time) > time.Minute {
+			return sqlc.User{}, apperror.NewUnauthorized("recent email verification required to enroll password")
+		}
+	} else if currentPassword == "" || !password.Verify(currentPassword, *user.PasswordHash) {
+		return sqlc.User{}, apperror.NewUnauthorized("current password required")
+	}
+	user, err = queries.SetUserPassword(ctx, sqlc.SetUserPasswordParams{
+		ID:           userID,
+		PasswordHash: &hash,
+	})
 	if err != nil {
 		return sqlc.User{}, err
 	}
-
+	// Rotate trust after password updates: no existing session survives.
+	if err := queries.RevokeUserSessions(ctx, userID); err != nil {
+		return sqlc.User{}, err
+	}
 	if s.recoveryURL != "" {
 		now := time.Now()
 		_, err = s.emails.QueueTx(ctx, tx, email.Request{
@@ -561,6 +586,9 @@ func (s *Service) ResetPassword(ctx context.Context, id uuid.UUID, code, value s
 		return apperror.NewServiceUnavailable("password recovery is not configured", nil)
 	}
 
+	if err := validateNewPassword(value); err != nil {
+		return err
+	}
 	hash, err := password.Hash(value)
 	if err != nil {
 		return apperror.NewBadRequest("invalid password")
