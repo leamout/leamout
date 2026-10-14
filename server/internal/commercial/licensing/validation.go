@@ -41,7 +41,7 @@ func (c Config) Validate() error {
 	// silently running with an unintentionally disabled commercial extension.
 	if c.Mode == SelfHosted && (strings.TrimSpace(c.DeploymentID) != "" || strings.TrimSpace(c.File) != "") &&
 		(strings.TrimSpace(c.DeploymentID) == "" || strings.TrimSpace(c.File) == "" || len(keys) == 0) {
-		return fmt.Errorf("Enterprise license requires LICENSE_DEPLOYMENT_ID, LICENSE_FILE and an issuer public keyring")
+		return fmt.Errorf("enterprise license requires LICENSE_DEPLOYMENT_ID, LICENSE_FILE and an issuer public keyring")
 	}
 	for id, encoded := range keys {
 		key, err := base64.StdEncoding.DecodeString(encoded)
