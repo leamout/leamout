@@ -1,0 +1,9 @@
+[
+  {
+    "targets": ["replace-with-verified-metrics-service:9090"],
+    "labels": {
+      "component": "replace-me",
+      "environment": "local"
+    }
+  }
+]

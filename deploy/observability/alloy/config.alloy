@@ -1,0 +1,39 @@
+// Accept OTLP logs and traces from explicitly configured Leamout services.
+ // No Docker socket, host filesystem or ambient application secrets required.
+otelcol.receiver.otlp "leamout" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    logs   = [otelcol.processor.batch.logs.input]
+    traces = [otelcol.processor.batch.traces.input]
+  }
+}
+
+otelcol.processor.batch "logs" {
+  output {
+    logs = [otelcol.exporter.otlphttp.loki.input]
+  }
+}
+
+otelcol.processor.batch "traces" {
+  output {
+    traces = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlphttp "loki" {
+  client {
+    endpoint = "http://loki:3100"
+  }
+  logs_endpoint = "http://loki:3100/otlp/v1/logs"
+}
+
+otelcol.exporter.otlphttp "tempo" {
+  client {
+    endpoint = "http://tempo:4318"
+  }
+}

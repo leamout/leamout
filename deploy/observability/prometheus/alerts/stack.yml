@@ -1,0 +1,20 @@
+groups:
+  - name: observability-stack
+    rules:
+      - alert: ObservabilityTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} has been unreachable for over 5 minutes."
+
+      - alert: PrometheusScrapeSamplesMissing
+        expr: scrape_samples_scraped == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No samples scraped from {{ $labels.job }}"
+          description: "Target {{ $labels.instance }} has returned no samples for over 10 minutes."

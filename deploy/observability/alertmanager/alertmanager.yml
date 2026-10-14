@@ -1,0 +1,14 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: not-configured
+  group_by: ["alertname", "job"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+# Bootstrap only: alerts are evaluated and visible, but not delivered until
+# an authorized operator configures an email/webhook/PagerDuty/etc receiver.
+receivers:
+  - name: not-configured
