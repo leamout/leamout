@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"
 	"github.com/leamout/leamout/server/internal/media/session"

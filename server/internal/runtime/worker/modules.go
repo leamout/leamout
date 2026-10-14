@@ -136,11 +136,11 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger, 
 	if cloud {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
 			Database: postgresClient.Pool(),
-			Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
-				"pro": cfg.Polar.ProProductID,
-				"scale": cfg.Polar.ScaleProductID,
+				"pro":       cfg.Polar.ProProductID,
+				"scale":     cfg.Polar.ScaleProductID,
 			},
 			FrontendURL: cfg.FrontendURL,
 		})
@@ -175,8 +175,8 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger, 
 	}
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		Calls: callsService,
-		Database: postgresClient.Pool(),
+		Calls:            callsService,
+		Database:         postgresClient.Pool(),
 	})
 	if cloud {
 		callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)

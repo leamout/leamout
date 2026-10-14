@@ -133,13 +133,13 @@ func newModules(ctx context.Context, cfg config.Config, cloud bool) (*modules, e
 	var commercialModule *commercial.Module
 	if cloud {
 		commercialModule = commercial.New(queries, commercial.Dependencies{
-			Database: postgresClient.Pool(),
-			Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			Database:    postgresClient.Pool(),
+			Polar:       polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			FrontendURL: cfg.FrontendURL,
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
-				"pro": cfg.Polar.ProProductID,
-				"scale": cfg.Polar.ScaleProductID,
+				"pro":       cfg.Polar.ProProductID,
+				"scale":     cfg.Polar.ScaleProductID,
 			},
 		})
 		platformModule.Retention.Service.SetPlanRetentionResolver(

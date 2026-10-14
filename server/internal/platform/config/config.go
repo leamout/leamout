@@ -33,8 +33,8 @@ type AWSConfig struct {
 }
 
 type Config struct {
-	AWS        AWSConfig   `envPrefix:"AWS_"`
-	Polar      PolarConfig `envPrefix:"POLAR_"`
+	AWS   AWSConfig   `envPrefix:"AWS_"`
+	Polar PolarConfig `envPrefix:"POLAR_"`
 
 	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
 	FrontendURL           string      `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`

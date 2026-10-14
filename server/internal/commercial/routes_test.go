@@ -20,6 +20,8 @@ func TestCloudRoutesRequireAuthorization(t *testing.T) {
 	for _, path := range []string{"/billing/status", "/limits", "/runtime-usage", "/entitlements"} {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil))
-		if rec.Code != http.StatusForbidden { t.Errorf("%s status: %d", path, rec.Code) }
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("%s status: %d", path, rec.Code)
+		}
 	}
 }

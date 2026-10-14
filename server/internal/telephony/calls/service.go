@@ -91,7 +91,9 @@ func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context, uuid.UUID
 }
 
 func (s *Service) requireRuntimeAllowance(ctx context.Context, organizationID uuid.UUID) error {
-	if s.runtimeAllowance == nil { return nil }
+	if s.runtimeAllowance == nil {
+		return nil
+	}
 	return s.runtimeAllowance(ctx, organizationID)
 }
 
@@ -421,7 +423,9 @@ func (s *Service) acquireOrganizationAdmission(
 	organizationID uuid.UUID,
 	leaseID string,
 ) error {
-	if s.planConcurrency == nil { return nil }
+	if s.planConcurrency == nil {
+		return nil
+	}
 	maxConcurrent, limited, err := s.planConcurrency(ctx, organizationID)
 	if err != nil {
 		return err

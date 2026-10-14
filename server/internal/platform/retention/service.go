@@ -45,7 +45,9 @@ func (s *Service) Upsert(ctx context.Context, organizationID uuid.UUID, resource
 	}
 	if s.retentionDays != nil {
 		maxDays, limited, err := s.retentionDays(ctx, organizationID)
-		if err != nil { return Policy{}, err }
+		if err != nil {
+			return Policy{}, err
+		}
 		if limited && int64(req.RetentionDays) > maxDays {
 			return Policy{}, apperror.NewPaymentRequired("retention_days exceeds organization plan limit")
 		}

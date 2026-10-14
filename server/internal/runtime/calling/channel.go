@@ -112,7 +112,7 @@ func (s *ChannelStore) Delete(ctx context.Context, callID uuid.UUID) error {
 }
 
 type AdmissionLimiter struct {
-	client       *redisintegration.Client
+	client *redisintegration.Client
 }
 
 func NewAdmissionLimiter(client *redisintegration.Client) *AdmissionLimiter {
