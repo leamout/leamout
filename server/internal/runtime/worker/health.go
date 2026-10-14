@@ -35,6 +35,13 @@ func runWorkloadsWithReadiness(ctx context.Context, logger *logging.Logger, modu
 		return fmt.Errorf("listen for worker readiness: %w", err)
 	}
 
+	// Readiness stays loopback-only; the metrics port is internal to Docker.
+	metricsListener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", ":9091")
+	if err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("listen for worker metrics: %w", err)
+	}
+
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -42,9 +49,21 @@ func runWorkloadsWithReadiness(ctx context.Context, logger *logging.Logger, modu
 		Handler:           workerReadinessHandler(modules.ready),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
-	serverErr := make(chan error, 1)
+	metricsServer := &http.Server{
+		Handler:           workerMetricsHandler(),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	serverErr := make(chan error, 2)
 	go func() {
 		err := server.Serve(listener)
+		if errors.Is(err, http.ErrServerClosed) {
+			err = nil
+		}
+		serverErr <- err
+	}()
+
+	go func() {
+		err := metricsServer.Serve(metricsListener)
 		if errors.Is(err, http.ErrServerClosed) {
 			err = nil
 		}
@@ -76,6 +95,9 @@ func runWorkloadsWithReadiness(ctx context.Context, logger *logging.Logger, modu
 		if result == nil {
 			result = fmt.Errorf("shutdown worker readiness: %w", err)
 		}
+	}
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil && result == nil {
+		result = fmt.Errorf("shutdown worker metrics: %w", err)
 	}
 	return result
 }

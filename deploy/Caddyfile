@@ -12,6 +12,10 @@ http://turn.{$DOMAIN} {
 }
 
 api.{$DOMAIN} {
+    # Never publish operational telemetry over the API hostname.
+    @metrics path /metrics /metrics/*
+    respond @metrics 404
+
     reverse_proxy server:8080
 
     header {

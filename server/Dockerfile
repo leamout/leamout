@@ -33,7 +33,12 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w -X github.com/leamout/leamout/server/internal/commercial/licensing.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
         -o /out/media \
-        ./cmd/media
+        ./cmd/media; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/freeswitch-exporter \
+        ./cmd/freeswitch-exporter
 
 FROM alpine:3.22 AS runtime
 
@@ -48,6 +53,7 @@ RUN apk add --no-cache \
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
 COPY --from=build /out/media /leamout/media
+COPY --from=build /out/freeswitch-exporter /leamout/freeswitch-exporter
 
 USER leamout
 

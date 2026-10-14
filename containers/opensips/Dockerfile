@@ -18,6 +18,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         "opensips=$package_version" \
         "opensips-auth-modules=$package_version" \
+        "opensips-http-modules=$package_version" \
+        "opensips-prometheus-module=$package_version" \
         "opensips-postgres-module=$package_version" \
         "opensips-tlsmgm-module=$package_version" \
         "opensips-tls-openssl-module=$package_version" \
@@ -30,6 +32,8 @@ RUN apt-get update \
         auth_db.so \
         db_postgres.so \
         gflags.so \
+        httpd.so \
+        prometheus.so \
         mi_fifo.so \
         pike.so \
         rtpengine.so \

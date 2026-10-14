@@ -1,0 +1,40 @@
+# Optional overlay for the independently deployable Enterprise observability stack.
+services:
+  server:
+    networks: [edge, control, observability]
+  worker:
+    networks: [control, observability]
+  media:
+    networks: [control, observability]
+  freeswitch-exporter:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+      target: runtime
+    command: ["/leamout/freeswitch-exporter"]
+    restart: unless-stopped
+    environment:
+      FREESWITCH_ESL_ADDRESS: freeswitch:8021
+      FREESWITCH_ESL_PASSWORD: ${FREESWITCH_ESL_PASSWORD:?Required for exporter}
+    depends_on:
+      freeswitch:
+        condition: service_healthy
+    networks: [control, observability]
+  opensips-metrics-proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    volumes:
+      - ./metrics/opensips.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [opensips]
+    networks: [control, observability]
+  rtpengine-metrics-proxy:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    volumes:
+      - ./metrics/rtpengine.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [rtpengine]
+    networks: [control, observability]
+networks:
+  observability:
+    external: true
+    name: leamout-observability
