@@ -10,7 +10,7 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 
 	"github.com/leamout/leamout/server/internal/ai"
-		"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
 	natsintegration "github.com/leamout/leamout/server/internal/integrations/nats"
@@ -133,11 +133,11 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	var billingWebhookJob *billing.WebhookJob
 	cloudCommercial := commercial.New(queries, commercial.Dependencies{
 		Database: postgresClient.Pool(),
-		Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+		Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 		PolarProducts: map[string]string{
 			"developer": cfg.Polar.DeveloperProductID,
-			"pro": cfg.Polar.ProProductID,
-			"scale": cfg.Polar.ScaleProductID,
+			"pro":       cfg.Polar.ProProductID,
+			"scale":     cfg.Polar.ScaleProductID,
 		},
 		FrontendURL: cfg.FrontendURL,
 	})

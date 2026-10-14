@@ -66,7 +66,6 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	subscriptionsService := subscriptions.NewService(subscriptionsRepository)
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
 
-
 	billingService := billing.NewService(
 		plansService,
 		subscriptionsService,

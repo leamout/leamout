@@ -34,4 +34,3 @@ func (m *Middleware) Require(capability Capability) func(http.Handler) http.Hand
 		})
 	}
 }
-

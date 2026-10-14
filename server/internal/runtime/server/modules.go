@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
