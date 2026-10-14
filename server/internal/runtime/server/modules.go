@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/commercial"
@@ -50,10 +49,6 @@ type modules struct {
 }
 
 func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
-	licenseService, err := licensing.NewService(cfg.Commercial)
-	if err != nil {
-		return nil, fmt.Errorf("initialize licensing: %w", err)
-	}
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -136,14 +131,9 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		credentialCipher,
 		trustedProxies,
 	)
-	var polarClient *polar.Client
-	if !licenseService.SelfHosted() {
-		polarClient = polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment)
-	}
 	commercialModule := commercial.New(queries, commercial.Dependencies{
 		Database:    postgresClient.Pool(),
-		License:     licenseService,
-		Polar:       polarClient,
+		Polar:       polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 		FrontendURL: cfg.FrontendURL,
 		PolarProducts: map[string]string{
 			"developer": cfg.Polar.DeveloperProductID,
@@ -166,7 +156,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		Queries:           queries,
 		CallsController:   calling.NewController(freeSwitch),
 		CallsChannelStore: calling.NewChannelStore(redisClient),
-		CallsAdmission:    calling.NewAdmissionLimiterForDeployment(redisClient, cfg.Commercial.Mode, cfg.Commercial.DeploymentID),
+		CallsAdmission:    calling.NewAdmissionLimiter(redisClient),
 		CredentialCipher:  credentialCipher,
 		WebRTCService:     turnService,
 		RecordingStorage:  recordingStorage,

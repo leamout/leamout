@@ -4,7 +4,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/entitlements"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
@@ -13,7 +12,6 @@ import (
 )
 
 type Module struct {
-	License       *licensing.Service
 	Billing       BillingModule
 	Plans         PlansModule
 	Subscriptions SubscriptionsModule
@@ -28,7 +26,6 @@ type BillingModule struct {
 
 type Dependencies struct {
 	Database      *pgxpool.Pool
-	License       *licensing.Service
 	Polar         *polarintegration.Client
 	PolarProducts map[string]string
 	FrontendURL   string
@@ -69,7 +66,6 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	subscriptionsService := subscriptions.NewService(subscriptionsRepository)
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
 
-	limitsService.SetLicenseService(deps.License)
 
 	billingService := billing.NewService(
 		plansService,
@@ -80,14 +76,12 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	)
 
 	billingService.SetRepository(billing.NewRepository(queries, deps.Database))
-	billingService.SetStatusDependencies(deps.License, limitsService)
+	billingService.SetStatusDependencies(limitsService)
 
 	entitlementsRepository := entitlements.NewRepository(queries)
 	entitlementsService := entitlements.NewService(entitlementsRepository)
-	entitlementsService.SetLicenseService(deps.License)
 
 	return &Module{
-		License: deps.License,
 		Billing: BillingModule{
 			Service: billingService,
 			Handler: billing.NewHandler(billingService),

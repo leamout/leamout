@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 )
 
@@ -54,5 +53,4 @@ type Status struct {
 	Usage             limits.RuntimeUsage  `json:"usage"`
 	PortalAvailable   bool                 `json:"portal_available"`
 	CheckoutAvailable bool                 `json:"checkout_available"`
-	License           *licensing.Status    `json:"license,omitempty"`
 }

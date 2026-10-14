@@ -1,7 +1,7 @@
 # Deployment and monetization
 
-Leamout is a voice-agent platform that can be self-hosted or used as a managed
-cloud service. The underlying voice-agent platform and product concepts are the
+Leamout is a commercial voice-agent infrastructure platform. Leamout Cloud
+is the initial managed product. The underlying voice-agent platform and product concepts are the
 same in both deployment models:
 
 ```text
@@ -10,7 +10,7 @@ Leamout
 └── Cloud
 ```
 
-Enterprise is optional commercial packaging for either deployment model. It is
+Enterprise private deployments are a future commercial expansion. It is
 not a third product architecture, runtime fleet, or separate control plane.
 
 Leamout is BYOC. Customers connect and pay for their own SIP trunks, carriers,

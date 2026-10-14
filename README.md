@@ -1,7 +1,6 @@
 # Leamout
 
-**Leamout is a carrier-grade platform for autonomous voice agents. Run it
-yourself or use Leamout Cloud.**
+**Leamout is the carrier-grade runtime and control plane for autonomous voice agents. Leamout Cloud is the first commercial product.**
 
 Leamout sits between customer-owned telephony infrastructure and realtime AI
 systems. It owns the runtime required to establish, control, process, and
@@ -72,11 +71,7 @@ Leamout provides:
 - recordings, events, webhooks, and observability;
 - Self-Hosted and Leamout Cloud deployment options.
 
-The same voice-agent platform underlies both deployment options. Self-Hosted
-Community is Apache-2.0 and requires **no license file or Leamout payment**.
-Enterprise is optional separately distributed commercial extensions, support,
-security, governance, and contractual packaging for either deployment;
-it is not a second runtime architecture. See [docs/open-core.md](docs/open-core.md).
+Leamout Cloud is the primary managed product. Commercial private deployments may be offered later under separate contracts. No Community/Enterprise edition flags or signed-license checks are required by the current runtime.
 
 Leamout does not buy or resell carrier minutes, phone numbers, SMS, WhatsApp
 capacity, or managed carrier services.

@@ -7,12 +7,10 @@ import (
 
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 
 	"github.com/leamout/leamout/server/internal/ai"
-	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
-	"github.com/leamout/leamout/server/internal/database/sqlc"
+		"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/minio"
 	natsintegration "github.com/leamout/leamout/server/internal/integrations/nats"
@@ -63,10 +61,6 @@ type modules struct {
 }
 
 func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) (*modules, error) {
-	licenseService, err := licensing.NewService(cfg.Commercial)
-	if err != nil {
-		return nil, fmt.Errorf("initialize licensing: %w", err)
-	}
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -126,7 +120,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	routingService := routing.NewService(routingRepository, nil)
 	callsRepository := calls.NewRepository(queries, postgresClient.Pool())
 	callController := calling.NewController(freeSwitch)
-	admissionLimiter := calling.NewAdmissionLimiterForDeployment(redisClient, cfg.Commercial.Mode, cfg.Commercial.DeploymentID)
+	admissionLimiter := calling.NewAdmissionLimiter(redisClient)
 	callsService := calls.NewService(
 		callsRepository,
 		routingService,
@@ -137,50 +131,44 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	)
 	var billingJob *billing.ReconciliationJob
 	var billingWebhookJob *billing.WebhookJob
-	var planLimits *commerciallimits.Service
-	if licenseService.SelfHosted() {
-		planLimits = commerciallimits.NewService(nil, nil, queries)
-		planLimits.SetLicenseService(licenseService)
-	} else {
-		cloudCommercial := commercial.New(queries, commercial.Dependencies{
-			Database: postgresClient.Pool(),
-			License:  licenseService,
-			Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
-			PolarProducts: map[string]string{
-				"developer": cfg.Polar.DeveloperProductID,
-				"pro":       cfg.Polar.ProProductID,
-				"scale":     cfg.Polar.ScaleProductID,
+	cloudCommercial := commercial.New(queries, commercial.Dependencies{
+		Database: postgresClient.Pool(),
+		Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+		PolarProducts: map[string]string{
+			"developer": cfg.Polar.DeveloperProductID,
+			"pro": cfg.Polar.ProProductID,
+			"scale": cfg.Polar.ScaleProductID,
+		},
+		FrontendURL: cfg.FrontendURL,
+	})
+	planLimits := cloudCommercial.Limits.Service
+	if cfg.Polar.AccessToken != "" && cfg.Polar.WebhookSecret != "" {
+		billingRepository := billing.NewRepository(queries, postgresClient.Pool())
+		billingJob, err = billing.NewReconciliationJob(
+			billingRepository,
+			cloudCommercial.Billing.Service,
+			15*time.Minute,
+			func(ctx context.Context, err error) {
+				logger.Warn(ctx, "billing reconciliation failed", "error", err)
 			},
-			FrontendURL: cfg.FrontendURL,
-		})
-		planLimits = cloudCommercial.Limits.Service
-		if cfg.Polar.AccessToken != "" && cfg.Polar.WebhookSecret != "" {
-			billingRepository := billing.NewRepository(queries, postgresClient.Pool())
-			billingJob, err = billing.NewReconciliationJob(
-				billingRepository,
-				cloudCommercial.Billing.Service,
-				15*time.Minute,
-				func(ctx context.Context, err error) {
-					logger.Warn(ctx, "billing reconciliation failed", "error", err)
-				},
-			)
-			if err != nil {
-				closeDependencies()
-				return nil, err
-			}
-			billingWebhookJob, err = billing.NewWebhookJob(
-				billingRepository,
-				cloudCommercial.Billing.Service,
-				func(ctx context.Context, err error) {
-					logger.Warn(ctx, "billing webhook processing failed", "error", err)
-				},
-			)
-			if err != nil {
-				closeDependencies()
-				return nil, err
-			}
+		)
+		if err != nil {
+			closeDependencies()
+			return nil, err
+		}
+		billingWebhookJob, err = billing.NewWebhookJob(
+			billingRepository,
+			cloudCommercial.Billing.Service,
+			func(ctx context.Context, err error) {
+				logger.Warn(ctx, "billing webhook processing failed", "error", err)
+			},
+		)
+		if err != nil {
+			closeDependencies()
+			return nil, err
 		}
 	}
+
 	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
 	callsService.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
 	aiModule := ai.New(queries, ai.Dependencies{
@@ -253,7 +241,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize recording reconciliation: %w", err)
 	}
 	retentionCleanup, err := retention.NewCleanupJob(
-		retention.NewRepositoryForDeployment(queries, licenseService.SelfHosted()),
+		retention.NewRepository(queries),
 		recordingsService,
 		retention.DefaultCleanupJobConfig(),
 	)
