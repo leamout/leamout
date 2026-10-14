@@ -21,7 +21,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
@@ -385,17 +384,10 @@ func newBillingAcceptance(t *testing.T) *billingAcceptance {
 		"sandbox",
 		httpClient,
 	)
-	licenseService, err := licensing.NewService(licensing.Config{
-		Mode: licensing.Cloud,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	queries := sqlc.New(pool)
 	plansService := plans.NewService(plans.NewRepository(queries))
 	subscriptionsService := subscriptions.NewService(subscriptions.NewRepository(queries))
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
-	limitsService.SetLicenseService(licenseService)
 	billingService := NewService(
 		plansService,
 		subscriptionsService,
@@ -408,7 +400,7 @@ func newBillingAcceptance(t *testing.T) *billingAcceptance {
 		"https://console.example.test",
 	)
 	billingService.SetRepository(NewRepository(queries, pool))
-	billingService.SetStatusDependencies(licenseService, limitsService)
+	billingService.SetStatusDependencies(limitsService)
 	repository := NewRepository(queries, pool)
 	worker, err := NewWebhookJob(
 		repository,

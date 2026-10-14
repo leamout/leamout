@@ -112,8 +112,7 @@ func (s *ChannelStore) Delete(ctx context.Context, callID uuid.UUID) error {
 }
 
 type AdmissionLimiter struct {
-	deploymentID string
-	client       *redisintegration.Client
+	client *redisintegration.Client
 }
 
 func NewAdmissionLimiter(client *redisintegration.Client) *AdmissionLimiter {
@@ -123,22 +122,6 @@ func NewAdmissionLimiter(client *redisintegration.Client) *AdmissionLimiter {
 	return &AdmissionLimiter{
 		client: client,
 	}
-}
-
-// Self-hosted concurrency is shared across every organization in the deployment.
-func NewAdmissionLimiterForDeployment(client *redisintegration.Client, mode, deploymentID string) *AdmissionLimiter {
-	l := NewAdmissionLimiter(client)
-	if mode == "self_hosted" {
-		l.deploymentID = deploymentID
-	}
-	return l
-}
-
-func (l *AdmissionLimiter) organizationPrefix(id uuid.UUID) string {
-	if l.deploymentID != "" {
-		return "telecom:admission:deployment:" + l.deploymentID
-	}
-	return organizationAdmissionPrefix(id)
 }
 
 func (l *AdmissionLimiter) Acquire(
@@ -241,7 +224,7 @@ func (l *AdmissionLimiter) AcquireOrganization(
 
 	allowed, err := l.client.AcquireConcurrentLease(
 		ctx,
-		l.organizationPrefix(organizationID),
+		organizationAdmissionPrefix(organizationID),
 		leaseID,
 		maxConcurrent,
 		callAdmissionLeaseTTL,
@@ -266,7 +249,7 @@ func (l *AdmissionLimiter) BindOrganization(
 	}
 	return l.client.BindCallLease(
 		ctx,
-		l.organizationPrefix(organizationID),
+		organizationAdmissionPrefix(organizationID),
 		leaseID,
 		callID.String(),
 	)
@@ -282,7 +265,7 @@ func (l *AdmissionLimiter) ReleaseOrganization(
 	}
 	return l.client.ReleaseCallLease(
 		ctx,
-		l.organizationPrefix(organizationID),
+		organizationAdmissionPrefix(organizationID),
 		callOrLeaseID,
 	)
 }
@@ -296,7 +279,7 @@ func (l *AdmissionLimiter) RefreshOrganization(
 	}
 	return l.client.RefreshCallLease(
 		ctx,
-		l.organizationPrefix(organizationID),
+		organizationAdmissionPrefix(organizationID),
 		callID.String(),
 		callAdmissionLeaseTTL,
 	)

@@ -26,13 +26,7 @@ func RegisterRoutes(
 		organizationAccess("webhooks"),
 	)
 
-	audit.RegisterRoutes(
-		router,
-		module.Audit.Handler,
-		func(next http.Handler) http.Handler {
-			return organizationAccess("audit")(entitlementsMiddleware.RequireSelfHostedDataFeature("audit_logging")(next))
-		},
-	)
+	audit.RegisterRoutes(router, module.Audit.Handler, organizationAccess("audit"))
 
 	storage.RegisterRoutes(
 		router,

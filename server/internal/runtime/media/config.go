@@ -8,11 +8,9 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 )
 
 type Config struct {
-	Commercial       licensing.Config
 	RedisURL         string        `env:"REDIS_URL"`
 	NodeID           string        `env:"MEDIA_NODE_ID"`
 	ControlURL       string        `env:"MEDIA_CONTROL_URL"`
@@ -59,9 +57,6 @@ func loadConfig() (Config, error) {
 }
 
 func (c Config) Validate() error {
-	if err := c.Commercial.Validate(); err != nil {
-		return err
-	}
 	if strings.TrimSpace(c.ListenAddress) == "" {
 		return fmt.Errorf("media listen address is required")
 	}

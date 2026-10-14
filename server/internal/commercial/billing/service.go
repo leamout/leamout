@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
@@ -26,7 +25,6 @@ const providerPolar = "polar"
 
 type Service struct {
 	repo          *Repository
-	license       *licensing.Service
 	limits        *limits.Service
 	plans         *plans.Service
 	subscriptions *subscriptions.Service
@@ -152,15 +150,14 @@ func (s *Service) SetRepository(repo *Repository) {
 	s.repo = repo
 }
 
-func (s *Service) SetStatusDependencies(license *licensing.Service, limitsService *limits.Service) {
-	s.license = license
+func (s *Service) SetStatusDependencies(limitsService *limits.Service) {
 	s.limits = limitsService
 }
 
 // Verify first, then acknowledge only after durable insertion. Retries retain
 // the original receipt; reusing an event ID for different bytes is rejected.
 func (s *Service) Webhook(ctx context.Context, payload []byte, headers http.Header) error {
-	if s.license.SelfHosted() || s.polar == nil || !s.polar.Configured() || s.repo == nil {
+	if s.polar == nil || !s.polar.Configured() || s.repo == nil {
 		return apperror.NewServiceUnavailable("Polar webhook inbox is not configured", nil)
 	}
 	event, err := s.polar.ParseWebhook(payload, headers)
@@ -313,7 +310,7 @@ func (s *Service) ReconcileSubscription(ctx context.Context, target Reconciliati
 // Customer State discovers initial purchases, but excludes past-due customers.
 // Always fetch a known subscription as well, including when state is empty.
 func (s *Service) RecoverOrganization(ctx context.Context, organizationID uuid.UUID) error {
-	if s.license.SelfHosted() || s.polar == nil || !s.polar.Configured() {
+	if s.polar == nil || !s.polar.Configured() {
 		return apperror.NewServiceUnavailable("Polar billing is not configured", nil)
 	}
 	existing, err := s.subscriptions.Get(ctx, organizationID)
@@ -396,19 +393,8 @@ func (s *Service) Status(ctx context.Context, organizationID uuid.UUID) (Status,
 		return Status{}, apperror.NewBadRequest("organization context required")
 	}
 	result := Status{
-		DeploymentMode:    licensing.Cloud,
+		DeploymentMode:    "cloud",
 		BillingConfigured: s.polar.Configured(),
-	}
-	if s.license.SelfHosted() {
-		result.DeploymentMode = licensing.SelfHosted
-		result.BillingConfigured = false
-		status := s.license.Status()
-		result.License = &status
-		result.Usage.Unlimited = true
-		// Self-Hosted Community capacity is operator-managed and unlimited by
-		// the commercial licensing system. Enterprise claims gate extensions.
-		result.Limits = limits.Effective{}
-		return result, nil
 	}
 	sub, err := s.subscriptions.Get(ctx, organizationID)
 	if err != nil {

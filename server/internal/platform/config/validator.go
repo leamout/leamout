@@ -5,16 +5,10 @@ import (
 	"net/netip"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
 )
 
 func (c Config) Validate() error {
-	if c.Commercial.Mode != licensing.SelfHosted {
-		if err := c.Polar.Validate(); err != nil {
-			return err
-		}
-	}
-	return c.Commercial.Validate()
+	return c.Polar.Validate()
 }
 
 func (c PolarConfig) Validate() error {
