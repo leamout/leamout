@@ -41,20 +41,16 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 	if err != nil {
 		return sqlc.VoiceAgent{}, err
 	}
+	var agent sqlc.VoiceAgent
 	if s.planAgentLimit == nil {
-		return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("plan agent limits unavailable", nil)
+		agent, err = s.repo.Create(ctx, organizationID, normalized)
+	} else {
+		cap, limited, limitErr := s.planAgentLimit(ctx, organizationID)
+		if limitErr != nil { return sqlc.VoiceAgent{}, limitErr }
+		if !limited || cap <= 0 { return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("cloud plan agent limit is required", nil) }
+		agent, err = s.repo.CreateWithLimit(ctx, organizationID, normalized, cap)
 	}
-	cap, limited, err := s.planAgentLimit(ctx, organizationID)
-	if err != nil {
-		return sqlc.VoiceAgent{}, err
-	}
-	if !limited || cap <= 0 {
-		return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("plan agent limit is required", nil)
-	}
-	agent, err := s.repo.CreateWithLimit(ctx, organizationID, normalized, cap)
-	if err != nil {
-		return agent, writeError(err, "create voice agent")
-	}
+	if err != nil { return agent, writeError(err, "create voice agent") }
 	if err := s.applyBindings(ctx, organizationID, agent.ID, normalized.Bindings, false); err != nil {
 		return sqlc.VoiceAgent{}, err
 	}

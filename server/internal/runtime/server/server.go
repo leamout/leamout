@@ -11,7 +11,17 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/logging"
 )
 
+// Run starts the license-free Core API.
 func Run(ctx context.Context) error {
+	return run(ctx, false)
+}
+
+// RunCloud starts the API with Cloud billing and quotas explicitly installed.
+func RunCloud(ctx context.Context) error {
+	return run(ctx, true)
+}
+
+func run(ctx context.Context, cloud bool) error {
 	logger := logging.New().With("process", "server")
 
 	cfg, err := config.Load()
@@ -19,7 +29,12 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("load configuration: %w", err)
 	}
 
-	modules, err := newModules(ctx, cfg)
+	if cloud {
+		if err := cfg.Polar.Validate(); err != nil {
+			return fmt.Errorf("validate Cloud billing config: %w", err)
+		}
+	}
+	modules, err := newModules(ctx, cfg, cloud)
 	if err != nil {
 		return err
 	}

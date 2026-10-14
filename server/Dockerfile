@@ -20,19 +20,23 @@ COPY . .
 RUN set -eux; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
-        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/platform/deployment.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
+        -ldflags="-s -w" \
         -o /out/server \
         ./cmd/server; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
-        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/platform/deployment.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
+        -ldflags="-s -w" \
         -o /out/worker \
         ./cmd/worker; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
-        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/platform/deployment.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
+        -ldflags="-s -w" \
         -o /out/media \
-        ./cmd/media
+        ./cmd/media; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath -ldflags="-s -w" -o /out/cloud-server ./cmd/cloud-server; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath -ldflags="-s -w" -o /out/cloud-worker ./cmd/cloud-worker
 
 FROM alpine:3.22 AS runtime
 
@@ -47,6 +51,8 @@ RUN apk add --no-cache \
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
 COPY --from=build /out/media /leamout/media
+COPY --from=build /out/cloud-server /leamout/cloud-server
+COPY --from=build /out/cloud-worker /leamout/cloud-worker
 
 USER leamout
 

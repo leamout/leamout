@@ -43,20 +43,12 @@ func (s *Service) Upsert(ctx context.Context, organizationID uuid.UUID, resource
 	if err := validateUpsert(req); err != nil {
 		return Policy{}, err
 	}
-	if s.retentionDays == nil {
-		return Policy{}, apperror.NewServiceUnavailable(
-			"commercial plan limit service is unavailable",
-			nil,
-		)
-	}
-	maxDays, limited, err := s.retentionDays(ctx, organizationID)
-	if err != nil {
-		return Policy{}, err
-	}
-	if limited && int64(req.RetentionDays) > maxDays {
-		return Policy{}, apperror.NewPaymentRequired(
-			"retention_days exceeds the organization plan limit",
-		)
+	if s.retentionDays != nil {
+		maxDays, limited, err := s.retentionDays(ctx, organizationID)
+		if err != nil { return Policy{}, err }
+		if limited && int64(req.RetentionDays) > maxDays {
+			return Policy{}, apperror.NewPaymentRequired("retention_days exceeds organization plan limit")
+		}
 	}
 	value, err := s.repo.Upsert(ctx, organizationID, resource, req)
 	if err != nil {

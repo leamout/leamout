@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"
@@ -178,7 +177,6 @@ func TestHandlerExposesMediaMetrics(t *testing.T) {
 
 func TestCommunitySelfHostedMediaStartsSessionsWithoutLicense(t *testing.T) {
 	cfg := validRuntimeConfig()
-	cfg.Commercial.Mode = deployment.SelfHosted
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("Community self-hosted config validation: %v", err)
 	}

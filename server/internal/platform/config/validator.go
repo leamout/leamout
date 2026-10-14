@@ -5,17 +5,9 @@ import (
 	"net/netip"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
-func (c Config) Validate() error {
-	if c.Commercial.Mode != deployment.SelfHosted {
-		if err := c.Polar.Validate(); err != nil {
-			return err
-		}
-	}
-	return c.Commercial.Validate()
-}
+func (c Config) Validate() error { return nil }
 
 func (c PolarConfig) Validate() error {
 	if c.Environment != "production" && c.Environment != "sandbox" {

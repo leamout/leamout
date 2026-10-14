@@ -9,11 +9,9 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
 type Module struct {
-	Deployment    deployment.Config
 	Billing       BillingModule
 	Plans         PlansModule
 	Subscriptions SubscriptionsModule
@@ -28,7 +26,6 @@ type BillingModule struct {
 
 type Dependencies struct {
 	Database      *pgxpool.Pool
-	Deployment    deployment.Config
 	Polar         *polarintegration.Client
 	PolarProducts map[string]string
 	FrontendURL   string
@@ -69,7 +66,6 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	subscriptionsService := subscriptions.NewService(subscriptionsRepository)
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
 
-	limitsService.SetDeployment(deps.Deployment)
 
 	billingService := billing.NewService(
 		plansService,
@@ -80,14 +76,12 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	)
 
 	billingService.SetRepository(billing.NewRepository(queries, deps.Database))
-	billingService.SetStatusDependencies(deps.Deployment, limitsService)
+	billingService.SetStatusDependencies(limitsService)
 
 	entitlementsRepository := entitlements.NewRepository(queries)
 	entitlementsService := entitlements.NewService(entitlementsRepository)
-	entitlementsService.SetDeployment(deps.Deployment)
 
 	return &Module{
-		Deployment: deps.Deployment,
 		Billing: BillingModule{
 			Service: billingService,
 			Handler: billing.NewHandler(billingService),

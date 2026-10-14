@@ -26,7 +26,6 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
 const (
@@ -389,7 +388,6 @@ func newBillingAcceptance(t *testing.T) *billingAcceptance {
 	plansService := plans.NewService(plans.NewRepository(queries))
 	subscriptionsService := subscriptions.NewService(subscriptions.NewRepository(queries))
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
-	limitsService.SetDeployment(deployment.Config{Mode: deployment.Cloud})
 	billingService := NewService(
 		plansService,
 		subscriptionsService,
@@ -402,7 +400,7 @@ func newBillingAcceptance(t *testing.T) *billingAcceptance {
 		"https://console.example.test",
 	)
 	billingService.SetRepository(NewRepository(queries, pool))
-	billingService.SetStatusDependencies(deployment.Config{Mode: deployment.Cloud}, limitsService)
+	billingService.SetStatusDependencies(limitsService)
 	repository := NewRepository(queries, pool)
 	worker, err := NewWebhookJob(
 		repository,

@@ -80,13 +80,12 @@ func newRouter(cfg config.Config, logger *logging.Logger, modules *modules) *chi
 			organizationContextAccess,
 			sessionOrganizationAccess,
 		)
-		platform.RegisterRoutes(
-			r,
-			modules.platform,
-			organizationAccess,
-			modules.commercial.Entitlements.Middleware,
-		)
-		commercial.RegisterRoutes(r, modules.commercial, organizationAccess, modules.platform.Idempotency.Middleware.HandleRequired)
+		if modules.commercial != nil {
+			platform.RegisterRoutes(r, modules.platform, organizationAccess, modules.commercial.Entitlements.Middleware)
+			commercial.RegisterRoutes(r, modules.commercial, organizationAccess, modules.platform.Idempotency.Middleware.HandleRequired)
+		} else {
+			platform.RegisterRoutes(r, modules.platform, organizationAccess, nil)
+		}
 		ai.RegisterRoutes(r, modules.ai, organizationAccess)
 		telephony.RegisterRoutes(
 			r,

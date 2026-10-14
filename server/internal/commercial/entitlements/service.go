@@ -5,12 +5,10 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {
-	deployment deployment.Config
 	repo       *Repository
 }
 
@@ -18,10 +16,6 @@ func NewService(repo *Repository) *Service {
 	return &Service{
 		repo: repo,
 	}
-}
-
-func (s *Service) SetDeployment(config deployment.Config) {
-	s.deployment = config
 }
 
 func (s *Service) ListEffective(
@@ -56,9 +50,6 @@ func (s *Service) Enabled(
 	capability, err := normalizeCapability(capability)
 	if err != nil {
 		return false, err
-	}
-	if s.deployment.SelfHosted() {
-		return true, nil
 	}
 	enabled, err := s.repo.EffectiveEnabled(ctx, organizationID, capability)
 	if err != nil {
@@ -96,9 +87,6 @@ func (s *Service) Set(
 	capability, err := normalizeCapability(capability)
 	if err != nil {
 		return Entitlement{}, err
-	}
-	if s.deployment.SelfHosted() {
-		return Entitlement{}, apperror.NewForbidden("self-hosted deployment has no commercial entitlement overrides")
 	}
 	value, err := s.repo.Set(ctx, organizationID, capability, enabled)
 	if err != nil {

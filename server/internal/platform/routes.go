@@ -20,19 +20,20 @@ func RegisterRoutes(
 	organizationAccess func(string) func(http.Handler) http.Handler,
 	entitlementsMiddleware *entitlements.Middleware,
 ) {
+	capability := func(name entitlements.Capability) func(http.Handler) http.Handler {
+		if entitlementsMiddleware == nil {
+			return func(next http.Handler) http.Handler { return next }
+		}
+		return entitlementsMiddleware.Require(name)
+	}
+
 	webhooks.RegisterRoutes(
 		router,
 		module.Webhooks.Handler,
 		organizationAccess("webhooks"),
 	)
 
-	audit.RegisterRoutes(
-		router,
-		module.Audit.Handler,
-		func(next http.Handler) http.Handler {
-			return organizationAccess("audit")(entitlementsMiddleware.RequireSelfHostedDataFeature("audit_logging")(next))
-		},
-	)
+	audit.RegisterRoutes(router, module.Audit.Handler, organizationAccess("audit"))
 
 	storage.RegisterRoutes(
 		router,
@@ -44,20 +45,20 @@ func RegisterRoutes(
 		router,
 		module.Networking.Handler,
 		organizationAccess("networking"),
-		entitlementsMiddleware.Require(entitlements.CapabilityPrivateNetworking),
+		capability(entitlements.CapabilityPrivateNetworking),
 	)
 
 	scim.RegisterManagementRoutes(
 		router,
 		module.SCIM.Handler,
 		organizationAccess("scim"),
-		entitlementsMiddleware.Require(entitlements.CapabilitySCIM),
+		capability(entitlements.CapabilitySCIM),
 	)
 
 	retention.RegisterRoutes(
 		router,
 		module.Retention.Handler,
 		organizationAccess("retention"),
-		entitlementsMiddleware.Require(entitlements.CapabilityRetentionPolicies),
+		capability(entitlements.CapabilityRetentionPolicies),
 	)
 }

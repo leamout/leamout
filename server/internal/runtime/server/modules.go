@@ -47,7 +47,7 @@ type modules struct {
 	credentialCipher     *encryption.Cipher
 }
 
-func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
+func newModules(ctx context.Context, cfg config.Config, cloud bool) (*modules, error) {
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -130,25 +130,22 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		credentialCipher,
 		trustedProxies,
 	)
-	var polarClient *polar.Client
-	if !cfg.Commercial.SelfHosted() {
-		polarClient = polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment)
+	var commercialModule *commercial.Module
+	if cloud {
+		commercialModule = commercial.New(queries, commercial.Dependencies{
+			Database: postgresClient.Pool(),
+			Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			FrontendURL: cfg.FrontendURL,
+			PolarProducts: map[string]string{
+				"developer": cfg.Polar.DeveloperProductID,
+				"pro": cfg.Polar.ProProductID,
+				"scale": cfg.Polar.ScaleProductID,
+			},
+		})
+		platformModule.Retention.Service.SetPlanRetentionResolver(
+			commercialModule.Limits.Service.RetentionDays,
+		)
 	}
-	commercialModule := commercial.New(queries, commercial.Dependencies{
-		Database:    postgresClient.Pool(),
-		Deployment:  cfg.Commercial,
-		Polar:       polarClient,
-		FrontendURL: cfg.FrontendURL,
-		PolarProducts: map[string]string{
-			"developer": cfg.Polar.DeveloperProductID,
-			"pro":       cfg.Polar.ProProductID,
-			"scale":     cfg.Polar.ScaleProductID,
-		},
-	})
-	platformModule.Retention.Service.SetPlanRetentionResolver(
-		commercialModule.Limits.Service.RetentionDays,
-	)
-
 	recordingStorage := recordings.NewResolvedObjectStorage(
 		objectClient,
 		platformModule.Storage.Service,
@@ -160,7 +157,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		Queries:           queries,
 		CallsController:   calling.NewController(freeSwitch),
 		CallsChannelStore: calling.NewChannelStore(redisClient),
-		CallsAdmission:    calling.NewAdmissionLimiterForDeployment(redisClient, cfg.Commercial.Mode, cfg.Commercial.DeploymentID),
+		CallsAdmission:    calling.NewAdmissionLimiter(redisClient),
 		CredentialCipher:  credentialCipher,
 		WebRTCService:     turnService,
 		RecordingStorage:  recordingStorage,
@@ -175,23 +172,18 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		CredentialCipher: credentialCipher,
 		Calls:            telephonyModule.Calls.Service,
 		Database:         postgresClient.Pool(),
-		PlanAgentLimit:   commercialModule.Limits.Service.MaxVoiceAgents,
 	})
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
 		aiModule.Agents.Service.RequireReady,
 	)
-	telephonyModule.Calls.Service.SetPlanConcurrencyResolver(
-		commercialModule.Limits.Service.MaxConcurrentCalls,
-	)
-	telephonyModule.Calls.Service.SetRuntimeAllowanceCheck(
-		commercialModule.Limits.Service.RequireRuntimeAllowance,
-	)
-	telephonyModule.Trunks.Service.SetPlanTrunkLimit(
-		commercialModule.Limits.Service.MaxSIPTrunks,
-	)
-	aiModule.Orchestration.SetRuntimeAllowanceCheck(
-		commercialModule.Limits.Service.RequireRuntimeAllowance,
-	)
+	if cloud {
+		limits := commercialModule.Limits.Service
+		aiModule.Agents.Service.SetPlanAgentLimit(limits.MaxVoiceAgents)
+		telephonyModule.Calls.Service.SetPlanConcurrencyResolver(limits.MaxConcurrentCalls)
+		telephonyModule.Calls.Service.SetRuntimeAllowanceCheck(limits.RequireRuntimeAllowance)
+		telephonyModule.Trunks.Service.SetPlanTrunkLimit(limits.MaxSIPTrunks)
+		aiModule.Orchestration.SetRuntimeAllowanceCheck(limits.RequireRuntimeAllowance)
+	}
 
 	resolver := authn.NewResolver(identityModule.Session.Service, tenancyModule.Credentials.Service)
 	authMiddleware := middleware.NewAuthnMiddleware(resolver)

@@ -132,20 +132,12 @@ func (s *Service) Create(
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	if s.planTrunkLimit == nil {
-		return sqlc.Trunk{}, apperror.NewServiceUnavailable("plan trunk limits unavailable", nil)
+	if s.planTrunkLimit != nil {
+		cap, limited, limitErr := s.planTrunkLimit(ctx, organizationID)
+		if limitErr != nil { return sqlc.Trunk{}, limitErr }
+		if !limited || cap <= 0 { return sqlc.Trunk{}, apperror.NewServiceUnavailable("cloud plan trunk limit is required", nil) }
+		if err := s.repo.LockAndCheckTrunkCapacity(ctx, tx, organizationID, cap); err != nil { return sqlc.Trunk{}, err }
 	}
-	cap, limited, limitErr := s.planTrunkLimit(ctx, organizationID)
-	if limitErr != nil {
-		return sqlc.Trunk{}, limitErr
-	}
-	if !limited || cap <= 0 {
-		return sqlc.Trunk{}, apperror.NewServiceUnavailable("plan trunk limit is required", nil)
-	}
-	if err := s.repo.LockAndCheckTrunkCapacity(ctx, tx, organizationID, cap); err != nil {
-		return sqlc.Trunk{}, err
-	}
-
 	transactionRepo := s.repo.WithTx(tx)
 	item, err := transactionRepo.Create(ctx, sqlc.CreateTrunkParams{
 		ID:                      id,

@@ -8,7 +8,17 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/logging"
 )
 
+// Run starts the license-free Core worker.
 func Run(ctx context.Context) error {
+	return run(ctx, false)
+}
+
+// RunCloud starts the worker with Cloud commercial policies installed.
+func RunCloud(ctx context.Context) error {
+	return run(ctx, true)
+}
+
+func run(ctx context.Context, cloud bool) error {
 	logger := logging.New().With("process", "worker")
 
 	cfg, err := config.Load()
@@ -16,7 +26,12 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("load configuration: %w", err)
 	}
 
-	modules, err := newModules(ctx, cfg, logger)
+	if cloud {
+		if err := cfg.Polar.Validate(); err != nil {
+			return fmt.Errorf("validate Cloud billing config: %w", err)
+		}
+	}
+	modules, err := newModules(ctx, cfg, logger, cloud)
 	if err != nil {
 		return err
 	}

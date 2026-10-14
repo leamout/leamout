@@ -1,0 +1,6 @@
+# Explicit hosted Cloud deployment; never inferred from environment credentials.
+services:
+  server:
+    command: ["/leamout/cloud-server"]
+  worker:
+    command: ["/leamout/cloud-worker"]

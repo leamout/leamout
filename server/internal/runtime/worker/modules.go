@@ -61,7 +61,7 @@ type modules struct {
 	trunkHealth             *trunks.HealthCheckJob
 }
 
-func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) (*modules, error) {
+func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger, cloud bool) (*modules, error) {
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -121,7 +121,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	routingService := routing.NewService(routingRepository, nil)
 	callsRepository := calls.NewRepository(queries, postgresClient.Pool())
 	callController := calling.NewController(freeSwitch)
-	admissionLimiter := calling.NewAdmissionLimiterForDeployment(redisClient, cfg.Commercial.Mode, cfg.Commercial.DeploymentID)
+	admissionLimiter := calling.NewAdmissionLimiter(redisClient)
 	callsService := calls.NewService(
 		callsRepository,
 		routingService,
@@ -133,24 +133,21 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	var billingJob *billing.ReconciliationJob
 	var billingWebhookJob *billing.WebhookJob
 	var planLimits *commerciallimits.Service
-	if cfg.Commercial.SelfHosted() {
-		planLimits = commerciallimits.NewService(nil, nil, queries)
-		planLimits.SetDeployment(cfg.Commercial)
-	} else {
+	if cloud {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
-			Database:   postgresClient.Pool(),
-			Deployment: cfg.Commercial,
-			Polar:      polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			Database: postgresClient.Pool(),
+			Polar: polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
-				"pro":       cfg.Polar.ProProductID,
-				"scale":     cfg.Polar.ScaleProductID,
+				"pro": cfg.Polar.ProProductID,
+				"scale": cfg.Polar.ScaleProductID,
 			},
 			FrontendURL: cfg.FrontendURL,
 		})
 		planLimits = cloudCommercial.Limits.Service
 		if cfg.Polar.AccessToken != "" && cfg.Polar.WebhookSecret != "" {
 			billingRepository := billing.NewRepository(queries, postgresClient.Pool())
+			var err error
 			billingJob, err = billing.NewReconciliationJob(
 				billingRepository,
 				cloudCommercial.Billing.Service,
@@ -176,16 +173,18 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 			}
 		}
 	}
-	callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
-	callsService.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
 	aiModule := ai.New(queries, ai.Dependencies{
 		CredentialCipher: credentialCipher,
-		Calls:            callsService,
-		Database:         postgresClient.Pool(),
-		PlanAgentLimit:   planLimits.MaxVoiceAgents,
+		Calls: callsService,
+		Database: postgresClient.Pool(),
 	})
+	if cloud {
+		callsService.SetPlanConcurrencyResolver(planLimits.MaxConcurrentCalls)
+		callsService.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
+		aiModule.Agents.Service.SetPlanAgentLimit(planLimits.MaxVoiceAgents)
+		aiModule.Orchestration.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
+	}
 	mediaNodes := medianodes.NewRegistry(redisClient)
-	aiModule.Orchestration.SetRuntimeAllowanceCheck(planLimits.RequireRuntimeAllowance)
 	agentRuntime, err := agent.NewWithMediaNodes(
 		aiModule.Orchestration,
 		freeSwitch,
@@ -248,7 +247,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize recording reconciliation: %w", err)
 	}
 	retentionCleanup, err := retention.NewCleanupJob(
-		retention.NewRepositoryForDeployment(queries, cfg.Commercial.SelfHosted()),
+		retention.NewRepositoryForDeployment(queries, !cloud),
 		recordingsService,
 		retention.DefaultCleanupJobConfig(),
 	)

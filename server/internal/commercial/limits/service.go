@@ -9,12 +9,10 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {
-	deployment    deployment.Config
 	plans         *plans.Service
 	subscriptions *subscriptions.Service
 	queries       *sqlc.Queries
@@ -33,18 +31,9 @@ func NewService(plansService *plans.Service, subscriptionsService *subscriptions
 	return s
 }
 
-func (s *Service) SetDeployment(config deployment.Config) {
-	s.deployment = config
-}
-
 func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective, error) {
 	if organizationID == uuid.Nil {
 		return Effective{}, apperror.NewBadRequest("organization_id is required")
-	}
-	if s.deployment.SelfHosted() {
-		// Community and Enterprise operate the same Apache-2.0 runtime.
-		// No commercial license can impose a core telephony or AI quota.
-		return Effective{}, nil
 	}
 	sub, err := s.subscriptions.Get(ctx, organizationID)
 	if err != nil {

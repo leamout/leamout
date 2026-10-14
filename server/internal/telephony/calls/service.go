@@ -91,9 +91,7 @@ func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context, uuid.UUID
 }
 
 func (s *Service) requireRuntimeAllowance(ctx context.Context, organizationID uuid.UUID) error {
-	if s.runtimeAllowance == nil {
-		return apperror.NewServiceUnavailable("runtime allowance service unavailable", nil)
-	}
+	if s.runtimeAllowance == nil { return nil }
 	return s.runtimeAllowance(ctx, organizationID)
 }
 
@@ -423,12 +421,7 @@ func (s *Service) acquireOrganizationAdmission(
 	organizationID uuid.UUID,
 	leaseID string,
 ) error {
-	if s.planConcurrency == nil {
-		return apperror.NewServiceUnavailable(
-			"commercial plan limit service is unavailable",
-			nil,
-		)
-	}
+	if s.planConcurrency == nil { return nil }
 	maxConcurrent, limited, err := s.planConcurrency(ctx, organizationID)
 	if err != nil {
 		return err

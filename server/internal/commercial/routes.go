@@ -19,10 +19,6 @@ func RegisterRoutes(
 ) {
 	router.With(organizationAccess("commercial")).Get("/billing/status", module.Billing.Handler.Status)
 	limits.RegisterRoutes(router, limits.NewHandler(module.Limits.Service), organizationAccess("commercial"))
-	if module.Deployment.SelfHosted() {
-		entitlements.RegisterRoutes(router, module.Entitlements.Handler, organizationAccess("commercial"))
-		return
-	}
 	plans.RegisterRoutes(router, module.Plans.Handler)
 
 	auth := organizationAccess("commercial")
