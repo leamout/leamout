@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 

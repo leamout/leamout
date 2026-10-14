@@ -7,7 +7,7 @@ import (
 
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
-		"github.com/leamout/leamout/server/internal/integrations/payments/polar"
+	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 
 	"github.com/leamout/leamout/server/internal/ai"
 	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
@@ -138,9 +138,9 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		planLimits.SetDeployment(cfg.Commercial)
 	} else {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
-			Database: postgresClient.Pool(),
+			Database:   postgresClient.Pool(),
 			Deployment: cfg.Commercial,
-			Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+			Polar:      polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
 				"pro":       cfg.Polar.ProProductID,

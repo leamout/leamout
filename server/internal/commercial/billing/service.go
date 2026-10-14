@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/commercial/plans"

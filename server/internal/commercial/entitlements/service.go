@@ -11,7 +11,7 @@ import (
 
 type Service struct {
 	deployment deployment.Config
-	repo    *Repository
+	repo       *Repository
 }
 
 func NewService(repo *Repository) *Service {

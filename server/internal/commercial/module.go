@@ -4,16 +4,16 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/entitlements"
-	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
 type Module struct {
-	Deployment deployment.Config
+	Deployment    deployment.Config
 	Billing       BillingModule
 	Plans         PlansModule
 	Subscriptions SubscriptionsModule
@@ -28,7 +28,7 @@ type BillingModule struct {
 
 type Dependencies struct {
 	Database      *pgxpool.Pool
-	Deployment deployment.Config
+	Deployment    deployment.Config
 	Polar         *polarintegration.Client
 	PolarProducts map[string]string
 	FrontendURL   string

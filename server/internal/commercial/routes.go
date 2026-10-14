@@ -6,7 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/entitlements"
-		"github.com/leamout/leamout/server/internal/commercial/limits"
+	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 )
