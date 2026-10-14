@@ -4,7 +4,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
 	"github.com/leamout/leamout/server/internal/commercial/entitlements"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/internal/commercial/limits"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
@@ -13,7 +13,7 @@ import (
 )
 
 type Module struct {
-	License       *licensing.Service
+	Deployment deployment.Config
 	Billing       BillingModule
 	Plans         PlansModule
 	Subscriptions SubscriptionsModule
@@ -28,7 +28,7 @@ type BillingModule struct {
 
 type Dependencies struct {
 	Database      *pgxpool.Pool
-	License       *licensing.Service
+	Deployment deployment.Config
 	Polar         *polarintegration.Client
 	PolarProducts map[string]string
 	FrontendURL   string
@@ -69,7 +69,7 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	subscriptionsService := subscriptions.NewService(subscriptionsRepository)
 	limitsService := limits.NewService(plansService, subscriptionsService, queries)
 
-	limitsService.SetLicenseService(deps.License)
+	limitsService.SetDeployment(deps.Deployment)
 
 	billingService := billing.NewService(
 		plansService,
@@ -80,14 +80,14 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	)
 
 	billingService.SetRepository(billing.NewRepository(queries, deps.Database))
-	billingService.SetStatusDependencies(deps.License, limitsService)
+	billingService.SetStatusDependencies(deps.Deployment, limitsService)
 
 	entitlementsRepository := entitlements.NewRepository(queries)
 	entitlementsService := entitlements.NewService(entitlementsRepository)
-	entitlementsService.SetLicenseService(deps.License)
+	entitlementsService.SetDeployment(deps.Deployment)
 
 	return &Module{
-		License: deps.License,
+		Deployment: deps.Deployment,
 		Billing: BillingModule{
 			Service: billingService,
 			Handler: billing.NewHandler(billingService),

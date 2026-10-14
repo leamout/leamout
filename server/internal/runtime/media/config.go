@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
 type Config struct {
-	Commercial       licensing.Config
+	Commercial       deployment.Config
 	RedisURL         string        `env:"REDIS_URL"`
 	NodeID           string        `env:"MEDIA_NODE_ID"`
 	ControlURL       string        `env:"MEDIA_CONTROL_URL"`

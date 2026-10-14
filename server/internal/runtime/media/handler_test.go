@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/media/engine/echo"
@@ -178,16 +178,9 @@ func TestHandlerExposesMediaMetrics(t *testing.T) {
 
 func TestCommunitySelfHostedMediaStartsSessionsWithoutLicense(t *testing.T) {
 	cfg := validRuntimeConfig()
-	cfg.Commercial.Mode = licensing.SelfHosted
+	cfg.Commercial.Mode = deployment.SelfHosted
 	if err := cfg.Validate(); err != nil {
-		t.Fatalf("Community Self-Hosted config validation: %v", err)
-	}
-	license, err := licensing.NewService(cfg.Commercial)
-	if err != nil {
-		t.Fatalf("Community license initialization: %v", err)
-	}
-	if status := license.Status(); status.State != "community" {
-		t.Fatalf("license state = %q, want community", status.State)
+		t.Fatalf("Community self-hosted config validation: %v", err)
 	}
 
 	manager, err := session.NewManager(1, cfg.AttachTimeout, map[session.Engine]session.Starter{

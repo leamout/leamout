@@ -5,12 +5,12 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type Service struct {
-	license *licensing.Service
+	deployment deployment.Config
 	repo    *Repository
 }
 
@@ -20,8 +20,8 @@ func NewService(repo *Repository) *Service {
 	}
 }
 
-func (s *Service) SetLicenseService(service *licensing.Service) {
-	s.license = service
+func (s *Service) SetDeployment(config deployment.Config) {
+	s.deployment = config
 }
 
 func (s *Service) ListEffective(
@@ -57,8 +57,8 @@ func (s *Service) Enabled(
 	if err != nil {
 		return false, err
 	}
-	if s.license.SelfHosted() {
-		return s.license.Enabled(ctx, string(capability))
+	if s.deployment.SelfHosted() {
+		return true, nil
 	}
 	enabled, err := s.repo.EffectiveEnabled(ctx, organizationID, capability)
 	if err != nil {
@@ -97,8 +97,8 @@ func (s *Service) Set(
 	if err != nil {
 		return Entitlement{}, err
 	}
-	if s.license.SelfHosted() {
-		return Entitlement{}, apperror.NewForbidden("self-hosted features are managed by the signed license")
+	if s.deployment.SelfHosted() {
+		return Entitlement{}, apperror.NewForbidden("self-hosted deployment has no commercial entitlement overrides")
 	}
 	value, err := s.repo.Set(ctx, organizationID, capability, enabled)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
 type MinIOConfig struct {
@@ -34,7 +34,7 @@ type AWSConfig struct {
 }
 
 type Config struct {
-	Commercial licensing.Config
+	Commercial deployment.Config
 	AWS        AWSConfig   `envPrefix:"AWS_"`
 	Polar      PolarConfig `envPrefix:"POLAR_"`
 

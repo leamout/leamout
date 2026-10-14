@@ -5,11 +5,11 @@ import (
 	"net/netip"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 )
 
 func (c Config) Validate() error {
-	if c.Commercial.Mode != licensing.SelfHosted {
+	if c.Commercial.Mode != deployment.SelfHosted {
 		if err := c.Polar.Validate(); err != nil {
 			return err
 		}

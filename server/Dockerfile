@@ -4,7 +4,6 @@ ARG GO_VERSION=1.26.9
 
 FROM golang:${GO_VERSION}-alpine AS build
 
-ARG LICENSE_PUBLIC_KEYS=""
 
 WORKDIR /src
 
@@ -21,17 +20,17 @@ COPY . .
 RUN set -eux; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
-        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/commercial/licensing.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
+        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/platform/deployment.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
         -o /out/server \
         ./cmd/server; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
-        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/commercial/licensing.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
+        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/platform/deployment.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
         -o /out/worker \
         ./cmd/worker; \
     CGO_ENABLED=0 GOOS=linux go build \
         -trimpath \
-        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/commercial/licensing.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
+        -ldflags="-s -w -X github.com/leamout/leamout/server/internal/platform/deployment.BuildPublicKeys=${LICENSE_PUBLIC_KEYS}" \
         -o /out/media \
         ./cmd/media
 

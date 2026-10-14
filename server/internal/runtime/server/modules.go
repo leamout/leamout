@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
-
-	"github.com/leamout/leamout/server/internal/ai"
+		"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity"
@@ -50,10 +48,6 @@ type modules struct {
 }
 
 func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
-	licenseService, err := licensing.NewService(cfg.Commercial)
-	if err != nil {
-		return nil, fmt.Errorf("initialize licensing: %w", err)
-	}
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -137,12 +131,12 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		trustedProxies,
 	)
 	var polarClient *polar.Client
-	if !licenseService.SelfHosted() {
+	if !cfg.Commercial.SelfHosted() {
 		polarClient = polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment)
 	}
 	commercialModule := commercial.New(queries, commercial.Dependencies{
 		Database:    postgresClient.Pool(),
-		License:     licenseService,
+		Deployment:  cfg.Commercial,
 		Polar:       polarClient,
 		FrontendURL: cfg.FrontendURL,
 		PolarProducts: map[string]string{

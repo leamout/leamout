@@ -7,8 +7,7 @@ import (
 
 	"github.com/leamout/leamout/server/internal/commercial"
 	"github.com/leamout/leamout/server/internal/commercial/billing"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
-	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
+		"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 
 	"github.com/leamout/leamout/server/internal/ai"
 	commerciallimits "github.com/leamout/leamout/server/internal/commercial/limits"
@@ -63,10 +62,6 @@ type modules struct {
 }
 
 func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) (*modules, error) {
-	licenseService, err := licensing.NewService(cfg.Commercial)
-	if err != nil {
-		return nil, fmt.Errorf("initialize licensing: %w", err)
-	}
 	postgresClient, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("initialize PostgreSQL: %w", err)
@@ -138,13 +133,13 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	var billingJob *billing.ReconciliationJob
 	var billingWebhookJob *billing.WebhookJob
 	var planLimits *commerciallimits.Service
-	if licenseService.SelfHosted() {
+	if cfg.Commercial.SelfHosted() {
 		planLimits = commerciallimits.NewService(nil, nil, queries)
-		planLimits.SetLicenseService(licenseService)
+		planLimits.SetDeployment(cfg.Commercial)
 	} else {
 		cloudCommercial := commercial.New(queries, commercial.Dependencies{
 			Database: postgresClient.Pool(),
-			License:  licenseService,
+			Deployment: cfg.Commercial,
 			Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 			PolarProducts: map[string]string{
 				"developer": cfg.Polar.DeveloperProductID,
@@ -253,7 +248,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize recording reconciliation: %w", err)
 	}
 	retentionCleanup, err := retention.NewCleanupJob(
-		retention.NewRepositoryForDeployment(queries, licenseService.SelfHosted()),
+		retention.NewRepositoryForDeployment(queries, cfg.Commercial.SelfHosted()),
 		recordingsService,
 		retention.DefaultCleanupJobConfig(),
 	)

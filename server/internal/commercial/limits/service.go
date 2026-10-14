@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/commercial/licensing"
+	"github.com/leamout/leamout/server/internal/platform/deployment"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
@@ -14,7 +14,7 @@ import (
 )
 
 type Service struct {
-	license       *licensing.Service
+	deployment    deployment.Config
 	plans         *plans.Service
 	subscriptions *subscriptions.Service
 	queries       *sqlc.Queries
@@ -33,15 +33,15 @@ func NewService(plansService *plans.Service, subscriptionsService *subscriptions
 	return s
 }
 
-func (s *Service) SetLicenseService(service *licensing.Service) {
-	s.license = service
+func (s *Service) SetDeployment(config deployment.Config) {
+	s.deployment = config
 }
 
 func (s *Service) Get(ctx context.Context, organizationID uuid.UUID) (Effective, error) {
 	if organizationID == uuid.Nil {
 		return Effective{}, apperror.NewBadRequest("organization_id is required")
 	}
-	if s.license.SelfHosted() {
+	if s.deployment.SelfHosted() {
 		// Community and Enterprise operate the same Apache-2.0 runtime.
 		// No commercial license can impose a core telephony or AI quota.
 		return Effective{}, nil
