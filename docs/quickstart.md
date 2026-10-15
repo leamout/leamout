@@ -1,14 +1,14 @@
-# Leamout Cloud quickstart
+# Leamout quickstart
 
-Leamout Cloud is a managed service. Customers do not deploy OpenSIPS,
+Leamout is a managed service. Customers do not deploy OpenSIPS,
 FreeSWITCH, Redis or the Go processes. Leamout operates those services.
 
-## 1. Sign in to the Cloud console
+## 1. Sign in to the Leamout console
 
 Use the hosted Leamout console at https://console.leamout.com to create an
 account or sign in. Create or select your organization.
 
-Choose the Cloud subscription plan that meets your intended call concurrency,
+Choose the Leamout subscription plan that meets your intended call concurrency,
 monthly runtime minutes, SIP trunk count, Voice Agent count and retention
 requirements. Complete checkout if the selected plan requires payment.
 
@@ -42,13 +42,13 @@ connectivity and call-routing prerequisites before activation.
 ## 5. Make a test call
 
 Originate or receive a call through your connected SIP trunk, then use the
-Cloud console to review the call, event diagnostics, media session history,
+Leamout console to review the call, event diagnostics, media session history,
 conversation records and runtime usage. Active calls are not terminated
 solely because the monthly allowance is subsequently reached.
 
 ## Operational note
 
-The product workflow above is the intended Cloud onboarding flow. Certain
+The product workflow above is the intended Leamout onboarding flow. Certain
 console screens, carrier ingress details and live deployment steps may still
 require implementation or production validation. Do not confuse the
 repository's internal Docker Compose and synthetic acceptance tests with
@@ -58,7 +58,7 @@ customer onboarding.
 
 From a Leamout development checkout, engineers can validate the runtime using
 `sh tests/voice-agent-v1/run.sh`. This starts disposable local test infrastructure
-and does not create a customer-hosted product or bypass Cloud plans.
+and does not create a customer-hosted product or bypass subscription plans.
 
 For implementation details, see [architecture.md](architecture.md),
 [media-plane.md](media-plane.md), [monetization.md](monetization.md), and

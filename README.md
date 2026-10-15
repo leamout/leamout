@@ -1,6 +1,6 @@
 # Leamout
 
-**Leamout is the carrier-grade runtime and control plane for autonomous voice agents. Leamout Cloud is the first commercial product.**
+**Leamout is the managed, carrier-grade runtime and control plane for autonomous voice agents.**
 
 Leamout sits between customer-owned telephony infrastructure and realtime AI
 systems. It owns the runtime required to establish, control, process, and
@@ -69,9 +69,9 @@ Leamout provides:
 - secure tool execution;
 - routing and human handoff;
 - recordings, events, webhooks, and observability;
-- managed Leamout Cloud infrastructure with organization-based usage and subscriptions.
+- managed Leamout infrastructure with organization-based usage and subscriptions.
 
-Leamout Cloud is the only supported commercial product. Leamout operates the SIP, media, agent and control-plane infrastructure; customers connect their own carriers and AI providers. Docker and local stacks remain development and acceptance-test tools, not a supported customer self-installation offering.
+Leamout is the only supported product. Leamout operates the SIP, media, agent and control-plane infrastructure; customers connect their own carriers and AI providers. Docker and local stacks remain development and acceptance-test tools, not a supported customer self-installation offering.
 
 Leamout does not buy or resell carrier minutes, phone numbers, SMS, WhatsApp
 capacity, or managed carrier services.
@@ -336,9 +336,9 @@ GRAFANA_ADMIN_PASSWORD=replace-with-a-strong-password docker compose \
 Grafana binds only to 127.0.0.1:3000 by default. See
 [deploy/README.md](deploy/README.md) for OTLP collection and security guidance.
 
-## Cloud billing with Polar
+## Subscriptions and billing with Polar
 
-Cloud checkout and customer portal sessions use Polar. Configure `POLAR_ACCESS_TOKEN`
+Checkout and customer portal sessions use Polar. Configure `POLAR_ACCESS_TOKEN`
 and `POLAR_WEBHOOK_SECRET` in the application environment. `POLAR_ENVIRONMENT`
 defaults to `production`; use `sandbox` with sandbox credentials and product IDs
 for acceptance testing. The API contract is pinned to `2026-10`.
@@ -387,20 +387,16 @@ for the checkout back button; success and return URLs must use the configured
 frontend origin. No undocumented provider idempotency header is assumed.
 
 Migration 034 creates the subscription schema with Polar as the supported billing
-provider. Leamout Cloud enforces organization-level subscription limits and
+provider. Leamout enforces organization-level subscription limits and
 runtime usage quotas for new agent sessions and call admission.
 
-## License
+## Proprietary development and historical licensing
 
-The software in this repository is licensed under the [Apache License 2.0](LICENSE).
-See [NOTICE](NOTICE) for attribution information.
+See [PROPRIETARY.md](PROPRIETARY.md) for Leamout's current proprietary
+development notice and source ownership limitations. The former root Apache-2.0
+license file has been removed from this branch; doing so does **not** revoke
+grants previously made for Apache-2.0 code or third-party materials.
+See [NOTICE](NOTICE) for attribution and trademark information.
 
-The Apache License 2.0 does not grant permission to use Leamout trade names,
-trademarks, service marks, or product names except as permitted by the license.
-Previously published Apache-2.0 copies retain their existing license grants.
-The Cloud-hosted service has separate commercial terms; the repository's
-existing license does not itself establish a hosted-service subscription.
-
-See [PROPRIETARY.md](PROPRIETARY.md) for the intended proprietary development
-and commercial-service boundary. That notice does not supersede `LICENSE`
-or revoke any existing Apache-2.0 permissions.
+Leamout is the single managed product. Source repository access and hosted
+service subscriptions are separate arrangements.

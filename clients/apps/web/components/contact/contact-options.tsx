@@ -6,7 +6,7 @@ export function ContactOptions() {
       <section className="rounded-xl border border-border p-8">
         <h2 className="text-2xl font-semibold">Building with Leamout?</h2>
         <p className="my-5 leading-7 text-muted-foreground">
-          Start with the Cloud console and product documentation.
+          Start with the Leamout console and product documentation.
           Include the affected organization, call timestamp and non-sensitive
           diagnostic details when you contact support.
         </p>
@@ -20,7 +20,7 @@ export function ContactOptions() {
       <section className="rounded-xl border border-border p-8">
         <h2 className="text-2xl font-semibold">Questions and feedback</h2>
         <p className="my-5 leading-7 text-muted-foreground">
-          Questions about Leamout Cloud should go through the documented
+          Questions about Leamout should go through the documented
           support channels. Never publish credentials, recordings, personal
           information or vulnerability reports in a public issue.
         </p>

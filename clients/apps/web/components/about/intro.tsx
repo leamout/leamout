@@ -10,7 +10,7 @@ export function AboutIntro() {
       <div className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-muted-foreground">
         <p>
           We are building the runtime and control plane that developers use to build and run autonomous voice agents
-          on Leamout Cloud.
+          on Leamout.
         </p>
       </div>
     </div>

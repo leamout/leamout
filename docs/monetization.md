@@ -1,16 +1,16 @@
-# Leamout Cloud commercial model
+# Leamout commercial model
 
-Leamout Cloud is the sole supported product: a managed carrier-grade runtime
+Leamout is the sole supported product: a managed carrier-grade runtime
 and control plane for autonomous voice agents. Leamout runs the infrastructure;
 customers manage their organizations, agents, carrier connections and AI
-provider accounts through the Cloud console and API.
+provider accounts through the Leamout console and API.
 
 ## Customer workflow
 
 ```text
 Create account and organization
     ↓
-Select Cloud plan
+Select subscription plan
     ↓
 Connect customer-owned SIP trunk and phone numbers (BYOC)
     ↓
@@ -23,7 +23,7 @@ Handle calls, inspect diagnostics and usage
 
 ## Revenue and responsibility
 
-Leamout Cloud subscriptions fund the managed runtime, control plane,
+Leamout subscriptions fund the managed runtime, control plane,
 observability and platform capacity. Carrier charges are billed by the
 customer's carrier. AI providers are billed directly to the customer when
 using BYOA. There is no managed carrier resale, telecom wallet, telecom
@@ -34,7 +34,7 @@ The current application and website plan catalog is seeded from
 or capacity limits without changing and validating that catalog and the
 Polar product mappings together.
 
-| Cloud tier | Current seed price (USD/month) |
+| Plan | Current seed price (USD/month) |
 | --- | ---: |
 | Free | $0 |
 | Developer | $79 |
@@ -63,9 +63,9 @@ billing must be defined explicitly before customers are charged for it.
 
 ## Recording storage
 
-Cloud-managed recording storage is organization-isolated. Customers may
+Managed recording storage is organization-isolated. Customers may
 optionally configure a tenant-owned S3-compatible recording destination
-(BYOS). This does not change Leamout's ownership of the Cloud infrastructure.
+(BYOS). This does not change Leamout's ownership of the Managed infrastructure.
 See [storage.md](storage.md) for the security model.
 
 ## Operations

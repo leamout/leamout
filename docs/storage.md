@@ -4,20 +4,20 @@ Leamout supports managed recording storage and customer-controlled S3-compatible
 
 ## Cloud recording storage
 
-Leamout Cloud provides a managed default S3-compatible object store, currently
+Leamout provides a managed default S3-compatible object store, currently
 MinIO, with organization-prefix isolation. Organizations can optionally
 configure their own S3-compatible destination (BYOS), using tenant-scoped
 encrypted credentials and validated public HTTPS endpoints.
 
 ```text
-Leamout Cloud
+Leamout
 ├── Leamout-managed storage (default)
 │   └── organization-prefixed object keys
 └── Organization BYOS (optional)
     └── customer-controlled S3-compatible bucket
 ```
 
-Cloud operators own the configuration and security of the default object
+Leamout operators own the configuration and security of the default object
 store. Customers cannot change the shared default bucket or provide arbitrary
 object keys.
 
@@ -90,7 +90,7 @@ This relationship is enforced by the database, not only application code.
 
 When a recording has no custom `storage_integration_id`, Leamout uses the deployment's default object store.
 
-For Leamout Cloud the default is bundled MinIO on shared infrastructure, so Leamout enforces organization namespacing before upload, playback URL generation, and deletion.
+For Leamout the default is bundled MinIO on shared infrastructure, so Leamout enforces organization namespacing before upload, playback URL generation, and deletion.
 
 Customers do not receive credentials to the shared managed object store.
 
@@ -165,7 +165,7 @@ Recording storage must preserve these invariants:
 
 The product abstraction is **Leamout-managed storage**, not AWS S3.
 
-Leamout Cloud uses a Leamout-operated S3-compatible object store for managed
+Leamout uses a Leamout-operated S3-compatible object store for managed
 recording storage. Changes to that operator-owned backend do not alter the
 organization BYOS contract.
 

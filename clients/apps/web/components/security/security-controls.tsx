@@ -15,7 +15,7 @@ export function SecurityControls() {
           "Retention limits follow your plan. Configurable policies are available on eligible plans, with scheduled cleanup for supported resources.",
         ],
         [
-          "Cloud infrastructure",
+          "Managed infrastructure",
           "Leamout operates and maintains the hosting infrastructure, service certificates, updates and platform backups. Customers protect access to their own carrier and AI provider accounts.",
         ],
       ].map(([title, text]) => (
