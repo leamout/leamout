@@ -26,7 +26,7 @@ services:
     environment:
       DATABASE_URL: postgres://leamout:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/leamout?sslmode=disable&search_path=public
     volumes:
-      - ../server/migrations:/migrations:ro
+      - ../../server/migrations:/migrations:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,7 +50,7 @@ services:
     restart: unless-stopped
     command: ["-c", "/etc/nats/nats-server.conf"]
     volumes:
-      - ../containers/nats/nats-server.conf:/etc/nats/nats-server.conf:ro
+      - ../../containers/nats/nats-server.conf:/etc/nats/nats-server.conf:ro
       - nats-data:/data
     networks: [control]
 
@@ -72,13 +72,13 @@ services:
 
   server:
     build:
-      context: ../server
+      context: ../../server
       dockerfile: Dockerfile
       target: runtime
     restart: unless-stopped
     command: ["/leamout/server"]
     env_file:
-      - ${APP_ENV_FILE:-../server/.env}
+      - ${APP_ENV_FILE:-../../server/.env}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -94,13 +94,13 @@ services:
 
   worker:
     build:
-      context: ../server
+      context: ../../server
       dockerfile: Dockerfile
       target: runtime
     restart: unless-stopped
     command: ["/leamout/worker"]
     env_file:
-      - ${APP_ENV_FILE:-../server/.env}
+      - ${APP_ENV_FILE:-../../server/.env}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -118,13 +118,13 @@ services:
 
   media:
     build:
-      context: ../server
+      context: ../../server
       dockerfile: Dockerfile
       target: runtime
     restart: unless-stopped
     command: ["/leamout/media"]
     env_file:
-      - ${APP_ENV_FILE:-../server/.env}
+      - ${APP_ENV_FILE:-../../server/.env}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/readyz"]
       interval: 3s
@@ -136,13 +136,13 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     env_file:
-      - ${APP_ENV_FILE:-../server/.env}
+      - ${APP_ENV_FILE:-../../server/.env}
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../Caddyfile:/etc/caddy/Caddyfile:ro
       - /var/lib/leamout/acme:/srv/leamout-acme:ro
       - caddy-data:/data
       - caddy-config:/config
@@ -153,12 +153,12 @@ services:
 
   freeswitch:
     build:
-      context: ../containers/freeswitch
+      context: ../../containers/freeswitch
       dockerfile: Dockerfile
     restart: unless-stopped
     stop_grace_period: 60s
     env_file:
-      - ${APP_ENV_FILE:-../server/.env}
+      - ${APP_ENV_FILE:-../../server/.env}
     depends_on:
       media:
         condition: service_healthy
@@ -176,7 +176,7 @@ services:
 
   rtpengine:
     build:
-      context: ../containers/rtpengine
+      context: ../../containers/rtpengine
       dockerfile: Dockerfile
     restart: unless-stopped
     stop_grace_period: 30s
@@ -192,7 +192,7 @@ services:
 
   opensips:
     build:
-      context: ../containers/opensips
+      context: ../../containers/opensips
       dockerfile: Dockerfile
     restart: unless-stopped
     stop_grace_period: 30s
@@ -219,11 +219,11 @@ services:
 
   coturn:
     build:
-      context: ../containers/coturn
+      context: ../../containers/coturn
       dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
-      - ${APP_ENV_FILE:-../server/.env}
+      - ${APP_ENV_FILE:-../../server/.env}
     environment:
       TURN_REALM: ${TURN_REALM:?TURN_REALM is required}
       TURN_EXTERNAL_IP: ${PUBLIC_IP:?PUBLIC_IP is required}

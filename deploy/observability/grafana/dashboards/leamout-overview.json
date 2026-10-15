@@ -1,0 +1,76 @@
+{
+  "title": "Leamout Overview",
+  "uid": "leamout-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": [
+    "leamout"
+  ],
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API metrics up",
+      "id": 1,
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"leamout\",component=\"api\"}",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Media metrics up",
+      "id": 2,
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"leamout\",component=\"media\"}",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "API HTTP requests per second",
+      "id": 3,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 7
+      },
+      "targets": [
+        {
+          "expr": "rate(leamout_http_requests_total[5m])",
+          "refId": "A"
+        }
+      ],
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      }
+    }
+  ]
+}

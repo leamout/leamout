@@ -1,0 +1,11 @@
+groups:
+  - name: leamout-availability
+    rules:
+      - alert: LeamoutMetricsUnavailable
+        expr: up{job="leamout"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Leamout metrics target unavailable"
+          description: "Prometheus cannot scrape {{ $labels.instance }} for 5 minutes."
