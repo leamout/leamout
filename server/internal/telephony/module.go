@@ -4,7 +4,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/leamout/leamout/server/internal/database/sqlc"
-	"github.com/leamout/leamout/server/internal/platform/metrics"
+	"github.com/leamout/leamout/server/internal/observability/metrics"
 	"github.com/leamout/leamout/server/internal/runtime/calling"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 	"github.com/leamout/leamout/server/internal/telephony/calls"
