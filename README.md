@@ -390,13 +390,13 @@ Migration 034 creates the subscription schema with Polar as the supported billin
 provider. Leamout enforces organization-level subscription limits and
 runtime usage quotas for new agent sessions and call admission.
 
-## Proprietary development and historical licensing
+## Proprietary software
 
-See [PROPRIETARY.md](PROPRIETARY.md) for Leamout's current proprietary
-development notice and source ownership limitations. The former root Apache-2.0
-license file has been removed from this branch; doing so does **not** revoke
-grants previously made for Apache-2.0 code or third-party materials.
-See [NOTICE](NOTICE) for attribution and trademark information.
+Leamout is developed as a proprietary managed infrastructure product.
+See [PROPRIETARY.md](PROPRIETARY.md) for the software ownership and
+distribution notice, and [NOTICE](NOTICE) for copyright and trademark
+information.
 
-Leamout is the single managed product. Source repository access and hosted
-service subscriptions are separate arrangements.
+Repository source access and subscription access to the Leamout managed
+service are governed separately. Third-party rights remain subject to
+their applicable terms.

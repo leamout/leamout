@@ -208,19 +208,17 @@ Avoid unrelated schema cleanup in the same pull request unless it is required fo
 
 ## Contribution rights
 
-Leamout is moving toward proprietary development. Do not assume that new
-contributions are accepted under Apache-2.0 or that uploading a pull request
-transfers copyright to Leamout.
+Leamout is proprietary software. Contributors must not assume that opening a
+pull request transfers copyright or grants Leamout permission to distribute
+their work under proprietary terms.
 
-Before submitting or merging third-party code, maintainers must establish the
-appropriate contribution terms and confirm permission to incorporate it in
-the intended distribution. Identify any third-party materials and licenses.
+Before accepting third-party contributions, maintainers must establish
+appropriate written contribution terms and confirm permission to use the
+material in the intended distribution. Identify and preserve applicable
+third-party licenses and attribution obligations.
 
-Contributions previously made under Apache-2.0 remain governed by the grants
-already made. See [PROPRIETARY.md](PROPRIETARY.md) for the historical
-licensing boundary. This repository currently remains publicly accessible;
-new proprietary material should not be published here until repository
-access and distribution terms have been reviewed.
+See [PROPRIETARY.md](PROPRIETARY.md) for Leamout's software notice.
+Do not submit confidential material into a publicly accessible repository.
 
 ## Pull requests
 

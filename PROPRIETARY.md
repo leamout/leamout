@@ -21,19 +21,15 @@ proprietary. Individual copyrights, third-party licenses, contribution rights,
 and any licenses granted to a recipient still control. Any proprietary
 distribution requires verification of ownership and explicit applicable terms.
 
-## Prior Apache-2.0 releases and contributions
+## Ownership and third-party materials
 
-Parts of this repository have previously been distributed under the Apache
-License, Version 2.0. Removing the former root `LICENSE` file from the
-current branch does **not** revoke or override permissions already granted
-for those copies or other content covered by that license. Earlier versions,
-their license text and notices remain available in Git history and any
-previously distributed copies.
+Original software and other materials are subject to the rights held by
+their respective copyright owners. This document does not change rights
+already granted to recipients under independently applicable terms.
 
-Existing contributors and third-party copyright holders retain their rights.
-This document does not relicense contributions without the necessary rights
-or agreements. Third-party dependencies retain their respective licenses
-and required attribution, including in proprietary distributions.
+Third-party dependencies and contributions remain subject to their
+applicable licenses, permissions, and attribution requirements.
+Leamout does not claim ownership of third-party code through this notice.
 
 ## Leamout managed service
 
@@ -52,5 +48,5 @@ Leamout names, brands and logos are not licensed by this notice. Rights to
 third-party marks likewise remain with their respective owners.
 
 Before changing repository visibility or distributing a proprietary release,
-review code ownership, past grants, contribution terms, all third-party
+review code ownership, contribution permissions, applicable third-party
 licenses, and the relevant commercial agreements.
