@@ -61,5 +61,5 @@ From a Leamout development checkout, engineers can validate the runtime using
 and does not create a customer-hosted product or bypass Cloud plans.
 
 For implementation details, see [architecture.md](architecture.md),
-[cloud-first.md](cloud-first.md), [media-plane.md](media-plane.md), and
+[media-plane.md](media-plane.md), [monetization.md](monetization.md), and
 [storage.md](storage.md).

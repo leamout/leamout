@@ -282,10 +282,9 @@ agent sessions
 General-purpose messaging, managed carrier commerce, telecom resale, telecom
 wallet charging, and payment adapters are outside the current product boundary.
 
-See [the Voice Agent execution plan](docs/voice-agent-execution-plan.md) for the
-ordered delivery plan covering organization AI integrations, agent presets and
-readiness, the golden call lifecycle, operational release gates, and the
-product-facing API and UI.
+See [the platform architecture](docs/architecture.md) and
+[realtime media contracts](docs/media-plane.md) for the runtime design.
+Runnable end-to-end acceptance checks live under `tests/`.
 
 ## Validation
 
@@ -401,3 +400,7 @@ trademarks, service marks, or product names except as permitted by the license.
 Previously published Apache-2.0 copies retain their existing license grants.
 The Cloud-hosted service has separate commercial terms; the repository's
 existing license does not itself establish a hosted-service subscription.
+
+See [PROPRIETARY.md](PROPRIETARY.md) for the intended proprietary development
+and commercial-service boundary. That notice does not supersede `LICENSE`
+or revoke any existing Apache-2.0 permissions.
