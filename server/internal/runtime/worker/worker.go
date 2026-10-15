@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/leamout/leamout/server/internal/platform/config"
 	"github.com/leamout/leamout/server/internal/observability/logging"
+	"github.com/leamout/leamout/server/internal/platform/config"
 )
 
 func Run(ctx context.Context) error {
