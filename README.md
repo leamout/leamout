@@ -69,9 +69,9 @@ Leamout provides:
 - secure tool execution;
 - routing and human handoff;
 - recordings, events, webhooks, and observability;
-- Self-Hosted and Leamout Cloud deployment options.
+- managed Leamout Cloud infrastructure with organization-based usage and subscriptions.
 
-Leamout Cloud is the primary managed product. Commercial private deployments may be offered later under separate contracts. No Community/Enterprise edition flags or signed-license checks are required by the current runtime.
+Leamout Cloud is the only supported commercial product. Leamout operates the SIP, media, agent and control-plane infrastructure; customers connect their own carriers and AI providers. Docker and local stacks remain development and acceptance-test tools, not a supported customer self-installation offering.
 
 Leamout does not buy or resell carrier minutes, phone numbers, SMS, WhatsApp
 capacity, or managed carrier services.
@@ -375,8 +375,8 @@ for the checkout back button; success and return URLs must use the configured
 frontend origin. No undocumented provider idempotency header is assumed.
 
 Migration 034 creates the subscription schema with Polar as the supported billing
-provider. Self-hosted Community runs without any Leamout license or Polar
-subscription. Signed licenses enable optional Enterprise extensions only.
+provider. Leamout Cloud enforces organization-level subscription limits and
+runtime usage quotas for new agent sessions and call admission.
 
 ## License
 
@@ -385,5 +385,6 @@ See [NOTICE](NOTICE) for attribution information.
 
 The Apache License 2.0 does not grant permission to use Leamout trade names,
 trademarks, service marks, or product names except as permitted by the license.
-Separately distributed Leamout Cloud, enterprise, or proprietary software may
-be provided under different terms.
+Previously published Apache-2.0 copies retain their existing license grants.
+The Cloud-hosted service has separate commercial terms; the repository's
+existing license does not itself establish a hosted-service subscription.

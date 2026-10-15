@@ -8,15 +8,15 @@ export function SecurityControls() {
         ],
         [
           "Provider credentials",
-          "Provider secrets are encrypted at rest and are not returned through the public API. Operators are responsible for protecting deployment encryption keys.",
+          "Provider secrets are encrypted at rest and are not returned through the public API. Leamout operators protect the platform encryption keys.",
         ],
         [
           "Retention controls",
           "Retention limits follow your plan. Configurable policies are available on eligible plans, with scheduled cleanup for supported resources.",
         ],
         [
-          "Deployment responsibility",
-          "Self-hosted operators manage their network, certificates, updates, backups, and infrastructure access. Deployment configuration is part of the security boundary.",
+          "Cloud infrastructure",
+          "Leamout operates and maintains the hosting infrastructure, service certificates, updates and platform backups. Customers protect access to their own carrier and AI provider accounts.",
         ],
       ].map(([title, text]) => (
         <section key={title} className="border-t border-border py-8">

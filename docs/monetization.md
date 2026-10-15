@@ -1,232 +1,76 @@
-# Deployment and monetization
+# Leamout Cloud commercial model
 
-Leamout is a commercial voice-agent infrastructure platform. Leamout Cloud
-is the initial managed product. The underlying voice-agent platform and product concepts are the
-same in both deployment models:
+Leamout Cloud is the sole supported product: a managed carrier-grade runtime
+and control plane for autonomous voice agents. Leamout runs the infrastructure;
+customers manage their organizations, agents, carrier connections and AI
+provider accounts through the Cloud console and API.
 
-```text
-Leamout
-├── Self-Hosted
-└── Cloud
-```
-
-Enterprise private deployments are a future commercial expansion. It is
-not a third product architecture, runtime fleet, or separate control plane.
-
-Leamout is BYOC. Customers connect and pay for their own SIP trunks, carriers,
-PBXs, SBCs, and AI providers. Leamout does not resell carrier services or
-introduce itself into the customer's carrier billing relationship.
-
-## One voice-agent platform
-
-Both deployment models expose the same core execution path:
+## Customer workflow
 
 ```text
-SIP Trunk
+Create account and organization
     ↓
-Call
+Select Cloud plan
     ↓
-Voice Agent
+Connect customer-owned SIP trunk and phone numbers (BYOC)
     ↓
-Realtime Media
+Configure organization AI providers (BYOA)
     ↓
-AI Providers
+Create and activate Voice Agent
     ↓
-Tools
-    ↓
-Recording
-    ↓
-Conversation History
-    ↓
-Observability
+Handle calls, inspect diagnostics and usage
 ```
 
-The deployment choice determines who operates Leamout's infrastructure. It
-does not create a different Voice Agent, Media Runtime, Agent Runtime, provider,
-or telephony architecture.
+## Revenue and responsibility
 
-## Leamout Self-Hosted
+Leamout Cloud subscriptions fund the managed runtime, control plane,
+observability and platform capacity. Carrier charges are billed by the
+customer's carrier. AI providers are billed directly to the customer when
+using BYOA. There is no managed carrier resale, telecom wallet, telecom
+usage rating, or prepaid telecom balance.
 
-With Leamout Self-Hosted, a customer or operator deploys and runs Leamout on
-their own infrastructure. It is suitable for developers, teams, and
-organizations that want full control, and it can operate without Leamout Cloud
-in the call path.
+The current application and website plan catalog is seeded from
+`server/migrations/033_create_plans.sql`. Do not publish different prices
+or capacity limits without changing and validating that catalog and the
+Polar product mappings together.
 
-A self-hosted stack may include:
+| Cloud tier | Current seed price (USD/month) |
+| --- | ---: |
+| Free | $0 |
+| Developer | $79 |
+| Pro | $299 |
+| Scale | $799 |
 
-- OpenSIPS;
-- RTPengine;
-- FreeSWITCH;
-- Media Runtime;
-- Agent Runtime;
-- PostgreSQL;
-- Redis;
-- NATS JetStream;
-- MinIO.
+These are current repository seed values, **not** a decision to change or
+finalize pricing. Plan limits cover concurrent calls, monthly runtime
+allowance, number of Voice Agents and SIP trunks, and retention.
 
-Operators connect their own SIP trunks and carrier accounts, supply their own
-AI-provider credentials, and may configure an external S3-compatible recording
-store. They are responsible for infrastructure, carrier, AI-provider, and
-storage costs.
+## Plan enforcement
 
-The Community implementation in this repository is Apache-2.0 licensed, and
-its core Voice Agent, telephony, BYOC/BYOA/BYOS, local identity and base access
-controls run without a commercial license. Enterprise contracts may license
-separately distributed proprietary extensions and provide support; they never
-relicense code already published under Apache 2.0.
+The API and asynchronous worker must apply the same organization entitlement
+and runtime-usage checks to every new call/agent session. Missing plan data
+must not grant unlimited capacity. Once the runtime allowance is exhausted,
+new sessions are rejected; active calls can finish. Subscription changes,
+payment-grace periods, and allowance reset use the durable subscription
+lifecycle and Polar reconciliation logic.
 
-See [open-core.md](open-core.md) for edition and authentication boundaries.
+## AI provider ownership
 
-## Leamout Cloud
-
-Leamout Cloud is Leamout operated and hosted by us. Customers use the managed
-service rather than operating its underlying infrastructure.
-
-```text
-Customer
-    ↓
-Leamout Cloud
-├── Voice Agents
-├── SIP Trunks
-├── Calls
-├── Recordings
-├── Tools
-├── AI Providers
-├── Conversation History
-└── Observability
-```
-
-Leamout Cloud also provides organization and user management. Customers do not
-need to run customer-side nodes: we operate the infrastructure beneath these
-product concepts, including the established SIP, media, and agent execution
-components.
-
-Cloud is subscription-led. Customers connect and pay for their own
-carriers and AI providers. Subscription prices and included capacity below are
-initial product hypotheses subject to infrastructure benchmarks and customer
-validation. They are not usage-based telecom or AI charges.
-
-| Plan | USD/month | Concurrent calls | Monthly runtime minutes | Voice agents | SIP trunks | Retention |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Free | $0 | 1 | 100 | 1 | 1 | 1 day |
-| Developer | $79 | 3 | 2,000 | 5 | 3 | 14 days |
-| Pro | $299 | 15 | 10,000 | 25 | 10 | 30 days |
-| Scale | $799 | 40 | 30,000 | 100 | 30 | 90 days |
-| Enterprise | Custom | Contract | Contract | Contract | Contract | Contract |
-
-The monthly runtime allowance measures Leamout-hosted voice-agent runtime, not
-carrier billing minutes or provider STT/LLM/TTS usage. The intended overage
-policy is **no automatic overage charges**: let established calls finish,
-reject new Voice Agent sessions after allowance exhaustion, and reset usage at
-the next subscription billing period. Monthly allowances must be enforced in
-the backend before these tiers are published. Recordings and storage require
-separate measured retention and storage budgets.
-
-Self-hosted capacity is operated and paid for by the customer. The open-source
-core does not require activation or enforce commercial concurrent-call or
-media-node limits. A signed Enterprise license is optional and gates additional
-Enterprise features, not Community Voice Agent execution.
-
-## Enterprise packaging
-
-Enterprise is an optional commercial contract layered on Leamout Cloud or
-Leamout Self-Hosted. Depending on customer requirements, it may include:
-
-- SSO;
-- advanced RBAC;
-- audit logging;
-- longer retention;
-- deployment assistance;
-- private networking support;
-- security and compliance documentation;
-- support SLAs;
-- high-availability guidance;
-- custom contractual terms.
-
-These capabilities do not create an Enterprise runtime architecture or an
-Enterprise control plane. An Enterprise customer chooses Cloud or Self-Hosted
-and adds the appropriate support, security, governance, and contractual terms.
-
-## AI providers
-
-AI-provider credentials are organization-scoped and customer-owned in both
-deployment models. No platform AI key fallback is available for voice agents. Voice Agents bind credentials for STT, LLM, TTS, or Realtime providers;
-provider-specific settings remain part of the agent/provider configuration.
-
-```text
-Organization
-    ↓
-AI Provider Credentials
-    ↓
-Voice Agent Provider Bindings
-├── STT
-├── LLM
-├── TTS
-└── Realtime
-    ↓
-Voice Agent Session
-    ↓
-Media Runtime
-```
-
-Leamout does not move these credentials into deployment-global environment
-variables as part of the Cloud or Self-Hosted distinction.
+Voice Agent STT, LLM, TTS and realtime providers bind organization-owned
+provider integrations. Secrets are encrypted and must not be copied into
+immutable session snapshots. Any platform-supplied AI feature and usage
+billing must be defined explicitly before customers are charged for it.
 
 ## Recording storage
 
-Recording storage preserves the existing managed-storage and tenant BYOS
-boundaries.
+Cloud-managed recording storage is organization-isolated. Customers may
+optionally configure a tenant-owned S3-compatible recording destination
+(BYOS). This does not change Leamout's ownership of the Cloud infrastructure.
+See [storage.md](storage.md) for the security model.
 
-### Self-Hosted
+## Operations
 
-```text
-Leamout Self-Hosted
-├── Default: bundled local MinIO
-└── Optional: operator-configured external S3-compatible storage
-```
-
-### Cloud
-
-```text
-Leamout Cloud
-├── Default: Leamout-managed recording storage
-│   └── bundled MinIO
-│       └── organization prefix isolation
-└── Optional: organization BYOS
-    └── customer's S3-compatible storage
-```
-
-Tenant BYOS is organization-owned. Credentials remain encrypted, endpoints
-must be public HTTPS S3-compatible endpoints, and SSRF protections remain in
-force. Operator configuration of the Self-Hosted default store remains
-separate from an organization's tenant-scoped BYOS integration. See
-[storage.md](storage.md) for the complete security model.
-
-## Commercial boundaries
-
-```text
-Customer pays carrier
-Customer pays AI providers
-Customer owns BYOC connectivity
-Customer may own recording storage through BYOS
-
-Leamout may charge for:
-    Cloud subscriptions
-    Enterprise support and SLAs
-    security and governance features
-    deployment assistance
-    custom contractual requirements
-```
-
-Leamout's commercial model does not include:
-
-- telecom wallet charging;
-- telecom consumption billing;
-- managed carrier resale;
-- retail carrier rates;
-- an online charging system (OCS);
-- per-minute telecom billing infrastructure.
-
-This boundary keeps monetization focused on operating the platform and on
-optional support, security, and governance rather than recreating carrier
-commerce.
+Leamout deploys and operates its own SIP, media, API, worker, database,
+coordination, storage and observability services. The repository's Docker
+Compose and acceptance scripts are for Leamout's internal operations and
+testing, **not** a customer-supported Self-Hosted product.

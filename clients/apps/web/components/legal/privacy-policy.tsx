@@ -15,11 +15,11 @@ export function PrivacyPolicy() {
         </p>
       </section>
       <section className="border-t border-border py-8">
-        <h2 className="text-xl font-semibold">Deployment context</h2>
+        <h2 className="text-xl font-semibold">Cloud service context</h2>
         <p className="mt-4 leading-8 text-muted-foreground">
-          For self-hosted installations, the organization operating the
-          deployment determines how its call and account data is handled.
-          Consult that operator’s privacy information.
+          Leamout Cloud is operated by Leamout. The approved privacy policy
+          will describe how service data is processed, protected and retained,
+          including the responsibilities of customers and service providers.
         </p>
       </section>
     </DocumentLayout>

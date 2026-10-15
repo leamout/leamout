@@ -15,11 +15,11 @@ export function TermsOfService() {
         </p>
       </section>
       <section className="border-t border-border py-8">
-        <h2 className="text-xl font-semibold">Open-source software</h2>
+        <h2 className="text-xl font-semibold">Hosted service</h2>
         <p className="mt-4 leading-8 text-muted-foreground">
-          The repository contains the license governing the open-source
-          software. Hosted-service terms and enterprise agreements are separate
-          documents.
+          Leamout Cloud is offered as a managed service. Commercial service
+          terms, billing conditions and data processing requirements are being
+          prepared; repository source licenses do not replace those terms.
         </p>
       </section>
     </DocumentLayout>
