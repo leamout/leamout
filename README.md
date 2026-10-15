@@ -57,7 +57,7 @@ Infrastructure is deployed and validated with the configurations in
 - [Realtime media plane](docs/media-plane.md)
 - [Getting started](docs/quickstart.md)
 - [Deployment and observability](deploy/README.md)
-- [Subscriptions and billing](docs/billing.md)
+- [Ecosystem](docs/ecosystem.md)
 
 ## Proprietary software
 
