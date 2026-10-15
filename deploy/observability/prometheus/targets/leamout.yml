@@ -1,0 +1,8 @@
+- targets:
+    - server:8080
+  labels:
+    component: api
+- targets:
+    - media:8090
+  labels:
+    component: media

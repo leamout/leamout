@@ -305,8 +305,8 @@ Configure and validate the deployment from the repository root:
 cp .env.example .env
 cp server/.env.example server/.env
 # Replace example secrets and addresses in both files before deploying.
-docker compose --env-file .env -f deploy/compose.yaml config --quiet
-docker compose --env-file .env -f deploy/compose.yaml up -d
+docker compose --env-file .env -f deploy/compose/docker.yaml config --quiet
+docker compose --env-file .env -f deploy/compose/docker.yaml up -d
 ```
 
 The root `.env` supplies infrastructure settings for Compose, such as
@@ -321,8 +321,21 @@ Keep the password in `server/.env`'s `DATABASE_URL` consistent with the root
 for Compose; replace them with reachable addresses when running Go directly.
 Acceptance suites generate their own temporary application environment files.
 To validate examples without creating deployment files, run
-`APP_ENV_FILE=../server/.env.example docker compose --env-file .env.example -f deploy/compose.yaml config --quiet`.
+`APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml config --quiet`.
 Keep both environment files private. No `.env` file is copied into the image.
+
+To enable the optional metrics, logs, traces and dashboards stack, start the
+observability overlay with the main Compose file:
+
+```sh
+GRAFANA_ADMIN_PASSWORD=replace-with-a-strong-password docker compose \
+  --env-file .env \
+  -f deploy/compose/docker.yaml \
+  -f deploy/compose/observability.yaml up -d
+```
+
+Grafana binds only to 127.0.0.1:3000 by default. See
+[deploy/README.md](deploy/README.md) for OTLP collection and security guidance.
 
 ## Cloud billing with Polar
 

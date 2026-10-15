@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build sqlc compose-validate
+.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability
 
 test:
 	cd server && go test ./...
@@ -16,4 +16,7 @@ sqlc:
 	cd server && sqlc generate
 
 compose-validate:
-	docker compose --env-file .env.example -f deploy/compose.yaml config --quiet
+	APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml config --quiet
+
+compose-validate-observability:
+	GRAFANA_ADMIN_PASSWORD=ci-only-placeholder APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml config --quiet
