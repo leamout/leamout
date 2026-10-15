@@ -17,7 +17,7 @@ export function TermsOfService() {
       <section className="border-t border-border py-8">
         <h2 className="text-xl font-semibold">Hosted service</h2>
         <p className="mt-4 leading-8 text-muted-foreground">
-          Leamout Cloud is offered as a managed service. Commercial service
+          Leamout is offered as a managed service. Commercial service
           terms, billing conditions and data processing requirements are being
           prepared; repository source licenses do not replace those terms.
         </p>

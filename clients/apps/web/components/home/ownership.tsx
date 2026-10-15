@@ -9,7 +9,7 @@ export function Ownership() {
         </h2>
         <div>
           <p className="leading-8 text-muted-foreground">
-            Leamout Cloud operates the runtime and control plane. Your carrier handles
+            Leamout operates the runtime and control plane. Your carrier handles
             telephony, and your AI providers handle model usage. You pay those
             providers directly, with no Leamout carrier or AI resale charges.
           </p>

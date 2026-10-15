@@ -206,22 +206,19 @@ When modifying schema or sqlc queries:
 
 Avoid unrelated schema cleanup in the same pull request unless it is required for the change.
 
-## Contribution license
+## Contribution rights
 
-Unless you explicitly state otherwise, any contribution you intentionally submit
-for inclusion in this repository is provided under the terms of the Apache
-License 2.0, without additional terms or conditions.
+Leamout is proprietary software. Contributors must not assume that opening a
+pull request transfers copyright or grants Leamout permission to distribute
+their work under proprietary terms.
 
-By submitting a pull request, patch, commit, issue attachment, or other material
-for inclusion in Monogo, you represent that you have the right to submit that
-material under the Apache License 2.0.
+Before accepting third-party contributions, maintainers must establish
+appropriate written contribution terms and confirm permission to use the
+material in the intended distribution. Identify and preserve applicable
+third-party licenses and attribution obligations.
 
-Do not submit code, documentation, media, generated output, or other material
-that you do not have permission to license to the project. If a contribution
-contains third-party material, clearly identify its source and license in the
-pull request.
-
-See [LICENSE](LICENSE) for the complete license terms.
+See [PROPRIETARY.md](PROPRIETARY.md) for Leamout's software notice.
+Do not submit confidential material into a publicly accessible repository.
 
 ## Pull requests
 

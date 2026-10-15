@@ -1,6 +1,6 @@
 # Leamout architecture
 
-Leamout Cloud is a managed, carrier-grade platform for autonomous voice
+Leamout is a managed, carrier-grade platform for autonomous voice
 agents. It connects customer-owned
 telephony infrastructure to realtime AI agents while providing call control,
 media orchestration, model orchestration, tool execution, interruption
@@ -19,7 +19,7 @@ Leamout should:
 - keep provider integrations behind provider-neutral contracts;
 - support both composable and integrated realtime AI engines;
 - make tool execution explicit, authorized, observable, and cancellable;
-- operate one Leamout Cloud execution model without product-edition switching;
+- operate one Leamout execution model without product-edition switching;
 - keep durable control-plane state separate from active per-session runtime
   state;
 - remain modular without prematurely turning every module into a network
@@ -393,7 +393,7 @@ Use PostgreSQL for durable product state:
 - audit state;
 - durable configuration and history.
 
-## Leamout Cloud deployment
+## Leamout deployment
 
 Leamout operates the API, worker, media runtime, signaling infrastructure,
 durable storage, and observability as a managed service. A customer connects
@@ -405,7 +405,7 @@ Community or Enterprise runtime modes. Plan and quota enforcement applies to
 every organization regardless of how the underlying infrastructure is run.
 
 Docker Compose and acceptance-test stacks in this repository are operator
-tools for developing, testing and deploying Leamout Cloud. They do not define a
+tools for developing, testing and deploying Leamout. They do not define a
 separate customer Self-Hosted product.
 
 ## Service boundaries

@@ -17,7 +17,7 @@ export function PricingFAQ() {
         ],
         [
           "Do I need to operate my own SIP or AI infrastructure?",
-          "No Leamout servers to install. Leamout Cloud runs the platform; connect your existing SIP carrier and AI providers using their credentials.",
+          "No Leamout servers to install. Leamout runs the platform; connect your existing SIP carrier and AI providers using their credentials.",
         ],
       ].map(([question, answer]) => (
         <details key={question} className="border-b border-border py-5">
