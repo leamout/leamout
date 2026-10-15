@@ -32,3 +32,33 @@ Current tracing initialization should be wired and tested independently.
 **Not production-ready by itself:** Configure an Alertmanager receiver,
 retention and storage capacities, TLS/authentication for cross-host telemetry,
 backup policies and monitoring access controls before running at scale.
+
+## Environment configuration
+
+Copy the deployment examples from the repository root:
+
+```sh
+cp .env.example .env
+cp server/.env.example server/.env
+```
+
+The root `.env` supplies Compose infrastructure settings including
+`POSTGRES_PASSWORD` and `PUBLIC_IP`. `server/.env` supplies application
+configuration to server, worker, media, Caddy, FreeSWITCH, and Coturn.
+
+Use the same PostgreSQL password in both files. Set the real `DOMAIN`,
+`CORS_ORIGINS`, `TURN_PUBLIC_URLS` and `TURN_REALM` for the deployment;
+replace all example secrets before operating an external service. Keep both
+environment files private and out of images and Git.
+
+Validate the Compose model before starting it:
+
+```sh
+APP_ENV_FILE=../../server/.env.example docker compose \
+  --env-file .env.example \
+  -f deploy/compose/docker.yaml config --quiet
+```
+
+For additional infrastructure telemetry, use the observability overlay as
+described above. Leamout's operator deployment does not constitute a separate
+customer self-hosting product.
