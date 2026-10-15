@@ -12,7 +12,7 @@ The homepage uses root metadata. Supporting pages define their own title, descri
 
 Before public launch:
 
-- Confirm the private enterprise contact and vulnerability-reporting channels. The contact page currently offers documentation and public GitHub issues only.
+- Establish actual Cloud support and private vulnerability-reporting channels before public launch; do not imply that a help desk is already available.
 - Supply approved privacy, terms, and cookie documents, including the responsible legal entity and contact details. These pages currently explain their pending status and use `noIndex`.
 - Supply the verified subprocessor register. This page also uses `noIndex` until published.
 - Review deployed analytics and cookie behavior before finalizing the cookie policy.

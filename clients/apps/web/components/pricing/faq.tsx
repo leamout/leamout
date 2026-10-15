@@ -16,8 +16,8 @@ export function PricingFAQ() {
           "Yes. Connect them through your SIP carrier, PBX, or SBC. Number purchasing is not part of Leamout.",
         ],
         [
-          "Can I self-host?",
-          "Leamout supports self-hosted deployment. Read the documentation for setup requirements and contact us to discuss enterprise deployment support.",
+          "Do I need to operate my own SIP or AI infrastructure?",
+          "No Leamout servers to install. Leamout Cloud runs the platform; connect your existing SIP carrier and AI providers using their credentials.",
         ],
       ].map(([question, answer]) => (
         <details key={question} className="border-b border-border py-5">

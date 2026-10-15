@@ -1,5 +1,4 @@
 import { BillingExplanation } from "@/components/pricing/billing-explanation";
-import { Enterprise } from "@/components/pricing/enterprise";
 import { PricingFAQ } from "@/components/pricing/faq";
 import PricingPlans from "@/components/pricing/pricing-plans";
 import { constructMetadata } from "@/lib/metadata";
@@ -17,7 +16,6 @@ export default function PricingPage() {
     <>
       <PricingPlans signupHref={`${consoleURL}/create-account`} />
       <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
-        <Enterprise />
         <BillingExplanation />
         <PricingFAQ />
       </div>

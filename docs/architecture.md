@@ -1,7 +1,7 @@
 # Leamout architecture
 
-Leamout is a carrier-grade platform for autonomous voice agents that can be
-self-hosted or used as a managed cloud service. It connects customer-owned
+Leamout Cloud is a managed, carrier-grade platform for autonomous voice
+agents. It connects customer-owned
 telephony infrastructure to realtime AI agents while providing call control,
 media orchestration, model orchestration, tool execution, interruption
 handling, routing, and observability.
@@ -19,8 +19,7 @@ Leamout should:
 - keep provider integrations behind provider-neutral contracts;
 - support both composable and integrated realtime AI engines;
 - make tool execution explicit, authorized, observable, and cancellable;
-- support both Self-Hosted and Leamout Cloud deployments without changing the
-  execution model;
+- operate one Leamout Cloud execution model without product-edition switching;
 - keep durable control-plane state separate from active per-session runtime
   state;
 - remain modular without prematurely turning every module into a network
@@ -394,32 +393,20 @@ Use PostgreSQL for durable product state:
 - audit state;
 - durable configuration and history.
 
-## Deployment model
+## Leamout Cloud deployment
 
-Leamout has two deployment models:
+Leamout operates the API, worker, media runtime, signaling infrastructure,
+durable storage, and observability as a managed service. A customer connects
+BYOC SIP trunks, phone numbers and AI provider accounts through organization-
+scoped configuration; customers do not deploy Leamout binaries.
 
-- **Leamout Self-Hosted**, operated by the customer on their infrastructure;
-- **Leamout Cloud**, operated and hosted by us.
+The Cloud platform has a single execution architecture and no Self-Hosted,
+Community or Enterprise runtime modes. Plan and quota enforcement applies to
+every organization regardless of how the underlying infrastructure is run.
 
-Both use the same voice-agent platform and execution architecture. Enterprise
-is optional commercial packaging for support, security, governance, deployment
-assistance, SLAs, and contractual requirements on either deployment model. It
-is not a third architecture or separate control plane.
-
-Deployment mode must not change the BYOC boundary. Customers continue to own
-their carrier accounts, SIP peers, phone numbers, and carrier spend.
-
-A hosted deployment may expose its own ingress address as ordinary deployment
-infrastructure, but that does not turn Leamout into a carrier or create a
-Leamout-managed carrier product.
-
-The deployment-neutral architecture can run in environments such as:
-
-- local development;
-- Docker-based self-hosting;
-- private VPC deployments;
-- Kubernetes deployments;
-- Leamout-managed cloud infrastructure.
+Docker Compose and acceptance-test stacks in this repository are operator
+tools for developing, testing and deploying Leamout Cloud. They do not define a
+separate customer Self-Hosted product.
 
 ## Service boundaries
 

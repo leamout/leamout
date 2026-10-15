@@ -2,29 +2,24 @@
 
 Leamout supports managed recording storage and customer-controlled S3-compatible storage without changing the recording API.
 
-## Deployment model
+## Cloud recording storage
+
+Leamout Cloud provides a managed default S3-compatible object store, currently
+MinIO, with organization-prefix isolation. Organizations can optionally
+configure their own S3-compatible destination (BYOS), using tenant-scoped
+encrypted credentials and validated public HTTPS endpoints.
 
 ```text
 Leamout Cloud
-├── Default: Leamout-managed recording storage
-│   └── bundled local MinIO
-│       └── organization prefix isolation
-│
-└── Optional: BYOS (Bring Your Own Storage)
-    └── customer's own S3-compatible storage
-
-Self-Hosted
-├── Default: bundled local MinIO
-└── Optional: external S3-compatible storage
+├── Leamout-managed storage (default)
+│   └── organization-prefixed object keys
+└── Organization BYOS (optional)
+    └── customer-controlled S3-compatible bucket
 ```
 
-The multi-tenant isolation rules in this document primarily protect Leamout Cloud's default managed storage path, where unrelated organizations share the same object-storage infrastructure.
-
-BYOS remains organization-owned and credential-isolated through the configured storage integration. Self-hosted deployments normally run inside a single customer's trust boundary while retaining organization namespacing for consistency.
-
-`storage_integrations` represents organization-owned BYOS. It is not the configuration mechanism for a self-hosted operator's default object store.
-
-The default object store is deployment-owned infrastructure. Leamout Cloud uses bundled MinIO for managed recording storage. Self-hosted deployments use bundled MinIO by default and may later point the deployment-owned default object store at an external S3-compatible backend without changing the tenant BYOS model.
+Cloud operators own the configuration and security of the default object
+store. Customers cannot change the shared default bucket or provide arbitrary
+object keys.
 
 ## Managed storage namespace
 
@@ -149,18 +144,6 @@ If Integration A is active when an upload starts, the recording is pinned to A b
 
 For Leamout-managed storage, a pinned recording has no `storage_integration_id`. The persisted managed key/provider/bucket identify that the destination was already selected, so a retry remains on managed storage even if the organization later configures BYOS.
 
-## Self-hosted storage
-
-Self-hosted Leamout uses bundled local MinIO by default.
-
-The same organization-prefixed object layout is retained for predictable storage semantics:
-
-```text
-organizations/{organization_id}/recordings/...
-```
-
-A self-hosted operator may replace the deployment's default object store with an external S3-compatible backend. That operator-owned infrastructure configuration is separate from the tenant-facing `storage_integrations` BYOS API.
-
 ## Security invariants
 
 Recording storage must preserve these invariants:
@@ -182,7 +165,9 @@ Recording storage must preserve these invariants:
 
 The product abstraction is **Leamout-managed storage**, not AWS S3.
 
-Leamout Cloud uses bundled MinIO for managed recording storage. Self-hosted deployments use bundled MinIO by default and may use another deployment-owned S3-compatible backend.
+Leamout Cloud uses a Leamout-operated S3-compatible object store for managed
+recording storage. Changes to that operator-owned backend do not alter the
+organization BYOS contract.
 
 Organization BYOS remains a separate tenant-owned storage integration path.
 

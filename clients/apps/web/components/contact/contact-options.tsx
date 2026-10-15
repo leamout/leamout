@@ -6,9 +6,9 @@ export function ContactOptions() {
       <section className="rounded-xl border border-border p-8">
         <h2 className="text-2xl font-semibold">Building with Leamout?</h2>
         <p className="my-5 leading-7 text-muted-foreground">
-          Start with setup documentation and the project repository. Include
-          your deployment environment and the behavior you are trying to achieve
-          when asking a technical question.
+          Start with the Cloud console and product documentation.
+          Include the affected organization, call timestamp and non-sensitive
+          diagnostic details when you contact support.
         </p>
         <Link
           href="/docs"
@@ -20,16 +20,16 @@ export function ContactOptions() {
       <section className="rounded-xl border border-border p-8">
         <h2 className="text-2xl font-semibold">Questions and feedback</h2>
         <p className="my-5 leading-7 text-muted-foreground">
-          Use the repository’s issue tracker for public questions and
-          reproducible bugs. Do not include credentials, call recordings,
-          personal data, or vulnerability details in public issues.
+          Questions about Leamout Cloud should go through the documented
+          support channels. Never publish credentials, recordings, personal
+          information or vulnerability reports in a public issue.
         </p>
-        <a
-          href="https://github.com/leamout/leamout/issues"
+        <Link
+          href="/contact"
           className="font-medium underline decoration-brand-orange underline-offset-8"
         >
-          Visit the issue tracker
-        </a>
+          Cloud contact information
+        </Link>
       </section>
     </div>
   );

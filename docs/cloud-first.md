@@ -1,21 +1,36 @@
-# Leamout Cloud-first architecture
+# Leamout Cloud architecture
 
-Leamout Cloud is the first commercial deployment of one proprietary infrastructure
-platform. The runtime has three entrypoints: `server`, `worker`, and `media`.
-It has no deployment-mode, deployment-ID, Community-edition or signed-license
-branches. Enterprise private deployments are a future commercial expansion.
+Leamout Cloud is the only supported Leamout product and deployment model.
+Leamout operates one multi-tenant SIP-native infrastructure platform.
 
-The server and worker initialize subscription plan policies regardless of
-whether Polar checkout credentials are configured. Subscription allowance and
-resource quotas are enforced through the existing service callbacks and database
-entitlements; missing plan data must never grant unrestricted Cloud access.
-The media process does not consult billing on its realtime audio path.
+The application has three entrypoints: `server` (control-plane HTTP API),
+`worker` (durable asynchronous tasks and orchestration), and `media`
+(realtime call audio). OpenSIPS, FreeSWITCH, RTPengine, Coturn, PostgreSQL,
+Redis, NATS JetStream and object storage provide the shared infrastructure.
 
-For future private deployments, design a separate explicit commercial policy
-and deployment packaging after there is a paying customer and an agreed
-contract. Do not restore edition flags to the hot path.
+## Commercial invariants
 
-**Licensing:** Existing Apache-2.0 publications remain subject to that
-license. Making the repository private would require a separate authorized
-repository administration action, and does not revoke existing grants.
-Review rights to all contributed code before relicensing future distributions.
+Every organization is subject to authenticated tenancy boundaries, BYOC
+trunk admission, plans, runtime usage quotas and applicable feature
+entitlements. Server-initiated and worker-initiated calls must enforce
+the same plan policies. Runtime allowance exhaustion prevents **new**
+sessions and does not terminate existing calls.
+
+There is no deployment edition selector, signed-license runtime gate, or
+unmetered customer Self-Hosted mode. A missing subscription may map to the
+published Cloud Free tier, but missing/incomplete tier configuration must
+fail closed rather than bypass limits.
+
+## Deployments
+
+`deploy/`, `containers/` and the acceptance test stacks are maintained
+by Leamout to build, test and operate its hosted service. They are not
+customer self-installation instructions.
+
+## Source licensing
+
+The current public repository contains Apache-2.0 licensed code. Existing
+grants to distributed copies cannot be revoked merely by changing the
+product's hosting strategy or making future development private. Changes to
+future distribution and licensing require separate legal and repository
+administration decisions.

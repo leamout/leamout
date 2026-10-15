@@ -137,11 +137,13 @@ model/voice for OpenAI. Activation snapshots the validated bindings, including
 their integration ids, into the active Voice Agent revision. Provider secrets
 remain outside that snapshot and are resolved only when a media session starts.
 
-OpenAI Realtime currently retains its optional deployment-level fallback for
-local/self-hosted operation. An organization-scoped realtime provider binding,
-when present, overrides that fallback for the session. Rotating an integration
-returns it to `unchecked` without changing credentials already copied into an
-active, immutable media session.
+OpenAI Realtime supports an optional operator-configured fallback credential
+when no organization provider binding is present. This is an implementation
+detail of the hosted runtime, not a separate product mode. An
+organization-scoped provider binding takes precedence; rotating an integration
+returns it to `unchecked` without mutating an already active media session.
+Cloud policy must explicitly control use and billing of any platform-owned
+fallback credential before offering it to customers.
 
 The provider registry itself stores implementations only. It does not persist
 credentials. Provider-specific configuration is interpreted by the selected
