@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/leamout/leamout/server/internal/platform/config"
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 )
 
 func Run(ctx context.Context) error {
