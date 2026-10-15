@@ -25,7 +25,7 @@ services:
   voice-agent-v1-carrier:
     image: leamout/voice-agent-v1-carrier:dev
     build:
-      context: ../containers/freeswitch
+      context: ../../containers/freeswitch
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
