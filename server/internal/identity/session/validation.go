@@ -2,7 +2,6 @@ package session
 
 import (
 	"errors"
-	"net/netip"
 	"strings"
 	"time"
 
@@ -48,17 +47,4 @@ func validateSessionExpiry(session sqlc.Session) error {
 	}
 
 	return nil
-}
-
-func parseIP(value *string) *netip.Addr {
-	if value == nil || *value == "" {
-		return nil
-	}
-
-	ip, err := netip.ParseAddr(*value)
-	if err != nil {
-		return nil
-	}
-
-	return &ip
 }

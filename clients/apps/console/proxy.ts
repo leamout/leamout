@@ -27,6 +27,5 @@ export const config = {
     "/settings/:path*",
     "/organizations/:path*",
     "/create-organization/:path*",
-    "/create-account/password",
   ],
 };

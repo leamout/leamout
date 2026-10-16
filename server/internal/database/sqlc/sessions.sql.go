@@ -17,6 +17,9 @@ const createSession = `-- name: CreateSession :one
 INSERT INTO sessions (
     user_id,
     token_hash,
+    identity_subject,
+    identity_session_id,
+    tokens_ciphertext,
     assurance,
     ip_address,
     user_agent,
@@ -27,28 +30,37 @@ SELECT
     u.id,
     $1,
     $2,
-    $3::inet,
-    $4::text,
-    $5::timestamptz,
+    $3,
+    $4,
+    $5,
+    $6::inet,
+    $7::text,
+    $8::timestamptz,
     NOW()
 FROM users AS u
-WHERE u.id = $6
+WHERE u.id = $9
   AND u.disabled_at IS NULL
-RETURNING id, user_id, token_hash, assurance, ip_address, user_agent, expires_at, last_seen_at, revoked_at, created_at
+RETURNING id, user_id, token_hash, identity_subject, identity_session_id, tokens_ciphertext, assurance, ip_address, user_agent, expires_at, last_seen_at, revoked_at, created_at
 `
 
 type CreateSessionParams struct {
-	TokenHash string             `db:"token_hash" json:"token_hash"`
-	Assurance string             `db:"assurance" json:"assurance"`
-	IpAddress *netip.Addr        `db:"ip_address" json:"ip_address"`
-	UserAgent *string            `db:"user_agent" json:"user_agent"`
-	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	UserID    uuid.UUID          `db:"user_id" json:"user_id"`
+	TokenHash         string             `db:"token_hash" json:"token_hash"`
+	IdentitySubject   string             `db:"identity_subject" json:"identity_subject"`
+	IdentitySessionID string             `db:"identity_session_id" json:"identity_session_id"`
+	TokensCiphertext  string             `db:"tokens_ciphertext" json:"tokens_ciphertext"`
+	Assurance         string             `db:"assurance" json:"assurance"`
+	IpAddress         *netip.Addr        `db:"ip_address" json:"ip_address"`
+	UserAgent         *string            `db:"user_agent" json:"user_agent"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.TokenHash,
+		arg.IdentitySubject,
+		arg.IdentitySessionID,
+		arg.TokensCiphertext,
 		arg.Assurance,
 		arg.IpAddress,
 		arg.UserAgent,
@@ -60,6 +72,9 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.IdentitySubject,
+		&i.IdentitySessionID,
+		&i.TokensCiphertext,
 		&i.Assurance,
 		&i.IpAddress,
 		&i.UserAgent,
@@ -72,7 +87,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT s.id, s.user_id, s.token_hash, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
+SELECT s.id, s.user_id, s.token_hash, s.identity_subject, s.identity_session_id, s.tokens_ciphertext, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
@@ -90,6 +105,9 @@ func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (Session, er
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.IdentitySubject,
+		&i.IdentitySessionID,
+		&i.TokensCiphertext,
 		&i.Assurance,
 		&i.IpAddress,
 		&i.UserAgent,
@@ -102,7 +120,7 @@ func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (Session, er
 }
 
 const getSessionByTokenHash = `-- name: GetSessionByTokenHash :one
-SELECT s.id, s.user_id, s.token_hash, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
+SELECT s.id, s.user_id, s.token_hash, s.identity_subject, s.identity_session_id, s.tokens_ciphertext, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
@@ -120,6 +138,9 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (
 		&i.ID,
 		&i.UserID,
 		&i.TokenHash,
+		&i.IdentitySubject,
+		&i.IdentitySessionID,
+		&i.TokensCiphertext,
 		&i.Assurance,
 		&i.IpAddress,
 		&i.UserAgent,
@@ -132,7 +153,7 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (
 }
 
 const listSessionsByUserID = `-- name: ListSessionsByUserID :many
-SELECT s.id, s.user_id, s.token_hash, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
+SELECT s.id, s.user_id, s.token_hash, s.identity_subject, s.identity_session_id, s.tokens_ciphertext, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
 JOIN users AS u
     ON u.id = s.user_id
@@ -156,6 +177,9 @@ func (q *Queries) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([
 			&i.ID,
 			&i.UserID,
 			&i.TokenHash,
+			&i.IdentitySubject,
+			&i.IdentitySessionID,
+			&i.TokensCiphertext,
 			&i.Assurance,
 			&i.IpAddress,
 			&i.UserAgent,
@@ -172,6 +196,35 @@ func (q *Queries) ListSessionsByUserID(ctx context.Context, userID uuid.UUID) ([
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockIdentitySession = `-- name: LockIdentitySession :one
+SELECT s.id, s.user_id, s.token_hash, s.identity_subject, s.identity_session_id, s.tokens_ciphertext, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at FROM sessions AS s
+JOIN users AS u ON u.id = s.user_id
+WHERE s.id = $1 AND s.revoked_at IS NULL
+  AND s.expires_at > NOW() AND u.disabled_at IS NULL
+FOR UPDATE OF s
+`
+
+func (q *Queries) LockIdentitySession(ctx context.Context, id uuid.UUID) (Session, error) {
+	row := q.db.QueryRow(ctx, lockIdentitySession, id)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenHash,
+		&i.IdentitySubject,
+		&i.IdentitySessionID,
+		&i.TokensCiphertext,
+		&i.Assurance,
+		&i.IpAddress,
+		&i.UserAgent,
+		&i.ExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const revokeSession = `-- name: RevokeSession :exec
@@ -224,5 +277,20 @@ type TouchSessionParams struct {
 
 func (q *Queries) TouchSession(ctx context.Context, arg TouchSessionParams) error {
 	_, err := q.db.Exec(ctx, touchSession, arg.ID, arg.UserID)
+	return err
+}
+
+const updateIdentitySessionTokens = `-- name: UpdateIdentitySessionTokens :exec
+UPDATE sessions SET tokens_ciphertext = $1, last_seen_at = NOW()
+WHERE id = $2 AND revoked_at IS NULL
+`
+
+type UpdateIdentitySessionTokensParams struct {
+	TokensCiphertext string    `db:"tokens_ciphertext" json:"tokens_ciphertext"`
+	ID               uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *Queries) UpdateIdentitySessionTokens(ctx context.Context, arg UpdateIdentitySessionTokensParams) error {
+	_, err := q.db.Exec(ctx, updateIdentitySessionTokens, arg.TokensCiphertext, arg.ID)
 	return err
 }

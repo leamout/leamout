@@ -8,9 +8,7 @@ import (
 
 func (c Capability) IsValid() bool {
 	switch c {
-	case CapabilitySSO,
-		CapabilitySCIM,
-		CapabilityAdvancedRBAC,
+	case CapabilityAdvancedRBAC,
 		CapabilityRetentionPolicies,
 		CapabilityPrivateNetworking:
 		return true

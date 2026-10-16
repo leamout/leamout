@@ -2,33 +2,22 @@
 
 import { Button } from "@leamout/ui/components/button";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
-import { ApiError, api, errorMessage } from "@/lib/api";
-import { flowKey } from "./auth-flow-provider";
+import { api, errorMessage } from "@/lib/api";
 import { useSession } from "./require-session";
 
 export function AccountMenu() {
   const session = useSession();
   const client = useQueryClient();
-  const router = useRouter();
   const logout = useMutation({
-    mutationFn: async () => {
-      try {
-        await api<void>("/sessions/current", { method: "DELETE" });
-      } catch (error) {
-        if (!(error instanceof ApiError && error.status === 401)) throw error;
-      }
-    },
-    onSuccess: async () => {
+    mutationFn: () =>
+      api<{ logout_url: string }>("/auth/logout", {
+        method: "POST",
+        body: {},
+      }),
+    onSuccess: async ({ logout_url }) => {
       await client.cancelQueries();
       client.clear();
-      try {
-        sessionStorage.removeItem(flowKey);
-      } catch {
-        // Session storage may be disabled.
-      }
-      router.replace("/log-in");
-      router.refresh();
+      window.location.assign(logout_url);
     },
   });
 

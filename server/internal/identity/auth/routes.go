@@ -1,30 +1,13 @@
 package auth
 
-import (
-	"net/http"
+import "github.com/go-chi/chi/v5"
 
-	"github.com/go-chi/chi/v5"
-)
-
-func RegisterRoutes(
-	router chi.Router,
-	handler *Handler,
-	authMiddleware func(http.Handler) http.Handler,
-) {
+func RegisterRoutes(router chi.Router, handler *Handler) {
+	router.Post("/identity/backchannel-logout", handler.BackchannelLogout)
 	router.Route("/auth", func(r chi.Router) {
-		r.Post("/start", handler.Start)
-		r.Post("/password/recovery", handler.StartRecovery)
-		r.Post("/password/reset", handler.ResetPassword)
-
-		r.Post("/password/login", handler.LoginWithPassword)
-
-		r.Post("/otp/send", handler.SendOTP)
-		r.Post("/otp/verify", handler.VerifyOTP)
-
-		r.Group(func(r chi.Router) {
-			r.Use(authMiddleware)
-
-			r.Post("/password/enroll", handler.SetPassword)
-		})
+		r.Get("/login", handler.Login)
+		r.Get("/callback", handler.Callback)
+		r.Post("/logout", handler.Logout)
+		r.Get("/account", handler.Account)
 	})
 }

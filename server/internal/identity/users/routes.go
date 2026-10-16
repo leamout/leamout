@@ -15,7 +15,6 @@ func RegisterRoutes(
 		r.Use(authMiddleware)
 
 		r.Get("/me", handler.GetMe)
-		r.Patch("/me", handler.UpdateMe)
 		r.Delete("/me", handler.DeleteMe)
 	})
 }

@@ -8,10 +8,6 @@ import (
 )
 
 type Data struct {
-	Purpose      string    `json:"purpose,omitempty"`
-	ChangedAt    string    `json:"changed_at,omitempty"`
-	RecoveryURL  string    `json:"recovery_url,omitempty"`
-	Code         string    `json:"code,omitempty"`
 	ExpiresAt    time.Time `json:"expires_at"`
 	Organization string    `json:"organization,omitempty"`
 	Inviter      string    `json:"inviter,omitempty"`

@@ -8,8 +8,6 @@ func TestCapabilityValidation(t *testing.T) {
 		capability Capability
 		valid      bool
 	}{
-		{name: "sso", capability: CapabilitySSO, valid: true},
-		{name: "scim", capability: CapabilitySCIM, valid: true},
 		{name: "advanced RBAC", capability: CapabilityAdvancedRBAC, valid: true},
 		{name: "retention policies", capability: CapabilityRetentionPolicies, valid: true},
 		{name: "private networking", capability: CapabilityPrivateNetworking, valid: true},
@@ -26,11 +24,11 @@ func TestCapabilityValidation(t *testing.T) {
 }
 
 func TestNormalizeCapabilityTrimsWhitespace(t *testing.T) {
-	got, err := normalizeCapability("  sso  ")
+	got, err := normalizeCapability("  advanced_rbac  ")
 	if err != nil {
 		t.Fatalf("normalizeCapability() error = %v", err)
 	}
-	if got != CapabilitySSO {
-		t.Fatalf("normalizeCapability() = %q, want %q", got, CapabilitySSO)
+	if got != CapabilityAdvancedRBAC {
+		t.Fatalf("normalizeCapability() = %q, want %q", got, CapabilityAdvancedRBAC)
 	}
 }

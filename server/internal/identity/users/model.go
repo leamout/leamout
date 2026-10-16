@@ -7,7 +7,7 @@ import (
 )
 
 // Response is the public representation of an authenticated user.
-// Authentication secrets such as password hashes are intentionally omitted.
+// Identity provider tokens are never exposed.
 type Response struct {
 	ID            uuid.UUID `json:"id"`
 	Email         string    `json:"email"`
@@ -15,8 +15,4 @@ type Response struct {
 	Name          *string   `json:"name,omitempty"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
-}
-
-type UpdateProfileRequest struct {
-	Name *string `json:"name"`
 }

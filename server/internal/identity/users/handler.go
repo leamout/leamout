@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/security/authn"
 	"github.com/leamout/leamout/server/pkg/apperror"
-	"github.com/leamout/leamout/server/pkg/helper"
 	"github.com/leamout/leamout/server/pkg/httputil"
 )
 
@@ -26,33 +25,6 @@ func (h *Handler) GetMe(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user, err := h.service.Get(r.Context(), userID)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	httputil.OK(w, toResponse(user))
-}
-
-func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
-	userID, err := authenticatedUserID(r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	req, err := helper.DecodeJSON[UpdateProfileRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	if err := validateUpdateProfileRequest(req); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	user, err := h.service.UpdateProfile(r.Context(), userID, req.Name)
 	if err != nil {
 		httputil.Error(w, err)
 		return

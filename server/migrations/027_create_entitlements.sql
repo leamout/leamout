@@ -9,8 +9,6 @@ CREATE TABLE IF NOT EXISTS entitlements (
     PRIMARY KEY (organization_id, capability),
     CONSTRAINT chk_entitlements_capability
         CHECK (capability IN (
-            'sso',
-            'scim',
             'advanced_rbac',
             'retention_policies',
             'private_networking'

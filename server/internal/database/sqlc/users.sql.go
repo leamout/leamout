@@ -11,42 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const createUser = `-- name: CreateUser :one
-INSERT INTO users (
-    name,
-    email,
-    password_hash
-) VALUES (
-    $1,
-    $2,
-    $3
-)
-RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
-`
-
-type CreateUserParams struct {
-	Name         *string `db:"name" json:"name"`
-	Email        string  `db:"email" json:"email"`
-	PasswordHash *string `db:"password_hash" json:"password_hash"`
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.Name, arg.Email, arg.PasswordHash)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.EmailVerified,
-		&i.Name,
-		&i.PasswordHash,
-		&i.IsPlatformAdmin,
-		&i.DisabledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const disableUser = `-- name: DisableUser :exec
 UPDATE users
 SET
@@ -136,7 +100,7 @@ func (q *Queries) GetBackofficeUser(ctx context.Context, id uuid.UUID) (GetBacko
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
+SELECT id, email, email_verified, name, identity_issuer, identity_subject, is_platform_admin, disabled_at, created_at, updated_at
 FROM users
 WHERE email = $1
   AND disabled_at IS NULL
@@ -151,7 +115,8 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Email,
 		&i.EmailVerified,
 		&i.Name,
-		&i.PasswordHash,
+		&i.IdentityIssuer,
+		&i.IdentitySubject,
 		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
@@ -161,7 +126,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByEmailIncludingDisabled = `-- name: GetUserByEmailIncludingDisabled :one
-SELECT id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
+SELECT id, email, email_verified, name, identity_issuer, identity_subject, is_platform_admin, disabled_at, created_at, updated_at
 FROM users
 WHERE email = $1
 LIMIT 1
@@ -175,7 +140,8 @@ func (q *Queries) GetUserByEmailIncludingDisabled(ctx context.Context, email str
 		&i.Email,
 		&i.EmailVerified,
 		&i.Name,
-		&i.PasswordHash,
+		&i.IdentityIssuer,
+		&i.IdentitySubject,
 		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
@@ -185,7 +151,7 @@ func (q *Queries) GetUserByEmailIncludingDisabled(ctx context.Context, email str
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
+SELECT id, email, email_verified, name, identity_issuer, identity_subject, is_platform_admin, disabled_at, created_at, updated_at
 FROM users
 WHERE id = $1
   AND disabled_at IS NULL
@@ -200,7 +166,8 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Email,
 		&i.EmailVerified,
 		&i.Name,
-		&i.PasswordHash,
+		&i.IdentityIssuer,
+		&i.IdentitySubject,
 		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,
@@ -394,91 +361,37 @@ func (q *Queries) ListBackofficeUsers(ctx context.Context) ([]ListBackofficeUser
 	return items, nil
 }
 
-const markUserEmailVerified = `-- name: MarkUserEmailVerified :one
-UPDATE users
-SET
-    email_verified = TRUE,
-    updated_at = NOW()
-WHERE id = $1
-  AND disabled_at IS NULL
-RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
+const upsertIdentityUser = `-- name: UpsertIdentityUser :one
+INSERT INTO users (identity_issuer, identity_subject, name, email, email_verified)
+VALUES ($1, $2, $3, $4, TRUE)
+ON CONFLICT (identity_issuer, identity_subject) DO UPDATE
+SET name = EXCLUDED.name, email = EXCLUDED.email, email_verified = TRUE, updated_at = NOW()
+WHERE users.disabled_at IS NULL
+RETURNING id, email, email_verified, name, identity_issuer, identity_subject, is_platform_admin, disabled_at, created_at, updated_at
 `
 
-func (q *Queries) MarkUserEmailVerified(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRow(ctx, markUserEmailVerified, id)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.EmailVerified,
-		&i.Name,
-		&i.PasswordHash,
-		&i.IsPlatformAdmin,
-		&i.DisabledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
+type UpsertIdentityUserParams struct {
+	IdentityIssuer  string  `db:"identity_issuer" json:"identity_issuer"`
+	IdentitySubject string  `db:"identity_subject" json:"identity_subject"`
+	Name            *string `db:"name" json:"name"`
+	Email           string  `db:"email" json:"email"`
+}
+
+func (q *Queries) UpsertIdentityUser(ctx context.Context, arg UpsertIdentityUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, upsertIdentityUser,
+		arg.IdentityIssuer,
+		arg.IdentitySubject,
+		arg.Name,
+		arg.Email,
 	)
-	return i, err
-}
-
-const setUserPassword = `-- name: SetUserPassword :one
-UPDATE users
-SET
-    password_hash = $1,
-    updated_at = NOW()
-WHERE id = $2
-  AND disabled_at IS NULL
-RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
-`
-
-type SetUserPasswordParams struct {
-	PasswordHash *string   `db:"password_hash" json:"password_hash"`
-	ID           uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) SetUserPassword(ctx context.Context, arg SetUserPasswordParams) (User, error) {
-	row := q.db.QueryRow(ctx, setUserPassword, arg.PasswordHash, arg.ID)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
 		&i.EmailVerified,
 		&i.Name,
-		&i.PasswordHash,
-		&i.IsPlatformAdmin,
-		&i.DisabledAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const updateUserProfile = `-- name: UpdateUserProfile :one
-UPDATE users
-SET
-    name = COALESCE($1, name),
-    email = COALESCE($2, email),
-    updated_at = NOW()
-WHERE id = $3
-  AND disabled_at IS NULL
-RETURNING id, email, email_verified, name, password_hash, is_platform_admin, disabled_at, created_at, updated_at
-`
-
-type UpdateUserProfileParams struct {
-	Name  *string   `db:"name" json:"name"`
-	Email *string   `db:"email" json:"email"`
-	ID    uuid.UUID `db:"id" json:"id"`
-}
-
-func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateUserProfile, arg.Name, arg.Email, arg.ID)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.EmailVerified,
-		&i.Name,
-		&i.PasswordHash,
+		&i.IdentityIssuer,
+		&i.IdentitySubject,
 		&i.IsPlatformAdmin,
 		&i.DisabledAt,
 		&i.CreatedAt,

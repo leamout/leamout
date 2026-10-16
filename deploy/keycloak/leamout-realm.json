@@ -1,0 +1,42 @@
+{
+  "realm": "leamout",
+  "enabled": true,
+  "displayName": "Leamout",
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "verifyEmail": true,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "sslRequired": "external",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 2592000,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "clients": [
+    {
+      "clientId": "leamout-console",
+      "name": "Leamout Console",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${KEYCLOAK_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["${FRONTEND_URL}/api/v1/auth/callback"],
+      "webOrigins": ["${FRONTEND_URL}"],
+      "defaultClientScopes": ["profile", "email"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "${FRONTEND_URL}/log-in",
+        "backchannel.logout.url": "${BACKEND_URL}/v1/identity/backchannel-logout",
+        "backchannel.logout.session.required": "true"
+      }
+    }
+  ]
+}
