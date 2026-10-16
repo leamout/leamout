@@ -1,5 +1,7 @@
 import { RequireSession } from "@/components/auth/require-session";
 import { ConsoleShell } from "@/components/console-shell";
+import { OrganizationProvider } from "@/components/onboarding/organization-provider";
+import { RequireOrganization } from "@/components/onboarding/require-organization";
 
 export default function ConsoleLayout({
   children,
@@ -8,7 +10,11 @@ export default function ConsoleLayout({
 }) {
   return (
     <RequireSession>
-      <ConsoleShell>{children}</ConsoleShell>
+      <OrganizationProvider>
+        <RequireOrganization>
+          <ConsoleShell>{children}</ConsoleShell>
+        </RequireOrganization>
+      </OrganizationProvider>
     </RequireSession>
   );
 }

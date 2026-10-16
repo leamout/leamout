@@ -2,16 +2,29 @@
 
 import { Button } from "@leamout/ui/components/button";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { errorMessage } from "@/lib/api";
+import { useOrganization } from "./organization-provider";
 
-type Organization = { id: string; name: string };
+export function OrganizationSelector() {
+  const router = useRouter();
+  const organization = useOrganization();
+  const [error, setError] = useState("");
 
-export function OrganizationSelector({
-  organizations = [],
-}: {
-  organizations?: Organization[];
-}) {
-  const [notice, setNotice] = useState("");
+  function select(id: string) {
+    setError("");
+    if (!organization.selectOrganization(id)) {
+      setError("Unable to save your organization selection. Please try again.");
+      return;
+    }
+    router.replace("/");
+  }
+
+  const loading =
+    !organization.ready ||
+    organization.isPending ||
+    organization.isFetching;
 
   return (
     <div className="space-y-6">
@@ -23,44 +36,46 @@ export function OrganizationSelector({
           Choose the workspace you want to manage.
         </p>
       </div>
-      {organizations.length > 0 ? (
+      {organization.isError ? (
+        <div className="space-y-3" role="alert">
+          <p className="text-sm">{errorMessage(organization.error)}</p>
+          <Button variant="outline" onClick={organization.refetch}>
+            Try again
+          </Button>
+        </div>
+      ) : loading ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          Loading your organizations…
+        </p>
+      ) : organization.organizations.length > 0 ? (
         <ul className="space-y-3" aria-label="Organizations">
-          {organizations.map((organization) => (
-            <li key={organization.id}>
+          {organization.organizations.map((item) => (
+            <li key={item.id}>
               <Button
-                className="h-auto w-full justify-start whitespace-normal break-words py-4 text-left"
+                className="h-auto w-full justify-between whitespace-normal break-words py-4 text-left"
                 variant="outline"
-                onClick={() =>
-                  setNotice(
-                    "This is a preview. Organization switching will be connected later.",
-                  )
-                }
+                onClick={() => select(item.id)}
               >
-                {organization.name}
+                <span>{item.name}</span>
+                {organization.selected?.id === item.id ? (
+                  <span className="text-xs text-muted-foreground">Current</span>
+                ) : null}
               </Button>
             </li>
           ))}
         </ul>
       ) : (
         <div className="rounded-xl border border-dashed p-6 text-center">
-          <p className="font-medium">No organizations to display</p>
+          <p className="font-medium">No organizations yet</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your organizations will appear here once account integration is
-            connected.
+            Create an organization to configure your first Voice Agent.
           </p>
         </div>
       )}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       <Button className="w-full" render={<Link href="/create-organization" />}>
         Create organization
       </Button>
-      <p role="status" className="text-sm text-muted-foreground">
-        {notice}
-      </p>
-      <p className="text-center text-sm">
-        <Link href="/log-in" className="underline">
-          Back to log in
-        </Link>
-      </p>
     </div>
   );
 }

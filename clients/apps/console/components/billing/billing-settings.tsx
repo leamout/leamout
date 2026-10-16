@@ -23,6 +23,7 @@ import {
   hasConfirmedSubscription,
 } from "./presentation";
 import type { AvailablePlan, BillingStatus, Organization } from "./types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 
 const checkoutPollAttempts = 10;
 const checkoutPollInterval = 3_000;
@@ -32,18 +33,15 @@ export function BillingSettings() {
   const params = useSearchParams();
   const requestedOrganization = params.get("organization");
   const [busy, setBusy] = useState(false);
-  const organizations = useQuery({
-    queryKey: ["billing-organizations"],
-    queryFn: ({ signal }) => api<Organization[]>("/organizations", { signal }),
-  });
-  const activeOrganizations = organizations.data?.filter(
+  const organizationContext = useOrganization();
+  const activeOrganizations = organizationContext.organizations.filter(
     (organization) => organization.status === "active",
   );
   const selected = requestedOrganization
-    ? activeOrganizations?.find(
+    ? activeOrganizations.find(
         (organization) => organization.id === requestedOrganization,
       )
-    : activeOrganizations?.[0];
+    : organizationContext.selected;
 
   return (
     <div className="space-y-8">
@@ -53,16 +51,16 @@ export function BillingSettings() {
           Review your plan, usage, and payment settings.
         </p>
       </header>
-      {organizations.isPending ? (
+      {organizationContext.isPending || organizationContext.isFetching ? (
         <p role="status" className="text-sm text-muted-foreground">
           Loading your organizations…
         </p>
-      ) : organizations.isError ? (
+      ) : organizationContext.isError ? (
         <RequestError
-          error={organizations.error}
-          onRetry={() => organizations.refetch()}
+          error={organizationContext.error}
+          onRetry={organizationContext.refetch}
         />
-      ) : activeOrganizations?.length ? (
+      ) : activeOrganizations.length ? (
         <>
           <div className="max-w-sm space-y-2">
             <label
@@ -77,10 +75,12 @@ export function BillingSettings() {
               value={selected?.id ?? ""}
               disabled={busy}
               onChange={(event) => {
-                const query = new URLSearchParams({
-                  organization: event.target.value,
-                });
-                router.replace(`/settings/billing?${query}`);
+                if (organizationContext.selectOrganization(event.target.value)) {
+                  const query = new URLSearchParams({
+                    organization: event.target.value,
+                  });
+                  router.replace(`/settings/billing?${query}`);
+                }
               }}
             >
               {!selected && <option value="">Choose an organization</option>}

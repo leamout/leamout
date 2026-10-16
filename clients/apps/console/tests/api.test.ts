@@ -141,3 +141,40 @@ test("forbidden billing responses reject instead of returning successful data", 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("organization listing and creation use the existing tenancy endpoints", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls: { path: string; options?: RequestInit }[] = [];
+  globalThis.fetch = async (path, options) => {
+    calls.push({ path: String(path), options });
+    return Response.json({
+      success: true,
+      data: options?.method === "POST"
+        ? { id: "org-new", name: "Voice Labs", status: "active", role: "owner" }
+        : [],
+    });
+  };
+
+  try {
+    const organizations = await api<unknown[]>("/organizations");
+    const created = await api<{ id: string; name: string }>("/organizations", {
+      method: "POST",
+      body: { name: "Voice Labs" },
+    });
+
+    assert.deepEqual(organizations, []);
+    assert.equal(created.id, "org-new");
+    assert.equal(calls[0].path, "/api/v1/organizations");
+    assert.equal(calls[1].path, "/api/v1/organizations");
+    assert.equal(calls[0].options?.method, "GET");
+    assert.equal(calls[1].options?.method, "POST");
+    assert.deepEqual(JSON.parse(String(calls[1].options?.body)), {
+      name: "Voice Labs",
+    });
+    assert.equal(new Headers(calls[1].options?.headers).get("Authorization"), null);
+    assert.equal(calls[1].options?.credentials, "same-origin");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
