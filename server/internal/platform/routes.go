@@ -11,7 +11,6 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/retention"
 	"github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/platform/webhooks"
-	"github.com/leamout/leamout/server/internal/security/scim"
 )
 
 func RegisterRoutes(
@@ -39,13 +38,6 @@ func RegisterRoutes(
 		module.Networking.Handler,
 		organizationAccess("networking"),
 		entitlementsMiddleware.Require(entitlements.CapabilityPrivateNetworking),
-	)
-
-	scim.RegisterManagementRoutes(
-		router,
-		module.SCIM.Handler,
-		organizationAccess("scim"),
-		entitlementsMiddleware.Require(entitlements.CapabilitySCIM),
 	)
 
 	retention.RegisterRoutes(

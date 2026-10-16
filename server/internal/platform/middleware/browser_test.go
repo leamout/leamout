@@ -11,17 +11,17 @@ func TestBrowser(t *testing.T) {
 		name, method, path, origin, contentType, fetchSite string
 		status                                             int
 	}{
-		{"console login", "POST", "/v1/auth/password/login", "https://console.example.com", "application/json", "same-origin", 204},
-		{"legacy browser", "POST", "/v1/auth/start", "https://console.example.com", "application/json; charset=utf-8", "", 204},
-		{"foreign origin", "POST", "/v1/auth/start", "https://evil.example.com", "application/json", "same-origin", 403},
-		{"null origin", "POST", "/v1/auth/start", "null", "application/json", "", 403},
+		{"console login", "POST", "/v1/auth/logout", "https://console.example.com", "application/json", "same-origin", 204},
+		{"legacy browser", "POST", "/v1/auth/logout", "https://console.example.com", "application/json; charset=utf-8", "", 204},
+		{"foreign origin", "POST", "/v1/auth/logout", "https://evil.example.com", "application/json", "same-origin", 403},
+		{"null origin", "POST", "/v1/auth/logout", "null", "application/json", "", 403},
 		{"cross-site without origin", "DELETE", "/v1/sessions/current", "", "", "cross-site", 403},
 		{"logout", "DELETE", "/v1/sessions/current", "https://console.example.com", "", "same-origin", 204},
 		{"foreign logout", "DELETE", "/v1/sessions/current", "https://evil.example.com", "", "cross-site", 403},
-		{"non-browser client", "POST", "/v1/auth/start", "", "application/json", "", 204},
-		{"form post", "POST", "/v1/auth/start", "", "text/plain", "", 415},
+		{"non-browser client", "POST", "/v1/auth/logout", "", "application/json", "", 204},
+		{"form post", "POST", "/v1/auth/logout", "", "text/plain", "", 415},
 		{"read", "GET", "/v1/users/me", "https://evil.example.com", "", "cross-site", 204},
-		{"preflight", "OPTIONS", "/v1/auth/start", "https://console.example.com", "", "cross-site", 204},
+		{"preflight", "OPTIONS", "/v1/auth/logout", "https://console.example.com", "", "cross-site", 204},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequestWithContext(t.Context(), tc.method, tc.path, nil)

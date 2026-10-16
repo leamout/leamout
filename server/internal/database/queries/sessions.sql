@@ -2,6 +2,9 @@
 INSERT INTO sessions (
     user_id,
     token_hash,
+    identity_subject,
+    identity_session_id,
+    tokens_ciphertext,
     assurance,
     ip_address,
     user_agent,
@@ -11,6 +14,9 @@ INSERT INTO sessions (
 SELECT
     u.id,
     sqlc.arg(token_hash),
+    sqlc.arg(identity_subject),
+    sqlc.arg(identity_session_id),
+    sqlc.arg(tokens_ciphertext),
     sqlc.arg(assurance),
     sqlc.narg(ip_address)::inet,
     sqlc.narg(user_agent)::text,
@@ -84,3 +90,14 @@ UPDATE sessions
 SET revoked_at = NOW()
 WHERE user_id = sqlc.arg(user_id)
   AND revoked_at IS NULL;
+
+-- name: LockIdentitySession :one
+SELECT s.* FROM sessions AS s
+JOIN users AS u ON u.id = s.user_id
+WHERE s.id = sqlc.arg(id) AND s.revoked_at IS NULL
+  AND s.expires_at > NOW() AND u.disabled_at IS NULL
+FOR UPDATE OF s;
+
+-- name: UpdateIdentitySessionTokens :exec
+UPDATE sessions SET tokens_ciphertext = sqlc.arg(tokens_ciphertext), last_seen_at = NOW()
+WHERE id = sqlc.arg(id) AND revoked_at IS NULL;

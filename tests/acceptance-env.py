@@ -2,11 +2,18 @@
 
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import sys
 
 values = {
     "APP_ENV": "production",
     "DOMAIN": os.environ["DOMAIN"],
+    "FRONTEND_URL": "https://console.acceptance.invalid",
+    "BACKEND_URL": "http://server:8080",
+    "KEYCLOAK_ISSUER": "https://keycloak:8443/realms/leamout",
+    "KEYCLOAK_CLIENT_ID": "leamout-console",
+    "KEYCLOAK_CLIENT_SECRET": "acceptance-keycloak-client-not-live",
     "DATABASE_URL": (
         "postgres://leamout:"
         + os.environ["POSTGRES_PASSWORD"]
@@ -41,3 +48,23 @@ for key, value in values.items():
     lines.append(f"{key}='{escaped}'\n")
 
 Path(sys.argv[1]).write_text("".join(lines), encoding="utf-8")
+
+# Keep production HTTPS and issuer validation enabled for acceptance tests.
+identity_dir = Path(sys.argv[1] + ".identity")
+trust_dir = identity_dir / "trust"
+trust_dir.mkdir(parents=True, exist_ok=True)
+subprocess.run(
+    [
+        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+        "-days", "1", "-subj", "/CN=keycloak",
+        "-addext", "subjectAltName=DNS:keycloak",
+        "-keyout", str(identity_dir / "key.pem"),
+        "-out", str(identity_dir / "certificate.pem"),
+    ],
+    check=True,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+)
+# Keycloak runs as a non-root container user. This is a disposable test key.
+(identity_dir / "key.pem").chmod(0o644)
+shutil.copyfile(identity_dir / "certificate.pem", trust_dir / "keycloak.pem")

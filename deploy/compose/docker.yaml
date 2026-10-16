@@ -1,6 +1,46 @@
 name: leamout-cloud
 
 services:
+  keycloak-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+    volumes:
+      - keycloak-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [control]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    restart: unless-stopped
+    command: ["start", "--import-realm"]
+    env_file:
+      - ${APP_ENV_FILE:-../../server/.env}
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
+      KC_HOSTNAME: https://auth.leamout.com
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: 172.32.0.0/24
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
+    volumes:
+      - ../keycloak/leamout-realm.json:/opt/keycloak/data/import/leamout-realm.json:ro
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+    networks: [control]
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
@@ -149,7 +189,7 @@ services:
     depends_on:
       server:
         condition: service_started
-    networks: [edge]
+    networks: [edge, control]
 
   freeswitch:
     build:
@@ -241,6 +281,7 @@ services:
     networks: [media]
 
 volumes:
+  keycloak-postgres-data:
   postgres-data:
   redis-data:
   nats-data:

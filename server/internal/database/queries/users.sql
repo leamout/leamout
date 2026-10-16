@@ -1,15 +1,10 @@
--- name: CreateUser :one
-INSERT INTO users (
-    name,
-    email,
-    password_hash
-) VALUES (
-    sqlc.arg(name),
-    sqlc.arg(email),
-    sqlc.narg(password_hash)
-)
+-- name: UpsertIdentityUser :one
+INSERT INTO users (identity_issuer, identity_subject, name, email, email_verified)
+VALUES (sqlc.arg(identity_issuer), sqlc.arg(identity_subject), sqlc.narg(name), sqlc.arg(email), TRUE)
+ON CONFLICT (identity_issuer, identity_subject) DO UPDATE
+SET name = EXCLUDED.name, email = EXCLUDED.email, email_verified = TRUE, updated_at = NOW()
+WHERE users.disabled_at IS NULL
 RETURNING *;
-
 
 -- name: GetUserByID :one
 SELECT *
@@ -34,26 +29,6 @@ WHERE email = sqlc.arg(email)
 LIMIT 1;
 
 
--- name: SetUserPassword :one
-UPDATE users
-SET
-    password_hash = sqlc.arg(password_hash),
-    updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND disabled_at IS NULL
-RETURNING *;
-
-
--- name: MarkUserEmailVerified :one
-UPDATE users
-SET
-    email_verified = TRUE,
-    updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND disabled_at IS NULL
-RETURNING *;
-
-
 -- name: DisableUser :exec
 UPDATE users
 SET
@@ -61,16 +36,6 @@ SET
     updated_at = NOW()
 WHERE id = sqlc.arg(id)
   AND disabled_at IS NULL;
-
--- name: UpdateUserProfile :one
-UPDATE users
-SET
-    name = COALESCE(sqlc.narg(name), name),
-    email = COALESCE(sqlc.narg(email), email),
-    updated_at = NOW()
-WHERE id = sqlc.arg(id)
-  AND disabled_at IS NULL
-RETURNING *;
 
 -- name: ListBackofficeUsers :many
 SELECT

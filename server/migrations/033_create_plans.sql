@@ -69,8 +69,6 @@ VALUES
         0,
         'month',
         '{
-            "sso": false,
-            "scim": false,
             "advanced_rbac": false,
             "retention_policies": false,
             "private_networking": false
@@ -93,8 +91,6 @@ VALUES
         7900,
         'month',
         '{
-            "sso": false,
-            "scim": false,
             "advanced_rbac": false,
             "retention_policies": false,
             "private_networking": false
@@ -117,8 +113,6 @@ VALUES
         29900,
         'month',
         '{
-            "sso": false,
-            "scim": false,
             "advanced_rbac": true,
             "retention_policies": true,
             "private_networking": false
@@ -141,8 +135,6 @@ VALUES
         79900,
         'month',
         '{
-            "sso": false,
-            "scim": false,
             "advanced_rbac": true,
             "retention_policies": true,
             "private_networking": false
@@ -165,8 +157,6 @@ VALUES
         NULL,
         'year',
         '{
-            "sso": true,
-            "scim": true,
             "advanced_rbac": true,
             "retention_policies": true,
             "private_networking": true

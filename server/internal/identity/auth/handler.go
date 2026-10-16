@@ -1,285 +1,177 @@
 package auth
 
 import (
+	"crypto/subtle"
+	"encoding/json"
 	"net/http"
+	"time"
 
-	"github.com/google/uuid"
-
+	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity/session"
+	"github.com/leamout/leamout/server/internal/integrations/keycloak"
 	"github.com/leamout/leamout/server/internal/security/authn"
+	"github.com/leamout/leamout/server/internal/security/encryption"
+	"github.com/leamout/leamout/server/internal/security/token"
 	"github.com/leamout/leamout/server/pkg/apperror"
-	"github.com/leamout/leamout/server/pkg/helper"
 	"github.com/leamout/leamout/server/pkg/httputil"
+	"golang.org/x/oauth2"
 )
 
+const stateCookie = "leamout-oidc-state"
+
 type Handler struct {
-	service        *Service
-	sessionService *session.Service
-	development    bool
-	cookieDomain   string
+	queries     *sqlc.Queries
+	sessions    *session.Service
+	client      *keycloak.Client
+	cipher      *encryption.Cipher
+	frontendURL string
+	development bool
 }
 
-func NewHandler(
-	service *Service,
-	sessionService *session.Service,
-	development bool,
-	cookieDomain string,
-) *Handler {
+func NewHandler(queries *sqlc.Queries, sessions *session.Service, client *keycloak.Client, cipher *encryption.Cipher, frontendURL string, development bool) *Handler {
 	return &Handler{
-		service:        service,
-		sessionService: sessionService,
-		development:    development,
-		cookieDomain:   cookieDomain,
+		queries:     queries,
+		sessions:    sessions,
+		client:      client,
+		cipher:      cipher,
+		frontendURL: frontendURL,
+		development: development,
 	}
 }
 
-func (h *Handler) Start(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	req, err := helper.DecodeJSON[startRequest](r)
+func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	state, err := token.Generate(32)
 	if err != nil {
-		httputil.Error(w, err)
+		h.failed(w)
 		return
 	}
-
-	email, err := validateStartRequest(req)
+	nonce, err := token.Generate(32)
 	if err != nil {
-		httputil.Error(w, err)
+		h.failed(w)
 		return
 	}
-
-	transaction, err := h.service.Start(
-		r.Context(),
-		email,
-	)
+	verifier := oauth2.GenerateVerifier()
+	encrypted, err := h.cipher.EncryptForScope("oidc-login:"+token.Hash(state), verifier)
 	if err != nil {
-		httputil.Error(w, err)
+		h.failed(w)
 		return
 	}
-
-	httputil.OK(
-		w,
-		startResponse{
-			TransactionID: transaction.ID,
-			Methods:       authenticationMethods(),
-		},
-	)
+	expiry := time.Now().Add(5 * time.Minute)
+	if err := h.queries.DeleteExpiredOIDCLoginAttempts(r.Context()); err != nil {
+		h.failed(w)
+		return
+	}
+	if err := h.queries.CreateOIDCLoginAttempt(r.Context(), sqlc.CreateOIDCLoginAttemptParams{
+		StateHash:          token.Hash(state),
+		VerifierCiphertext: encrypted,
+		Nonce:              nonce,
+		ExpiresAt:          pgconv.NullableTimestamptz(&expiry),
+	}); err != nil {
+		h.failed(w)
+		return
+	}
+	h.setStateCookie(w, state, 300)
+	http.Redirect(w, r, h.client.AuthorizationURL(state, nonce, verifier, r.URL.Query().Get("register") == "true"), http.StatusFound)
 }
 
-func (h *Handler) LoginWithPassword(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	req, err := helper.DecodeJSON[passwordLoginRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
+func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie(stateCookie)
+	state := r.URL.Query().Get("state")
+	h.setStateCookie(w, "", -1)
+	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(state)) != 1 {
+		h.failed(w)
 		return
 	}
-
-	transactionID, err := validatePasswordLoginRequest(req)
-	if err != nil {
-		httputil.Error(w, err)
+	attempt, err := h.queries.ConsumeOIDCLoginAttempt(r.Context(), token.Hash(state))
+	if err != nil || r.URL.Query().Get("error") != "" || r.URL.Query().Get("code") == "" {
+		h.failed(w)
 		return
 	}
-
-	user, err := h.service.LoginWithPassword(
-		r.Context(),
-		transactionID,
-		req.Password,
-	)
+	verifier, err := h.cipher.DecryptForScope("oidc-login:"+token.Hash(state), attempt.VerifierCiphertext)
 	if err != nil {
-		httputil.Error(w, err)
+		h.failed(w)
 		return
 	}
-
-	h.createSession(w, r, user.ID, authn.AssurancePassword)
+	identity, tokens, err := h.client.Exchange(r.Context(), r.URL.Query().Get("code"), verifier, attempt.Nonce)
+	if err != nil {
+		h.failed(w)
+		return
+	}
+	user, err := h.queries.UpsertIdentityUser(r.Context(), sqlc.UpsertIdentityUserParams{
+		IdentityIssuer:  h.client.Issuer(),
+		IdentitySubject: identity.Subject,
+		Email:           identity.Email,
+		Name:            &identity.Name,
+	})
+	if err != nil {
+		h.failed(w)
+		return
+	}
+	value, created, err := h.sessions.Create(r.Context(), user.ID, identity.Subject, identity.SessionID, tokens)
+	if err != nil {
+		h.failed(w)
+		return
+	}
+	session.SetCookie(w, value, created.ExpiresAt.Time, h.development, "")
+	http.Redirect(w, r, h.frontendURL+"/organizations", http.StatusFound)
 }
 
-func (h *Handler) SendOTP(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	req, err := helper.DecodeJSON[sendOTPRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
+func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
+	idToken := ""
+	if cookie, err := r.Cookie(authn.SessionCookieName); err == nil {
+		stored, err := h.sessions.Get(r.Context(), cookie.Value)
+		if err == nil {
+			clear, err := h.cipher.DecryptForScope("identity-session:"+stored.UserID.String(), stored.TokensCiphertext)
+			if err == nil {
+				var tokens keycloak.Tokens
+				if json.Unmarshal([]byte(clear), &tokens) == nil {
+					idToken = tokens.IDToken
+				}
+			}
+			if err := h.sessions.Revoke(r.Context(), stored.ID, stored.UserID); err != nil {
+				h.failed(w)
+				return
+			}
+		}
 	}
-
-	transactionID, err := validateSendOTPRequest(req)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	if _, err := h.service.SendOTP(
-		r.Context(),
-		transactionID,
-	); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	httputil.OK(
-		w,
-		sendOTPResponse{
-			TransactionID: transactionID,
-		},
-	)
+	session.ClearCookie(w, h.development, "")
+	httputil.OK(w, map[string]string{"logout_url": h.client.LogoutURL(idToken, h.frontendURL+"/log-in")})
 }
 
-func (h *Handler) VerifyOTP(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	req, err := helper.DecodeJSON[verifyOTPRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	transactionID, code, err := validateVerifyOTPRequest(req)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	user, err := h.service.VerifyOTP(
-		r.Context(),
-		transactionID,
-		code,
-	)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	h.createSession(w, r, user.ID, authn.AssuranceOTP)
+func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, h.client.Issuer()+"/account/", http.StatusFound)
 }
 
-func (h *Handler) SetPassword(
-	w http.ResponseWriter,
-	r *http.Request,
-) {
-	req, err := helper.DecodeJSON[setPasswordRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	if err := validateSetPasswordRequest(req); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	userID, ok := authn.UserIDFromContext(r.Context())
-	if !ok {
-		httputil.Error(
-			w,
-			apperror.NewUnauthorized("authentication required"),
-		)
-		return
-	}
-
-	principal, ok := authn.PrincipalFromContext(r.Context())
-	if !ok || principal.Credential.Type != authn.CredentialSession {
-		httputil.Error(w, apperror.NewUnauthorized("session authentication required"))
-		return
-	}
-	user, err := h.service.SetPassword(
-		r.Context(),
-		userID,
-		principal.Credential.ID,
-		principal.Assurance,
-		req.CurrentPassword,
-		req.Password,
-	)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	// Password changes invalidate the old cookie and all other sessions.
-	session.ClearCookie(w, h.development, h.cookieDomain)
-	httputil.OK(
-		w,
-		authenticationResponse{
-			UserID: user.ID,
-		},
-	)
+func (h *Handler) setStateCookie(w http.ResponseWriter, value string, maxAge int) {
+	http.SetCookie(w, &http.Cookie{Name: stateCookie, Value: value, Path: "/", MaxAge: maxAge, Secure: !h.development, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 }
 
-func (h *Handler) createSession(
-	w http.ResponseWriter,
-	r *http.Request,
-	userID uuid.UUID,
-	assurance authn.AssuranceLevel,
-) {
-	token, sess, err := h.sessionService.CreateWithAssurance(
-		r.Context(),
-		userID,
-		helper.ClientIP(r),
-		helper.UserAgent(r),
-		assurance,
-	)
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-
-	session.SetCookie(
-		w,
-		token,
-		sess.ExpiresAt.Time,
-		h.development,
-		h.cookieDomain,
-	)
-
-	httputil.OK(
-		w,
-		authenticationResponse{
-			UserID:        userID,
-			SessionExpiry: sess.ExpiresAt.Time.Format(http.TimeFormat),
-		},
-	)
+func (h *Handler) failed(w http.ResponseWriter) {
+	httputil.Error(w, apperror.NewUnauthorized("sign-in could not be completed; return to Leamout and try again"))
 }
 
-func authenticationMethods() []string {
-	return []string{"password", "otp"}
-}
-
-func (h *Handler) StartRecovery(w http.ResponseWriter, r *http.Request) {
-	req, err := helper.DecodeJSON[startRequest](r)
+func (h *Handler) BackchannelLogout(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
+	if err := r.ParseForm(); err != nil {
+		h.failed(w)
+		return
+	}
+	event, err := h.client.VerifyLogout(r.Context(), r.PostForm.Get("logout_token"))
 	if err != nil {
-		httputil.Error(w, err)
+		h.failed(w)
 		return
 	}
-	transaction, err := h.service.StartRecovery(r.Context(), req.Email)
-	if err != nil {
-		httputil.Error(w, err)
+	if err := h.queries.DeleteExpiredOIDCLogoutEvents(r.Context()); err != nil {
+		h.failed(w)
 		return
 	}
-	httputil.OK(w, sendOTPResponse{TransactionID: transaction.ID})
-}
-
-func (h *Handler) ResetPassword(w http.ResponseWriter, r *http.Request) {
-	req, err := helper.DecodeJSON[resetPasswordRequest](r)
-	if err != nil {
-		httputil.Error(w, err)
+	if err := h.queries.ApplyOIDCLogout(r.Context(), sqlc.ApplyOIDCLogoutParams{
+		TokenID: event.TokenID, ExpiresAt: pgconv.NullableTimestamptz(&event.Expiry),
+		Issuer: event.Issuer, Subject: event.Subject, SessionID: event.SessionID,
+	}); err != nil {
+		h.failed(w)
 		return
 	}
-	id, code, err := validateVerifyOTPRequest(verifyOTPRequest{TransactionID: req.TransactionID, Code: req.Code})
-	if err != nil {
-		httputil.Error(w, err)
-		return
-	}
-	if err := validateSetPasswordRequest(setPasswordRequest{Password: req.Password}); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-	if err := h.service.ResetPassword(r.Context(), id, code, req.Password); err != nil {
-		httputil.Error(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	w.WriteHeader(http.StatusOK)
 }

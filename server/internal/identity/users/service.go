@@ -2,7 +2,6 @@ package users
 
 import (
 	"context"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
@@ -24,30 +23,6 @@ func (s *Service) Get(ctx context.Context, userID uuid.UUID) (sqlc.User, error) 
 	}
 
 	user, err := s.repo.GetByID(ctx, userID)
-	if err != nil {
-		return sqlc.User{}, apperror.NewNotFound("user not found")
-	}
-
-	return user, nil
-}
-
-func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, name *string) (sqlc.User, error) {
-	if err := validateUserID(userID); err != nil {
-		return sqlc.User{}, err
-	}
-
-	if name != nil {
-		value := strings.TrimSpace(*name)
-		if value == "" {
-			return sqlc.User{}, apperror.NewBadRequest("name cannot be empty")
-		}
-		name = &value
-	}
-
-	user, err := s.repo.UpdateProfile(ctx, sqlc.UpdateUserProfileParams{
-		ID:   userID,
-		Name: name,
-	})
 	if err != nil {
 		return sqlc.User{}, apperror.NewNotFound("user not found")
 	}

@@ -28,12 +28,14 @@ CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-voice-agent-v1.XXXXXX")
 export VOICE_AGENT_V1_SUITE_DIR="$SCRIPT_DIR"
 export VOICE_AGENT_V1_CERT_DIR="$CERT_DIR"
 
+. "$REPO_ROOT/tests/acceptance-identity.sh"
+
 # Generate an isolated application env file; never require or overwrite server/.env.
 APP_ENV_FILE=$(mktemp)
 export APP_ENV_FILE
 python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
 
-COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/voice-agent-v1/compose.yaml -f tests/acceptance-minio.yaml"
+COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/voice-agent-v1/compose.yaml -f tests/acceptance-minio.yaml -f tests/acceptance-identity.yaml"
 
 cleanup() {
     status=$?
@@ -57,6 +59,9 @@ cleanup() {
         rm -rf "$CERT_DIR"
     else
         printf '%s\n' "Voice Agent v1 stack retained; certificates: $CERT_DIR"
+    fi
+    if [ "${VOICE_AGENT_V1_KEEP_STACK:-0}" != "1" ]; then
+        rm -rf "$APP_ENV_FILE.identity"
     fi
     rm -f "$APP_ENV_FILE"
     exit "$status"

@@ -9,16 +9,12 @@ import (
 type Capability string
 
 const (
-	CapabilitySSO               Capability = "sso"
-	CapabilitySCIM              Capability = "scim"
 	CapabilityAdvancedRBAC      Capability = "advanced_rbac"
 	CapabilityRetentionPolicies Capability = "retention_policies"
 	CapabilityPrivateNetworking Capability = "private_networking"
 )
 
 var capabilities = []Capability{
-	CapabilitySSO,
-	CapabilitySCIM,
 	CapabilityAdvancedRBAC,
 	CapabilityRetentionPolicies,
 	CapabilityPrivateNetworking,

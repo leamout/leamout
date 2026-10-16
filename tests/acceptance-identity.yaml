@@ -1,0 +1,31 @@
+# Real, isolated identity provider for API startup in acceptance stacks.
+services:
+  keycloak:
+    environment:
+      KC_HOSTNAME: https://keycloak:8443
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_CERTIFICATE_FILE: /identity-tls/certificate.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /identity-tls/key.pem
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_MANAGEMENT_SCHEME: http
+    volumes:
+      - ${APP_ENV_FILE:?APP_ENV_FILE is required}.identity/certificate.pem:/identity-tls/certificate.pem:ro
+      - ${APP_ENV_FILE:?APP_ENV_FILE is required}.identity/key.pem:/identity-tls/key.pem:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000; printf \"GET /health/ready HTTP/1.0\\r\\n\\r\\n\" >&3; head -n 1 <&3 | grep -q \" 200 \"'"
+      interval: 5s
+      timeout: 5s
+      start_period: 60s
+      retries: 36
+
+  server:
+    environment:
+      # Keep any suite-specific SSL_CERT_FILE (e.g. the mock AI provider CA).
+      SSL_CERT_DIR: /identity-trust
+    volumes:
+      - ${APP_ENV_FILE:?APP_ENV_FILE is required}.identity/trust:/identity-trust:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy

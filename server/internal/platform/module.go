@@ -14,7 +14,6 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/platform/webhooks"
 	"github.com/leamout/leamout/server/internal/security/encryption"
-	"github.com/leamout/leamout/server/internal/security/scim"
 )
 
 type Module struct {
@@ -22,7 +21,6 @@ type Module struct {
 	Idempotency IdempotencyModule
 	Networking  NetworkingModule
 	Storage     StorageModule
-	SCIM        SCIMModule
 	Retention   RetentionModule
 	Webhooks    WebhooksModule
 }
@@ -50,13 +48,6 @@ type StorageModule struct {
 	Repository *storage.Repository
 	Service    *storage.Service
 	Handler    *storage.Handler
-}
-
-type SCIMModule struct {
-	Repository *scim.Repository
-	Service    *scim.Service
-	Handler    *scim.Handler
-	Middleware *scim.Middleware
 }
 
 type RetentionModule struct {
@@ -92,9 +83,6 @@ func New(
 	storageRepository := storage.NewRepository(queries)
 	storageService := storage.NewService(storageRepository, credentialCipher)
 
-	scimRepository := scim.NewRepository(queries)
-	scimService := scim.NewService(scimRepository)
-
 	retentionRepository := retention.NewRepository(queries)
 	retentionService := retention.NewService(retentionRepository)
 
@@ -125,12 +113,6 @@ func New(
 			Repository: storageRepository,
 			Service:    storageService,
 			Handler:    storage.NewHandler(storageService),
-		},
-		SCIM: SCIMModule{
-			Repository: scimRepository,
-			Service:    scimService,
-			Handler:    scim.NewHandler(scimService),
-			Middleware: scim.NewMiddleware(scimService),
 		},
 		Retention: RetentionModule{
 			Repository: retentionRepository,

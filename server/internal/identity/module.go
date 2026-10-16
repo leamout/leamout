@@ -1,10 +1,13 @@
 package identity
 
 import (
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity/auth"
 	"github.com/leamout/leamout/server/internal/identity/session"
 	"github.com/leamout/leamout/server/internal/identity/users"
+	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/security/encryption"
 )
 
 type Module struct {
@@ -14,9 +17,7 @@ type Module struct {
 }
 
 type AuthModule struct {
-	Repository *auth.Repository
-	Service    *auth.Service
-	Handler    *auth.Handler
+	Handler *auth.Handler
 }
 
 type SessionModule struct {
@@ -34,27 +35,20 @@ type UsersModule struct {
 func New(
 	queries *sqlc.Queries,
 	development bool,
-	cookieDomain string,
+	db *pgxpool.Pool,
+	client *keycloak.Client,
+	cipher *encryption.Cipher,
+	frontendURL string,
 ) *Module {
 	sessionRepository := session.NewRepository(queries)
-	sessionService := session.NewService(sessionRepository)
-
-	authRepository := auth.NewRepository(queries)
-	authService := auth.NewService(authRepository)
+	sessionService := session.NewService(sessionRepository, db, client, cipher)
 
 	usersRepository := users.NewRepository(queries)
 	usersService := users.NewService(usersRepository)
 
 	return &Module{
 		Auth: AuthModule{
-			Repository: authRepository,
-			Service:    authService,
-			Handler: auth.NewHandler(
-				authService,
-				sessionService,
-				development,
-				cookieDomain,
-			),
+			Handler: auth.NewHandler(queries, sessionService, client, cipher, frontendURL, development),
 		},
 		Session: SessionModule{
 			Repository: sessionRepository,
@@ -62,7 +56,7 @@ func New(
 			Handler: session.NewHandler(
 				sessionService,
 				development,
-				cookieDomain,
+				"",
 			),
 		},
 		Users: UsersModule{

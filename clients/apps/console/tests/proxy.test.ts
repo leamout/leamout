@@ -4,7 +4,7 @@ import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 import { NextRequest } from "next/server";
 import { config, proxy } from "../proxy";
 
-test("protects console, onboarding, and password enrollment routes", () => {
+test("protects console and onboarding routes", () => {
   for (const url of [
     "/",
     "/agents",
@@ -20,7 +20,6 @@ test("protects console, onboarding, and password enrollment routes", () => {
     "/settings/security",
     "/organizations",
     "/create-organization",
-    "/create-account/password",
   ]) {
     assert.equal(unstable_doesMiddlewareMatch({ config, url }), true, url);
   }
@@ -32,10 +31,8 @@ test("leaves public auth pages, API rewrites, and assets accessible", () => {
     "/log-in/password",
     "/create-account",
     "/email-verification",
-    "/forgot-password",
-    "/reset-password",
     "/api/v1/users/me",
-    "/api/v1/auth/start",
+    "/api/v1/auth/login",
     "/_next/static/app.js",
     "/_next/image",
     "/favicon.ico",

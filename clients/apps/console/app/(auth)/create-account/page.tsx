@@ -1,5 +1,11 @@
-import { CreateAccountForm } from "@/components/auth/create-account-form";
+import { IdentityEntry } from "@/components/auth/identity-entry";
 
 export default function Page() {
-  return <CreateAccountForm />;
+  return (
+    <IdentityEntry
+      title="Create your account"
+      description="Get started with Leamout."
+      register={true}
+    />
+  );
 }

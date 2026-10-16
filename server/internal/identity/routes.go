@@ -17,7 +17,6 @@ func RegisterRoutes(
 	auth.RegisterRoutes(
 		router,
 		module.Auth.Handler,
-		requireSession,
 	)
 
 	session.RegisterRoutes(

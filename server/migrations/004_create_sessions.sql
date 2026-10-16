@@ -4,6 +4,9 @@ CREATE TABLE IF NOT EXISTS sessions (
         REFERENCES users(id)
         ON DELETE CASCADE,
     token_hash TEXT NOT NULL UNIQUE,
+    identity_subject TEXT NOT NULL,
+    identity_session_id TEXT NOT NULL,
+    tokens_ciphertext TEXT NOT NULL,
     assurance TEXT NOT NULL DEFAULT 'unknown',
     ip_address INET,
     user_agent TEXT,

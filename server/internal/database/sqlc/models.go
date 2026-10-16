@@ -37,31 +37,6 @@ type AuditEvent struct {
 	OccurredAt     pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
 }
 
-type AuthChallenge struct {
-	ID                uuid.UUID          `db:"id" json:"id"`
-	AuthTransactionID *uuid.UUID         `db:"auth_transaction_id" json:"auth_transaction_id"`
-	Identifier        string             `db:"identifier" json:"identifier"`
-	SecretHash        string             `db:"secret_hash" json:"secret_hash"`
-	Purpose           string             `db:"purpose" json:"purpose"`
-	State             []byte             `db:"state" json:"state"`
-	Attempts          int32              `db:"attempts" json:"attempts"`
-	MaxAttempts       int32              `db:"max_attempts" json:"max_attempts"`
-	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	ConsumedAt        pgtype.Timestamptz `db:"consumed_at" json:"consumed_at"`
-	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
-}
-
-type AuthTransaction struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	Identifier     string             `db:"identifier" json:"identifier"`
-	UserID         *uuid.UUID         `db:"user_id" json:"user_id"`
-	State          string             `db:"state" json:"state"`
-	SelectedMethod *string            `db:"selected_method" json:"selected_method"`
-	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type BillingWebhookEvent struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	Provider       string             `db:"provider" json:"provider"`
@@ -168,6 +143,18 @@ type NetworkPolicy struct {
 	Status         string             `db:"status" json:"status"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
+type OidcLoginAttempt struct {
+	StateHash          string             `db:"state_hash" json:"state_hash"`
+	VerifierCiphertext string             `db:"verifier_ciphertext" json:"verifier_ciphertext"`
+	Nonce              string             `db:"nonce" json:"nonce"`
+	ExpiresAt          pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+}
+
+type OidcLogoutEvent struct {
+	TokenID   string             `db:"token_id" json:"token_id"`
+	ExpiresAt pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
 }
 
 type OpensipsInboundTrunkCredential struct {
@@ -322,52 +309,20 @@ type RetentionPolicy struct {
 	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
-type ScimIdentity struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	UserID         uuid.UUID          `db:"user_id" json:"user_id"`
-	ExternalID     string             `db:"external_id" json:"external_id"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
-type ScimToken struct {
-	ID             uuid.UUID          `db:"id" json:"id"`
-	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Name           string             `db:"name" json:"name"`
-	TokenPrefix    string             `db:"token_prefix" json:"token_prefix"`
-	TokenHash      string             `db:"token_hash" json:"token_hash"`
-	ExpiresAt      pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	LastUsedAt     pgtype.Timestamptz `db:"last_used_at" json:"last_used_at"`
-	RevokedAt      pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
-	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
-}
-
 type Session struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	UserID     uuid.UUID          `db:"user_id" json:"user_id"`
-	TokenHash  string             `db:"token_hash" json:"token_hash"`
-	Assurance  string             `db:"assurance" json:"assurance"`
-	IpAddress  *netip.Addr        `db:"ip_address" json:"ip_address"`
-	UserAgent  *string            `db:"user_agent" json:"user_agent"`
-	ExpiresAt  pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
-	LastSeenAt pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
-	RevokedAt  pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
-}
-
-type SsoConnection struct {
-	ID               uuid.UUID          `db:"id" json:"id"`
-	OrganizationID   uuid.UUID          `db:"organization_id" json:"organization_id"`
-	Name             string             `db:"name" json:"name"`
-	Protocol         string             `db:"protocol" json:"protocol"`
-	Issuer           string             `db:"issuer" json:"issuer"`
-	Configuration    []byte             `db:"configuration" json:"configuration"`
-	SecretCiphertext *string            `db:"secret_ciphertext" json:"secret_ciphertext"`
-	Status           string             `db:"status" json:"status"`
-	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ID                uuid.UUID          `db:"id" json:"id"`
+	UserID            uuid.UUID          `db:"user_id" json:"user_id"`
+	TokenHash         string             `db:"token_hash" json:"token_hash"`
+	IdentitySubject   string             `db:"identity_subject" json:"identity_subject"`
+	IdentitySessionID string             `db:"identity_session_id" json:"identity_session_id"`
+	TokensCiphertext  string             `db:"tokens_ciphertext" json:"tokens_ciphertext"`
+	Assurance         string             `db:"assurance" json:"assurance"`
+	IpAddress         *netip.Addr        `db:"ip_address" json:"ip_address"`
+	UserAgent         *string            `db:"user_agent" json:"user_agent"`
+	ExpiresAt         pgtype.Timestamptz `db:"expires_at" json:"expires_at"`
+	LastSeenAt        pgtype.Timestamptz `db:"last_seen_at" json:"last_seen_at"`
+	RevokedAt         pgtype.Timestamptz `db:"revoked_at" json:"revoked_at"`
+	CreatedAt         pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type StorageIntegration struct {
@@ -477,7 +432,8 @@ type User struct {
 	Email           string             `db:"email" json:"email"`
 	EmailVerified   bool               `db:"email_verified" json:"email_verified"`
 	Name            *string            `db:"name" json:"name"`
-	PasswordHash    *string            `db:"password_hash" json:"password_hash"`
+	IdentityIssuer  string             `db:"identity_issuer" json:"identity_issuer"`
+	IdentitySubject string             `db:"identity_subject" json:"identity_subject"`
 	IsPlatformAdmin bool               `db:"is_platform_admin" json:"is_platform_admin"`
 	DisabledAt      pgtype.Timestamptz `db:"disabled_at" json:"disabled_at"`
 	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`

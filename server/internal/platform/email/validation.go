@@ -8,7 +8,6 @@ import (
 	"strings"
 )
 
-var codePattern = regexp.MustCompile(`^[0-9]{6}$`)
 var templateNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 func validateData(name string, data Data) error {
@@ -19,22 +18,12 @@ func validateData(name string, data Data) error {
 		return fmt.Errorf("email expiry is required")
 	}
 	switch name {
-	case "verification-code":
-		if data.Purpose != "" && data.Purpose != "verification" && data.Purpose != "password-recovery" {
-			return fmt.Errorf("invalid verification purpose")
-		}
-
-		if !codePattern.MatchString(data.Code) {
-			return fmt.Errorf("invalid verification code")
-		}
 	case "organization-invitation":
 		if !ValidURL(data.AcceptURL) || data.Organization == "" {
 			return fmt.Errorf("invalid invitation data")
 		}
-	case "password-changed":
-		if !ValidURL(data.RecoveryURL) || data.ChangedAt == "" {
-			return fmt.Errorf("invalid password notification data")
-		}
+	default:
+		return fmt.Errorf("unsupported email template")
 	}
 	return nil
 }
