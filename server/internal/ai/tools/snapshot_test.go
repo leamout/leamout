@@ -32,7 +32,10 @@ func TestResolveSessionToolAuthorizesOnlyFrozenIdentity(t *testing.T) {
 	if _, err := resolveSessionTool(value, expected.ID, expected.Name); err != nil {
 		t.Fatalf("matching ID/name rejected: %v", err)
 	}
-	cases := []struct{ id uuid.UUID; name string }{
+	cases := []struct {
+		id   uuid.UUID
+		name string
+	}{
 		{uuid.Nil, "newly_added_tool"},
 		{uuid.New(), expected.Name},
 		{expected.ID, "renamed_tool"},
