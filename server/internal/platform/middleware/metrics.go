@@ -3,7 +3,7 @@ package middleware
 import (
 	"net/http"
 
-	"github.com/leamout/leamout/server/internal/platform/metrics"
+	"github.com/leamout/leamout/server/internal/observability/metrics"
 )
 
 // Metrics records process-level HTTP request and error counters.

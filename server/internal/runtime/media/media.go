@@ -15,7 +15,7 @@ import (
 	"github.com/leamout/leamout/server/internal/media/engine/realtime"
 	"github.com/leamout/leamout/server/internal/media/session"
 	"github.com/leamout/leamout/server/internal/media/transport"
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 )
 
 func Run(ctx context.Context) error {

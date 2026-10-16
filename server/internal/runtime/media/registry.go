@@ -7,7 +7,7 @@ import (
 
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
 	"github.com/leamout/leamout/server/internal/media/session"
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 	"github.com/leamout/leamout/server/internal/runtime/medianodes"
 )
 

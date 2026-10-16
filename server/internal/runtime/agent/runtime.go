@@ -8,7 +8,7 @@ import (
 
 	"github.com/leamout/leamout/server/internal/ai/orchestration"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 	"github.com/leamout/leamout/server/internal/runtime/medianodes"
 )
 

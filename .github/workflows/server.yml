@@ -52,6 +52,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Check obsolete observability imports
+        run: |
+          if grep -RInE --include='*.go' 'github.com/leamout/leamout/server/internal/platform/(logging|metrics|tracing)' .; then
+            echo "::error::Obsolete observability package imports remain"
+            exit 1
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@v7
         with:

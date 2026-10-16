@@ -12,7 +12,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/leamout/leamout/server/internal/media/session"
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 )
 
 type Attacher interface {
