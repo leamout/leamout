@@ -13,18 +13,34 @@ import (
 
 const applyOIDCLogout = `-- name: ApplyOIDCLogout :exec
 WITH event AS (
-    INSERT INTO oidc_logout_events (token_id, expires_at)
-    VALUES ($4, $5)
+    INSERT INTO oidc_logout_events (
+        token_id,
+        expires_at
+    )
+    VALUES (
+        $4,
+        $5
+    )
     ON CONFLICT DO NOTHING
     RETURNING token_id
 )
-UPDATE sessions AS s SET revoked_at = NOW()
+UPDATE sessions AS s
+SET revoked_at = NOW()
 FROM users AS u
-WHERE EXISTS (SELECT 1 FROM event)
+WHERE EXISTS (
+    SELECT 1
+    FROM event
+)
   AND u.id = s.user_id
   AND u.identity_issuer = $1
-  AND ($2::text = '' OR s.identity_subject = $2)
-  AND ($3::text = '' OR s.identity_session_id = $3)
+  AND (
+      $2::text = ''
+      OR s.identity_subject = $2
+  )
+  AND (
+      $3::text = ''
+      OR s.identity_session_id = $3
+  )
   AND s.revoked_at IS NULL
 `
 
@@ -49,7 +65,8 @@ func (q *Queries) ApplyOIDCLogout(ctx context.Context, arg ApplyOIDCLogoutParams
 
 const consumeOIDCLoginAttempt = `-- name: ConsumeOIDCLoginAttempt :one
 DELETE FROM oidc_login_attempts
-WHERE state_hash = $1 AND expires_at > NOW()
+WHERE state_hash = $1
+  AND expires_at > NOW()
 RETURNING state_hash, verifier_ciphertext, nonce, expires_at
 `
 
@@ -66,8 +83,18 @@ func (q *Queries) ConsumeOIDCLoginAttempt(ctx context.Context, stateHash string)
 }
 
 const createOIDCLoginAttempt = `-- name: CreateOIDCLoginAttempt :exec
-INSERT INTO oidc_login_attempts (state_hash, verifier_ciphertext, nonce, expires_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO oidc_login_attempts (
+    state_hash,
+    verifier_ciphertext,
+    nonce,
+    expires_at
+)
+VALUES (
+    $1,
+    $2,
+    $3,
+    $4
+)
 `
 
 type CreateOIDCLoginAttemptParams struct {
@@ -88,7 +115,8 @@ func (q *Queries) CreateOIDCLoginAttempt(ctx context.Context, arg CreateOIDCLogi
 }
 
 const deleteExpiredOIDCLoginAttempts = `-- name: DeleteExpiredOIDCLoginAttempts :exec
-DELETE FROM oidc_login_attempts WHERE expires_at <= NOW()
+DELETE FROM oidc_login_attempts
+WHERE expires_at <= NOW()
 `
 
 func (q *Queries) DeleteExpiredOIDCLoginAttempts(ctx context.Context) error {
@@ -97,7 +125,8 @@ func (q *Queries) DeleteExpiredOIDCLoginAttempts(ctx context.Context) error {
 }
 
 const deleteExpiredOIDCLogoutEvents = `-- name: DeleteExpiredOIDCLogoutEvents :exec
-DELETE FROM oidc_logout_events WHERE expires_at <= NOW()
+DELETE FROM oidc_logout_events
+WHERE expires_at <= NOW()
 `
 
 func (q *Queries) DeleteExpiredOIDCLogoutEvents(ctx context.Context) error {
