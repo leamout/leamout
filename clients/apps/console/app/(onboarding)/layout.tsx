@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { RequireSession } from "@/components/auth/require-session";
+import { OrganizationProvider } from "@/components/onboarding/organization-provider";
 
 export default function OnboardingLayout({
   children,
@@ -8,6 +9,7 @@ export default function OnboardingLayout({
 }) {
   return (
     <RequireSession>
+      <OrganizationProvider>
       <div className="flex min-h-svh flex-col items-center px-6 py-10">
         <Link href="/log-in" className="text-xl font-semibold tracking-tight">
           Leamout
@@ -16,6 +18,7 @@ export default function OnboardingLayout({
           {children}
         </main>
       </div>
+      </OrganizationProvider>
     </RequireSession>
   );
 }

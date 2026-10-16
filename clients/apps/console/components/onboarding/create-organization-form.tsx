@@ -10,7 +10,11 @@ import {
 } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
 import Link from "next/link";
-import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { api, errorMessage } from "@/lib/api";
+import type { Organization } from "@/lib/organizations";
+import { useOrganization } from "./organization-provider";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -19,14 +23,27 @@ const organizationSchema = z.object({
 });
 
 export function CreateOrganizationForm() {
-  const [notice, setNotice] = useState("");
+  const router = useRouter();
+  const organization = useOrganization();
+  const create = useMutation({
+    mutationFn: (name: string) =>
+      api<Organization>("/organizations", {
+        method: "POST",
+        body: { name },
+      }),
+    onSuccess: (created) => {
+      if (organization.addOrganization(created)) {
+        router.replace("/");
+      }
+    },
+  });
   const form = useForm<z.infer<typeof organizationSchema>>({
     resolver: zodResolver(organizationSchema),
     defaultValues: { name: "" },
   });
 
-  function onSubmit() {
-    setNotice("This is a preview. Your organization has not been created.");
+  function onSubmit(values: z.infer<typeof organizationSchema>) {
+    create.mutate(values.name.trim());
   }
 
   return (
@@ -42,7 +59,6 @@ export function CreateOrganizationForm() {
       <form
         className="space-y-4"
         onSubmit={form.handleSubmit(onSubmit)}
-        onChange={() => setNotice("")}
       >
         <Controller
           name="name"
@@ -79,13 +95,21 @@ export function CreateOrganizationForm() {
         <Button
           className="w-full"
           type="submit"
-          disabled={form.formState.isSubmitting}
+          disabled={create.isPending}
         >
           Create organization
         </Button>
-        <p role="status" className="text-sm text-muted-foreground">
-          {notice}
-        </p>
+        {create.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage(create.error)}
+          </p>
+        )}
+        {create.isSuccess && !organization.selected && (
+          <p role="alert" className="text-sm text-destructive">
+            Organization created, but your browser could not save the selection.
+            Select it from the organization list to continue.
+          </p>
+        )}
       </form>
       <p className="text-center text-sm">
         Already have an organization?{" "}
