@@ -269,3 +269,25 @@ The current layer does not yet implement:
 
 Those features build on this session contract rather than changing the audio
 transport or provider boundaries.
+
+
+## Immutable tool execution and emergency revocation
+
+The durable `configuration_snapshot.tools` freezes tool IDs, names, schemas,
+types, webhook endpoints, and timeouts at call admission. The Media Runtime
+receives only model-visible fields. When a model issues `tool.call`, the Agent
+Runtime passes its exact advertised name to the executor, which validates
+session, organization, agent, call, active state, and snapshot authorization.
+Tool additions and edits cannot modify the behavior of a live call.
+
+**Revocation policy:** disabling or deleting a tool stops *new* executions,
+including on previously started calls. Changes to tool names, arguments,
+endpoints, types, and timeouts apply only to newly created sessions. Signing
+secrets are never snapshotted: rotation changes the credential used for new
+webhook attempts. Already claimed/in-flight operations may finish during a
+concurrent disable, deletion, or rotation and cannot be retroactively undone.
+Per-session tool-call idempotency remains enforced by the execution store.
+
+Sessions created using the older, model-only tool snapshot intentionally fail
+closed for tool execution rather than resolving mutable definitions. Normal
+conversation may continue until the session ends.
