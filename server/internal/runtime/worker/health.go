@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 )
 
 func (m *modules) ready(ctx context.Context) error {
