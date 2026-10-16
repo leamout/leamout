@@ -1,5 +1,2 @@
-import { CreateTrunkForm } from "@/components/sip-trunks/create-trunk-form";
-
-export default function Page() {
-  return <CreateTrunkForm />;
-}
+import { TrunkEditor } from "@/components/resources/trunk-editor";
+export default function Page(){return <TrunkEditor />;}

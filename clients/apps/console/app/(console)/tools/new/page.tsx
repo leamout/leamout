@@ -1,5 +1,2 @@
-import { CreateToolForm } from "@/components/tools/create-tool-form";
-
-export default function Page() {
-  return <CreateToolForm />;
-}
+import { ToolEditor } from "@/components/resources/tool-editor";
+export default function Page(){return <ToolEditor />;}

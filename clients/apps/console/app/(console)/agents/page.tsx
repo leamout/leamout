@@ -1,5 +1,2 @@
-import { AgentList } from "@/components/agents/agent-list";
-
-export default function Page() {
-  return <AgentList />;
-}
+import { ResourceList } from "@/components/resources/resource-list";
+export default function Page(){return <ResourceList kind="agents" />;}

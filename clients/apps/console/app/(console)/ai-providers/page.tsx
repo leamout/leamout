@@ -1,5 +1,2 @@
-import { ProviderList } from "@/components/ai-providers/provider-list";
-
-export default function Page() {
-  return <ProviderList />;
-}
+import { ResourceList } from "@/components/resources/resource-list";
+export default function Page(){return <ResourceList kind="integrations" />;}

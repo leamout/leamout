@@ -1,5 +1,2 @@
-import { ToolList } from "@/components/tools/tool-list";
-
-export default function Page() {
-  return <ToolList />;
-}
+import { ResourceList } from "@/components/resources/resource-list";
+export default function Page(){return <ResourceList kind="tools" />;}

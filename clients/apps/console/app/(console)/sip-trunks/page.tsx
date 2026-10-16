@@ -1,5 +1,2 @@
-import { TrunkList } from "@/components/sip-trunks/trunk-list";
-
-export default function Page() {
-  return <TrunkList />;
-}
+import { ResourceList } from "@/components/resources/resource-list";
+export default function Page(){return <ResourceList kind="trunks" />;}
