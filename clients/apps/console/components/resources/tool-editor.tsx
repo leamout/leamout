@@ -6,10 +6,10 @@ import { Textarea } from "@leamout/ui/components/textarea";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api,errorMessage } from "@/lib/api";
-import { resourceKeys,useAgents,useAllTools,type AgentTool,type AgentToolWithOwner } from "@/lib/resources";
+import { resourceKeys,useAgents,useAllTools,type AgentTool } from "@/lib/resources";
 import { RequestError,RequestLoading } from "./request-state";
 
 const builtinNames=["hangup_call","transfer_call","hold_call","resume_call","send_dtmf"];
@@ -31,6 +31,7 @@ export function ToolEditor({id}:{id?:string}) {
   const [timeoutMs,setTimeoutMs]=useState("10000");
   const [enabled,setEnabled]=useState(false);
   const [secret,setSecret]=useState("");
+  const [createdId,setCreatedId]=useState("");
   const [validation,setValidation]=useState("");
   useEffect(()=>{
     if(!tool)return;
@@ -52,13 +53,21 @@ export function ToolEditor({id}:{id?:string}) {
     method:id?"PATCH":"POST",organizationId:orgId,
     body:{...(!id?{type}:{}),name:name.trim(),description:description.trim(),parameters:JSON.parse(parameters),
       ...(type==="webhook"?{endpoint_url:endpointUrl.trim()}:{}),timeout_ms:Number(timeoutMs),enabled},
-  }),onSuccess:async(value)=>{if(value.signing_secret)setSecret(value.signing_secret);await invalidate();if(!id)router.push(`/tools/${value.id}`);}});
+  }),onSuccess:async(value)=>{
+    await invalidate();
+    if(!id && value.signing_secret){
+      setSecret(value.signing_secret);
+      setCreatedId(value.id);
+    } else if(!id) {
+      router.push(`/tools/${value.id}`);
+    }
+  }});
   const remove=useMutation({mutationFn:()=>api<void>(`/voice-agents/${owner}/tools/${id}`,{method:"DELETE",organizationId:orgId}),onSuccess:async()=>{await invalidate();router.push("/tools");}});
   if(agents.isPending||(id&&tools.isPending))return <RequestLoading what="agent tools"/>;
   if(agents.isError)return <RequestError error={agents.error} retry={()=>void agents.refetch()}/>;
   if(id&&tools.isError)return <RequestError error={tools.error} retry={()=>void tools.refetch()}/>;
   if(id&&!tool)return <div role="alert">Tool not found in this organization.</div>;
-  function submit(event:React.FormEvent<HTMLFormElement>){
+  function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();setValidation("");
     if(!owner||!name.trim()||!description.trim())return setValidation("Complete the required fields.");
     try{const v=JSON.parse(parameters);if(!v||typeof v!=="object"||Array.isArray(v))throw Error();}catch{return setValidation("Parameters must be a JSON object.");}
@@ -81,6 +90,13 @@ export function ToolEditor({id}:{id?:string}) {
     {save.isError&&<p role="alert" className="text-sm text-destructive">{errorMessage(save.error)}</p>}
     {remove.isError&&<p role="alert" className="text-sm text-destructive">{errorMessage(remove.error)}</p>}
     <div className="flex gap-3"><Button disabled={save.isPending}>{id?"Save tool":"Create tool"}</Button>{id&&<Button type="button" variant="destructive" disabled={remove.isPending} onClick={()=>{if(window.confirm("Delete this tool?"))remove.mutate();}}>Delete tool</Button>}</div>
-    {secret&&<p role="status" className="rounded-lg border p-3 text-sm break-all">Signing secret (copy now; shown once): <code>{secret}</code></p>}
+    {secret&&<div role="status" className="space-y-3 rounded-lg border p-4">
+      <p className="text-sm font-medium">Signing secret (copy now; shown once)</p>
+      <code className="block break-all text-xs">{secret}</code>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" onClick={()=>void navigator.clipboard.writeText(secret)}>Copy secret</Button>
+        <Button type="button" onClick={()=>router.push(`/tools/${createdId}`)}>View tool</Button>
+      </div>
+    </div>}
   </form>;
 }
