@@ -21,9 +21,11 @@ COMPOSE = [
     "docker",
     "compose",
     "-f",
-    "deploy/compose.yaml",
+    "deploy/compose/docker.yaml",
     "-f",
     "tests/graceful-drain/compose.yaml",
+    "-f",
+    "tests/acceptance-minio.yaml",
 ]
 STATE = {}
 

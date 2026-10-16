@@ -18,7 +18,7 @@ ORG_ID = "00000000-0000-0000-0000-000000001101"
 INITIAL_INSTRUCTIONS = "You are the Voice Agent v1 acceptance assistant."
 COMPOSE = [
     "docker", "compose",
-    "-f", "deploy/compose.yaml",
+    "-f", "deploy/compose/docker.yaml",
     "-f", "tests/voice-agent-v1/compose.yaml",
     "-f", "tests/acceptance-minio.yaml",
 ]
