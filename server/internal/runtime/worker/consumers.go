@@ -9,7 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
-	"github.com/leamout/leamout/server/internal/platform/logging"
+	"github.com/leamout/leamout/server/internal/observability/logging"
 	"github.com/leamout/leamout/server/internal/runtime/calling"
 )
 
