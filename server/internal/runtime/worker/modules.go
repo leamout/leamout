@@ -12,7 +12,6 @@ import (
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
-	"github.com/leamout/leamout/server/internal/integrations/minio"
 	natsintegration "github.com/leamout/leamout/server/internal/integrations/nats"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
@@ -214,21 +213,11 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 
 	recordingsRepository := recordings.NewRepository(postgresClient.Pool())
-	objectClient, err := minio.New(ctx, minio.DefaultConfig(
-		cfg.Domain, cfg.MinIO.AccessKey, cfg.MinIO.SecretKey,
-	))
-	if err != nil {
-		closeDependencies()
-		return nil, fmt.Errorf("initialize recording object storage: %w", err)
-	}
 	storageService := platformstorage.NewService(
 		platformstorage.NewRepository(queries),
 		credentialCipher,
 	)
-	recordingStorage := recordings.NewResolvedObjectStorage(
-		objectClient,
-		storageService,
-	)
+	recordingStorage := recordings.NewObjectStorage(storageService)
 	recordingsService := recordings.NewService(recordingsRepository, recordingStorage)
 	recordingIngestion, err := recordings.NewIngestionJob(
 		recordingsRepository,

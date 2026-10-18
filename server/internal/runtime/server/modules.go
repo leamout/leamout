@@ -11,7 +11,6 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"github.com/leamout/leamout/server/internal/integrations/keycloak"
-	"github.com/leamout/leamout/server/internal/integrations/minio"
 	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
@@ -101,14 +100,6 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		return nil, fmt.Errorf("initialize TURN credentials: %w", err)
 	}
 
-	objectClient, err := minio.New(ctx, minio.DefaultConfig(
-		cfg.Domain, cfg.MinIO.AccessKey, cfg.MinIO.SecretKey,
-	))
-	if err != nil {
-		closeDependencies()
-		return nil, fmt.Errorf("initialize recording object storage: %w", err)
-	}
-
 	queries := sqlc.New(postgresClient.Pool())
 	keycloakClient, err := keycloak.New(ctx, cfg.Keycloak, cfg.FrontendURL+"/api/v1/auth/callback", cfg.IsDevelopment())
 	if err != nil {
@@ -144,10 +135,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		commercialModule.Limits.Service.RetentionDays,
 	)
 
-	recordingStorage := recordings.NewResolvedObjectStorage(
-		objectClient,
-		platformModule.Storage.Service,
-	)
+	recordingStorage := recordings.NewObjectStorage(platformModule.Storage.Service)
 
 	metricsRegistry := metrics.New(redisClient)
 	telephonyModule, err := telephony.New(telephony.Dependencies{
