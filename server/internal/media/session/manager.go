@@ -99,7 +99,7 @@ func (m *Manager) Start(ctx context.Context, cfg Config) error {
 	managedCtx, cancel := context.WithCancel(context.Background())
 	managed := &managedSession{
 		config: cfg, ctx: managedCtx, cancel: cancel, complete: make(chan struct{}),
-		createdAt: time.Now(),
+		createdAt:        time.Now(),
 		pendingToolCalls: make(map[string]Event),
 	}
 	type startResult struct {
@@ -422,18 +422,18 @@ type managedSession struct {
 	cancel   context.CancelFunc
 	complete chan struct{}
 
-	mu           sync.Mutex
-	control      chan Event
-	controlOpen  bool
-	stream       Stream
-	connection   Connection
-	attached     bool
+	mu               sync.Mutex
+	control          chan Event
+	controlOpen      bool
+	stream           Stream
+	connection       Connection
+	attached         bool
 	pendingToolCalls map[string]Event
-	attachTimer  *time.Timer
-	finished     bool
-	createdAt    time.Time
-	finishOnce   sync.Once
-	completeOnce sync.Once
+	attachTimer      *time.Timer
+	finished         bool
+	createdAt        time.Time
+	finishOnce       sync.Once
+	completeOnce     sync.Once
 }
 
 func (s *managedSession) finish() {

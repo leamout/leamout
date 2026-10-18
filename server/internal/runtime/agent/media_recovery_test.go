@@ -36,7 +36,7 @@ func TestMediaSessionStatusRejectsMissingMedia(t *testing.T) {
 	defer server.Close()
 
 	client := &mediaClient{
-		token: "secret",
+		token:  "secret",
 		client: server.Client(),
 	}
 	_, err := client.GetSessionAt(t.Context(), server.URL, uuid.New())
