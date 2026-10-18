@@ -4,7 +4,7 @@
 - `compose/observability.yaml` adds Prometheus, Alertmanager, Grafana, Loki,
   Tempo and Alloy to the **same Compose project**.
 - `observability/` contains the configs, rules, targets and dashboard provisioning.
-- `Caddyfile` and `minio-policy.json` are deployment assets.
+- `Caddyfile` is the public proxy configuration. Recording objects live exclusively in customer-owned S3-compatible storage.
 
 From the repository root:
 
@@ -70,3 +70,9 @@ Run `python3 tests/ops/validate.py` to check the default origins, Keycloak realm
 Prometheus alerts cover target availability, API HTTP 5xx spikes, media attachment timeouts, provider/transport failures, mean turn latency, and backpressure. The exporter currently measures aggregate mean latency; no p95/p99 claim is possible without histograms. Suggested initial operational objectives are API success >=99.5% and media attachment success >=99% over rolling 30-day windows. The present short-window alerts are operational signals, not full error-budget burn alerts. Configure a real Alertmanager receiver before production.
 
 The Voice Agent release gate tests continued call, media fork and durable-session identity across a worker restart. An independent media-process restart remains a destructive fault: it is not a call-continuity mechanism. A media **process crash** loses its in-memory provider streams; the system cannot transparently resume an existing call on a replacement media process. Draining and controlled rollover must be preferred to crashing active media nodes.
+
+## BYOS-only recording storage
+
+Leamout Cloud does not provide a default object store. Customers configure S3-compatible recording integrations; the runtime does not start or depend on MinIO. The `recordings-data` volume remains temporary FreeSWITCH recording staging, not long-term object storage.
+
+**Existing deployments:** before removing a live MinIO service or volume, back up and migrate every recording where `storage_integration_id IS NULL` into the appropriate customer bucket. Verify object content and transactionally update its integration ID and bucket. Legacy recordings remain intentionally inaccessible to the BYOS-only adapter until migrated; never silently repoint them to the current customer bucket. This PR does not automate migration.

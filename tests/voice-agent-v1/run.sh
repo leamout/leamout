@@ -8,10 +8,6 @@ export DOMAIN="${DOMAIN:-localhost}"
 export PUBLIC_IP="${PUBLIC_IP:-127.0.0.1}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-acceptance-postgres-password}"
-export MINIO_ROOT_USER="${MINIO_ROOT_USER:-acceptance-root}"
-export MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-acceptance-root-password}"
-export MINIO_APP_ACCESS_KEY="$MINIO_ROOT_USER"
-export MINIO_APP_SECRET_KEY="$MINIO_ROOT_PASSWORD"
 export DIDWW_API_KEY="${DIDWW_API_KEY:-acceptance-didww-not-live}"
 export COMMPEAK_API_AUTHORIZATION="${COMMPEAK_API_AUTHORIZATION:-acceptance-commpeak-not-live}"
 export MEDIA_TOKEN_SECRET="${MEDIA_TOKEN_SECRET:-acceptance-media-token-secret-0123456789abcdef}"
@@ -35,7 +31,7 @@ APP_ENV_FILE=$(mktemp)
 export APP_ENV_FILE
 python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
 
-COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/voice-agent-v1/compose.yaml -f tests/acceptance-minio.yaml -f tests/acceptance-identity.yaml"
+COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/voice-agent-v1/compose.yaml -f tests/acceptance-identity.yaml"
 
 cleanup() {
     status=$?
@@ -107,9 +103,8 @@ chmod 0600 "$CERT_DIR/openai.key" "$CERT_DIR/opensips-privkey.pem"
 cd "$REPO_ROOT"
 $COMPOSE config --quiet
 
-(cd "$REPO_ROOT" && sh tests/pull-acceptance-minio.sh)
 
-$COMPOSE up -d --build postgres redis nats minio voice-agent-v1-openai
+$COMPOSE up -d --build postgres redis nats voice-agent-v1-openai
 
 printf '%s\n' "Waiting for fake OpenAI Realtime fixture..."
 fake_openai_ready=0
