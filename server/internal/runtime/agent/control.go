@@ -113,6 +113,16 @@ func (r *Runtime) registerControl(
 	sessionID uuid.UUID,
 	rawURL string,
 ) error {
+	return r.registerControlWithState(ctx, call, sessionID, rawURL, nil)
+}
+
+func (r *Runtime) registerControlWithState(
+	ctx context.Context,
+	call sqlc.Call,
+	sessionID uuid.UUID,
+	rawURL string,
+	restored *conversationState,
+) error {
 	control, err := r.media.OpenControl(ctx, rawURL)
 	if err != nil {
 		return err
@@ -126,7 +136,11 @@ func (r *Runtime) registerControl(
 	}
 	r.controls[sessionID] = control
 	if r.states[sessionID] == nil {
-		r.states[sessionID] = newConversationState()
+		if restored != nil {
+			r.states[sessionID] = restored
+		} else {
+			r.states[sessionID] = newConversationState()
+		}
 	}
 	r.callSessions[call.ID] = sessionID
 	r.mu.Unlock()

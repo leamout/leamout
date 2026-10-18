@@ -148,6 +148,16 @@ type ToolResult struct {
 	IsError    bool   `json:"is_error,omitempty"`
 }
 
+// Status exposes non-secret liveness and attachment identity for worker recovery.
+// It deliberately omits provider credentials and the media configuration.
+type Status struct {
+	ID             uuid.UUID `json:"id"`
+	OrganizationID uuid.UUID `json:"organization_id"`
+	CallID         uuid.UUID `json:"call_id"`
+	ChannelID      uuid.UUID `json:"channel_id"`
+	Attached       bool      `json:"attached"`
+}
+
 // Validate checks identity, media, and immutable configuration invariants.
 func (c Config) Validate() error {
 	if c.ID == uuid.Nil {

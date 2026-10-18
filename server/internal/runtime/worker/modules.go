@@ -49,6 +49,7 @@ type modules struct {
 	agentRuntime            *agent.Runtime
 	callReconciliation      *calls.ReconciliationJob
 	sessionReconciliation   *sessionReconciliationJob
+	sessionRecovery         *sessionRecoveryJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
 	webhookDelivery         *webhooks.DeliveryJob
@@ -195,6 +196,12 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	sessionReconciliation := &sessionReconciliationJob{
 		queries: queries,
 	}
+	sessionRecovery := &sessionRecoveryJob{
+		queries:    queries,
+		freeSwitch: freeSwitch,
+		runtime:    agentRuntime,
+		logger:     logger,
+	}
 
 	callReconciliation, err := calls.NewReconciliationJob(
 		callsRepository,
@@ -316,6 +323,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		agentRuntime:            agentRuntime,
 		callReconciliation:      callReconciliation,
 		sessionReconciliation:   sessionReconciliation,
+		sessionRecovery:         sessionRecovery,
 		outbox:                  outboxJob,
 		webhookConsumer:         webhooks.NewConsumer(natsClient, webhookService),
 		webhookDelivery:         webhookDeliveryJob,

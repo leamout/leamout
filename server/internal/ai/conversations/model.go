@@ -37,3 +37,9 @@ type Identity struct {
 	OrganizationID uuid.UUID
 	SessionID      uuid.UUID
 }
+
+// TurnRecovery carries the minimal durable turn data needed to resume
+// conversation sequencing after a worker restart.
+type TurnRecovery struct {
+	Sequence int32
+}

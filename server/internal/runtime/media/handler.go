@@ -54,6 +54,10 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.createSession(w, r)
 	case r.Method == http.MethodGet &&
 		strings.HasPrefix(r.URL.Path, "/internal/v1/sessions/") &&
+		!strings.HasSuffix(r.URL.Path, "/control"):
+		h.sessionStatus(w, r)
+	case r.Method == http.MethodGet &&
+		strings.HasPrefix(r.URL.Path, "/internal/v1/sessions/") &&
 		strings.HasSuffix(r.URL.Path, "/control"):
 		h.controlSession(w, r)
 	case r.Method == http.MethodDelete &&
@@ -171,6 +175,31 @@ func (h *handler) createSession(w http.ResponseWriter, r *http.Request) {
 		WebSocketURL:        websocketURL.String(),
 		ControlWebSocketURL: controlURL,
 	})
+}
+
+func (h *handler) sessionStatus(w http.ResponseWriter, r *http.Request) {
+	if !h.authorized(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	rawID := strings.TrimPrefix(r.URL.Path, "/internal/v1/sessions/")
+	if rawID == "" || strings.Contains(rawID, "/") {
+		http.Error(w, "invalid media session id", http.StatusBadRequest)
+		return
+	}
+	id, err := uuid.Parse(rawID)
+	if err != nil {
+		http.Error(w, "invalid media session id", http.StatusBadRequest)
+		return
+	}
+	status, found := h.manager.Status(id)
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(status)
 }
 
 func (h *handler) controlSession(w http.ResponseWriter, r *http.Request) {

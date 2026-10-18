@@ -29,6 +29,9 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("subscribe FreeSWITCH events: %w", err)
 	}
 
+	if err := modules.sessionRecovery.Reconcile(ctx); err != nil {
+		logger.Warn(ctx, "initial active Voice Agent recovery failed; periodic retries will continue", "error", err)
+	}
 	if err := runWorkloadsWithReadiness(ctx, logger, modules); err != nil {
 		return fmt.Errorf("worker runtime: %w", err)
 	}

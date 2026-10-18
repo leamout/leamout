@@ -99,7 +99,8 @@ func (m *Manager) Start(ctx context.Context, cfg Config) error {
 	managedCtx, cancel := context.WithCancel(context.Background())
 	managed := &managedSession{
 		config: cfg, ctx: managedCtx, cancel: cancel, complete: make(chan struct{}),
-		controlDone: make(chan struct{}), createdAt: time.Now(),
+		createdAt:        time.Now(),
+		pendingToolCalls: make(map[string]Event),
 	}
 	type startResult struct {
 		stream Stream
@@ -230,6 +231,13 @@ func (m *Manager) AttachControl(id uuid.UUID) (*ControlAttachment, error) {
 		return nil, ErrControlAlreadyAttached
 	}
 	events := make(chan Event, 64)
+	for _, event := range managed.pendingToolCalls {
+		select {
+		case events <- event:
+		default:
+			return nil, ErrControlBackpressure
+		}
+	}
 	managed.control = events
 	managed.controlOpen = true
 	return &ControlAttachment{manager: m, id: id, session: managed, events: events}, nil
@@ -355,6 +363,29 @@ func (m *Manager) SessionIDs() []uuid.UUID {
 	return ids
 }
 
+// Status allows an authenticated worker to verify that the original media
+// session and its audio fork are still active before reconnecting control.
+func (m *Manager) Status(id uuid.UUID) (Status, bool) {
+	m.mu.Lock()
+	managed, exists := m.sessions[id]
+	m.mu.Unlock()
+	if !exists {
+		return Status{}, false
+	}
+	managed.mu.Lock()
+	defer managed.mu.Unlock()
+	if managed.finished || managed.ctx.Err() != nil {
+		return Status{}, false
+	}
+	return Status{
+		ID:             managed.config.ID,
+		OrganizationID: managed.config.OrganizationID,
+		CallID:         managed.config.CallID,
+		ChannelID:      managed.config.ChannelID,
+		Attached:       managed.attached,
+	}, true
+}
+
 // Config returns the immutable configuration of a live session. It is used by
 // the control endpoint to make repeated create requests idempotent.
 func (m *Manager) Config(id uuid.UUID) (Config, bool) {
@@ -391,19 +422,18 @@ type managedSession struct {
 	cancel   context.CancelFunc
 	complete chan struct{}
 
-	mu           sync.Mutex
-	control      chan Event
-	controlOpen  bool
-	controlDone  chan struct{}
-	controlOnce  sync.Once
-	stream       Stream
-	connection   Connection
-	attached     bool
-	attachTimer  *time.Timer
-	finished     bool
-	createdAt    time.Time
-	finishOnce   sync.Once
-	completeOnce sync.Once
+	mu               sync.Mutex
+	control          chan Event
+	controlOpen      bool
+	stream           Stream
+	connection       Connection
+	attached         bool
+	pendingToolCalls map[string]Event
+	attachTimer      *time.Timer
+	finished         bool
+	createdAt        time.Time
+	finishOnce       sync.Once
+	completeOnce     sync.Once
 }
 
 func (s *managedSession) finish() {
@@ -458,7 +488,13 @@ func (s *managedSession) submitToolResult(ctx context.Context, result ToolResult
 	}
 	stream := s.stream
 	s.mu.Unlock()
-	return stream.SubmitToolResult(ctx, result)
+	if err := stream.SubmitToolResult(ctx, result); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	delete(s.pendingToolCalls, result.ToolCallID)
+	s.mu.Unlock()
+	return nil
 }
 
 func (s *managedSession) interrupt(ctx context.Context) error {
@@ -484,6 +520,16 @@ func (s *managedSession) interrupt(ctx context.Context) error {
 func (s *managedSession) publish(event Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if event.Type == EventToolCall && event.ToolCall != nil {
+		if event.ToolCall.ID == "" {
+			return fmt.Errorf("media tool call id is required")
+		}
+		if _, exists := s.pendingToolCalls[event.ToolCall.ID]; !exists &&
+			len(s.pendingToolCalls) >= 64 {
+			return ErrControlBackpressure
+		}
+		s.pendingToolCalls[event.ToolCall.ID] = event
+	}
 	if !s.controlOpen || s.control == nil {
 		return nil
 	}
@@ -496,17 +542,14 @@ func (s *managedSession) publish(event Event) error {
 }
 
 func (s *managedSession) closeControl() {
-	s.controlOnce.Do(func() {
-		s.mu.Lock()
-		control := s.control
-		s.controlOpen = false
-		s.control = nil
-		s.mu.Unlock()
-		if control != nil {
-			close(control)
-		}
-		close(s.controlDone)
-	})
+	s.mu.Lock()
+	control := s.control
+	s.controlOpen = false
+	s.control = nil
+	s.mu.Unlock()
+	if control != nil {
+		close(control)
+	}
 }
 
 func (s *managedSession) markComplete() {
