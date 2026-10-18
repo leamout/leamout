@@ -31,9 +31,10 @@ func newConversationState() *conversationState {
 	return &conversationState{nextSequence: 1}
 }
 
-// restoreConversationState resumes numbering after the last persisted turn.
-// Provider-internal partial responses cannot be reconstructed across worker
-// failure; durable completed turns and counters remain authoritative.
+// restoreConversationState rebuilds counters from durable turns because active
+// session summary fields are normally written only when the call terminates.
+// Provider-internal partial responses and unpersisted interruptions cannot be
+// reconstructed after a worker failure.
 func restoreConversationState(
 	turns []conversations.TurnRecovery,
 	turnCount int32,
@@ -46,14 +47,31 @@ func restoreConversationState(
 		if turn.Sequence >= state.nextSequence {
 			state.nextSequence = turn.Sequence + 1
 		}
+		if turn.Role != "assistant" {
+			continue
+		}
+
+		state.turnCount++
+		if state.firstResponseLatency == nil && turn.LLMTTFTMS != nil {
+			// The first persisted assistant TTFT is the best available
+			// approximation when the original response.start was lost.
+			latency := time.Duration(*turn.LLMTTFTMS) * time.Millisecond
+			state.firstResponseLatency = &latency
+		}
+		if turn.TurnLatencyMS != nil {
+			state.totalTurnLatency += time.Duration(*turn.TurnLatencyMS) * time.Millisecond
+			state.turnLatencyCount++
+		}
 	}
-	state.turnCount = turnCount
+	if turnCount > state.turnCount {
+		state.turnCount = turnCount
+	}
 	state.interruptionCount = interruptionCount
 	if firstLatency != nil {
-		value := time.Duration(*firstLatency) * time.Millisecond
-		state.firstResponseLatency = &value
+		latency := time.Duration(*firstLatency) * time.Millisecond
+		state.firstResponseLatency = &latency
 	}
-	if avgLatency != nil && turnCount > 0 {
+	if avgLatency != nil && state.turnLatencyCount == 0 && turnCount > 0 {
 		state.totalTurnLatency = time.Duration(*avgLatency) * time.Millisecond * time.Duration(turnCount)
 		state.turnLatencyCount = turnCount
 	}

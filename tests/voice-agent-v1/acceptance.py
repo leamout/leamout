@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import datetime
 import json
 import os
 import ssl
@@ -658,6 +659,9 @@ def verify_worker_restart_recovery():
     session_id = STATE["session_id"]
     channel_id = STATE["channel_id"]
 
+    restarted_at = datetime.datetime.now(
+        datetime.timezone.utc
+    ).isoformat(timespec="seconds")
     compose("restart", "worker")
 
     def recovered():
@@ -693,8 +697,13 @@ def verify_worker_restart_recovery():
     # Confirm the newly started worker has reattached the original session.
     # Liveness and fork continuity alone would not prove control recovery.
     def restored_control():
-        output = compose("logs", "--no-color", "--since=90s", "worker")
-        return "Voice Agent control recovered" in output
+        output = compose(
+            "logs", "--no-color", "--since", restarted_at, "worker"
+        )
+        return (
+            '"msg":"Voice Agent control recovered"' in output
+            and f'"session_id":"{session_id}"' in output
+        )
 
     wait_for("worker recovered Voice Agent control", restored_control, timeout=45, interval=1)
 
