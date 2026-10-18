@@ -99,7 +99,7 @@ func (m *Manager) Start(ctx context.Context, cfg Config) error {
 	managedCtx, cancel := context.WithCancel(context.Background())
 	managed := &managedSession{
 		config: cfg, ctx: managedCtx, cancel: cancel, complete: make(chan struct{}),
-		controlDone: make(chan struct{}), createdAt: time.Now(),
+		createdAt: time.Now(),
 		pendingToolCalls: make(map[string]Event),
 	}
 	type startResult struct {
@@ -425,8 +425,6 @@ type managedSession struct {
 	mu           sync.Mutex
 	control      chan Event
 	controlOpen  bool
-	controlDone  chan struct{}
-	controlOnce  sync.Once
 	stream       Stream
 	connection   Connection
 	attached     bool
@@ -544,17 +542,14 @@ func (s *managedSession) publish(event Event) error {
 }
 
 func (s *managedSession) closeControl() {
-	s.controlOnce.Do(func() {
-		s.mu.Lock()
-		control := s.control
-		s.controlOpen = false
-		s.control = nil
-		s.mu.Unlock()
-		if control != nil {
-			close(control)
-		}
-		close(s.controlDone)
-	})
+	s.mu.Lock()
+	control := s.control
+	s.controlOpen = false
+	s.control = nil
+	s.mu.Unlock()
+	if control != nil {
+		close(control)
+	}
 }
 
 func (s *managedSession) markComplete() {

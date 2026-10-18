@@ -31,6 +31,29 @@ func newConversationState() *conversationState {
 	return &conversationState{nextSequence: 1}
 }
 
+// restoreConversationState resumes numbering after the last persisted turn.
+// Provider-internal partial responses cannot be reconstructed across worker
+// failure; durable completed turns and counters remain authoritative.
+func restoreConversationState(turns []conversations.TurnRecovery, turnCount, interruptionCount int32, firstLatency, avgLatency *int32) *conversationState {
+	state := newConversationState()
+	for _, turn := range turns {
+		if turn.Sequence >= state.nextSequence {
+			state.nextSequence = turn.Sequence + 1
+		}
+	}
+	state.turnCount = turnCount
+	state.interruptionCount = interruptionCount
+	if firstLatency != nil {
+		value := time.Duration(*firstLatency) * time.Millisecond
+		state.firstResponseLatency = &value
+	}
+	if avgLatency != nil && turnCount > 0 {
+		state.totalTurnLatency = time.Duration(*avgLatency) * time.Millisecond * time.Duration(turnCount)
+		state.turnLatencyCount = turnCount
+	}
+	return state
+}
+
 func (s *conversationState) observe(event session.Event) {
 	at := event.OccurredAt
 	if at.IsZero() {
