@@ -1,0 +1,44 @@
+name: Cloud deployment and observability gates
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "deploy/**"
+      - "server/.env.example"
+      - ".env.example"
+      - "tests/ops/**"
+      - ".github/workflows/ops.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    name: Validate proxy, Keycloak and Prometheus
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Check static deployment invariants
+        run: python3 tests/ops/validate.py
+
+      - name: Check deployment files
+        run: |
+          APP_ENV_FILE=../../server/.env.example docker compose \
+            --env-file .env.example -f deploy/compose/docker.yaml config --quiet
+
+      - name: Validate Caddyfile
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy adapt \
+            --config /etc/caddy/Caddyfile --adapter caddyfile --validate
+
+      - name: Validate Prometheus alerts
+        run: |
+          docker run --rm \
+            -v "$PWD/deploy/observability/prometheus/alerts:/etc/prometheus/alerts:ro" \
+            --entrypoint /bin/promtool prom/prometheus:v3.15.0 \
+            check rules /etc/prometheus/alerts/leamout.yml

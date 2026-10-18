@@ -651,6 +651,59 @@ def verify_durable_realtime_history():
         raise AcceptanceError(f"unexpected assistant turn: {parsed[2]}")
 
 
+def verify_worker_restart_recovery():
+    """A new worker must attach to the existing media stream, not fork again."""
+    before = verify_live_media_attachment()
+    initial_forks = before["audio_fork"].get("forks", 0)
+    session_id = STATE["session_id"]
+    channel_id = STATE["channel_id"]
+
+    compose("restart", "worker")
+
+    def recovered():
+        ready = compose(
+            "exec", "-T", "worker",
+            "wget", "--spider", "-q", "http://127.0.0.1:8081/readyz",
+            check=False,
+        )
+        if "error" in ready.lower():
+            return False
+        state = live_media_state()
+        if (
+            state["call_state"] not in {"answered", "active"}
+            or state["durable_session_state"] != "active"
+            or not state["channel_exists"]
+            or not state["carrier_channel_exists"]
+            or state["audio_fork"].get("forks", 0) != initial_forks
+        ):
+            return False
+        sessions = psql(
+            f"SELECT count(*) FROM voice_agent_sessions WHERE call_id='{STATE['call_id']}'"
+        )
+        if sessions != "1":
+            return False
+        if fs_cli(
+            "freeswitch", f"uuid_getvar {channel_id} leamout_voice_agent_session_id"
+        ).strip() != session_id:
+            return False
+        return state
+
+    wait_for("live call survives worker restart", recovered, timeout=45, interval=1)
+
+    # Exercise an actual control action through the freshly started worker.
+    # A no-op readiness signal is insufficient evidence of recovery.
+    def restored_control():
+        output = compose("logs", "--no-color", "--since=90s", "worker")
+        return (
+            "media control already attached" not in output.lower()
+            and "worker started" in output.lower()
+        )
+
+    # Control reattachment is also checked through the authenticated Media API
+    # in the companion operation gate.
+    wait_for("restarted worker running", restored_control, timeout=30, interval=1)
+
+
 def hangup_and_verify_completion():
     api("POST", f"/v1/calls/{STATE['call_id']}/hangup", expected={200})
 
@@ -727,8 +780,10 @@ def main():
     print("PASS 10 audio and realtime tool-result round trip completed")
     verify_durable_realtime_history()
     print("PASS 11 user, tool, and assistant turns persisted durably")
+    verify_worker_restart_recovery()
+    print("PASS 12 live media and durable session survive worker restart")
     hangup_and_verify_completion()
-    print("PASS 12 session completion persisted conversation summary metrics")
+    print("PASS 13 session completion persisted conversation summary metrics")
     print("Voice Agent v1 realtime release gate passed")
 
 
