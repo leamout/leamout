@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/leamout/leamout/server/internal/media/session"
 )
 
 func TestManagerPreservesPendingToolEventsAcrossControlDetach(t *testing.T) {
