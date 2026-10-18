@@ -38,8 +38,11 @@ type Identity struct {
 	SessionID      uuid.UUID
 }
 
-// TurnRecovery carries the minimal durable turn data needed to resume
-// conversation sequencing after a worker restart.
+// TurnRecovery captures persisted conversation data needed to reconstruct
+// turn numbering and summary metrics when a worker regains live call control.
 type TurnRecovery struct {
-	Sequence int32
+	Sequence      int32
+	Role          string
+	LLMTTFTMS     *int32
+	TurnLatencyMS *int32
 }

@@ -103,7 +103,12 @@ func (j *sessionRecoveryJob) recoverCandidate(
 	}
 	turns := make([]conversations.TurnRecovery, 0, len(persisted))
 	for _, turn := range persisted {
-		turns = append(turns, conversations.TurnRecovery{Sequence: turn.Sequence})
+		turns = append(turns, conversations.TurnRecovery{
+			Sequence:      turn.Sequence,
+			Role:          turn.Role,
+			LLMTTFTMS:     turn.LlmTtftMs,
+			TurnLatencyMS: turn.TurnLatencyMs,
+		})
 	}
 	agentID := candidate.VoiceAgentID
 	call := sqlc.Call{
@@ -112,7 +117,19 @@ func (j *sessionRecoveryJob) recoverCandidate(
 		VoiceAgentID:   &agentID,
 		State:          candidate.State,
 	}
-	return j.runtime.RecoverSession(ctx, record, call, channelID, turns)
+	recovered, err := j.runtime.RecoverSession(ctx, record, call, channelID, turns)
+	if err != nil {
+		return err
+	}
+	if recovered && j.logger != nil {
+		j.logger.Info(
+			ctx,
+			"Voice Agent control recovered",
+			"session_id", candidate.SessionID,
+			"call_id", candidate.CallID,
+		)
+	}
+	return nil
 }
 
 func (j *sessionRecoveryJob) Run(ctx context.Context) error {

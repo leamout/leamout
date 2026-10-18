@@ -3,9 +3,87 @@ groups:
     rules:
       - alert: LeamoutMetricsUnavailable
         expr: up{job="leamout"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Leamout {{ $labels.component }} metrics target unavailable"
+          description: "Prometheus cannot scrape {{ $labels.instance }} for 2 minutes."
+
+  - name: leamout-api-slo
+    rules:
+      - alert: LeamoutAPIHighErrorRate
+        expr: |
+          (
+            sum by (component) (increase(leamout_http_errors_total{component="api"}[10m]))
+            /
+            clamp_min(sum by (component) (increase(leamout_http_requests_total{component="api"}[10m])), 1)
+          ) > 0.05
+          and
+          sum by (component) (increase(leamout_http_requests_total{component="api"}[10m])) >= 50
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Leamout API HTTP 5xx rate exceeds 5%"
+          description: "Check API errors and deployments; alert requires 50 requests in ten minutes."
+
+  - name: leamout-media-slo
+    rules:
+      - alert: LeamoutMediaAttachmentFailures
+        expr: |
+          sum by (component) (
+            increase(leamout_media_failures_total{component="media",reason="attach_timeout"}[10m])
+          ) >= 3
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Repeated media attachment timeouts"
+          description: "At least three attachment timeouts in ten minutes."
+
+      - alert: LeamoutMediaHighTurnLatency
+        expr: |
+          (
+            rate(leamout_media_turn_latency_seconds{component="media"}[10m])
+            /
+            clamp_min(rate(leamout_media_turn_latency_count{component="media"}[10m]), 0.0001)
+          ) > 2
+          and
+          increase(leamout_media_turn_latency_count{component="media"}[10m]) >= 20
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Leamout metrics target unavailable"
-          description: "Prometheus cannot scrape {{ $labels.instance }} for 5 minutes."
+          summary: "Mean media turn latency above two seconds"
+          description: "Mean turn latency exceeded 2s with at least 20 turns; this is not a p95."
+
+      - alert: LeamoutMediaProviderOrTransportFailures
+        expr: |
+          sum by (component) (
+            increase(leamout_media_failures_total{
+              component="media",
+              reason=~"provider_failure|provider_timeout|transport_failure|playback_timeout"
+            }[10m])
+          ) >= 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Provider or transport failure spike"
+          description: "At least five provider or transport failures in ten minutes."
+
+      - alert: LeamoutMediaBackpressure
+        expr: |
+          sum by (component) (
+            increase(leamout_media_failures_total{
+              component="media",
+              reason=~"input_backpressure|output_backpressure|control_backpressure"
+            }[5m])
+          ) >= 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Realtime media queues under pressure"
+          description: "At least three backpressure failures in five minutes."

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leamout/leamout/server/internal/ai/conversations"
 	"github.com/leamout/leamout/server/internal/media/session"
 )
 
@@ -84,5 +85,83 @@ func TestConversationStateToolTurnUsesSharedSequence(t *testing.T) {
 	}
 	if turn.ToolCallID == nil || *turn.ToolCallID != "call-1" {
 		t.Fatalf("tool call id = %v", turn.ToolCallID)
+	}
+}
+
+func TestRestoreConversationStateFromPersistedTurns(t *testing.T) {
+	first := int32(125)
+	turnLatency := int32(500)
+	turns := []conversations.TurnRecovery{
+		{Sequence: 1, Role: "user"},
+		{Sequence: 2, Role: "tool"},
+		{
+			Sequence:      3,
+			Role:          "assistant",
+			LLMTTFTMS:     &first,
+			TurnLatencyMS: &turnLatency,
+		},
+	}
+
+	// Active sessions keep zero counters until completion. Recovery must
+	// derive the summary from persisted turns instead.
+	state := restoreConversationState(turns, 0, 0, nil, nil)
+	got := state.summary()
+	if got.TurnCount != 1 {
+		t.Fatalf("recovered turn_count = %d, want 1", got.TurnCount)
+	}
+	if got.FirstResponseLatencyMS == nil || *got.FirstResponseLatencyMS != first {
+		t.Fatalf("recovered first response latency = %v", got.FirstResponseLatencyMS)
+	}
+	if got.AverageTurnLatencyMS == nil || *got.AverageTurnLatencyMS != turnLatency {
+		t.Fatalf("recovered average turn latency = %v", got.AverageTurnLatencyMS)
+	}
+
+	// The next assistant turn must retain monotonic sequencing and update
+	// both the historical and current worker's latency observations.
+	base := time.Now().UTC()
+	state.observe(session.Event{
+		Type:       session.EventSpeechStopped,
+		OccurredAt: base,
+	})
+	state.observe(session.Event{
+		Type:       session.EventResponseStarted,
+		OccurredAt: base.Add(200 * time.Millisecond),
+	})
+	state.observe(session.Event{
+		Type:       session.EventResponseDelta,
+		OccurredAt: base.Add(300 * time.Millisecond),
+		Response:   &session.ResponseEvent{Text: "after restart"},
+	})
+	stopped := session.Event{
+		Type:       session.EventResponseStopped,
+		OccurredAt: base.Add(400 * time.Millisecond),
+	}
+	state.observe(stopped)
+	resumed, ok := state.assistantTurn(stopped)
+	if !ok || resumed.Sequence != 4 {
+		t.Fatalf("resumed assistant turn = %+v, ok=%v", resumed, ok)
+	}
+	got = state.summary()
+	if got.TurnCount != 2 {
+		t.Fatalf("turn_count after resumed response = %d, want 2", got.TurnCount)
+	}
+	if got.AverageTurnLatencyMS == nil || *got.AverageTurnLatencyMS != 450 {
+		t.Fatalf("average turn latency after restart = %v, want 450", got.AverageTurnLatencyMS)
+	}
+}
+
+func TestRestoreConversationStateRetainsDurableSummaryFallback(t *testing.T) {
+	first := int32(200)
+	avg := int32(300)
+	state := restoreConversationState(nil, 2, 1, &first, &avg)
+	summary := state.summary()
+	if summary.TurnCount != 2 || summary.InterruptionCount != 1 {
+		t.Fatalf("restored counts = %+v", summary)
+	}
+	if summary.FirstResponseLatencyMS == nil || *summary.FirstResponseLatencyMS != first {
+		t.Fatalf("restored first latency = %v", summary.FirstResponseLatencyMS)
+	}
+	if summary.AverageTurnLatencyMS == nil || *summary.AverageTurnLatencyMS != avg {
+		t.Fatalf("restored avg latency = %v", summary.AverageTurnLatencyMS)
 	}
 }

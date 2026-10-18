@@ -12,6 +12,10 @@ http://turn.{$DOMAIN} {
 }
 
 api.{$DOMAIN} {
+    # Prometheus scrapes the private server directly; do not proxy metrics.
+    @privateMetrics path /metrics
+    respond @privateMetrics 404
+
     reverse_proxy server:8080
 
     header {
