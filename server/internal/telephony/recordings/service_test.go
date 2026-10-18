@@ -53,15 +53,17 @@ func TestServicePlaybackReturnsSignedURL(t *testing.T) {
 		t.Fatalf("recordingObjectKey() error = %v", err)
 	}
 	provider, bucket := "s3", "recordings"
+	integrationID := uuid.New()
 	repo := &fakeServiceRepository{recording: sqlc.Recording{
 		ID:              recordingID,
 		OrganizationID:  organizationID,
 		Status:          string(StatusCompleted),
 		StorageKey:      &key,
+		StorageIntegrationID: &integrationID,
 		StorageProvider: &provider,
 		StorageBucket:   &bucket,
 	}}
-	service := NewService(repo, NewObjectStorage(&fakeObjectStore{}))
+	service := NewService(repo, newTestStorageForRecording(&fakeObjectStore{}, repo.recording))
 	result, err := service.Playback(context.Background(), organizationID, recordingID)
 	if err != nil {
 		t.Fatalf("Playback() error = %v", err)
@@ -83,16 +85,18 @@ func TestServiceDeleteRemovesObjectBeforeRow(t *testing.T) {
 		t.Fatalf("recordingObjectKey() error = %v", err)
 	}
 	provider, bucket := "s3", "recordings"
+	integrationID := uuid.New()
 	repo := &fakeServiceRepository{recording: sqlc.Recording{
 		ID:              recordingID,
 		OrganizationID:  organizationID,
 		Status:          string(StatusCompleted),
 		StorageKey:      &key,
+		StorageIntegrationID: &integrationID,
 		StorageProvider: &provider,
 		StorageBucket:   &bucket,
 	}}
 	objects := &fakeObjectStore{}
-	service := NewService(repo, NewObjectStorage(objects))
+	service := NewService(repo, newTestStorageForRecording(objects, repo.recording))
 	if err := service.Delete(context.Background(), organizationID, recordingID); err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
@@ -104,7 +108,7 @@ func TestServiceDeleteRemovesObjectBeforeRow(t *testing.T) {
 func TestServiceRejectsDeleteDuringUpload(t *testing.T) {
 	organizationID, recordingID := uuid.New(), uuid.New()
 	repo := &fakeServiceRepository{recording: sqlc.Recording{ID: recordingID, OrganizationID: organizationID, Status: string(StatusUploading)}}
-	service := NewService(repo, NewObjectStorage(&fakeObjectStore{}))
+	service := NewService(repo, newTestStorageForRecording(&fakeObjectStore{}, repo.recording))
 	if err := service.Delete(context.Background(), organizationID, recordingID); err == nil {
 		t.Fatal("expected upload conflict")
 	}

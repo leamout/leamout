@@ -3,6 +3,7 @@ package recordings
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,8 +11,27 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
+
+func newTestStorageForRecording(store *fakeObjectStore, recording sqlc.Recording) *ObjectStorage {
+	storage, _ := newTestBYOSStorage(store, recording.OrganizationID)
+	if recording.StorageIntegrationID != nil {
+		id := *recording.StorageIntegrationID
+		storage.resolveByID = func(_ context.Context, orgID, requestedID uuid.UUID) (platformstorage.ResolvedIntegration, error) {
+			if orgID != recording.OrganizationID || requestedID != id {
+				return platformstorage.ResolvedIntegration{}, fmt.Errorf("invalid integration")
+			}
+			return platformstorage.ResolvedIntegration{Integration: platformstorage.Integration{
+				ID: id,
+				OrganizationID: orgID,
+				Bucket: store.Bucket(),
+			}}, nil
+		}
+	}
+	return storage
+}
 
 type fakeIngestionRepository struct {
 	items                              []sqlc.Recording
@@ -99,7 +119,7 @@ func TestIngestionUploadsAndRemovesStagedFile(t *testing.T) {
 	object := &fakeObjectStore{}
 	job, err := NewIngestionJob(
 		repo,
-		NewObjectStorage(object),
+		newTestStorageForRecording(object, recording),
 		DefaultIngestionConfig(root),
 	)
 	if err != nil {
@@ -140,12 +160,14 @@ func TestIngestionReusesPinnedStorageKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	provider, bucket := "s3", "recordings"
+	integrationID := uuid.New()
 	recording := sqlc.Recording{
 		ID:              recordingID,
 		OrganizationID:  organizationID,
 		SourcePath:      &path,
 		Status:          "uploading",
 		StorageKey:      &key,
+		StorageIntegrationID: &integrationID,
 		StorageProvider: &provider,
 		StorageBucket:   &bucket,
 	}
@@ -153,7 +175,7 @@ func TestIngestionReusesPinnedStorageKey(t *testing.T) {
 	object := &fakeObjectStore{}
 	job, err := NewIngestionJob(
 		repo,
-		NewObjectStorage(object),
+		newTestStorageForRecording(object, recording),
 		DefaultIngestionConfig(root),
 	)
 	if err != nil {
@@ -187,7 +209,7 @@ func TestIngestionRetriesThenFails(t *testing.T) {
 	config.MaxAttempts = 2
 	job, err := NewIngestionJob(
 		repo,
-		NewObjectStorage(&fakeObjectStore{}),
+		newTestStorageForRecording(&fakeObjectStore{}, recording),
 		config,
 	)
 	if err != nil {
@@ -220,7 +242,7 @@ func TestIngestionRejectsPathOutsideStaging(t *testing.T) {
 	repo := &fakeIngestionRepository{items: []sqlc.Recording{recording}}
 	job, err := NewIngestionJob(
 		repo,
-		NewObjectStorage(&fakeObjectStore{}),
+		newTestStorageForRecording(&fakeObjectStore{}, recording),
 		DefaultIngestionConfig(root),
 	)
 	if err != nil {
