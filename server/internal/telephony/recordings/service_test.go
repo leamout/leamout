@@ -55,13 +55,13 @@ func TestServicePlaybackReturnsSignedURL(t *testing.T) {
 	provider, bucket := "s3", "recordings"
 	integrationID := uuid.New()
 	repo := &fakeServiceRepository{recording: sqlc.Recording{
-		ID:              recordingID,
-		OrganizationID:  organizationID,
-		Status:          string(StatusCompleted),
-		StorageKey:      &key,
+		ID:                   recordingID,
+		OrganizationID:       organizationID,
+		Status:               string(StatusCompleted),
+		StorageKey:           &key,
 		StorageIntegrationID: &integrationID,
-		StorageProvider: &provider,
-		StorageBucket:   &bucket,
+		StorageProvider:      &provider,
+		StorageBucket:        &bucket,
 	}}
 	service := NewService(repo, newTestStorageForRecording(&fakeObjectStore{}, repo.recording))
 	result, err := service.Playback(context.Background(), organizationID, recordingID)
@@ -87,13 +87,13 @@ func TestServiceDeleteRemovesObjectBeforeRow(t *testing.T) {
 	provider, bucket := "s3", "recordings"
 	integrationID := uuid.New()
 	repo := &fakeServiceRepository{recording: sqlc.Recording{
-		ID:              recordingID,
-		OrganizationID:  organizationID,
-		Status:          string(StatusCompleted),
-		StorageKey:      &key,
+		ID:                   recordingID,
+		OrganizationID:       organizationID,
+		Status:               string(StatusCompleted),
+		StorageKey:           &key,
 		StorageIntegrationID: &integrationID,
-		StorageProvider: &provider,
-		StorageBucket:   &bucket,
+		StorageProvider:      &provider,
+		StorageBucket:        &bucket,
 	}}
 	objects := &fakeObjectStore{}
 	service := NewService(repo, newTestStorageForRecording(objects, repo.recording))

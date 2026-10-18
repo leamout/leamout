@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 )
 
 func newTestStorageForRecording(store *fakeObjectStore, recording sqlc.Recording) *ObjectStorage {
@@ -24,9 +24,9 @@ func newTestStorageForRecording(store *fakeObjectStore, recording sqlc.Recording
 				return platformstorage.ResolvedIntegration{}, fmt.Errorf("invalid integration")
 			}
 			return platformstorage.ResolvedIntegration{Integration: platformstorage.Integration{
-				ID: id,
+				ID:             id,
 				OrganizationID: orgID,
-				Bucket: store.Bucket(),
+				Bucket:         store.Bucket(),
 			}}, nil
 		}
 	}
@@ -162,14 +162,14 @@ func TestIngestionReusesPinnedStorageKey(t *testing.T) {
 	provider, bucket := "s3", "recordings"
 	integrationID := uuid.New()
 	recording := sqlc.Recording{
-		ID:              recordingID,
-		OrganizationID:  organizationID,
-		SourcePath:      &path,
-		Status:          "uploading",
-		StorageKey:      &key,
+		ID:                   recordingID,
+		OrganizationID:       organizationID,
+		SourcePath:           &path,
+		Status:               "uploading",
+		StorageKey:           &key,
 		StorageIntegrationID: &integrationID,
-		StorageProvider: &provider,
-		StorageBucket:   &bucket,
+		StorageProvider:      &provider,
+		StorageBucket:        &bucket,
 	}
 	repo := &fakeIngestionRepository{items: []sqlc.Recording{recording}}
 	object := &fakeObjectStore{}

@@ -3,8 +3,8 @@ package recordings
 import (
 	"context"
 	"fmt"
-	"strings"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,12 +37,12 @@ func newTestBYOSStorage(store *fakeObjectStore, organizationID uuid.UUID) (*Obje
 	integrationID := uuid.New()
 	resolved := platformstorage.ResolvedIntegration{
 		Integration: platformstorage.Integration{
-			ID: integrationID,
+			ID:             integrationID,
 			OrganizationID: organizationID,
-			Provider: platformstorage.ProviderS3,
-			Purpose: platformstorage.PurposeRecordings,
-			Bucket: store.Bucket(),
-			Status: platformstorage.StatusActive,
+			Provider:       platformstorage.ProviderS3,
+			Purpose:        platformstorage.PurposeRecordings,
+			Bucket:         store.Bucket(),
+			Status:         platformstorage.StatusActive,
 		},
 	}
 	return &ObjectStorage{
@@ -71,11 +71,11 @@ func TestObjectStoragePlaybackAndDelete(t *testing.T) {
 	key := "organizations/" + organizationID.String() + "/recordings/2026/10/02/id.wav"
 	provider, bucket := "s3", "recordings"
 	recording := sqlc.Recording{
-		OrganizationID:  organizationID,
+		OrganizationID:       organizationID,
 		StorageIntegrationID: &integrationID,
-		StorageKey:      &key,
-		StorageProvider: &provider,
-		StorageBucket:   &bucket,
+		StorageKey:           &key,
+		StorageProvider:      &provider,
+		StorageBucket:        &bucket,
 	}
 	url, expires, err := storage.PlaybackURL(context.Background(), recording)
 	if err != nil {
@@ -98,10 +98,10 @@ func TestObjectStorageRejectsLegacyManagedRecording(t *testing.T) {
 	key := "organizations/" + organizationID.String() + "/recordings/old.wav"
 	provider, bucket := "s3", "recordings"
 	recording := sqlc.Recording{
-		OrganizationID: organizationID,
-		StorageKey: &key,
+		OrganizationID:  organizationID,
+		StorageKey:      &key,
 		StorageProvider: &provider,
-		StorageBucket: &bucket,
+		StorageBucket:   &bucket,
 	}
 	if _, _, err := storage.PlaybackURL(context.Background(), recording); err == nil {
 		t.Fatal("legacy managed recording was allowed to use BYOS")

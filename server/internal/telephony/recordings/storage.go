@@ -116,7 +116,7 @@ func (s *ObjectStorage) clientForRecording(
 ) (ObjectStore, *uuid.UUID, error) {
 	var (
 		resolved platformstorage.ResolvedIntegration
-		err error
+		err      error
 	)
 	if recording.StorageIntegrationID != nil {
 		if s.resolveByID != nil {
@@ -173,11 +173,11 @@ func (s *ObjectStorage) clientForRecording(
 
 func customClient(ctx context.Context, resolved platformstorage.ResolvedIntegration) (ObjectStore, error) {
 	client, err := s3integration.New(ctx, s3integration.Config{
-		Endpoint: resolved.EndpointURL,
-		Region: resolved.Region,
-		Bucket: resolved.Bucket,
-		AccessKey: resolved.AccessKeyID,
-		SecretKey: resolved.SecretAccessKey,
+		Endpoint:     resolved.EndpointURL,
+		Region:       resolved.Region,
+		Bucket:       resolved.Bucket,
+		AccessKey:    resolved.AccessKeyID,
+		SecretKey:    resolved.SecretAccessKey,
 		UsePathStyle: resolved.UsePathStyle,
 	})
 	if err != nil {
