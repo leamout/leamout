@@ -3,7 +3,6 @@ package session_test
 import (
 	"context"
 	"testing"
-
 )
 
 func TestManagerPreservesPendingToolEventsAcrossControlDetach(t *testing.T) {

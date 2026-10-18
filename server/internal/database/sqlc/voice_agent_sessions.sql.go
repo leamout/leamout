@@ -334,20 +334,19 @@ func (q *Queries) ListActiveVoiceAgentSessionsForRecovery(ctx context.Context) (
 		return nil, err
 	}
 	defer rows.Close()
-
 	items := []ListActiveVoiceAgentSessionsForRecoveryRow{}
 	for rows.Next() {
-		var item ListActiveVoiceAgentSessionsForRecoveryRow
+		var i ListActiveVoiceAgentSessionsForRecoveryRow
 		if err := rows.Scan(
-			&item.SessionID,
-			&item.OrganizationID,
-			&item.CallID,
-			&item.VoiceAgentID,
-			&item.State,
+			&i.SessionID,
+			&i.OrganizationID,
+			&i.CallID,
+			&i.VoiceAgentID,
+			&i.State,
 		); err != nil {
 			return nil, err
 		}
-		items = append(items, item)
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
