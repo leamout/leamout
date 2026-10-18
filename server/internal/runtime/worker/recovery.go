@@ -93,11 +93,27 @@ LIMIT 500
 	for _, channel := range channels {
 		live[channel.UUID] = true
 	}
+	// Scan each channel once, not once per durable session. The FreeSWITCH
+	// session variable is authoritative for the existing audio fork.
+	attached := make(map[uuid.UUID]string, len(live))
+	for channelID := range live {
+		marked, err := j.freeSwitch.GetVariable(ctx, channelID, "leamout_voice_agent_session_id")
+		if err != nil {
+			continue
+		}
+		if sessionID, err := uuid.Parse(strings.TrimSpace(marked)); err == nil {
+			attached[sessionID] = channelID
+		}
+	}
 	for _, candidate := range candidates {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := j.recoverCandidate(ctx, candidate, live); err != nil {
+		channelID := attached[candidate.sessionID]
+		if channelID == "" {
+			continue
+		}
+		if err := j.recoverCandidate(ctx, candidate, channelID); err != nil {
 			if j.logger != nil {
 				j.logger.Warn(ctx, "retry active Voice Agent control recovery",
 					"session_id", candidate.sessionID,
@@ -114,18 +130,8 @@ LIMIT 500
 func (j *sessionRecoveryJob) recoverCandidate(
 	ctx context.Context,
 	candidate activeRecoveryCandidate,
-	live map[string]bool,
+	channelID string,
 ) error {
-	// The audio fork channel is authenticated by a durable session identifier
-	// persisted to FreeSWITCH at initial attachment.
-	for channelID := range live {
-		marked, err := j.freeSwitch.GetVariable(ctx, channelID, "leamout_voice_agent_session_id")
-		if err != nil {
-			continue
-		}
-		if strings.TrimSpace(marked) != candidate.sessionID.String() {
-			continue
-		}
 		record, err := j.queries.GetVoiceAgentSessionByID(ctx, sqlc.GetVoiceAgentSessionByIDParams{
 			ID: candidate.sessionID, OrganizationID: candidate.organizationID,
 		})
@@ -147,9 +153,7 @@ func (j *sessionRecoveryJob) recoverCandidate(
 			ID: candidate.callID, OrganizationID: candidate.organizationID,
 			VoiceAgentID: &agentID, State: candidate.state,
 		}
-		return j.runtime.RecoverSession(ctx, record, call, channelID, turns)
-	}
-	return nil
+	return j.runtime.RecoverSession(ctx, record, call, channelID, turns)
 }
 
 func (j *sessionRecoveryJob) Run(ctx context.Context) error {
