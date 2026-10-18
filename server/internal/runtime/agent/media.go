@@ -96,6 +96,52 @@ func (c *mediaClient) CreateSessionAt(
 	return mediaSessionEndpoints{AudioURL: audioURL, ControlURL: controlURL}, nil
 }
 
+// GetSessionAt inspects the existing media stream without recreating it.
+func (c *mediaClient) GetSessionAt(ctx context.Context, baseURL string, id uuid.UUID) (session.Status, error) {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if id == uuid.Nil {
+		return session.Status{}, fmt.Errorf("media session id is required")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/internal/v1/sessions/"+id.String(), nil)
+	if err != nil {
+		return session.Status{}, fmt.Errorf("create media status request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return session.Status{}, fmt.Errorf("get media session status: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, maxMediaControlResponse))
+		return session.Status{}, fmt.Errorf("get media session status: HTTP %d", resp.StatusCode)
+	}
+	var status session.Status
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxMediaControlResponse)).Decode(&status); err != nil {
+		return session.Status{}, fmt.Errorf("decode media session status: %w", err)
+	}
+	return status, nil
+}
+
+func controlURLForSession(baseURL string, id uuid.UUID) (string, error) {
+	parsed, err := url.Parse(strings.TrimRight(strings.TrimSpace(baseURL), "/"))
+	if err != nil || parsed.Host == "" || parsed.User != nil {
+		return "", fmt.Errorf("invalid media control URL")
+	}
+	switch parsed.Scheme {
+	case "http":
+		parsed.Scheme = "ws"
+	case "https":
+		parsed.Scheme = "wss"
+	default:
+		return "", fmt.Errorf("invalid media control URL scheme")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/internal/v1/sessions/" + id.String() + "/control"
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
 func (c *mediaClient) StopSession(ctx context.Context, id uuid.UUID) error {
 	return c.StopSessionAt(ctx, c.baseURL, id)
 }
