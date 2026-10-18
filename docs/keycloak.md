@@ -4,14 +4,14 @@ Leamout Cloud uses one Keycloak realm for user authentication. Keycloak owns cre
 
 ## Deployment
 
-1. Point `auth.leamout.com` at the Caddy edge. Set `DOMAIN=leamout.com` in the application environment. If using another domain, update `KC_HOSTNAME` in Compose and `KEYCLOAK_ISSUER` together.
+1. Point `auth.leamout.com` at the Caddy edge. Set `DOMAIN=leamout.com` in both the root Compose `.env` and `server/.env`. Compose derives `KC_HOSTNAME=https://auth.<DOMAIN>`; update `KEYCLOAK_ISSUER` for other domains.
 2. Set the Keycloak database and bootstrap administrator passwords in root `.env`. Set `KEYCLOAK_CLIENT_SECRET` to a generated secret in `server/.env`.
-3. Set `FRONTEND_URL` to the console's exact public origin and `BACKEND_URL` to the API's public origin. The API must be able to reach the public Keycloak issuer. Keycloak must be able to reach the backchannel logout URL.
+3. Set `FRONTEND_URL=https://console.leamout.com`, `BACKEND_URL=https://api.leamout.com`, and `CORS_ORIGINS=https://console.leamout.com` for the hosted domain (or substitute your domain). The API must be able to reach the public Keycloak issuer. Keycloak must be able to reach the backchannel logout URL.
 4. Start the cloud Compose stack. It includes a dedicated Keycloak PostgreSQL database, Keycloak, and an `auth` reverse proxy route. Keycloak imports `deploy/keycloak/leamout-realm.json` only when the realm does not already exist.
 5. Configure the realm's SMTP settings, using SES SMTP credentials if desired. SES SMTP credentials are separate from the API credentials used by Leamout's invitation worker. Email verification is required, so registration cannot complete until SMTP works.
 6. Replace the bootstrap administrator with an operational administrator and remove bootstrap credentials from the deployment. Back up the Keycloak database separately from Leamout.
 
-The imported client is confidential, uses Authorization Code + S256 PKCE, and disables direct password grants, implicit grants, and service accounts. It registers exactly:
+The imported client is confidential, uses Authorization Code + S256 PKCE, and disables direct password grants, implicit grants, and service accounts. Keycloak resolves the client secret and origin placeholders from its environment during the initial realm import. Changes to environment variables alone do not update an already-imported realm. It registers exactly:
 
 - Callback: `<FRONTEND_URL>/api/v1/auth/callback`
 - Post-logout return: `<FRONTEND_URL>/log-in`

@@ -28,7 +28,7 @@ services:
       KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
-      KC_HOSTNAME: https://auth.leamout.com
+      KC_HOSTNAME: https://auth.${DOMAIN:-leamout.com}
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: xforwarded
       KC_PROXY_TRUSTED_ADDRESSES: 172.32.0.0/24
@@ -139,6 +139,12 @@ services:
       target: runtime
     restart: unless-stopped
     command: ["/leamout/worker"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 60s
     env_file:
       - ${APP_ENV_FILE:-../../server/.env}
     depends_on:
