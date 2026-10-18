@@ -112,7 +112,18 @@ func (j *sessionRecoveryJob) recoverCandidate(
 		VoiceAgentID:   &agentID,
 		State:          candidate.State,
 	}
-	return j.runtime.RecoverSession(ctx, record, call, channelID, turns)
+	if err := j.runtime.RecoverSession(ctx, record, call, channelID, turns); err != nil {
+		return err
+	}
+	if j.logger != nil {
+		j.logger.Info(
+			ctx,
+			"Voice Agent control recovered",
+			"session_id", candidate.SessionID,
+			"call_id", candidate.CallID,
+		)
+	}
+	return nil
 }
 
 func (j *sessionRecoveryJob) Run(ctx context.Context) error {

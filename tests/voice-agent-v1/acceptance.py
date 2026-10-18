@@ -690,18 +690,13 @@ def verify_worker_restart_recovery():
 
     wait_for("live call survives worker restart", recovered, timeout=45, interval=1)
 
-    # Exercise an actual control action through the freshly started worker.
-    # A no-op readiness signal is insufficient evidence of recovery.
+    # Confirm the newly started worker has reattached the original session.
+    # Liveness and fork continuity alone would not prove control recovery.
     def restored_control():
         output = compose("logs", "--no-color", "--since=90s", "worker")
-        return (
-            "media control already attached" not in output.lower()
-            and "worker started" in output.lower()
-        )
+        return "Voice Agent control recovered" in output
 
-    # Control reattachment is also checked through the authenticated Media API
-    # in the companion operation gate.
-    wait_for("restarted worker running", restored_control, timeout=30, interval=1)
+    wait_for("worker recovered Voice Agent control", restored_control, timeout=45, interval=1)
 
 
 def hangup_and_verify_completion():

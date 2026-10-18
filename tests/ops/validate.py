@@ -46,7 +46,7 @@ def main():
     assert "172.32.0.0/24" in compose
 
     caddy = (ROOT / "deploy/Caddyfile").read_text(encoding="utf-8")
-    assert re.search(r"@privateMetrics\\s+path /metrics", caddy)
+    assert re.search(r"@privateMetrics\s+path /metrics", caddy)
     assert "respond @privateMetrics 404" in caddy
     assert "reverse_proxy server:8080" in caddy
 
