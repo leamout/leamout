@@ -238,27 +238,19 @@ func (r *Runtime) executeRealtimeTool(
 		ToolCallID: toolCall.ID,
 		Name:       toolCall.Name,
 	}
-	tool, err := r.orchestrator.ResolveToolByName(
-		ctx,
-		call.OrganizationID,
-		*call.VoiceAgentID,
-		toolCall.Name,
-	)
+	// Match the name the model saw in this session's durable snapshot.
+	execution, err := r.orchestrator.ExecuteTool(ctx, tools.ExecuteRequest{
+		OrganizationID: call.OrganizationID,
+		VoiceAgentID:   *call.VoiceAgentID,
+		SessionID:      sessionID,
+		CallID:         call.ID,
+		ToolName:       toolCall.Name,
+		ToolCallID:     toolCall.ID,
+		Arguments:      toolCall.Arguments,
+	})
 	if err == nil {
-		var execution tools.ExecuteResult
-		execution, err = r.orchestrator.ExecuteTool(ctx, tools.ExecuteRequest{
-			OrganizationID: call.OrganizationID,
-			VoiceAgentID:   *call.VoiceAgentID,
-			SessionID:      sessionID,
-			CallID:         call.ID,
-			ToolID:         tool.ID,
-			ToolCallID:     toolCall.ID,
-			Arguments:      toolCall.Arguments,
-		})
-		if err == nil {
-			result.Name = execution.Name
-			result.Content = string(execution.Body)
-		}
+		result.Name = execution.Name
+		result.Content = string(execution.Body)
 	}
 	if err != nil {
 		result.IsError = true

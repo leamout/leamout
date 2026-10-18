@@ -33,6 +33,7 @@ type ExecuteRequest struct {
 	SessionID      uuid.UUID
 	CallID         uuid.UUID
 	ToolID         uuid.UUID
+	ToolName       string
 	ToolCallID     string
 	Arguments      json.RawMessage
 }
@@ -110,8 +111,8 @@ func (e *Executor) Execute(ctx context.Context, req ExecuteRequest) (ExecuteResu
 			"organization_id, voice_agent_id, session_id, and call_id are required",
 		)
 	}
-	if req.ToolID == uuid.Nil {
-		return ExecuteResult{}, apperror.NewBadRequest("tool id is required")
+	if req.ToolID == uuid.Nil && strings.TrimSpace(req.ToolName) == "" {
+		return ExecuteResult{}, apperror.NewBadRequest("tool id or name is required")
 	}
 	req.ToolCallID = strings.TrimSpace(req.ToolCallID)
 	if req.ToolCallID == "" || len(req.ToolCallID) > 255 {
@@ -123,12 +124,35 @@ func (e *Executor) Execute(ctx context.Context, req ExecuteRequest) (ExecuteResu
 		return ExecuteResult{}, err
 	}
 
-	tool, err := e.service.Get(ctx, req.OrganizationID, req.VoiceAgentID, req.ToolID)
+	// Authorize using the durable call snapshot, not the mutable tool catalog.
+	stored, err := e.service.repo.queries.GetVoiceAgentSessionByID(ctx, sqlc.GetVoiceAgentSessionByIDParams{
+		ID:             req.SessionID,
+		OrganizationID: req.OrganizationID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ExecuteResult{}, apperror.NewForbidden("voice agent session is unavailable")
+	}
+	if err != nil {
+		return ExecuteResult{}, apperror.NewInternal("read voice agent tool snapshot", err)
+	}
+	if err := validateExecutionSession(stored, req); err != nil {
+		return ExecuteResult{}, err
+	}
+	frozen, err := resolveSessionTool(stored.ConfigurationSnapshot, req.ToolID, req.ToolName)
 	if err != nil {
 		return ExecuteResult{}, err
 	}
-	if !tool.Enabled {
-		return ExecuteResult{}, apperror.NewForbidden("voice agent tool is disabled")
+	req.ToolID = frozen.ID
+
+	// The current row is only a revocation gate. Tool edits must not change
+	// the name, endpoint, arguments schema, type, or timeout of this call.
+	current, err := e.service.Get(ctx, req.OrganizationID, req.VoiceAgentID, frozen.ID)
+	if err != nil {
+		return ExecuteResult{}, apperror.NewForbidden("voice agent tool has been revoked")
+	}
+	tool, err := bindExecutionTool(current, frozen)
+	if err != nil {
+		return ExecuteResult{}, err
 	}
 
 	executionID, err := e.service.repo.ClaimExecution(ctx, req)
