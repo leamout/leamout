@@ -197,7 +197,6 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		queries: queries,
 	}
 	sessionRecovery := &sessionRecoveryJob{
-		pool:       postgresClient.Pool(),
 		queries:    queries,
 		freeSwitch: freeSwitch,
 		runtime:    agentRuntime,

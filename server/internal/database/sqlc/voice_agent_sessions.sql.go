@@ -297,6 +297,64 @@ func (q *Queries) GetVoiceAgentSessionByID(ctx context.Context, arg GetVoiceAgen
 	return i, err
 }
 
+const listActiveVoiceAgentSessionsForRecovery = `-- name: ListActiveVoiceAgentSessionsForRecovery :many
+SELECT
+    session.id AS session_id,
+    session.organization_id,
+    session.call_id,
+    session.voice_agent_id,
+    calls.state
+FROM voice_agent_sessions AS session
+JOIN calls
+  ON calls.id = session.call_id
+ AND calls.organization_id = session.organization_id
+JOIN organizations AS organization
+  ON organization.id = session.organization_id
+WHERE session.state = 'active'
+  AND calls.state IN ('answered', 'active')
+  AND calls.ended_at IS NULL
+  AND session.media_started_at IS NOT NULL
+  AND organization.status = 'active'
+  AND organization.deleted_at IS NULL
+ORDER BY session.started_at ASC
+LIMIT 500
+`
+
+type ListActiveVoiceAgentSessionsForRecoveryRow struct {
+	SessionID      uuid.UUID `db:"session_id" json:"session_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+	CallID         uuid.UUID `db:"call_id" json:"call_id"`
+	VoiceAgentID   uuid.UUID `db:"voice_agent_id" json:"voice_agent_id"`
+	State          string    `db:"state" json:"state"`
+}
+
+func (q *Queries) ListActiveVoiceAgentSessionsForRecovery(ctx context.Context) ([]ListActiveVoiceAgentSessionsForRecoveryRow, error) {
+	rows, err := q.db.Query(ctx, listActiveVoiceAgentSessionsForRecovery)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []ListActiveVoiceAgentSessionsForRecoveryRow{}
+	for rows.Next() {
+		var item ListActiveVoiceAgentSessionsForRecoveryRow
+		if err := rows.Scan(
+			&item.SessionID,
+			&item.OrganizationID,
+			&item.CallID,
+			&item.VoiceAgentID,
+			&item.State,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markVoiceAgentMediaStarted = `-- name: MarkVoiceAgentMediaStarted :one
 UPDATE voice_agent_sessions AS session
 SET media_started_at = COALESCE(session.media_started_at, GREATEST(session.started_at, NOW())),

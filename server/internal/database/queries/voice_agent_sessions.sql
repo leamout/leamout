@@ -157,3 +157,26 @@ WHERE session.organization_id = sqlc.arg(organization_id)
   AND session.media_started_at < sqlc.arg(period_end)::timestamptz
   AND (session.media_ended_at IS NULL
        OR session.media_ended_at > sqlc.arg(period_start)::timestamptz);
+
+-- name: ListActiveVoiceAgentSessionsForRecovery :many
+SELECT
+    session.id AS session_id,
+    session.organization_id,
+    session.call_id,
+    session.voice_agent_id,
+    calls.state
+FROM voice_agent_sessions AS session
+JOIN calls
+  ON calls.id = session.call_id
+ AND calls.organization_id = session.organization_id
+JOIN organizations AS organization
+  ON organization.id = session.organization_id
+WHERE session.state = 'active'
+  AND calls.state IN ('answered', 'active')
+  AND calls.ended_at IS NULL
+  AND session.media_started_at IS NOT NULL
+  AND organization.status = 'active'
+  AND organization.deleted_at IS NULL
+ORDER BY session.started_at ASC
+LIMIT 500;
+
