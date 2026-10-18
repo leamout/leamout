@@ -32,6 +32,7 @@ jobs:
       - name: Validate Caddyfile
         run: |
           docker run --rm \
+            --env-file .env.example \
             -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy adapt \
             --config /etc/caddy/Caddyfile --adapter caddyfile --validate
