@@ -132,27 +132,27 @@ func (j *sessionRecoveryJob) recoverCandidate(
 	candidate activeRecoveryCandidate,
 	channelID string,
 ) error {
-		record, err := j.queries.GetVoiceAgentSessionByID(ctx, sqlc.GetVoiceAgentSessionByIDParams{
-			ID: candidate.sessionID, OrganizationID: candidate.organizationID,
-		})
-		if err != nil {
-			return err
-		}
-		persisted, err := j.queries.ListVoiceAgentTurnsBySessionID(ctx, sqlc.ListVoiceAgentTurnsBySessionIDParams{
-			OrganizationID: candidate.organizationID, SessionID: candidate.sessionID,
-		})
-		if err != nil {
-			return err
-		}
-		turns := make([]conversations.TurnRecovery, 0, len(persisted))
-		for _, turn := range persisted {
-			turns = append(turns, conversations.TurnRecovery{Sequence: turn.Sequence})
-		}
-		agentID := candidate.voiceAgentID
-		call := sqlc.Call{
-			ID: candidate.callID, OrganizationID: candidate.organizationID,
-			VoiceAgentID: &agentID, State: candidate.state,
-		}
+	record, err := j.queries.GetVoiceAgentSessionByID(ctx, sqlc.GetVoiceAgentSessionByIDParams{
+		ID: candidate.sessionID, OrganizationID: candidate.organizationID,
+	})
+	if err != nil {
+		return err
+	}
+	persisted, err := j.queries.ListVoiceAgentTurnsBySessionID(ctx, sqlc.ListVoiceAgentTurnsBySessionIDParams{
+		OrganizationID: candidate.organizationID, SessionID: candidate.sessionID,
+	})
+	if err != nil {
+		return err
+	}
+	turns := make([]conversations.TurnRecovery, 0, len(persisted))
+	for _, turn := range persisted {
+		turns = append(turns, conversations.TurnRecovery{Sequence: turn.Sequence})
+	}
+	agentID := candidate.voiceAgentID
+	call := sqlc.Call{
+		ID: candidate.callID, OrganizationID: candidate.organizationID,
+		VoiceAgentID: &agentID, State: candidate.state,
+	}
 	return j.runtime.RecoverSession(ctx, record, call, channelID, turns)
 }
 
