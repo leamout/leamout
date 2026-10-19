@@ -69,4 +69,5 @@ jobs:
         run: |
           go mod edit -replace github.com/leamout/contracts=../contracts
           go mod edit -replace github.com/leamout/ai-providers=../ai-providers
+          go mod tidy
           go run ./cmd/validate

@@ -88,8 +88,8 @@ github.com/klauspost/compress v1.20.3 h1:zWNoFqq/lSuYQRim3dUXlXeA0IqwuZGicdG5ZTf
 github.com/klauspost/compress v1.20.3/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/klauspost/cpuid/v2 v2.4.0 h1:S6Hrbc7+ywsr0r+RLapfGBHfyefhCTwEh3A0tV913Dw=
 github.com/klauspost/cpuid/v2 v2.4.0/go.mod h1:19jmZ9mjzoF//ddRSUsv0zfBTJWh3QJh9FNxZTMrGxU=
-github.com/leamout/ai-providers v0.1.0 h1:RaNAF9ib1if8bhJNlISTOjswhlTCMO7FA7aXhreoWUY=
-github.com/leamout/ai-providers v0.1.0/go.mod h1:EQmDruaIOaBZ//z8Njiy4AxPShQ/Egr2EJOoT9E4WoU=
+github.com/leamout/ai-providers v0.1.1 h1:AylyRJ6tbvcMjXvgGXy8mIpKeisBf5qrhY3MZ5m9VYk=
+github.com/leamout/ai-providers v0.1.1/go.mod h1:jPwLHrWri2apNKYJzob0d0XhYA2b8u7MzJNDYc+2KfM=
 github.com/leamout/contracts v0.1.0 h1:BbHY3VFUu9GDl0vHf/zFWdOn1CCTopjXosYlZXrvVSQ=
 github.com/leamout/contracts v0.1.0/go.mod h1:UMu3d57bCEkimVHB17CD6M6CbXPK9oKzhwxBkT0t+aI=
 github.com/nats-io/nats.go v1.54.0 h1:vsXoOxjHp/GmPUN+EcI7uOf/uB+iAP+kEsAFNQN0yzA=
