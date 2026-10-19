@@ -230,10 +230,10 @@ func (r *Repository) CompleteUpload(
 		EventRecordingCompleted,
 		func(repo *Repository) (sqlc.Recording, error) {
 			return repo.queries.CompleteRecording(ctx, sqlc.CompleteRecordingParams{
-				FileSizeBytes:   &size,
-				Format:          &format,
-				OrganizationID:  recording.OrganizationID,
-				ID:              recording.ID,
+				FileSizeBytes:  &size,
+				Format:         &format,
+				OrganizationID: recording.OrganizationID,
+				ID:             recording.ID,
 			})
 		},
 	)
