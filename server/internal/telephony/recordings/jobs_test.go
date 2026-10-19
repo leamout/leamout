@@ -96,4 +96,3 @@ func TestDefaultIngestionConfigUsesBoundedRetries(t *testing.T) {
 		t.Fatalf("maximum retry interval too long: %s", config.MaxRetry)
 	}
 }
-
