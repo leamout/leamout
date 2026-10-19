@@ -21,7 +21,6 @@ COMPOSE = [
     "docker", "compose",
     "-f", "deploy/compose/docker.yaml",
     "-f", "tests/voice-agent-v1/compose.yaml",
-    "-f", "tests/acceptance-minio.yaml",
     "-f", "tests/acceptance-identity.yaml",
 ]
 STATE = {}
