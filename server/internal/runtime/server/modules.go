@@ -2,7 +2,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/leamout/leamout/server/internal/ai"
 	"github.com/leamout/leamout/server/internal/commercial"
@@ -26,6 +30,7 @@ import (
 	"github.com/leamout/leamout/server/internal/telephony"
 	"github.com/leamout/leamout/server/internal/telephony/recordings"
 	"github.com/leamout/leamout/server/internal/telephony/webrtc"
+	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/internal/tenancy"
 )
 
@@ -168,6 +173,20 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	)
 	telephonyModule.Calls.Service.SetRuntimeAllowanceCheck(
 		commercialModule.Limits.Service.RequireRuntimeAllowance,
+	)
+	telephonyModule.Calls.Service.SetRecordingStorageCheck(
+		func(ctx context.Context, organizationID uuid.UUID) error {
+			_, err := platformModule.Storage.Service.ResolveRecording(ctx, organizationID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return apperror.NewConflict(
+					"configure customer-owned S3-compatible storage before recording",
+				)
+			}
+			if err != nil {
+				return apperror.NewServiceUnavailable("recording storage is unavailable", err)
+			}
+			return nil
+		},
 	)
 	telephonyModule.Trunks.Service.SetPlanTrunkLimit(
 		commercialModule.Limits.Service.MaxSIPTrunks,

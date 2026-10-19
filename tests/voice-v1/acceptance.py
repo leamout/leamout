@@ -506,43 +506,23 @@ def play_audio():
 def record_audio():
     call_id = STATE["call_id"]
     path = "/var/lib/freeswitch/recordings/voice-v1-acceptance.wav"
-    api(
+
+    # This disposable Voice v1 stack has no customer-owned S3 credentials.
+    # BYOS-only Cloud must refuse to start recording rather than silently
+    # staging data that can never be uploaded to a customer bucket.
+    _, response = api(
         "POST",
         f"/v1/calls/{call_id}/record",
         {"action": "start", "path": path},
-        expected={200},
+        expected={409},
     )
-
-    def started():
-        return next(
-            (
-                item
-                for item in list_recordings()
-                if item["call_id"] == call_id and item["status"] == "recording"
-            ),
-            False,
+    if "S3-compatible storage" not in str(response):
+        raise AcceptanceError(
+            f"recording rejected without a clear BYOS prerequisite: {response}"
         )
-
-    recording = wait_for("recording.started persistence", started)
-    api(
-        "POST",
-        f"/v1/calls/{call_id}/record",
-        {"action": "stop", "path": path},
-        expected={200},
-    )
-
-    def completed():
-        return next(
-            (
-                item
-                for item in list_recordings()
-                if item["id"] == recording["id"] and item["status"] == "completed"
-            ),
-            False,
-        )
-
-    wait_for("recording.completed persistence", completed)
-    return f"recording {recording['id']} completed through lifecycle events"
+    if any(item["call_id"] == call_id for item in list_recordings()):
+        raise AcceptanceError("recording was created without configured BYOS storage")
+    return "recording start rejected without BYOS; no recording was created"
 
 
 def transfer():
@@ -711,7 +691,7 @@ def main():
     if record(5, "Originate an outbound call", outbound_call):
         record(8, "Hold/resume", hold_resume)
         record(9, "Play audio", play_audio)
-        record(10, "Record", record_audio)
+        record(10, "Record (BYOS prerequisite)", record_audio)
         record(7, "Transfer", transfer)
         try:
             detail = hangup_outbound()

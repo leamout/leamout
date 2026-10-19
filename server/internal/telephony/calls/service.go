@@ -22,6 +22,7 @@ type Service struct {
 	voiceAgentReadiness func(context.Context, uuid.UUID, uuid.UUID) error
 	planConcurrency     func(context.Context, uuid.UUID) (int64, bool, error)
 	runtimeAllowance    func(context.Context, uuid.UUID) error
+	recordingStorage    func(context.Context, uuid.UUID) error
 }
 
 type routeAttemptMetrics interface {
@@ -88,6 +89,20 @@ func (s *Service) SetPlanConcurrencyResolver(
 
 func (s *Service) SetRuntimeAllowanceCheck(check func(context.Context, uuid.UUID) error) {
 	s.runtimeAllowance = check
+}
+
+// SetRecordingStorageCheck configures the BYOS admission gate for new
+// recordings. Stopping an existing recording must not depend on the current
+// storage integration status.
+func (s *Service) SetRecordingStorageCheck(check func(context.Context, uuid.UUID) error) {
+	s.recordingStorage = check
+}
+
+func (s *Service) requireRecordingStorage(ctx context.Context, organizationID uuid.UUID) error {
+	if s.recordingStorage == nil {
+		return apperror.NewServiceUnavailable("recording storage admission is unavailable", nil)
+	}
+	return s.recordingStorage(ctx, organizationID)
 }
 
 func (s *Service) requireRuntimeAllowance(ctx context.Context, organizationID uuid.UUID) error {
@@ -678,6 +693,11 @@ func (s *Service) Record(ctx context.Context, org, id uuid.UUID, req RecordActio
 	req, err := normalizeRecord(req)
 	if err != nil {
 		return err
+	}
+	if req.Action == "start" {
+		if err := s.requireRecordingStorage(ctx, org); err != nil {
+			return err
+		}
 	}
 	return s.control(ctx, org, id, []State{StateAnswered, StateActive}, func(channelID string) error {
 		return s.controller.Record(ctx, channelID, calling.RecordRequest{Path: req.Path, Action: req.Action})
