@@ -89,7 +89,7 @@ func (d *Deployer) DeployPortable(
 			cancel()
 			if cleanupError != nil {
 				return PortableDeploymentResult{}, fmt.Errorf(
-					"deploy agent %q: %w; cleanup failed: %v",
+					"deploy agent %q: %w; cleanup failed: %w",
 					alias,
 					deployErr,
 					cleanupError,
