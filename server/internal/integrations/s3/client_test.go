@@ -1,7 +1,12 @@
 package s3
 
 import (
+	"bytes"
+	"context"
+	"io"
 	"net"
+	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -72,5 +77,82 @@ func TestValidateKey(t *testing.T) {
 	}
 	if err := validateKey("recordings/org/recording.wav"); err != nil {
 		t.Fatalf("validateKey() error = %v", err)
+	}
+}
+
+func TestNewRequiresHTTPS(t *testing.T) {
+	for _, endpoint := range []string{
+		"http://s3.example.com",
+		"http://127.0.0.1:9000",
+	} {
+		if _, err := New(context.Background(), Config{
+			Endpoint: endpoint,
+			Bucket: "recordings",
+			AccessKey: "test-key",
+			SecretKey: "test-secret",
+		}); err == nil {
+			t.Fatalf("insecure endpoint %q accepted", endpoint)
+		}
+	}
+}
+
+func TestNewUsesAWSClientForPresigning(t *testing.T) {
+	client, err := New(context.Background(), Config{
+		Endpoint: "https://storage.example.com",
+		Region: "us-east-1",
+		Bucket: "recordings",
+		AccessKey: "test-key",
+		SecretKey: "test-secret",
+		UsePathStyle: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, expires, err := client.PlaybackURL(
+		context.Background(), "organizations/tenant/recordings/test.wav",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := url.Parse(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if parsed.Scheme != "https" || parsed.Host != "storage.example.com" ||
+		!strings.HasPrefix(parsed.Path, "/recordings/organizations/") {
+		t.Fatalf("presigned URL does not use customer's path-style endpoint: %s", value)
+	}
+	if parsed.Query().Get("X-Amz-Signature") == "" ||
+		parsed.Query().Get("X-Amz-Expires") != "900" {
+		t.Fatalf("missing SigV4 signature or TTL in playback URL: %s", value)
+	}
+	if expires.IsZero() {
+		t.Fatal("presigned URL expiration missing")
+	}
+}
+
+func TestClientPutRejectsNonSeekableReader(t *testing.T) {
+	client, err := New(context.Background(), Config{
+		Endpoint: "https://storage.example.com",
+		Bucket: "recordings",
+		AccessKey: "test-key",
+		SecretKey: "test-secret",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ok := interface{}(bytes.NewBufferString("recording")).(io.ReadSeeker)
+	if ok {
+		t.Fatal("test reader unexpectedly seekable")
+	}
+	if err := client.Put(context.Background(), "recording.wav", "audio/wav",
+		bytes.NewBufferString("recording"), 9); err == nil {
+		t.Fatal("non-seekable upload accepted")
+	}
+}
+
+func TestS3TransportNeverUsesProxy(t *testing.T) {
+	if publicTransport().Proxy != nil {
+		t.Fatal("customer S3 transport must not use environment proxies")
 	}
 }
