@@ -16,7 +16,7 @@ import (
 // install a schedule evaluator in the inbound telephony routing service.
 type RoutingPlan struct {
 	Manifest agentcontract.RoutingManifest `json:"manifest"`
-	AgentIDs map[string]uuid.UUID           `json:"agent_ids"`
+	AgentIDs map[string]uuid.UUID          `json:"agent_ids"`
 }
 
 type PortableDeploymentResult struct {

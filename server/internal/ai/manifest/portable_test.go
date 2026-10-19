@@ -31,7 +31,7 @@ func samplePortablePackage() PortablePackage {
 	return PortablePackage{
 		Agents: map[string]agentcontract.Manifest{
 			"receptionist": receptionist,
-			"after-hours": afterHours,
+			"after-hours":  afterHours,
 		},
 		Tools: []agentcontract.ToolDefinition{
 			{
