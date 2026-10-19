@@ -27,7 +27,6 @@ COMPOSE = [
     "-f",
     "tests/voice-v1/compose.yaml",
     "-f",
-    "-f",
     "tests/acceptance-identity.yaml",
 ]
 

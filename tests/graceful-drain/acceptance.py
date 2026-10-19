@@ -25,7 +25,6 @@ COMPOSE = [
     "-f",
     "tests/graceful-drain/compose.yaml",
     "-f",
-    "-f",
     "tests/acceptance-identity.yaml",
 ]
 STATE = {}
