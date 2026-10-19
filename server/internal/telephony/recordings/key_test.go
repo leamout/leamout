@@ -27,22 +27,22 @@ func TestRecordingObjectKeyUsesOrganizationNamespace(t *testing.T) {
 	}
 }
 
-func TestValidateManagedRecordingKeyRejectsOtherOrganization(t *testing.T) {
+func TestValidateRecordingObjectKeyRejectsOtherOrganization(t *testing.T) {
 	organizationID := uuid.New()
 	otherOrganizationID := uuid.New()
 	key := "organizations/" + otherOrganizationID.String() + "/recordings/file.wav"
 
-	err := validateManagedRecordingKey(organizationID, key)
+	err := validateRecordingObjectKey(organizationID, key)
 	if err == nil || !strings.Contains(err.Error(), "outside organization prefix") {
-		t.Fatalf("validateManagedRecordingKey() error = %v", err)
+		t.Fatalf("validateRecordingObjectKey() error = %v", err)
 	}
 }
 
-func TestValidateManagedRecordingKeyRejectsTraversal(t *testing.T) {
+func TestValidateRecordingObjectKeyRejectsTraversal(t *testing.T) {
 	organizationID := uuid.New()
 	key := "organizations/" + organizationID.String() + "/recordings/../other/file.wav"
 
-	if err := validateManagedRecordingKey(organizationID, key); err == nil {
-		t.Fatal("validateManagedRecordingKey() error = nil")
+	if err := validateRecordingObjectKey(organizationID, key); err == nil {
+		t.Fatal("validateRecordingObjectKey() error = nil")
 	}
 }

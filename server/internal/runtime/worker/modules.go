@@ -217,7 +217,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		platformstorage.NewRepository(queries),
 		credentialCipher,
 	)
-	recordingStorage := recordings.NewObjectStorage(storageService)
+	recordingStorage := platformstorage.NewObjectStorage(storageService)
 	recordingsService := recordings.NewService(recordingsRepository, recordingStorage)
 	recordingIngestion, err := recordings.NewIngestionJob(
 		recordingsRepository,

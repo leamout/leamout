@@ -9,31 +9,11 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 )
 
-type fakeLifecycleService struct {
-	started int
-	stopped int
-	last    LifecycleEvent
-}
-
-func (f *fakeLifecycleService) ObserveStarted(_ context.Context, event LifecycleEvent) error {
-	f.started++
-	f.last = event
-	return nil
-}
-
-func (f *fakeLifecycleService) ObserveStopped(_ context.Context, event LifecycleEvent) error {
-	f.stopped++
-	f.last = event
-	return nil
-}
-
-func TestConsumerMapsRecordStart(t *testing.T) {
-	service := &fakeLifecycleService{}
-	consumer := &Consumer{service: service}
+func TestRecordingLifecycleEventMapsRecordStart(t *testing.T) {
 	timestamp := time.Date(2026, time.August, 29, 8, 0, 0, 0, time.UTC)
 	callID := uuid.New()
 
-	err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
+	event, err := recordingLifecycleEvent(freeswitch.Event{
 		Name: freeSWITCHEventRecordStart,
 		Headers: map[string]string{
 			"Unique-ID":                "channel-1",
@@ -45,29 +25,24 @@ func TestConsumerMapsRecordStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if service.started != 1 || service.stopped != 0 {
-		t.Fatalf("lifecycle calls = started:%d stopped:%d, want 1/0", service.started, service.stopped)
+	if event.CallID != callID {
+		t.Fatalf("call id = %s, want %s", event.CallID, callID)
 	}
-	if service.last.CallID != callID {
-		t.Fatalf("call id = %s, want %s", service.last.CallID, callID)
+	if event.ChannelID != "channel-1" {
+		t.Fatalf("channel = %q, want channel-1", event.ChannelID)
 	}
-	if service.last.ChannelID != "channel-1" {
-		t.Fatalf("channel = %q, want channel-1", service.last.ChannelID)
+	if event.Path != "/var/lib/freeswitch/recordings/call-1.wav" {
+		t.Fatalf("path = %q", event.Path)
 	}
-	if service.last.Path != "/var/lib/freeswitch/recordings/call-1.wav" {
-		t.Fatalf("path = %q", service.last.Path)
-	}
-	if !service.last.OccurredAt.Equal(timestamp) {
-		t.Fatalf("occurred_at = %s, want %s", service.last.OccurredAt, timestamp)
+	if !event.OccurredAt.Equal(timestamp) {
+		t.Fatalf("occurred_at = %s, want %s", event.OccurredAt, timestamp)
 	}
 }
 
-func TestConsumerMapsRecordStop(t *testing.T) {
-	service := &fakeLifecycleService{}
-	consumer := &Consumer{service: service}
+func TestRecordingLifecycleEventMapsRecordStop(t *testing.T) {
 	callID := uuid.New()
 
-	err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{
+	event, err := recordingLifecycleEvent(freeswitch.Event{
 		Name: freeSWITCHEventRecordStop,
 		Headers: map[string]string{
 			"Unique-ID":                "channel-2",
@@ -78,21 +53,30 @@ func TestConsumerMapsRecordStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if service.started != 0 || service.stopped != 1 {
-		t.Fatalf("lifecycle calls = started:%d stopped:%d, want 0/1", service.started, service.stopped)
+	if event.CallID != callID || event.ChannelID != "channel-2" ||
+		event.Path != "/var/lib/freeswitch/recordings/call-2.wav" {
+		t.Fatalf("record stop event = %+v", event)
 	}
 }
 
 func TestConsumerIgnoresUnrelatedEvent(t *testing.T) {
-	service := &fakeLifecycleService{}
-	consumer := &Consumer{service: service}
-
-	if err := consumer.HandleFreeSWITCHEvent(context.Background(), freeswitch.Event{Name: "CHANNEL_ANSWER"}); err != nil {
+	// Unrelated events must not touch the service dependency.
+	consumer := &Consumer{}
+	if err := consumer.HandleFreeSWITCHEvent(
+		context.Background(),
+		freeswitch.Event{Name: "CHANNEL_ANSWER"},
+	); err != nil {
 		t.Fatal(err)
 	}
-	if service.started != 0 || service.stopped != 0 {
-		t.Fatalf("unexpected lifecycle calls: %+v", service)
-	}
+}
+
+func TestNewConsumerRequiresService(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("NewConsumer accepted nil service")
+		}
+	}()
+	NewConsumer(nil)
 }
 
 func TestRecordingLifecycleEventRequiresIdentity(t *testing.T) {

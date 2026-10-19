@@ -24,11 +24,11 @@ import (
 	"github.com/leamout/leamout/server/internal/platform/config"
 	"github.com/leamout/leamout/server/internal/platform/email"
 	"github.com/leamout/leamout/server/internal/platform/middleware"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/runtime/calling"
 	"github.com/leamout/leamout/server/internal/security/authn"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 	"github.com/leamout/leamout/server/internal/telephony"
-	"github.com/leamout/leamout/server/internal/telephony/recordings"
 	"github.com/leamout/leamout/server/internal/telephony/webrtc"
 	"github.com/leamout/leamout/server/internal/tenancy"
 	"github.com/leamout/leamout/server/pkg/apperror"
@@ -140,7 +140,7 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		commercialModule.Limits.Service.RetentionDays,
 	)
 
-	recordingStorage := recordings.NewObjectStorage(platformModule.Storage.Service)
+	recordingStorage := platformstorage.NewObjectStorage(platformModule.Storage.Service)
 
 	metricsRegistry := metrics.New(redisClient)
 	telephonyModule, err := telephony.New(telephony.Dependencies{

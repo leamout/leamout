@@ -1,7 +1,12 @@
 package recordings
 
 import (
+	"fmt"
+	"path"
+	"strings"
+
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/listquery"
 )
@@ -30,4 +35,41 @@ func validateFilters(req ListRequest) error {
 		return err
 	}
 	return listquery.Range(req.CreatedFrom, req.CreatedBefore)
+}
+
+func recordingStoragePrefix(organizationID uuid.UUID) (string, error) {
+	if organizationID == uuid.Nil {
+		return "", fmt.Errorf("recording organization id is required")
+	}
+	return "organizations/" + organizationID.String() + "/recordings/", nil
+}
+
+func validateRecordingObjectKey(organizationID uuid.UUID, key string) error {
+	prefix, err := recordingStoragePrefix(organizationID)
+	if err != nil {
+		return err
+	}
+	if key == "" || path.IsAbs(key) || path.Clean(key) != key {
+		return fmt.Errorf("recording storage key is invalid")
+	}
+	if !strings.HasPrefix(key, prefix) || key == prefix {
+		return fmt.Errorf("recording storage key is outside organization prefix")
+	}
+	return nil
+}
+
+func recordingStorageDestination(recording sqlc.Recording) (uuid.UUID, string, string, error) {
+	if recording.StorageIntegrationID == nil ||
+		*recording.StorageIntegrationID == uuid.Nil ||
+		recording.StorageProvider == nil ||
+		*recording.StorageProvider != "s3" ||
+		recording.StorageBucket == nil ||
+		*recording.StorageBucket == "" ||
+		recording.StorageKey == nil {
+		return uuid.Nil, "", "", fmt.Errorf("recording does not have a pinned customer S3 destination")
+	}
+	if err := validateRecordingObjectKey(recording.OrganizationID, *recording.StorageKey); err != nil {
+		return uuid.Nil, "", "", err
+	}
+	return *recording.StorageIntegrationID, *recording.StorageBucket, *recording.StorageKey, nil
 }

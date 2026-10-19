@@ -9,32 +9,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
-// Storage manages recording objects without exposing storage URLs in metadata.
-type Storage interface {
-	PlaybackURL(context.Context, sqlc.Recording) (string, time.Time, error)
-	Delete(context.Context, sqlc.Recording) error
-}
-
-type recordingRepository interface {
-	Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.Recording, error)
-	GetIncludingDeleted(context.Context, uuid.UUID, uuid.UUID) (sqlc.Recording, error)
-	GetByCallStorageKey(context.Context, uuid.UUID, string) (sqlc.Recording, error)
-	GetCallOrganizationID(context.Context, uuid.UUID) (uuid.UUID, error)
-	List(context.Context, uuid.UUID, ListRequest) ([]sqlc.Recording, error)
-	Start(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (sqlc.Recording, error)
-	MarkReadyForUpload(context.Context, sqlc.Recording, time.Time) (sqlc.Recording, error)
-	Delete(context.Context, sqlc.Recording) (sqlc.Recording, error)
-}
-
 type Service struct {
-	repo    recordingRepository
-	storage Storage
+	repo    *Repository
+	storage *platformstorage.ObjectStorage
 }
 
-func NewService(repo recordingRepository, storage Storage) *Service {
+func NewService(repo *Repository, storage *platformstorage.ObjectStorage) *Service {
 	if repo == nil {
 		panic("recordings: repository is required")
 	}
@@ -147,7 +131,17 @@ func (s *Service) Playback(ctx context.Context, organizationID, id uuid.UUID) (P
 	if s.storage == nil {
 		return PlaybackResponse{}, apperror.NewServiceUnavailable("recording storage is unavailable", nil)
 	}
-	url, expiresAt, err := s.storage.PlaybackURL(ctx, recording)
+	integrationID, bucket, key, err := recordingStorageDestination(recording)
+	if err != nil {
+		return PlaybackResponse{}, apperror.NewServiceUnavailable("invalid recording storage destination", err)
+	}
+	url, expiresAt, err := s.storage.PlaybackURL(
+		ctx,
+		recording.OrganizationID,
+		integrationID,
+		bucket,
+		key,
+	)
 	if err != nil {
 		return PlaybackResponse{}, apperror.NewServiceUnavailable("create recording playback URL", err)
 	}
@@ -178,7 +172,11 @@ func (s *Service) Delete(ctx context.Context, organizationID, id uuid.UUID) erro
 	if s.storage == nil {
 		return apperror.NewServiceUnavailable("recording storage is unavailable", nil)
 	}
-	if err := s.storage.Delete(ctx, recording); err != nil {
+	integrationID, bucket, key, err := recordingStorageDestination(recording)
+	if err != nil {
+		return apperror.NewServiceUnavailable("invalid recording storage destination", err)
+	}
+	if err := s.storage.Delete(ctx, recording.OrganizationID, integrationID, bucket, key); err != nil {
 		return apperror.NewServiceUnavailable("delete recording object", err)
 	}
 
