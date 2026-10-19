@@ -1,11 +1,13 @@
 package recordings
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 )
 
 type Status string
@@ -85,4 +87,58 @@ type ListRequest struct {
 	CreatedBefore *time.Time
 	Offset        int32
 	Limit         int32
+}
+
+type ReconciliationJobConfig struct {
+	Interval  time.Duration
+	Grace     time.Duration
+	BatchSize int32
+}
+
+type reconciliationRepository interface {
+	ListForReconciliation(context.Context, time.Time, int32) ([]sqlc.Recording, error)
+	MarkReadyForUpload(context.Context, sqlc.Recording, time.Time) (sqlc.Recording, error)
+}
+
+type ReconciliationJob struct {
+	repo   reconciliationRepository
+	config ReconciliationJobConfig
+	now    func() time.Time
+}
+
+type IngestionConfig struct {
+	Interval    time.Duration
+	Lease       time.Duration
+	BaseRetry   time.Duration
+	MaxRetry    time.Duration
+	MaxAttempts int32
+	BatchSize   int32
+	StagingPath string
+}
+
+type ingestionRepository interface {
+	ListForUpload(context.Context, time.Time, time.Time, int32) ([]sqlc.Recording, error)
+	PinUpload(
+		context.Context,
+		sqlc.Recording,
+		*uuid.UUID,
+		string,
+		string,
+		string,
+	) (sqlc.Recording, error)
+	CompleteUpload(
+		context.Context,
+		sqlc.Recording,
+		string,
+		int64,
+	) (sqlc.Recording, error)
+	RetryUpload(context.Context, sqlc.Recording, time.Time, string) error
+	Fail(context.Context, sqlc.Recording) (sqlc.Recording, error)
+}
+
+type IngestionJob struct {
+	repo    ingestionRepository
+	storage *platformstorage.ObjectStorage
+	config  IngestionConfig
+	now     func() time.Time
 }
