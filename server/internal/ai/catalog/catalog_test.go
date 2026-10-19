@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/leamout/contracts/ai"
@@ -73,5 +74,51 @@ func assertProviderIDs(t *testing.T, descriptors []ai.Descriptor, want []string)
 		if descriptors[i].ID != want[i] {
 			t.Fatalf("provider %d = %q, want %q", i, descriptors[i].ID, want[i])
 		}
+	}
+}
+
+func TestBuiltinsRejectTenantControlledProviderEndpoints(t *testing.T) {
+	catalog, err := Builtins()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name     string
+		kind     ai.Kind
+		provider string
+		endpoint string
+	}{
+		{name: "deepgram", kind: ai.KindSTT, provider: "deepgram", endpoint: "wss://tenant.example.test/ws"},
+		{name: "assemblyai", kind: ai.KindSTT, provider: "assemblyai", endpoint: "wss://tenant.example.test/ws"},
+		{name: "groq", kind: ai.KindLLM, provider: "groq", endpoint: "https://tenant.example.test/v1/chat"},
+		{name: "openai-llm", kind: ai.KindLLM, provider: "openai", endpoint: "https://tenant.example.test/v1/chat"},
+		{name: "cartesia", kind: ai.KindTTS, provider: "cartesia", endpoint: "wss://tenant.example.test/ws"},
+		{name: "elevenlabs", kind: ai.KindTTS, provider: "elevenlabs", endpoint: "wss://tenant.example.test/ws"},
+		{name: "openai-realtime", kind: ai.KindRealtime, provider: "openai", endpoint: "wss://tenant.example.test/ws"},
+		{name: "gemini-realtime", kind: ai.KindRealtime, provider: "gemini", endpoint: "wss://tenant.example.test/ws"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			validator, ok := catalog.ConfigValidator(test.kind, test.provider)
+			if !ok {
+				t.Fatalf("%s provider validator is unavailable", test.provider)
+			}
+			if err := validator.ValidateConfig(json.RawMessage(`{}`)); err != nil {
+				t.Fatalf("default provider config was rejected: %v", err)
+			}
+
+			config, err := json.Marshal(map[string]any{
+				"endpoint":          test.endpoint,
+				"allowed_endpoints": []string{test.endpoint},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := validator.ValidateConfig(config); err == nil {
+				t.Fatal("tenant-controlled endpoint was accepted by built-in provider")
+			}
+		})
 	}
 }
