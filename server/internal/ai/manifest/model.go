@@ -45,4 +45,3 @@ type PortableDeploymentRequest struct {
 	Integrations map[string]uuid.UUID `json:"integrations,omitempty"`
 	Variables    map[string]string    `json:"variables,omitempty"`
 }
-
