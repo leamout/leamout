@@ -62,6 +62,28 @@ func TestOrganizationListFilters(t *testing.T) {
 	var trunks, agents, calls, numbers, recordings, events [2][3]uuid.UUID
 	for tenant, org := range orgs {
 		exec("INSERT INTO organizations(id, name) VALUES ($1, 'filter test')", org)
+
+		// Completed recordings must reference a customer-owned S3-compatible
+		// integration. Failed recordings need no permanent object destination.
+		storageIntegrationID := uuid.New()
+		exec(`
+			INSERT INTO storage_integrations (
+				id,
+				organization_id,
+				name,
+				provider,
+				purpose,
+				endpoint_url,
+				bucket,
+				access_key_id,
+				secret_access_key_ciphertext
+			) VALUES (
+				$1, $2, 'list filters BYOS', 's3', 'recordings',
+				'https://storage.example.com', 'recording-fixtures',
+				'test-access-key', 'test-encrypted-secret'
+			)
+		`, storageIntegrationID, org)
+
 		for i := range 3 {
 			stamp := from
 			if i == 2 {
@@ -92,7 +114,38 @@ func TestOrganizationListFilters(t *testing.T) {
 				state, recordingStatus, action = "failed", "failed", "call.failed"
 			}
 			exec("INSERT INTO calls(id, organization_id, direction, state, trunk_id, voice_agent_id, from_uri, to_uri, created_at) VALUES($1,$2,$3,$4,$5,$6,'from','to',$7)", calls[tenant][i], org, direction, state, trunks[tenant][i], agents[tenant][i], stamp)
-			exec("INSERT INTO recordings(id, organization_id, call_id, status, created_at) VALUES($1,$2,$3,$4,$5)", recordings[tenant][i], org, calls[tenant][i], recordingStatus, stamp)
+			if recordingStatus == "completed" {
+				exec(`
+					INSERT INTO recordings (
+						id,
+						organization_id,
+						call_id,
+						status,
+						storage_integration_id,
+						storage_key,
+						storage_provider,
+						storage_bucket,
+						created_at
+					) VALUES ($1, $2, $3, $4, $5, $6, 's3', 'recording-fixtures', $7)
+				`,
+					recordings[tenant][i],
+					org,
+					calls[tenant][i],
+					recordingStatus,
+					storageIntegrationID,
+					"organizations/"+org.String()+"/recordings/"+recordings[tenant][i].String()+".wav",
+					stamp,
+				)
+			} else {
+				exec(
+					"INSERT INTO recordings(id, organization_id, call_id, status, created_at) VALUES($1,$2,$3,$4,$5)",
+					recordings[tenant][i],
+					org,
+					calls[tenant][i],
+					recordingStatus,
+					stamp,
+				)
+			}
 			actorType := "user"
 			if i == 2 {
 				actorType = "organization_token"
