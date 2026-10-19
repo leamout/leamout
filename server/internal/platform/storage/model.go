@@ -73,6 +73,14 @@ type ResolvedIntegration struct {
 	SecretAccessKey string
 }
 
+// Destination contains the immutable, non-secret S3 destination to be pinned
+// into a recording before the upload begins.
+type Destination struct {
+	IntegrationID uuid.UUID
+	Provider      string
+	Bucket        string
+}
+
 func response(value Integration) Response {
 	return Response(value)
 }

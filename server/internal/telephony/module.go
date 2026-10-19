@@ -5,6 +5,7 @@ import (
 
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/observability/metrics"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/runtime/calling"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 	"github.com/leamout/leamout/server/internal/telephony/calls"
@@ -23,7 +24,7 @@ type Dependencies struct {
 	CallsAdmission    *calling.AdmissionLimiter
 	CredentialCipher  *encryption.Cipher
 	WebRTCService     *webrtc.Service
-	RecordingStorage  recordings.Storage
+	RecordingStorage  *platformstorage.ObjectStorage
 	Metrics           *metrics.Registry
 }
 
