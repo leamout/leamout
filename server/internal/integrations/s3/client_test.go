@@ -86,8 +86,8 @@ func TestNewRequiresHTTPS(t *testing.T) {
 		"http://127.0.0.1:9000",
 	} {
 		if _, err := New(context.Background(), Config{
-			Endpoint: endpoint,
-			Bucket: "recordings",
+			Endpoint:  endpoint,
+			Bucket:    "recordings",
 			AccessKey: "test-key",
 			SecretKey: "test-secret",
 		}); err == nil {
@@ -98,11 +98,11 @@ func TestNewRequiresHTTPS(t *testing.T) {
 
 func TestNewUsesAWSClientForPresigning(t *testing.T) {
 	client, err := New(context.Background(), Config{
-		Endpoint: "https://storage.example.com",
-		Region: "us-east-1",
-		Bucket: "recordings",
-		AccessKey: "test-key",
-		SecretKey: "test-secret",
+		Endpoint:     "https://storage.example.com",
+		Region:       "us-east-1",
+		Bucket:       "recordings",
+		AccessKey:    "test-key",
+		SecretKey:    "test-secret",
 		UsePathStyle: true,
 	})
 	if err != nil {
@@ -133,8 +133,8 @@ func TestNewUsesAWSClientForPresigning(t *testing.T) {
 
 func TestClientPutRejectsNonSeekableReader(t *testing.T) {
 	client, err := New(context.Background(), Config{
-		Endpoint: "https://storage.example.com",
-		Bucket: "recordings",
+		Endpoint:  "https://storage.example.com",
+		Bucket:    "recordings",
 		AccessKey: "test-key",
 		SecretKey: "test-secret",
 	})
