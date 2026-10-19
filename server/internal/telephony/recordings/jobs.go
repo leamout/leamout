@@ -2,23 +2,20 @@ package recordings
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log"
 	"mime"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/google/uuid"
-	"errors"
-	"fmt"
-	"log"
-	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 )
-
 type ReconciliationJobConfig struct {
 	Interval  time.Duration
 	Grace     time.Duration
