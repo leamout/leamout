@@ -24,8 +24,6 @@ COMPOSE = [
     "-f",
     "tests/byoc-v1/compose.yaml",
     "-f",
-    "tests/acceptance-minio.yaml",
-    "-f",
     "tests/acceptance-identity.yaml",
 ]
 S, RESULTS = {}, []

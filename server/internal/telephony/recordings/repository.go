@@ -3,6 +3,7 @@ package recordings
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -121,6 +122,12 @@ func (r *Repository) PinUpload(
 	provider string,
 	bucket string,
 ) (sqlc.Recording, error) {
+	if storageIntegrationID == nil || *storageIntegrationID == uuid.Nil ||
+		strings.TrimSpace(key) == "" ||
+		provider != "s3" ||
+		strings.TrimSpace(bucket) == "" {
+		return sqlc.Recording{}, fmt.Errorf("a valid customer BYOS destination is required")
+	}
 	return r.queries.PinRecordingUpload(ctx, sqlc.PinRecordingUploadParams{
 		StorageIntegrationID: storageIntegrationID,
 		StorageKey:           &key,
@@ -215,10 +222,6 @@ func (r *Repository) Complete(
 func (r *Repository) CompleteUpload(
 	ctx context.Context,
 	recording sqlc.Recording,
-	storageIntegrationID *uuid.UUID,
-	key string,
-	provider string,
-	bucket string,
 	format string,
 	size int64,
 ) (sqlc.Recording, error) {
@@ -227,14 +230,10 @@ func (r *Repository) CompleteUpload(
 		EventRecordingCompleted,
 		func(repo *Repository) (sqlc.Recording, error) {
 			return repo.queries.CompleteRecording(ctx, sqlc.CompleteRecordingParams{
-				StorageIntegrationID: storageIntegrationID,
-				StorageKey:           &key,
-				StorageProvider:      &provider,
-				StorageBucket:        &bucket,
-				FileSizeBytes:        &size,
-				Format:               &format,
-				OrganizationID:       recording.OrganizationID,
-				ID:                   recording.ID,
+				FileSizeBytes:  &size,
+				Format:         &format,
+				OrganizationID: recording.OrganizationID,
+				ID:             recording.ID,
 			})
 		},
 	)

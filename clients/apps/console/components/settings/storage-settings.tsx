@@ -8,15 +8,8 @@ export function StorageSettings() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Storage</h1>
-      <section className="space-y-2 rounded-lg border p-6">
-        <h2 className="font-semibold">Platform default</h2>
-        <p className="text-sm text-muted-foreground">
-          Default storage availability has not been loaded. Deployment
-          credentials are managed by the operator.
-        </p>
-      </section>
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold">Organization storage (BYOS)</h2>
+        <h2 className="text-lg font-semibold">Your recording storage (BYOS)</h2>
         <p className="text-sm text-muted-foreground">
           Configure S3-compatible recording storage. Existing storage
           configurations have not been loaded.

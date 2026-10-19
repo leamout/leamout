@@ -16,44 +16,33 @@ const completeRecording = `-- name: CompleteRecording :one
 UPDATE recordings
 SET
     status = 'completed',
-    storage_integration_id = COALESCE($1, storage_integration_id),
-    storage_key = COALESCE($2, storage_key),
-    storage_provider = COALESCE($3, storage_provider),
-    storage_bucket = COALESCE($4, storage_bucket),
-    storage_url = COALESCE($5, storage_url),
-    file_size_bytes = COALESCE($6, file_size_bytes),
-    format = COALESCE($7, format),
-    duration_seconds = COALESCE($8, duration_seconds),
+    file_size_bytes = COALESCE($1, file_size_bytes),
+    format = COALESCE($2, format),
+    duration_seconds = COALESCE($3, duration_seconds),
     upload_error = NULL,
     next_upload_at = NULL,
     completed_at = COALESCE(completed_at, NOW()),
     updated_at = NOW()
-WHERE organization_id = $9
-  AND id = $10
-  AND status IN ('recording', 'uploading')
+WHERE organization_id = $4
+  AND id = $5
+  AND status = 'uploading'
+  AND storage_integration_id IS NOT NULL
+  AND storage_key IS NOT NULL
+  AND storage_provider = 's3'
+  AND storage_bucket IS NOT NULL
 RETURNING id, organization_id, call_id, storage_integration_id, status, storage_key, storage_provider, storage_bucket, storage_url, source_path, stopped_at, upload_attempts, next_upload_at, upload_error, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 `
 
 type CompleteRecordingParams struct {
-	StorageIntegrationID *uuid.UUID `db:"storage_integration_id" json:"storage_integration_id"`
-	StorageKey           *string    `db:"storage_key" json:"storage_key"`
-	StorageProvider      *string    `db:"storage_provider" json:"storage_provider"`
-	StorageBucket        *string    `db:"storage_bucket" json:"storage_bucket"`
-	StorageUrl           *string    `db:"storage_url" json:"storage_url"`
-	FileSizeBytes        *int64     `db:"file_size_bytes" json:"file_size_bytes"`
-	Format               *string    `db:"format" json:"format"`
-	DurationSeconds      *int32     `db:"duration_seconds" json:"duration_seconds"`
-	OrganizationID       uuid.UUID  `db:"organization_id" json:"organization_id"`
-	ID                   uuid.UUID  `db:"id" json:"id"`
+	FileSizeBytes   *int64    `db:"file_size_bytes" json:"file_size_bytes"`
+	Format          *string   `db:"format" json:"format"`
+	DurationSeconds *int32    `db:"duration_seconds" json:"duration_seconds"`
+	OrganizationID  uuid.UUID `db:"organization_id" json:"organization_id"`
+	ID              uuid.UUID `db:"id" json:"id"`
 }
 
 func (q *Queries) CompleteRecording(ctx context.Context, arg CompleteRecordingParams) (Recording, error) {
 	row := q.db.QueryRow(ctx, completeRecording,
-		arg.StorageIntegrationID,
-		arg.StorageKey,
-		arg.StorageProvider,
-		arg.StorageBucket,
-		arg.StorageUrl,
 		arg.FileSizeBytes,
 		arg.Format,
 		arg.DurationSeconds,
@@ -804,7 +793,8 @@ func (q *Queries) MarkRecordingReadyForUpload(ctx context.Context, arg MarkRecor
 
 const pinRecordingUpload = `-- name: PinRecordingUpload :one
 UPDATE recordings
-SET storage_integration_id = $1,
+SET
+    storage_integration_id = $1,
     storage_key = $2,
     storage_provider = $3,
     storage_bucket = $4,
@@ -812,7 +802,14 @@ SET storage_integration_id = $1,
 WHERE organization_id = $5
   AND id = $6
   AND status = 'uploading'
+  AND storage_integration_id IS NULL
   AND storage_key IS NULL
+  AND storage_provider IS NULL
+  AND storage_bucket IS NULL
+  AND $1::uuid IS NOT NULL
+  AND length(btrim($2::text)) > 0
+  AND $3::text = 's3'
+  AND length(btrim($4::text)) > 0
 RETURNING id, organization_id, call_id, storage_integration_id, status, storage_key, storage_provider, storage_bucket, storage_url, source_path, stopped_at, upload_attempts, next_upload_at, upload_error, file_size_bytes, format, duration_seconds, started_at, completed_at, created_at, updated_at
 `
 

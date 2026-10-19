@@ -35,8 +35,6 @@ for key in (
     "ENCRYPTION_KEY",
     "TURN_AUTH_SECRET",
     "TURN_PUBLIC_URLS",
-    "MINIO_APP_ACCESS_KEY",
-    "MINIO_APP_SECRET_KEY",
 ):
     values[key] = os.environ[key]
 

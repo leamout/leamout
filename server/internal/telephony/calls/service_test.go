@@ -192,3 +192,39 @@ func TestRequireCallVoiceAgentReadyChecksBoundAgent(t *testing.T) {
 		t.Fatal("voice agent readiness check was not called")
 	}
 }
+
+// Recording cannot begin without an explicit organization-owned BYOS
+// destination. The check applies only to start, never to stop.
+func TestRequireRecordingStorageRejectsUnavailableGuard(t *testing.T) {
+	service := &Service{}
+	if err := service.requireRecordingStorage(context.Background(), uuid.New()); err == nil {
+		t.Fatal("unconfigured recording admission check accepted")
+	}
+}
+
+func TestRequireRecordingStoragePropagatesFailure(t *testing.T) {
+	want := errors.New("customer BYOS storage is not configured")
+	service := &Service{
+		recordingStorage: func(context.Context, uuid.UUID) error {
+			return want
+		},
+	}
+	if err := service.requireRecordingStorage(context.Background(), uuid.New()); !errors.Is(err, want) {
+		t.Fatalf("recording storage check error = %v, want %v", err, want)
+	}
+}
+
+func TestRequireRecordingStorageAcceptsConfiguredIntegration(t *testing.T) {
+	organizationID := uuid.New()
+	service := &Service{
+		recordingStorage: func(_ context.Context, got uuid.UUID) error {
+			if got != organizationID {
+				t.Fatalf("organization ID = %s, want %s", got, organizationID)
+			}
+			return nil
+		},
+	}
+	if err := service.requireRecordingStorage(context.Background(), organizationID); err != nil {
+		t.Fatalf("recording storage check error = %v", err)
+	}
+}

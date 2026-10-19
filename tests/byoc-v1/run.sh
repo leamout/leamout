@@ -8,11 +8,6 @@ export DOMAIN="${DOMAIN:-localhost}"
 export PUBLIC_IP="${PUBLIC_IP:-127.0.0.1}"
 export CORS_ORIGINS="${CORS_ORIGINS:-http://localhost}"
 export POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-acceptance-postgres-password}"
-export MINIO_ROOT_USER="${MINIO_ROOT_USER:-acceptance-root}"
-export MINIO_ROOT_PASSWORD="${MINIO_ROOT_PASSWORD:-acceptance-root-password}"
-# Disposable acceptance-only storage credentials; do not use root credentials in production.
-export MINIO_APP_ACCESS_KEY="$MINIO_ROOT_USER"
-export MINIO_APP_SECRET_KEY="$MINIO_ROOT_PASSWORD"
 # Synthetic credentials for disposable acceptance stacks; no provider calls
 # are made by these suites. Never reuse these values for real deployments.
 export DIDWW_API_KEY="${DIDWW_API_KEY:-acceptance-didww-not-live}"
@@ -41,7 +36,7 @@ APP_ENV_FILE=$(mktemp)
 export APP_ENV_FILE
 python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
 
-COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/byoc-v1/compose.yaml -f tests/acceptance-minio.yaml -f tests/acceptance-identity.yaml"
+COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/byoc-v1/compose.yaml -f tests/acceptance-identity.yaml"
 
 cleanup() {
     status=$?

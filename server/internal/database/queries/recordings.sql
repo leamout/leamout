@@ -108,7 +108,8 @@ RETURNING *;
 
 -- name: PinRecordingUpload :one
 UPDATE recordings
-SET storage_integration_id = sqlc.narg(storage_integration_id),
+SET
+    storage_integration_id = sqlc.narg(storage_integration_id),
     storage_key = sqlc.arg(storage_key),
     storage_provider = sqlc.arg(storage_provider),
     storage_bucket = sqlc.arg(storage_bucket),
@@ -116,18 +117,20 @@ SET storage_integration_id = sqlc.narg(storage_integration_id),
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
   AND status = 'uploading'
+  AND storage_integration_id IS NULL
   AND storage_key IS NULL
+  AND storage_provider IS NULL
+  AND storage_bucket IS NULL
+  AND sqlc.narg(storage_integration_id)::uuid IS NOT NULL
+  AND length(btrim(sqlc.arg(storage_key)::text)) > 0
+  AND sqlc.arg(storage_provider)::text = 's3'
+  AND length(btrim(sqlc.arg(storage_bucket)::text)) > 0
 RETURNING *;
 
 -- name: CompleteRecording :one
 UPDATE recordings
 SET
     status = 'completed',
-    storage_integration_id = COALESCE(sqlc.narg(storage_integration_id), storage_integration_id),
-    storage_key = COALESCE(sqlc.narg(storage_key), storage_key),
-    storage_provider = COALESCE(sqlc.narg(storage_provider), storage_provider),
-    storage_bucket = COALESCE(sqlc.narg(storage_bucket), storage_bucket),
-    storage_url = COALESCE(sqlc.narg(storage_url), storage_url),
     file_size_bytes = COALESCE(sqlc.narg(file_size_bytes), file_size_bytes),
     format = COALESCE(sqlc.narg(format), format),
     duration_seconds = COALESCE(sqlc.narg(duration_seconds), duration_seconds),
@@ -137,7 +140,11 @@ SET
     updated_at = NOW()
 WHERE organization_id = sqlc.arg(organization_id)
   AND id = sqlc.arg(id)
-  AND status IN ('recording', 'uploading')
+  AND status = 'uploading'
+  AND storage_integration_id IS NOT NULL
+  AND storage_key IS NOT NULL
+  AND storage_provider = 's3'
+  AND storage_bucket IS NOT NULL
 RETURNING *;
 
 -- name: FailRecording :one

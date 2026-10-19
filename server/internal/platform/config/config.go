@@ -11,11 +11,6 @@ import (
 	"github.com/leamout/leamout/server/internal/integrations/keycloak"
 )
 
-type MinIOConfig struct {
-	AccessKey string `env:"APP_ACCESS_KEY,required"`
-	SecretKey string `env:"APP_SECRET_KEY,required"`
-}
-
 type PolarConfig struct {
 	Environment        string `env:"ENVIRONMENT" envDefault:"production"`
 	AccessToken        string `env:"ACCESS_TOKEN"`
@@ -38,23 +33,22 @@ type Config struct {
 	AWS      AWSConfig       `envPrefix:"AWS_"`
 	Polar    PolarConfig     `envPrefix:"POLAR_"`
 
-	AppEnv                string      `env:"APP_ENV" envDefault:"development"`
-	FrontendURL           string      `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
-	BackendURL            string      `env:"BACKEND_URL" envDefault:"http://localhost:8080"`
-	Domain                string      `env:"DOMAIN"`
-	DatabaseURL           string      `env:"DATABASE_URL,required"`
-	RedisURL              string      `env:"REDIS_URL,required"`
-	NATSURL               string      `env:"NATS_URL,required"`
-	FreeSWITCHESLAddress  string      `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
-	FreeSWITCHESLPassword string      `env:"FREESWITCH_ESL_PASSWORD,required"`
-	MediaControlURL       string      `env:"MEDIA_CONTROL_URL" envDefault:"http://127.0.0.1:8090"`
-	MediaControlToken     string      `env:"MEDIA_CONTROL_TOKEN"`
-	EncryptionKey         string      `env:"ENCRYPTION_KEY,required"`
-	MinIO                 MinIOConfig `envPrefix:"MINIO_"`
-	TURNAuthSecret        string      `env:"TURN_AUTH_SECRET,required"`
-	TURNPublicURLs        []string    `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
-	CORSOrigins           []string    `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
-	TrustedProxyCIDRs     []string    `env:"TRUSTED_PROXY_CIDRS" envSeparator:","`
+	AppEnv                string   `env:"APP_ENV" envDefault:"development"`
+	FrontendURL           string   `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
+	BackendURL            string   `env:"BACKEND_URL" envDefault:"http://localhost:8080"`
+	Domain                string   `env:"DOMAIN"`
+	DatabaseURL           string   `env:"DATABASE_URL,required"`
+	RedisURL              string   `env:"REDIS_URL,required"`
+	NATSURL               string   `env:"NATS_URL,required"`
+	FreeSWITCHESLAddress  string   `env:"FREESWITCH_ESL_ADDRESS" envDefault:"127.0.0.1:8021"`
+	FreeSWITCHESLPassword string   `env:"FREESWITCH_ESL_PASSWORD,required"`
+	MediaControlURL       string   `env:"MEDIA_CONTROL_URL" envDefault:"http://127.0.0.1:8090"`
+	MediaControlToken     string   `env:"MEDIA_CONTROL_TOKEN"`
+	EncryptionKey         string   `env:"ENCRYPTION_KEY,required"`
+	TURNAuthSecret        string   `env:"TURN_AUTH_SECRET,required"`
+	TURNPublicURLs        []string `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
+	CORSOrigins           []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
+	TrustedProxyCIDRs     []string `env:"TRUSTED_PROXY_CIDRS" envSeparator:","`
 }
 
 func Load() (Config, error) {
@@ -101,8 +95,6 @@ func (c *Config) normalize() {
 	c.MediaControlURL = strings.TrimRight(strings.TrimSpace(c.MediaControlURL), "/")
 	c.MediaControlToken = strings.TrimSpace(c.MediaControlToken)
 	c.EncryptionKey = strings.TrimSpace(c.EncryptionKey)
-	c.MinIO.AccessKey = strings.TrimSpace(c.MinIO.AccessKey)
-	c.MinIO.SecretKey = strings.TrimSpace(c.MinIO.SecretKey)
 	c.TURNAuthSecret = strings.TrimSpace(c.TURNAuthSecret)
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)

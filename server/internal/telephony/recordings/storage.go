@@ -22,31 +22,26 @@ type ObjectStore interface {
 }
 
 type ObjectStorage struct {
-	client       ObjectStore
 	integrations *platformstorage.Service
+
+	// Test hooks; production always resolves tenant integrations and uses S3.
+	resolveActive func(context.Context, uuid.UUID) (platformstorage.ResolvedIntegration, error)
+	resolveByID   func(context.Context, uuid.UUID, uuid.UUID) (platformstorage.ResolvedIntegration, error)
+	newClient     func(context.Context, platformstorage.ResolvedIntegration) (ObjectStore, error)
 }
 
-func NewObjectStorage(client ObjectStore) *ObjectStorage {
-	if client == nil {
-		panic("recordings: object store is required")
+func NewObjectStorage(integrations *platformstorage.Service) *ObjectStorage {
+	if integrations == nil {
+		panic("recordings: storage integration service is required")
 	}
-	return &ObjectStorage{client: client}
-}
-
-func NewResolvedObjectStorage(
-	client ObjectStore,
-	integrations *platformstorage.Service,
-) *ObjectStorage {
-	storage := NewObjectStorage(client)
-	storage.integrations = integrations
-	return storage
+	return &ObjectStorage{integrations: integrations}
 }
 
 func (s *ObjectStorage) ResolveUpload(
 	ctx context.Context,
 	recording sqlc.Recording,
 ) (*uuid.UUID, string, string, error) {
-	client, integrationID, err := s.clientForRecording(ctx, recording, true)
+	client, integrationID, err := s.clientForRecording(ctx, recording)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -61,14 +56,12 @@ func (s *ObjectStorage) Put(
 	reader io.Reader,
 	size int64,
 ) (*uuid.UUID, string, string, error) {
-	client, integrationID, err := s.clientForRecording(ctx, recording, true)
+	client, integrationID, err := s.clientForRecording(ctx, recording)
 	if err != nil {
 		return nil, "", "", err
 	}
-	if integrationID == nil {
-		if err := validateManagedRecordingKey(recording.OrganizationID, key); err != nil {
-			return nil, "", "", err
-		}
+	if err := validateManagedRecordingKey(recording.OrganizationID, key); err != nil {
+		return nil, "", "", err
 	}
 	if err := client.Put(ctx, key, contentType, reader, size); err != nil {
 		return nil, "", "", err
@@ -85,41 +78,34 @@ func (s *ObjectStorage) PlaybackURL(
 		*recording.StorageProvider != "s3" {
 		return "", time.Time{}, fmt.Errorf("recording has no S3 object")
 	}
-	client, integrationID, err := s.clientForRecording(ctx, recording, false)
+	client, _, err := s.clientForRecording(ctx, recording)
 	if err != nil {
 		return "", time.Time{}, err
 	}
 	if recording.StorageBucket == nil || *recording.StorageBucket != client.Bucket() {
 		return "", time.Time{}, fmt.Errorf("recording S3 bucket is invalid")
 	}
-	if integrationID == nil {
-		if err := validateManagedRecordingKey(recording.OrganizationID, *recording.StorageKey); err != nil {
-			return "", time.Time{}, err
-		}
+	if err := validateManagedRecordingKey(recording.OrganizationID, *recording.StorageKey); err != nil {
+		return "", time.Time{}, err
 	}
 	return client.PlaybackURL(ctx, *recording.StorageKey)
 }
 
-func (s *ObjectStorage) Delete(
-	ctx context.Context,
-	recording sqlc.Recording,
-) error {
+func (s *ObjectStorage) Delete(ctx context.Context, recording sqlc.Recording) error {
 	if recording.StorageKey == nil ||
 		recording.StorageProvider == nil ||
 		*recording.StorageProvider != "s3" {
 		return fmt.Errorf("recording has no S3 object")
 	}
-	client, integrationID, err := s.clientForRecording(ctx, recording, false)
+	client, _, err := s.clientForRecording(ctx, recording)
 	if err != nil {
 		return err
 	}
 	if recording.StorageBucket == nil || *recording.StorageBucket != client.Bucket() {
 		return fmt.Errorf("recording S3 bucket is invalid")
 	}
-	if integrationID == nil {
-		if err := validateManagedRecordingKey(recording.OrganizationID, *recording.StorageKey); err != nil {
-			return err
-		}
+	if err := validateManagedRecordingKey(recording.OrganizationID, *recording.StorageKey); err != nil {
+		return err
 	}
 	return client.Delete(ctx, *recording.StorageKey)
 }
@@ -127,64 +113,65 @@ func (s *ObjectStorage) Delete(
 func (s *ObjectStorage) clientForRecording(
 	ctx context.Context,
 	recording sqlc.Recording,
-	forUpload bool,
 ) (ObjectStore, *uuid.UUID, error) {
+	var (
+		resolved platformstorage.ResolvedIntegration
+		err      error
+	)
 	if recording.StorageIntegrationID != nil {
-		if s.integrations == nil {
-			return nil, nil, fmt.Errorf(
-				"recording storage integration resolver is unavailable",
-			)
+		if s.resolveByID != nil {
+			resolved, err = s.resolveByID(ctx, recording.OrganizationID, *recording.StorageIntegrationID)
+		} else if s.integrations != nil {
+			resolved, err = s.integrations.ResolveByID(ctx, recording.OrganizationID, *recording.StorageIntegrationID)
+		} else {
+			return nil, nil, fmt.Errorf("recording storage resolver is unavailable")
 		}
-		resolved, err := s.integrations.ResolveByID(
-			ctx,
-			recording.OrganizationID,
-			*recording.StorageIntegrationID,
-		)
 		if err != nil {
-			return nil, nil, fmt.Errorf(
-				"resolve recording storage integration: %w",
-				err,
-			)
+			return nil, nil, fmt.Errorf("resolve recording BYOS integration: %w", err)
 		}
-		client, err := customClient(ctx, resolved)
+	} else {
+		// A pinned key without an integration belongs to managed storage.
+		// Never silently reinterpret that key against a new customer bucket.
+		if recording.StorageKey != nil {
+			return nil, nil, fmt.Errorf("legacy managed recording requires BYOS migration")
+		}
+		if s.resolveActive != nil {
+			resolved, err = s.resolveActive(ctx, recording.OrganizationID)
+		} else if s.integrations != nil {
+			resolved, err = s.integrations.ResolveRecording(ctx, recording.OrganizationID)
+		} else {
+			return nil, nil, fmt.Errorf("recording storage resolver is unavailable")
+		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, fmt.Errorf("organization must configure active BYOS storage: %w", err)
+		}
 		if err != nil {
-			return nil, nil, err
-		}
-		id := resolved.ID
-		return client, &id, nil
-	}
-
-	// A storage key without an integration id means this upload was already
-	// pinned to Leamout-managed storage. Do not re-resolve the organization's
-	// active integration on retry.
-	if forUpload && recording.StorageKey == nil && s.integrations != nil {
-		resolved, err := s.integrations.ResolveRecording(
-			ctx,
-			recording.OrganizationID,
-		)
-		if err == nil {
-			client, clientErr := customClient(ctx, resolved)
-			if clientErr != nil {
-				return nil, nil, clientErr
-			}
-			id := resolved.ID
-			return client, &id, nil
-		}
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil, fmt.Errorf(
-				"resolve organization recording storage: %w",
-				err,
-			)
+			return nil, nil, fmt.Errorf("resolve organization BYOS storage: %w", err)
 		}
 	}
 
-	return s.client, nil, nil
+	if resolved.ID == uuid.Nil || resolved.OrganizationID != recording.OrganizationID ||
+		(recording.StorageIntegrationID != nil && resolved.ID != *recording.StorageIntegrationID) {
+		return nil, nil, fmt.Errorf("recording storage integration scope mismatch")
+	}
+
+	var client ObjectStore
+	if s.newClient != nil {
+		client, err = s.newClient(ctx, resolved)
+	} else {
+		client, err = customClient(ctx, resolved)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	if client == nil {
+		return nil, nil, fmt.Errorf("recording object store unavailable")
+	}
+	id := resolved.ID
+	return client, &id, nil
 }
 
-func customClient(
-	ctx context.Context,
-	resolved platformstorage.ResolvedIntegration,
-) (ObjectStore, error) {
+func customClient(ctx context.Context, resolved platformstorage.ResolvedIntegration) (ObjectStore, error) {
 	client, err := s3integration.New(ctx, s3integration.Config{
 		Endpoint:     resolved.EndpointURL,
 		Region:       resolved.Region,

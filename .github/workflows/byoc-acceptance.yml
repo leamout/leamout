@@ -8,6 +8,7 @@ on:
       - "deploy/**"
       - "containers/**"
       - "tests/byoc-v1/**"
+      - "tests/check_acceptance_compose.py"
       - ".github/workflows/byoc-acceptance.yml"
 
 permissions:
@@ -31,6 +32,7 @@ jobs:
         run: |
           sh -n tests/byoc-v1/run.sh
           python3 -m py_compile tests/byoc-v1/acceptance.py
+          python3 tests/check_acceptance_compose.py
 
       - name: Run BYOC v1 acceptance suite
         run: sh tests/byoc-v1/run.sh
