@@ -16,6 +16,22 @@ leamout/agents
 
 `leamout/agents` is a compatibility-tested catalog and is not a runtime dependency of `leamout/leamout`.
 
+## Portable agent packages
+
+The only portable JSON contract is defined by `github.com/leamout/contracts/agent`. A package is a directory of contract-defined documents, as used by `leamout/agents`:
+
+| File | Canonical Go contract | Purpose |
+| --- | --- | --- |
+| `agents/<alias>.json` | `agent.Manifest` | One credential-free voice agent and its provider bindings |
+| `tools.json` | `[]agent.ToolDefinition` | Shared built-in and webhook tools |
+| `routing.json` | `agent.RoutingManifest` | Default agent, schedule rules and file-stem aliases |
+
+Standalone examples may use `agent.json` for a single `agent.Manifest`. Manifests and routing documents use **numeric** `schema_version: 1`; provider bindings contain public provider configuration only. Organization credentials, integration IDs, tool secrets and deployment variables are resolved by the control plane when deploying, never shipped in a portable package.
+
+The older, unused `server/internal/ai/packages` schema combined multiple agents, tools and routing into one object with string `"1"` for `schema_version`. It is not part of the portable contract and has been removed. Do not introduce another runtime-specific portable JSON model.
+
+`server/internal/ai/manifest` validates the shared agent/tool types and deploys an individual agent. The `leamout/agents` validator checks entire package directories, including tool and routing references. Multi-agent deployment orchestration is a separate runtime concern and must build on these same contract types.
+
 ## Release policy
 
 Use semantic version tags for released dependency boundaries.

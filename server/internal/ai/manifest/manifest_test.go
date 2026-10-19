@@ -68,3 +68,57 @@ func TestResolveValue(t *testing.T) {
 		t.Fatalf("resolveValue() = %q", got)
 	}
 }
+
+func TestValidatorAcceptsCanonicalPortableDocuments(t *testing.T) {
+	t.Parallel()
+
+	var portableAgent agentcontract.Manifest
+	if err := json.Unmarshal([]byte(`{
+		"schema_version": 1,
+		"name": "Receptionist",
+		"engine": "realtime",
+		"instructions": "Answer calls.",
+		"providers": [
+			{"role": "realtime", "provider": "gemini", "config": {"model": "gemini-3.8-live"}}
+		],
+		"tools": ["hangup_call"]
+	}`), &portableAgent); err != nil {
+		t.Fatalf("decode portable agent: %v", err)
+	}
+
+	var portableTools []agentcontract.ToolDefinition
+	if err := json.Unmarshal([]byte(`[
+		{
+			"type": "builtin",
+			"name": "hangup_call",
+			"description": "End the active call.",
+			"parameters": {"type": "object"}
+		}
+	]`), &portableTools); err != nil {
+		t.Fatalf("decode portable tools: %v", err)
+	}
+
+	if err := NewValidator().Validate(Package{
+		Agent: portableAgent,
+		Tools: portableTools,
+	}); err != nil {
+		t.Fatalf("validate portable agent and tools: %v", err)
+	}
+
+	var portableRouting agentcontract.RoutingManifest
+	if err := json.Unmarshal([]byte(`{
+		"schema_version": 1,
+		"name": "Receptionist routing",
+		"default_agent": "receptionist"
+	}`), &portableRouting); err != nil {
+		t.Fatalf("decode portable routing: %v", err)
+	}
+	if err := portableRouting.Validate(); err != nil {
+		t.Fatalf("validate portable routing: %v", err)
+	}
+	if err := portableRouting.ValidateAgentReferences(map[string]struct{}{
+		"receptionist": {},
+	}); err != nil {
+		t.Fatalf("validate portable routing references: %v", err)
+	}
+}
