@@ -11,14 +11,6 @@ import (
 	agentcontract "github.com/leamout/contracts/agent"
 )
 
-// PortablePackage groups canonical contracts for a package directory or an
-// API deployment request. It does not define another portable agent schema.
-type PortablePackage struct {
-	Agents  map[string]agentcontract.Manifest `json:"agents"`
-	Tools   []agentcontract.ToolDefinition    `json:"tools"`
-	Routing agentcontract.RoutingManifest     `json:"routing"`
-}
-
 var agentAliasPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 const maxPortableAgents = 32
