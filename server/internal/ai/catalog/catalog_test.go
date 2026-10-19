@@ -89,14 +89,54 @@ func TestBuiltinsRejectTenantControlledProviderEndpoints(t *testing.T) {
 		provider string
 		endpoint string
 	}{
-		{name: "deepgram", kind: ai.KindSTT, provider: "deepgram", endpoint: "wss://tenant.example.test/ws"},
-		{name: "assemblyai", kind: ai.KindSTT, provider: "assemblyai", endpoint: "wss://tenant.example.test/ws"},
-		{name: "groq", kind: ai.KindLLM, provider: "groq", endpoint: "https://tenant.example.test/v1/chat"},
-		{name: "openai-llm", kind: ai.KindLLM, provider: "openai", endpoint: "https://tenant.example.test/v1/chat"},
-		{name: "cartesia", kind: ai.KindTTS, provider: "cartesia", endpoint: "wss://tenant.example.test/ws"},
-		{name: "elevenlabs", kind: ai.KindTTS, provider: "elevenlabs", endpoint: "wss://tenant.example.test/ws"},
-		{name: "openai-realtime", kind: ai.KindRealtime, provider: "openai", endpoint: "wss://tenant.example.test/ws"},
-		{name: "gemini-realtime", kind: ai.KindRealtime, provider: "gemini", endpoint: "wss://tenant.example.test/ws"},
+		{
+			name:     "deepgram",
+			kind:     ai.KindSTT,
+			provider: "deepgram",
+			endpoint: "wss://tenant.example.test/ws",
+		},
+		{
+			name:     "assemblyai",
+			kind:     ai.KindSTT,
+			provider: "assemblyai",
+			endpoint: "wss://tenant.example.test/ws",
+		},
+		{
+			name:     "groq",
+			kind:     ai.KindLLM,
+			provider: "groq",
+			endpoint: "https://tenant.example.test/v1/chat",
+		},
+		{
+			name:     "openai-llm",
+			kind:     ai.KindLLM,
+			provider: "openai",
+			endpoint: "https://tenant.example.test/v1/chat",
+		},
+		{
+			name:     "cartesia",
+			kind:     ai.KindTTS,
+			provider: "cartesia",
+			endpoint: "wss://tenant.example.test/ws",
+		},
+		{
+			name:     "elevenlabs",
+			kind:     ai.KindTTS,
+			provider: "elevenlabs",
+			endpoint: "wss://tenant.example.test/ws",
+		},
+		{
+			name:     "openai-realtime",
+			kind:     ai.KindRealtime,
+			provider: "openai",
+			endpoint: "wss://tenant.example.test/ws",
+		},
+		{
+			name:     "gemini-realtime",
+			kind:     ai.KindRealtime,
+			provider: "gemini",
+			endpoint: "wss://tenant.example.test/ws",
+		},
 	}
 
 	for _, test := range tests {
