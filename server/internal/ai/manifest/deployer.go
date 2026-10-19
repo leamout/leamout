@@ -13,13 +13,13 @@ import (
 )
 
 type DeploymentInput struct {
-	Integrations map[string]uuid.UUID
-	Variables    map[string]string
+	Integrations map[string]uuid.UUID `json:"integrations,omitempty"`
+	Variables    map[string]string    `json:"variables,omitempty"`
 }
 
 type DeploymentResult struct {
-	AgentID        uuid.UUID
-	SigningSecrets map[string]string
+	AgentID        uuid.UUID         `json:"agent_id"`
+	SigningSecrets map[string]string `json:"signing_secrets,omitempty"`
 }
 
 type Deployer struct {
