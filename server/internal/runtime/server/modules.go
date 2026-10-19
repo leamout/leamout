@@ -30,8 +30,8 @@ import (
 	"github.com/leamout/leamout/server/internal/telephony"
 	"github.com/leamout/leamout/server/internal/telephony/recordings"
 	"github.com/leamout/leamout/server/internal/telephony/webrtc"
-	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/internal/tenancy"
+	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
 type modules struct {
