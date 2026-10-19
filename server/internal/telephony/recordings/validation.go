@@ -37,7 +37,6 @@ func validateFilters(req ListRequest) error {
 	return listquery.Range(req.CreatedFrom, req.CreatedBefore)
 }
 
-
 func recordingStoragePrefix(organizationID uuid.UUID) (string, error) {
 	if organizationID == uuid.Nil {
 		return "", fmt.Errorf("recording organization id is required")

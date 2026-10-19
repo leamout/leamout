@@ -16,6 +16,7 @@ import (
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	platformstorage "github.com/leamout/leamout/server/internal/platform/storage"
 )
+
 type ReconciliationJobConfig struct {
 	Interval  time.Duration
 	Grace     time.Duration
@@ -431,4 +432,3 @@ func recordingObjectKey(
 	return prefix + occurredAt.UTC().Format("2006/01/02") + "/" +
 		recordingID.String() + "." + extension, nil
 }
-
