@@ -54,10 +54,6 @@ type ingestionRepository interface {
 	CompleteUpload(
 		context.Context,
 		sqlc.Recording,
-		*uuid.UUID,
-		string,
-		string,
-		string,
 		string,
 		int64,
 	) (sqlc.Recording, error)
@@ -239,16 +235,21 @@ func (j *IngestionJob) ingestOne(
 	if err != nil {
 		return j.retryOrFail(ctx, recording, err)
 	}
-	if _, err := j.repo.CompleteUpload(
-		ctx,
-		recording,
-		integrationID,
-		key,
-		provider,
-		bucket,
-		ext,
-		info.Size(),
-	); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if recording.StorageIntegrationID == nil ||
+		integrationID == nil ||
+		*recording.StorageIntegrationID != *integrationID ||
+		recording.StorageProvider == nil ||
+		*recording.StorageProvider != provider ||
+		recording.StorageBucket == nil ||
+		*recording.StorageBucket != bucket {
+		return j.retryOrFail(
+			ctx,
+			recording,
+			fmt.Errorf("recording upload destination differs from pinned BYOS integration"),
+		)
+	}
+	if _, err := j.repo.CompleteUpload(ctx, recording, ext, info.Size()); err != nil &&
+		!errors.Is(err, pgx.ErrNoRows) {
 		return fmt.Errorf("complete recording upload %s: %w", recording.ID, err)
 	}
 	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {

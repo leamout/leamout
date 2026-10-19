@@ -28,6 +28,32 @@ CREATE TABLE IF NOT EXISTS recordings (
     CONSTRAINT chk_recordings_status CHECK (
         status IN ('recording', 'uploading', 'completed', 'failed', 'deleted')
     ),
+    -- All permanent object fields must be absent before a destination is
+    -- pinned, or present together for a tenant-owned S3-compatible bucket.
+    CONSTRAINT chk_recordings_byos_destination CHECK (
+        (
+            storage_integration_id IS NULL
+            AND storage_key IS NULL
+            AND storage_provider IS NULL
+            AND storage_bucket IS NULL
+        )
+        OR
+        (
+            storage_integration_id IS NOT NULL
+            AND storage_key IS NOT NULL
+            AND length(btrim(storage_key)) > 0
+            AND storage_provider = 's3'
+            AND storage_bucket IS NOT NULL
+            AND length(btrim(storage_bucket)) > 0
+        )
+    ),
+    CONSTRAINT chk_recordings_completed_byos CHECK (
+        status <> 'completed' OR storage_integration_id IS NOT NULL
+    ),
+    -- Playback URLs are signed on demand; never persist a reusable URL.
+    CONSTRAINT chk_recordings_no_storage_url CHECK (
+        storage_url IS NULL
+    ),
     CONSTRAINT chk_recordings_upload_attempts CHECK (
         upload_attempts >= 0
     ),
