@@ -26,7 +26,7 @@ func DefaultReconciliationJobConfig() ReconciliationJobConfig {
 }
 
 func NewReconciliationJob(
-	repo reconciliationRepository,
+	repo *Repository,
 	config ReconciliationJobConfig,
 ) (*ReconciliationJob, error) {
 	if repo == nil {
@@ -108,7 +108,7 @@ func DefaultIngestionConfig(stagingPath string) IngestionConfig {
 }
 
 func NewIngestionJob(
-	repo ingestionRepository,
+	repo *Repository,
 	storage *platformstorage.ObjectStorage,
 	config IngestionConfig,
 ) (*IngestionJob, error) {

@@ -1,7 +1,6 @@
 package recordings
 
 import (
-	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -95,13 +94,8 @@ type ReconciliationJobConfig struct {
 	BatchSize int32
 }
 
-type reconciliationRepository interface {
-	ListForReconciliation(context.Context, time.Time, int32) ([]sqlc.Recording, error)
-	MarkReadyForUpload(context.Context, sqlc.Recording, time.Time) (sqlc.Recording, error)
-}
-
 type ReconciliationJob struct {
-	repo   reconciliationRepository
+	repo   *Repository
 	config ReconciliationJobConfig
 	now    func() time.Time
 }
@@ -116,28 +110,8 @@ type IngestionConfig struct {
 	StagingPath string
 }
 
-type ingestionRepository interface {
-	ListForUpload(context.Context, time.Time, time.Time, int32) ([]sqlc.Recording, error)
-	PinUpload(
-		context.Context,
-		sqlc.Recording,
-		*uuid.UUID,
-		string,
-		string,
-		string,
-	) (sqlc.Recording, error)
-	CompleteUpload(
-		context.Context,
-		sqlc.Recording,
-		string,
-		int64,
-	) (sqlc.Recording, error)
-	RetryUpload(context.Context, sqlc.Recording, time.Time, string) error
-	Fail(context.Context, sqlc.Recording) (sqlc.Recording, error)
-}
-
 type IngestionJob struct {
-	repo    ingestionRepository
+	repo    *Repository
 	storage *platformstorage.ObjectStorage
 	config  IngestionConfig
 	now     func() time.Time

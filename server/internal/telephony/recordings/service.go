@@ -13,23 +13,12 @@ import (
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
-type recordingRepository interface {
-	Get(context.Context, uuid.UUID, uuid.UUID) (sqlc.Recording, error)
-	GetIncludingDeleted(context.Context, uuid.UUID, uuid.UUID) (sqlc.Recording, error)
-	GetByCallStorageKey(context.Context, uuid.UUID, string) (sqlc.Recording, error)
-	GetCallOrganizationID(context.Context, uuid.UUID) (uuid.UUID, error)
-	List(context.Context, uuid.UUID, ListRequest) ([]sqlc.Recording, error)
-	Start(context.Context, uuid.UUID, uuid.UUID, string, time.Time) (sqlc.Recording, error)
-	MarkReadyForUpload(context.Context, sqlc.Recording, time.Time) (sqlc.Recording, error)
-	Delete(context.Context, sqlc.Recording) (sqlc.Recording, error)
-}
-
 type Service struct {
-	repo    recordingRepository
+	repo    *Repository
 	storage *platformstorage.ObjectStorage
 }
 
-func NewService(repo recordingRepository, storage *platformstorage.ObjectStorage) *Service {
+func NewService(repo *Repository, storage *platformstorage.ObjectStorage) *Service {
 	if repo == nil {
 		panic("recordings: repository is required")
 	}

@@ -16,13 +16,8 @@ const (
 	freeSWITCHEventRecordStop  = "RECORD_STOP"
 )
 
-type lifecycleService interface {
-	ObserveStarted(context.Context, LifecycleEvent) error
-	ObserveStopped(context.Context, LifecycleEvent) error
-}
-
 type Consumer struct {
-	service lifecycleService
+	service *Service
 }
 
 func NewConsumer(service *Service) *Consumer {
