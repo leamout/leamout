@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/security/egress"
 )
 
 type HealthCheckConfig struct {
@@ -127,16 +128,40 @@ type SIPOptionsProber struct {
 	TLSConfig *tls.Config
 }
 
+// Probe validates all DNS answers and dials a validated IP directly, so
+// a second DNS lookup cannot redirect the request to a private destination.
 func (p SIPOptionsProber) Probe(ctx context.Context, endpoint sqlc.TrunkEndpoint) (int32, error) {
-	address := net.JoinHostPort(endpoint.Host, strconv.Itoa(int(endpoint.Port)))
-	dialer := p.Dialer
-	if dialer == nil {
-		dialer = &net.Dialer{}
+	addresses, err := egress.ResolveHost(ctx, endpoint.Host)
+	if err != nil {
+		return 0, fmt.Errorf("reject SIP trunk endpoint %q: %w", endpoint.Host, err)
 	}
 	payload, err := optionsRequest(endpoint.Host, endpoint.Port, endpoint.Transport)
 	if err != nil {
 		return 0, err
 	}
+	dialer := p.Dialer
+	if dialer == nil {
+		dialer = &net.Dialer{}
+	}
+	var lastErr error
+	for _, ip := range addresses {
+		address := net.JoinHostPort(ip.String(), strconv.Itoa(int(endpoint.Port)))
+		code, probeErr := p.probeAddress(ctx, dialer, endpoint, address, payload)
+		if probeErr == nil {
+			return code, nil
+		}
+		lastErr = probeErr
+	}
+	return 0, lastErr
+}
+
+func (p SIPOptionsProber) probeAddress(
+	ctx context.Context,
+	dialer *net.Dialer,
+	endpoint sqlc.TrunkEndpoint,
+	address string,
+	payload []byte,
+) (int32, error) {
 	switch endpoint.Transport {
 	case "udp":
 		return p.probeUDP(ctx, dialer, address, payload)
