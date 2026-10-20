@@ -73,6 +73,19 @@ class DeploymentPreflightTests(unittest.TestCase):
         self.assertTrue(any("CORS_ORIGINS" in error for error in errors))
         self.assertTrue(any("POLAR_ACCESS_TOKEN" in error for error in errors))
 
+    def test_rejects_extra_https_origin(self):
+        infra, app = valid_settings()
+        app["CORS_ORIGINS"] += ",https://unreviewed.example.com"
+        self.assertTrue(any("CORS_ORIGINS" in error for error in validate(infra, app)))
+
+    def test_rejects_example_polar_credentials(self):
+        infra, app = valid_settings()
+        app["POLAR_ACCESS_TOKEN"] = "change-me-polar-access-token"
+        app["POLAR_WEBHOOK_SECRET"] = "change-me-polar-webhook-secret"
+        errors = validate(infra, app)
+        self.assertTrue(any("POLAR_ACCESS_TOKEN" in error for error in errors))
+        self.assertTrue(any("POLAR_WEBHOOK_SECRET" in error for error in errors))
+
     def test_rejects_cross_domain_configuration(self):
         infra, app = valid_settings()
         app["DOMAIN"] = "other.example"
