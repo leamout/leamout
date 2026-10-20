@@ -97,9 +97,8 @@ def validate(infra: dict[str, str], app: dict[str, str]) -> list[str]:
         for origin in app.get("CORS_ORIGINS", "").split(",")
         if origin.strip()
     ]
-    check(expected["FRONTEND_URL"] in origins, "CORS_ORIGINS must include FRONTEND_URL")
-    check(all(origin.startswith("https://") and "*" not in origin for origin in origins),
-          "CORS_ORIGINS must contain only explicit HTTPS origins")
+    check(origins == [expected["FRONTEND_URL"]],
+          "CORS_ORIGINS must contain only the deployed console HTTPS origin")
 
     turn_host = f"turn.{domain}"
     check(infra.get("TURN_REALM") == turn_host,
@@ -146,6 +145,11 @@ def validate(infra: dict[str, str], app: dict[str, str]) -> list[str]:
     polar_webhook = app.get("POLAR_WEBHOOK_SECRET", "")
     check(bool(polar_token) == bool(polar_webhook),
           "POLAR_ACCESS_TOKEN and POLAR_WEBHOOK_SECRET must be configured together")
+    if polar_token or polar_webhook:
+        check(not is_weak_secret(polar_token, 24),
+              "POLAR_ACCESS_TOKEN must be a strong, non-example credential")
+        check(not is_weak_secret(polar_webhook, 24),
+              "POLAR_WEBHOOK_SECRET must be a strong, non-example credential")
     return errors
 
 
