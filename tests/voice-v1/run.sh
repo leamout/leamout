@@ -48,7 +48,7 @@ cleanup() {
         (
             cd "$REPO_ROOT" &&
                 $COMPOSE logs --no-color --tail=300 \
-                    server \
+                    keycloak keycloak-postgres server \
                     worker \
                     freeswitch \
                     opensips \

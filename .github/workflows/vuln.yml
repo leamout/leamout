@@ -44,6 +44,9 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
+      - name: Generate backoffice templates
+        run: go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
+
       - name: Verify modules
         run: go mod verify
 

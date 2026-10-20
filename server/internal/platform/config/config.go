@@ -34,6 +34,7 @@ type Config struct {
 	Polar    PolarConfig     `envPrefix:"POLAR_"`
 
 	AppEnv                string   `env:"APP_ENV" envDefault:"development"`
+	BackofficeURL         string   `env:"BACKOFFICE_URL" envDefault:"http://localhost:8082"`
 	FrontendURL           string   `env:"FRONTEND_URL" envDefault:"http://localhost:3000"`
 	BackendURL            string   `env:"BACKEND_URL" envDefault:"http://localhost:8080"`
 	Domain                string   `env:"DOMAIN"`
@@ -85,6 +86,7 @@ func (c *Config) normalize() {
 	c.Polar.ScaleProductID = strings.TrimSpace(c.Polar.ScaleProductID)
 	c.AppEnv = strings.TrimSpace(c.AppEnv)
 	c.Domain = strings.TrimSpace(c.Domain)
+	c.BackofficeURL = strings.TrimRight(strings.TrimSpace(c.BackofficeURL), "/")
 	c.FrontendURL = strings.TrimRight(strings.TrimSpace(c.FrontendURL), "/")
 	c.BackendURL = strings.TrimRight(strings.TrimSpace(c.BackendURL), "/")
 	c.DatabaseURL = strings.TrimSpace(c.DatabaseURL)

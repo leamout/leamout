@@ -1,15 +1,15 @@
-.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability
+.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability backoffice-assets backoffice-generate
 
-test:
+test: backoffice-generate
 	cd server && go test ./...
 
-test-race:
+test-race: backoffice-generate
 	cd server && go test -race ./...
 
-vet:
+vet: backoffice-generate
 	cd server && go vet ./...
 
-build:
+build: backoffice-generate
 	cd server && go build ./...
 
 sqlc:
@@ -20,3 +20,9 @@ compose-validate:
 
 compose-validate-observability:
 	GRAFANA_ADMIN_PASSWORD=ci-only-placeholder APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml config --quiet
+
+backoffice-assets:
+	cd server/internal/backoffice && bun install --frozen-lockfile && bun run build
+
+backoffice-generate:
+	cd server && go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate

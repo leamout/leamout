@@ -65,7 +65,7 @@ cleanup() {
             "netstat -anu 2>/dev/null | awk 'NR > 2 { n=split(\$4,a,\":\"); p=a[n]+0; if (p >= 23000 && p <= 32768) print \$0 }'") >&2 || true
         (cd "$REPO_ROOT" && $COMPOSE exec -T graceful-drain-carrier fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
         (cd "$REPO_ROOT" && $COMPOSE exec -T freeswitch fs_cli -H 127.0.0.1 -P 8021 -p "$FREESWITCH_ESL_PASSWORD" -x 'sofia status profile internal') || true
-        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=400 server worker opensips freeswitch rtpengine graceful-drain-carrier postgres migrate) || true
+        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=400 keycloak keycloak-postgres server worker opensips freeswitch rtpengine graceful-drain-carrier postgres migrate) || true
     fi
     if [ "${GRACEFUL_DRAIN_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true

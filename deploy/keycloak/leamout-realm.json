@@ -29,7 +29,10 @@
       "implicitFlowEnabled": false,
       "serviceAccountsEnabled": false,
       "frontchannelLogout": false,
-      "redirectUris": ["${FRONTEND_URL}/api/v1/auth/callback"],
+      "redirectUris": [
+        "${FRONTEND_URL}/api/v1/auth/callback",
+        "${BACKOFFICE_URL}/auth/callback"
+      ],
       "webOrigins": ["${FRONTEND_URL}"],
       "defaultClientScopes": ["basic", "profile", "email"],
       "attributes": {

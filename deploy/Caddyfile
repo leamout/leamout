@@ -44,3 +44,15 @@ auth.{$DOMAIN} {
         Strict-Transport-Security "max-age=31536000"
     }
 }
+
+backoffice.{$DOMAIN} {
+    reverse_proxy backoffice:8082
+
+    header {
+        -Server
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        Strict-Transport-Security "max-age=31536000"
+    }
+}

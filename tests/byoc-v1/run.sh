@@ -43,7 +43,7 @@ cleanup() {
     trap - EXIT INT TERM
     if [ "$status" -ne 0 ]; then
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
-        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=300 server worker opensips freeswitch rtpengine byoc-v1-carrier postgres migrate) || true
+        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=300 keycloak keycloak-postgres server worker opensips freeswitch rtpengine byoc-v1-carrier postgres migrate) || true
     fi
     if [ "${BYOC_V1_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true

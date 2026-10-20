@@ -25,6 +25,7 @@ def main():
     assert infra["DOMAIN"] == domain, "root and app DOMAIN disagree"
     assert app["FRONTEND_URL"] == f"https://console.{domain}"
     assert app["BACKEND_URL"] == f"https://api.{domain}"
+    assert app["BACKOFFICE_URL"] == f"https://backoffice.{domain}"
     assert app["KEYCLOAK_ISSUER"] == f"https://auth.{domain}/realms/leamout"
     assert app["FRONTEND_URL"] in app["CORS_ORIGINS"].split(",")
     assert app["FRONTEND_URL"] != app["BACKEND_URL"]
@@ -33,7 +34,10 @@ def main():
         (ROOT / "deploy/keycloak/leamout-realm.json").read_text(encoding="utf-8")
     )
     client, = [item for item in realm["clients"] if item["clientId"] == "leamout-console"]
-    assert client["redirectUris"] == ["${FRONTEND_URL}/api/v1/auth/callback"]
+    assert client["redirectUris"] == [
+        "${FRONTEND_URL}/api/v1/auth/callback",
+        "${BACKOFFICE_URL}/auth/callback",
+    ]
     assert client["webOrigins"] == ["${FRONTEND_URL}"]
     assert client["attributes"]["backchannel.logout.url"] == (
         "${BACKEND_URL}/v1/identity/backchannel-logout"
@@ -49,6 +53,9 @@ def main():
     assert re.search(r"@privateMetrics\s+path /metrics", caddy)
     assert "respond @privateMetrics 404" in caddy
     assert "reverse_proxy server:8080" in caddy
+    assert re.search(
+        r"backoffice\.\{\$DOMAIN\}\s*\{\s*reverse_proxy backoffice:8082", caddy
+    )
 
     target = (
         ROOT / "deploy/observability/prometheus/targets/leamout.yml"

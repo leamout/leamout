@@ -49,7 +49,7 @@ cleanup() {
         (
             cd "$REPO_ROOT" &&
                 $COMPOSE logs --no-color --tail=300 \
-                    server opensips rtpengine freeswitch coturn postgres redis nats
+                    keycloak keycloak-postgres server opensips rtpengine freeswitch coturn postgres redis nats
         ) || true
     fi
 

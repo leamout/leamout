@@ -66,6 +66,19 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Build backoffice assets and generate templates
+        run: |
+          cd internal/backoffice
+          bun install --frozen-lockfile
+          bun run build
+          cd ../..
+          go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
+
       - name: Check modules
         run: |
           go mod tidy
