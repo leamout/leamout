@@ -12,21 +12,21 @@ import { plans } from "@/lib/plans";
 
 const presentation = {
   Free: {
-    background: "bg-blue-500/10",
+    background: "bg-card",
     description:
       "Build and test your first voice agent with your own providers.",
   },
   Developer: {
-    background: "bg-teal-400/20",
+    background: "bg-card",
     description:
       "For developers bringing their first voice applications into production.",
   },
   Pro: {
-    background: "bg-orange-400/15",
+    background: "bg-brand-orange/10",
     description: "More capacity and controls for growing production teams.",
   },
   Scale: {
-    background: "bg-violet-400/15",
+    background: "bg-card",
     description:
       "Room for higher-volume workloads and a larger fleet of agents.",
   },
@@ -50,7 +50,7 @@ export default function Pricing({ signupHref }: { signupHref: string }) {
           </Badge>
           <h1
             id="pricing-title"
-            className="max-w-2xl text-balance text-4xl font-medium leading-tight tracking-tight sm:text-5xl"
+            className="max-w-2xl text-balance text-4xl font-heading font-medium leading-tight tracking-tight sm:text-5xl"
           >
             The right plan for your next conversation.
           </h1>
@@ -124,12 +124,12 @@ export default function Pricing({ signupHref }: { signupHref: string }) {
                               aria-label={`Get started with ${plan.name}`}
                             />
                           }
-                          className="group relative h-12 w-fit overflow-hidden rounded-full bg-white py-1 ps-6 pe-14 text-sm font-medium text-black transition-all duration-300 hover:bg-white hover:ps-14 hover:pe-6 hover:text-black focus-visible:ring-black/40 motion-reduce:transition-none motion-reduce:hover:ps-6 motion-reduce:hover:pe-14"
+                          className="group relative h-12 w-fit overflow-hidden rounded-full bg-brand-orange py-1 ps-6 pe-14 text-sm font-medium text-[#101316] transition-all duration-300 hover:bg-brand-orange/90 hover:ps-14 hover:pe-6 hover:text-black focus-visible:ring-brand-orange/40 motion-reduce:transition-none motion-reduce:hover:ps-6 motion-reduce:hover:pe-14"
                         >
                           <span className="relative z-10">Get started</span>
                           <span
                             aria-hidden="true"
-                            className="absolute right-1 flex size-10 items-center justify-center rounded-full bg-black text-white transition-all duration-300 group-hover:right-[calc(100%-44px)] group-hover:rotate-45 motion-reduce:transition-none motion-reduce:group-hover:right-1 motion-reduce:group-hover:rotate-0"
+                            className="absolute right-1 flex size-10 items-center justify-center rounded-full bg-[#101316] text-[#F5F6F4] transition-all duration-300 group-hover:right-[calc(100%-44px)] group-hover:rotate-45 motion-reduce:transition-none motion-reduce:group-hover:right-1 motion-reduce:group-hover:rotate-0"
                           >
                             <HugeiconsIcon
                               icon={ArrowUpRight01Icon}

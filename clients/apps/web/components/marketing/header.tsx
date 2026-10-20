@@ -18,9 +18,10 @@ import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 
 const links = [
+  { label: "Platform", href: "/platform" },
+  { label: "Integrations", href: "/integrations" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Documentation", href: "/docs" },
-  { label: "Contact", href: "/contact" },
+  { label: "Docs", href: "/docs" },
 ];
 
 export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
@@ -29,7 +30,7 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
   const trigger = useRef<HTMLButtonElement>(null);
 
   return (
-    <header className="border-b border-border bg-background">
+    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-xl">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-background focus:p-3 focus:ring-2 focus:ring-ring"
@@ -37,7 +38,7 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
         Skip to content
       </a>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-6 px-5 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[76px] max-w-[1200px] items-center justify-between gap-6 px-5 sm:px-6 lg:px-8">
           <Link
             href="/"
             aria-label="Leamout home"
@@ -51,7 +52,7 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
           </Link>
           <NavigationMenu
             aria-label="Main navigation"
-            className="hidden md:flex"
+            className="hidden lg:flex"
           >
             <NavigationMenuList>
               {links.map((link) => (
@@ -67,7 +68,7 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
               ))}
             </NavigationMenuList>
           </NavigationMenu>
-          <div className="hidden items-center gap-2 md:flex">
+          <div className="hidden items-center gap-2 lg:flex">
             <Button
               variant="ghost"
               nativeButton={false}
@@ -84,13 +85,13 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
           </div>
           <CollapsibleTrigger
             ref={trigger}
-            render={<Button variant="outline" className="md:hidden" />}
+            render={<Button variant="outline" className="lg:hidden" />}
           >
             {open ? "Close menu" : "Menu"}
           </CollapsibleTrigger>
         </div>
         <CollapsibleContent
-          className="border-t border-border md:hidden"
+          className="border-t border-border lg:hidden"
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setOpen(false);
@@ -100,7 +101,7 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
         >
           <nav
             aria-label="Mobile navigation"
-            className="mx-auto flex max-w-6xl flex-col gap-2 px-5 py-5 sm:px-6"
+            className="mx-auto flex max-w-[1200px] flex-col gap-2 px-5 py-5 sm:px-6 lg:px-8"
           >
             {links.map((link) => (
               <Link

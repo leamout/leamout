@@ -1,7 +1,7 @@
 export function Mission() {
   return (
     <div className="grid gap-12 border-t border-border py-12 md:grid-cols-2">
-      <h2 className="text-3xl font-semibold tracking-tight">
+      <h2 className="text-3xl font-heading font-semibold tracking-tight">
         A platform built around ownership.
       </h2>
       <div className="space-y-5 leading-8 text-muted-foreground">

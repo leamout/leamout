@@ -4,6 +4,8 @@ const groups = [
   {
     title: "Resources",
     links: [
+      { label: "Platform", href: "/platform" },
+      { label: "Integrations", href: "/integrations" },
       { label: "Pricing", href: "/pricing" },
       { label: "Documentation", href: "/docs" },
       { label: "Security", href: "/security" },
@@ -30,30 +32,35 @@ const groups = [
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-border bg-muted/20">
-      <div className="mx-auto max-w-6xl px-5 py-12 sm:px-6 lg:px-8">
-        <div className="grid gap-10 lg:grid-cols-[1.2fr_2fr] lg:gap-20">
+    <footer className="border-t border-border bg-background">
+      <div className="mx-auto max-w-[1200px] px-5 pt-16 pb-8 sm:px-6 lg:px-8">
+        <div className="grid gap-12 lg:grid-cols-[1fr_1.5fr] lg:gap-20">
           <div>
             <Link
               href="/"
               aria-label="Leamout home"
-              className="rounded-sm font-heading text-xl font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-sm font-heading text-2xl font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Leamout
               <span aria-hidden="true" className="text-brand-orange">
                 .
               </span>
             </Link>
-            <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
-              Leamout is the carrier-grade runtime and control plane for
-              autonomous voice agents.
+            <p className="mt-5 max-w-sm leading-7 text-muted-foreground">
+              The carrier-grade runtime and control plane for autonomous voice
+              agents.
+            </p>
+            <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.15em] text-brand-orange">
+              SIP-native. Provider-independent.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-10 sm:grid-cols-3">
             {groups.map((group) => (
               <nav key={group.title} aria-label={group.title}>
-                <h2 className="text-sm font-semibold">{group.title}</h2>
-                <ul className="mt-4 space-y-3">
+                <h2 className="font-mono text-xs font-medium uppercase tracking-wider text-foreground">
+                  {group.title}
+                </h2>
+                <ul className="mt-5 space-y-3">
                   {group.links.map((link) => (
                     <li key={link.href}>
                       <Link
@@ -69,9 +76,10 @@ export function MarketingFooter() {
             ))}
           </div>
         </div>
-        <p className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Leamout. All rights reserved.
-        </p>
+        <div className="mt-16 flex flex-col gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:justify-between">
+          <p>© {new Date().getFullYear()} Leamout. All rights reserved.</p>
+          <p>One managed runtime. Your carrier and AI providers.</p>
+        </div>
       </div>
     </footer>
   );
