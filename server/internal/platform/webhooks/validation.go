@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/security/egress"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -52,9 +52,8 @@ func validateInboundEvent(event InboundEvent) error {
 
 func normalizeURL(v string) (string, error) {
 	v = strings.TrimSpace(v)
-	u, err := url.ParseRequestURI(v)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-		return "", apperror.NewBadRequest("url must be an https URL")
+	if _, err := egress.ParseHTTPS(v); err != nil {
+		return "", apperror.NewBadRequest("invalid webhook URL: " + err.Error())
 	}
 	return v, nil
 }

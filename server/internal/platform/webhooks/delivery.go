@@ -11,6 +11,7 @@ import (
 
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/security/egress"
 )
 
 const maxResponseBody = 4096
@@ -23,13 +24,18 @@ type HTTPSender struct {
 	client *http.Client
 }
 
-func NewHTTPSender() *HTTPSender {
-	return &HTTPSender{client: &http.Client{
-		Timeout: 10 * time.Second,
+func newWebhookClient() *http.Client {
+	return &http.Client{
+		Transport: egress.NewTransport(),
+		Timeout:   10 * time.Second,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
-	}}
+	}
+}
+
+func NewHTTPSender() *HTTPSender {
+	return &HTTPSender{client: newWebhookClient()}
 }
 
 func (s *HTTPSender) Send(ctx context.Context, delivery sqlc.ClaimWebhookDeliveriesRow) DeliveryAttempt {
@@ -43,7 +49,11 @@ func (s *HTTPSender) Send(ctx context.Context, delivery sqlc.ClaimWebhookDeliver
 		return DeliveryAttempt{Err: fmt.Errorf("marshal webhook delivery: %w", err)}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, delivery.Url, bytes.NewReader(body))
+	endpoint, err := egress.ParseHTTPS(delivery.Url)
+	if err != nil {
+		return DeliveryAttempt{Err: fmt.Errorf("validate webhook destination: %w", err)}
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint.String(), bytes.NewReader(body))
 	if err != nil {
 		return DeliveryAttempt{Err: fmt.Errorf("create webhook request: %w", err)}
 	}
@@ -76,7 +86,11 @@ func sendTest(c context.Context, endpoint sqlc.WebhookEndpoint) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	req, err := http.NewRequestWithContext(c, http.MethodPost, endpoint.Url, bytes.NewReader(body))
+	destination, err := egress.ParseHTTPS(endpoint.Url)
+	if err != nil {
+		return 0, fmt.Errorf("validate webhook destination: %w", err)
+	}
+	req, err := http.NewRequestWithContext(c, http.MethodPost, destination.String(), bytes.NewReader(body))
 	if err != nil {
 		return 0, err
 	}
@@ -86,13 +100,7 @@ func sendTest(c context.Context, endpoint sqlc.WebhookEndpoint) (int, error) {
 	req.Header.Set("X-Leamout-Event", "webhook.test")
 	req.Header.Set("X-Leamout-Timestamp", fmt.Sprintf("%d", now.Unix()))
 	req.Header.Set(signatureHeader, sign(endpoint.SigningSecret, body, now))
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	resp, err := client.Do(req)
+	resp, err := newWebhookClient().Do(req)
 	if err != nil {
 		return 0, err
 	}

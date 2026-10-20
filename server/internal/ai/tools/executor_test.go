@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -23,28 +22,6 @@ func TestValidateExecutionEndpointRequiresHTTPS(t *testing.T) {
 	}
 	if _, err := validateExecutionEndpoint("https://example.com/tool"); err != nil {
 		t.Fatalf("validateExecutionEndpoint() error = %v", err)
-	}
-}
-
-func TestValidateToolAddressRejectsInternalNetworks(t *testing.T) {
-	for _, raw := range []string{
-		"127.0.0.1",
-		"10.0.0.1",
-		"172.16.0.1",
-		"192.168.1.1",
-		"169.254.169.254",
-		"100.64.0.1",
-		"::1",
-		"fc00::1",
-		"fe80::1",
-	} {
-		address := netip.MustParseAddr(raw)
-		if err := validateToolAddress(address); err == nil {
-			t.Fatalf("validateToolAddress(%s) error = nil", raw)
-		}
-	}
-	if err := validateToolAddress(netip.MustParseAddr("8.8.8.8")); err != nil {
-		t.Fatalf("public address rejected: %v", err)
 	}
 }
 
@@ -105,5 +82,14 @@ func TestRequireNoBuiltinArguments(t *testing.T) {
 	}
 	if err := requireNoBuiltinArguments(json.RawMessage(`{"unexpected":true}`)); err == nil {
 		t.Fatal("non-empty arguments error = nil")
+	}
+}
+
+func TestExecutorDoesNotUseProxy(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:3128")
+	executor := NewExecutor(&Service{})
+	transport, ok := executor.client.Transport.(*http.Transport)
+	if !ok || transport.Proxy != nil {
+		t.Fatal("Voice Agent webhook tool must use a guarded, proxy-free transport")
 	}
 }
