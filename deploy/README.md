@@ -10,16 +10,21 @@ From the repository root:
 
 ```sh
 make deployment-up
-GRAFANA_ADMIN_PASSWORD=choose-a-strong-secret docker compose --env-file .env \
+GRAFANA_ADMIN_PASSWORD=choose-a-strong-secret docker compose \
+  --env-file .env --env-file server/.env \
   -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml up -d
 ```
 
-For configuration-only validation, set `APP_ENV_FILE=../../server/.env.example`
-and use `--env-file .env.example` with `config --quiet`. This relative
-`APP_ENV_FILE` path is resolved from `deploy/compose/`.
+For configuration-only validation, provide both example environment files
+with `--env-file .env.example --env-file server/.env.example`. No application
+configuration file is mounted or injected wholesale into containers.
 
-The overlay uses the existing `control` network. Grafana is published only
-on `127.0.0.1:3000`; access it through a secured tunnel or reverse proxy.
+The overlay uses the existing `control` network. The application stack also
+uses a separate public-proxy `edge` network, and isolated `database`, `cache`,
+`events`, and `identity` networks. FreeSWITCH and RTPEngine retain their
+fixed IP addresses on `control` for SIP/media connectivity.
+
+Grafana is published only on `127.0.0.1:3000`; access it through a secured tunnel or reverse proxy.
 All other monitoring services are internal-network-only.
 
 Prometheus scrapes `server:8080/metrics` and `media:8090/metrics` directly on the private `control` network. Caddy returns HTTP 404 at the public `api.<DOMAIN>/metrics` endpoint; do not publish these internal ports.
@@ -44,18 +49,25 @@ cp server/.env.example server/.env
 
 The root `.env` supplies Compose infrastructure settings including
 `POSTGRES_PASSWORD` and `PUBLIC_IP`. `server/.env` supplies application
-configuration to server, worker, media, Caddy, FreeSWITCH, and Coturn.
+configuration values consumed only by the individual services that need them.
+Compose uses both files for substitution, but each container receives an
+explicit environment allowlist. The edge proxy does not receive database,
+identity, billing, or encryption credentials.
 
-Use the same PostgreSQL password in both files. Match `DOMAIN` in the root `.env` and `server/.env`; the Compose value sets Keycloak's hostname and the application value configures Caddy. Default hosted origins are `FRONTEND_URL=https://console.leamout.com`, `BACKEND_URL=https://api.leamout.com`, `KEYCLOAK_ISSUER=https://auth.leamout.com/realms/leamout` and `CORS_ORIGINS=https://console.leamout.com`. Set the real `DOMAIN`,
+Use the same PostgreSQL password in both files. Match `DOMAIN` in the root
+`.env` and `server/.env`; Caddy and Keycloak derive their hostnames from this
+value. Default hosted origins are `FRONTEND_URL=https://console.leamout.com`, `BACKEND_URL=https://api.leamout.com`, `KEYCLOAK_ISSUER=https://auth.leamout.com/realms/leamout` and `CORS_ORIGINS=https://console.leamout.com`. Set the real `DOMAIN`,
 `CORS_ORIGINS`, `TURN_PUBLIC_URLS` and `TURN_REALM` for the deployment;
+keep `TRUSTED_PROXY_CIDRS=172.33.0.10/32` so only the static Caddy
+address can supply forwarded client IP headers;
 replace all example secrets before operating an external service. Keep both
 environment files private and out of images and Git.
 
 Validate the Compose model before starting it:
 
 ```sh
-APP_ENV_FILE=../../server/.env.example docker compose \
-  --env-file .env.example \
+docker compose \
+  --env-file .env.example --env-file server/.env.example \
   -f deploy/compose/docker.yaml config --quiet
 ```
 
@@ -101,11 +113,15 @@ live environment is ready for customer traffic.
    make deployment-preflight
    make compose-validate
    python3 tests/ops/validate.py
+   docker compose \
+     --env-file .env.example --env-file server/.env.example \
+     -f deploy/compose/docker.yaml config --format json \
+     | python3 tests/ops/assert_isolation.py
    ```
 
    The preflight checks example credentials, key strength and encoding,
-   public IP, DNS/origin consistency, database password consistency, and
-   accidental partial Polar configuration. It does not print secrets or
+   public IP, DNS/origin consistency, database password consistency, narrow
+   forwarded-header trust, and accidental partial Polar configuration. It does not print secrets or
    call external services.
 5. If this is an **upgrade**, back up PostgreSQL (including Keycloak's
    database), NATS JetStream, Redis, and relevant persistent volumes **before**
@@ -116,7 +132,7 @@ live environment is ready for customer traffic.
 
    ```sh
    make deployment-up
-   docker compose --env-file .env -f deploy/compose/docker.yaml ps
+   docker compose --env-file .env --env-file server/.env -f deploy/compose/docker.yaml ps
    ```
 
 7. Before enabling customer traffic, verify live HTTPS/TLS and Keycloak

@@ -25,12 +25,30 @@ def compose_command(path: Path) -> list[str]:
             for target in statement.targets
         ):
             continue
-        value = ast.literal_eval(statement.value)
-        if not isinstance(value, list) or not all(
-            isinstance(item, str) for item in value
-        ):
-            raise ValueError(f"{path}: COMPOSE must be a literal string list")
-        return value
+        if not isinstance(statement.value, ast.List):
+            raise ValueError(f"{path}: COMPOSE must be a list")
+
+        command = []
+        for item in statement.value.elts:
+            if isinstance(item, ast.Constant) and isinstance(item.value, str):
+                command.append(item.value)
+                continue
+
+            # Acceptance suites use a disposable file generated at runtime.
+            if (
+                isinstance(item, ast.Subscript)
+                and isinstance(item.value, ast.Attribute)
+                and isinstance(item.value.value, ast.Name)
+                and item.value.value.id == "os"
+                and item.value.attr == "environ"
+                and isinstance(item.slice, ast.Constant)
+                and item.slice.value == "APP_ENV_FILE"
+            ):
+                command.append("$APP_ENV_FILE")
+                continue
+
+            raise ValueError(f"{path}: unexpected dynamic Compose argument")
+        return command
 
     raise ValueError(f"{path}: missing COMPOSE command")
 
@@ -40,7 +58,10 @@ def validate(path: Path) -> None:
     if command[:2] != ["docker", "compose"]:
         raise ValueError(f"{path}: expected docker compose command")
 
-    index = 2
+    if command[2:4] != ["--env-file", "$APP_ENV_FILE"]:
+        raise ValueError(f"{path}: Compose must load the generated acceptance env file")
+
+    index = 4
     file_count = 0
     while index < len(command):
         if command[index] != "-f":

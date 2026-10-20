@@ -36,7 +36,7 @@ APP_ENV_FILE=$(mktemp)
 export APP_ENV_FILE
 python3 "$REPO_ROOT/tests/acceptance-env.py" "$APP_ENV_FILE"
 
-COMPOSE="docker compose -f deploy/compose/docker.yaml -f tests/byoc-v1/compose.yaml -f tests/acceptance-identity.yaml"
+COMPOSE="docker compose --env-file $APP_ENV_FILE -f deploy/compose/docker.yaml -f tests/byoc-v1/compose.yaml -f tests/acceptance-identity.yaml"
 
 cleanup() {
     status=$?

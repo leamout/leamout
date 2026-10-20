@@ -16,17 +16,17 @@ sqlc:
 	cd server && sqlc generate
 
 compose-validate:
-	APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml config --quiet
+	docker compose --env-file .env.example --env-file server/.env.example -f deploy/compose/docker.yaml config --quiet
 
 compose-validate-observability:
-	GRAFANA_ADMIN_PASSWORD=ci-only-placeholder APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml config --quiet
+	GRAFANA_ADMIN_PASSWORD=ci-only-placeholder docker compose --env-file .env.example --env-file server/.env.example -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml config --quiet
 
 deployment-preflight:
 	python3 tests/ops/preflight.py --infra-env .env --app-env server/.env
 
 deployment-up: deployment-preflight
-	docker compose --env-file .env -f deploy/compose/docker.yaml config --quiet
-	docker compose --env-file .env -f deploy/compose/docker.yaml up -d --build
+	docker compose --env-file .env --env-file server/.env -f deploy/compose/docker.yaml config --quiet
+	docker compose --env-file .env --env-file server/.env -f deploy/compose/docker.yaml up -d --build
 
 backoffice-assets:
 	cd server/internal/backoffice && bun install --frozen-lockfile && bun run build

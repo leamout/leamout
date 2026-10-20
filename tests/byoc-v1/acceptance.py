@@ -19,6 +19,8 @@ DID, CALLER = "+15551234567", "+15557654321"
 COMPOSE = [
     "docker",
     "compose",
+    "--env-file",
+    os.environ["APP_ENV_FILE"],
     "-f",
     "deploy/compose/docker.yaml",
     "-f",

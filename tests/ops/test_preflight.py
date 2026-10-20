@@ -31,6 +31,7 @@ def valid_settings():
         "BACKOFFICE_URL": f"https://backoffice.{DOMAIN}",
         "KEYCLOAK_ISSUER": f"https://auth.{DOMAIN}/realms/leamout",
         "CORS_ORIGINS": f"https://console.{DOMAIN}",
+        "TRUSTED_PROXY_CIDRS": "172.33.0.10/32",
         "TURN_PUBLIC_URLS": f"stun:turn.{DOMAIN}:3478,turn:turn.{DOMAIN}:3478?transport=udp",
         "FREESWITCH_ESL_PASSWORD": STRONG,
         "MEDIA_CONTROL_TOKEN": STRONG,
@@ -72,6 +73,12 @@ class DeploymentPreflightTests(unittest.TestCase):
         errors = validate(infra, app)
         self.assertTrue(any("CORS_ORIGINS" in error for error in errors))
         self.assertTrue(any("POLAR_ACCESS_TOKEN" in error for error in errors))
+
+    def test_rejects_untrusted_proxy_ranges(self):
+        infra, app = valid_settings()
+        app["TRUSTED_PROXY_CIDRS"] = "172.33.0.0/24"
+        errors = validate(infra, app)
+        self.assertTrue(any("TRUSTED_PROXY_CIDRS" in error for error in errors))
 
     def test_rejects_extra_https_origin(self):
         infra, app = valid_settings()
