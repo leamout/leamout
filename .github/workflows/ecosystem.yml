@@ -17,6 +17,10 @@ permissions:
 jobs:
   compatibility:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dependencies: [released, source]
     steps:
       - name: Checkout Leamout
         uses: actions/checkout@v7
@@ -47,27 +51,51 @@ jobs:
           go-version-file: leamout/server/go.mod
           cache: false
 
+      # Preserve HEAD-to-HEAD checks without replacing the released-dependency lane.
+      - name: Use source contracts for provider checks
+        if: matrix.dependencies == 'source'
+        working-directory: ai-providers
+        run: |
+          go mod edit -replace github.com/leamout/contracts=../contracts
+          go mod tidy
+
+      - name: Use source adapters and contracts for runtime checks
+        if: matrix.dependencies == 'source'
+        working-directory: leamout/server
+        run: |
+          go mod edit -replace github.com/leamout/contracts=../../contracts
+          go mod edit -replace github.com/leamout/ai-providers=../../ai-providers
+          go mod tidy
+
+      - name: Use source adapters and contracts for catalog checks
+        if: matrix.dependencies == 'source'
+        working-directory: agents
+        run: |
+          go mod edit -replace github.com/leamout/contracts=../contracts
+          go mod edit -replace github.com/leamout/ai-providers=../ai-providers
+          go mod tidy
+
+      - name: Show released runtime dependencies
+        if: matrix.dependencies == 'released'
+        working-directory: leamout/server
+        run: |
+          go list -m github.com/leamout/contracts
+          go list -m github.com/leamout/ai-providers
+
       - name: Validate contracts
         working-directory: contracts
         run: go test ./...
 
       - name: Validate providers against contracts
         working-directory: ai-providers
-        run: |
-          go mod edit -replace github.com/leamout/contracts=../contracts
-          go test ./...
+        run: go test ./...
 
       - name: Validate runtime AI boundaries
         working-directory: leamout/server
-        run: |
-          go mod edit -replace github.com/leamout/contracts=../../contracts
-          go mod edit -replace github.com/leamout/ai-providers=../../ai-providers
-          go test ./internal/ai/catalog ./internal/ai/manifest
+        run: go test ./internal/ai/catalog ./internal/ai/manifest
 
       - name: Validate agent catalog
         working-directory: agents
         run: |
-          go mod edit -replace github.com/leamout/contracts=../contracts
-          go mod edit -replace github.com/leamout/ai-providers=../ai-providers
-          go mod tidy
           go run ./cmd/validate
+          go test ./...
