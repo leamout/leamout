@@ -268,9 +268,9 @@ func (d *Deployer) validateIntegrations(
 			organizationID,
 			string(binding.Role),
 			providers.UpsertBindingRequest{
-				Provider: binding.Provider,
+				Provider:     binding.Provider,
 				CredentialID: &credentialID,
-				Config: binding.Config,
+				Config:       binding.Config,
 			},
 		); err != nil {
 			return fmt.Errorf("provider %q: %w", binding.Provider, err)
@@ -286,10 +286,10 @@ func (d *Deployer) begin(ctx context.Context) (*Deployer, pgx.Tx, error) {
 	}
 	return &Deployer{
 		validator: d.validator,
-		agents: d.agents.WithTx(tx),
-		tools: d.tools.WithTx(tx),
+		agents:    d.agents.WithTx(tx),
+		tools:     d.tools.WithTx(tx),
 		providers: d.providers.WithTx(tx),
-		db: d.db,
+		db:        d.db,
 	}, tx, nil
 }
 

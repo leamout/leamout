@@ -48,9 +48,9 @@ func TestPortableDeploymentFailureDoesNotConsumeAgentQuota(t *testing.T) {
 	)
 	pkg := deploymentTestPackage()
 	for name, integrations := range map[string]map[string]uuid.UUID{
-		"missing": nil,
+		"missing":              nil,
 		"foreign organization": {"gemini": foreignCredentialID},
-		"wrong provider": {"gemini": wrongProviderID},
+		"wrong provider":       {"gemini": wrongProviderID},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := deployer.DeployPortable(ctx, organizationID, pkg, DeploymentInput{
@@ -92,19 +92,19 @@ func deploymentTestPackage() PortablePackage {
 	return PortablePackage{
 		Agents: map[string]agentcontract.Manifest{
 			"alpha": deploymentTestAgent("Alpha", nil),
-			"beta": deploymentTestAgent("Beta", []string{"notify"}),
+			"beta":  deploymentTestAgent("Beta", []string{"notify"}),
 		},
 		Tools: []agentcontract.ToolDefinition{{
-			Type: agentcontract.ToolTypeWebhook,
-			Name: "notify",
+			Type:        agentcontract.ToolTypeWebhook,
+			Name:        "notify",
 			Description: "Notify the operator.",
 			EndpointURL: "https://example.com/notify",
-			Parameters: json.RawMessage(`{"type":"object"}`),
+			Parameters:  json.RawMessage(`{"type":"object"}`),
 		}},
 		Routing: agentcontract.RoutingManifest{
 			SchemaVersion: agentcontract.SchemaVersion,
-			Name: "Test routing",
-			DefaultAgent: "alpha",
+			Name:          "Test routing",
+			DefaultAgent:  "alpha",
 		},
 	}
 }
@@ -112,13 +112,13 @@ func deploymentTestPackage() PortablePackage {
 func deploymentTestAgent(name string, toolNames []string) agentcontract.Manifest {
 	return agentcontract.Manifest{
 		SchemaVersion: agentcontract.SchemaVersion,
-		Name: name,
-		Engine: agentcontract.EngineRealtime,
-		Instructions: "Answer the caller.",
+		Name:          name,
+		Engine:        agentcontract.EngineRealtime,
+		Instructions:  "Answer the caller.",
 		Providers: []agentcontract.ProviderBinding{{
-			Role: ai.KindRealtime,
+			Role:     ai.KindRealtime,
 			Provider: "gemini",
-			Config: json.RawMessage(`{"model":"gemini-3.8-live"}`),
+			Config:   json.RawMessage(`{"model":"gemini-3.8-live"}`),
 		}},
 		Tools: toolNames,
 	}
