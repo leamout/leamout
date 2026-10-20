@@ -1,0 +1,25 @@
+.leamout-marketing.dark {
+  color-scheme: dark;
+  --background: #211d1b;
+  --foreground: #f8f7f5;
+  --card: #302b28;
+  --card-foreground: #f8f7f5;
+  --popover: #302b28;
+  --popover-foreground: #f8f7f5;
+  --primary: #f43e01;
+  --primary-foreground: #171310;
+  --secondary: #403936;
+  --secondary-foreground: #f8f7f5;
+  --muted: #352f2c;
+  --muted-foreground: #c2bbb6;
+  --accent: #403936;
+  --accent-foreground: #f8f7f5;
+  --border: #514841;
+  --input: #625852;
+  --ring: #ff8e6d;
+}
+
+.leamout-marketing ::selection {
+  background: #f43e01;
+  color: #171310;
+}
