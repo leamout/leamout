@@ -29,6 +29,19 @@ func NewService(repo *Repository, providerServices ...*providers.Service) *Servi
 	}
 }
 
+// WithTx scopes creation, provider bindings, and reads to the deployment transaction.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	scoped := *s
+	repository := *s.repo
+	repository.queries = s.repo.queries.WithTx(tx)
+	repository.tx = tx
+	scoped.repo = &repository
+	if s.providers != nil {
+		scoped.providers = s.providers.WithTx(tx)
+	}
+	return &scoped
+}
+
 func (s *Service) SetPlanAgentLimit(limit func(context.Context, uuid.UUID) (int64, bool, error)) {
 	s.planAgentLimit = limit
 }

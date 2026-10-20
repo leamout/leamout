@@ -14,6 +14,7 @@ import (
 type Repository struct {
 	queries *sqlc.Queries
 	db      *pgxpool.Pool
+	tx      pgx.Tx
 }
 
 func NewRepository(queries *sqlc.Queries) *Repository { return &Repository{queries: queries} }
@@ -80,6 +81,9 @@ func (r *Repository) CreateWithLimit(
 	req CreateRequest,
 	maxAgents int64,
 ) (sqlc.VoiceAgent, error) {
+	if r.tx != nil {
+		return r.createWithLimitInTx(ctx, r.tx, organizationID, req, maxAgents)
+	}
 	if r.db == nil {
 		return sqlc.VoiceAgent{}, apperror.NewServiceUnavailable("Voice Agent capacity store is unavailable", nil)
 	}
@@ -88,6 +92,23 @@ func (r *Repository) CreateWithLimit(
 		return sqlc.VoiceAgent{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
+	agent, err := r.createWithLimitInTx(ctx, tx, organizationID, req, maxAgents)
+	if err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return sqlc.VoiceAgent{}, err
+	}
+	return agent, nil
+}
+
+func (r *Repository) createWithLimitInTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	organizationID uuid.UUID,
+	req CreateRequest,
+	maxAgents int64,
+) (sqlc.VoiceAgent, error) {
 	queries := r.queries.WithTx(tx)
 	if _, err := queries.LockOrganizationForCapacity(ctx, organizationID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -114,9 +135,6 @@ func (r *Repository) CreateWithLimit(
 		RecordingPolicy:    req.RecordingPolicy,
 	})
 	if err != nil {
-		return sqlc.VoiceAgent{}, err
-	}
-	if err := tx.Commit(ctx); err != nil {
 		return sqlc.VoiceAgent{}, err
 	}
 	return agent, nil
