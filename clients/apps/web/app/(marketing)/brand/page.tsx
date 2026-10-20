@@ -7,13 +7,13 @@ import { constructMetadata } from "@/lib/metadata";
 export const metadata = constructMetadata({
   title: "Brand",
   description:
-    "Find Leamout brand assets and guidelines for using our name, logo, and visual identity.",
+    "Explore the Leamout identity: Graphite, Off-white, Leamout Orange, the wordmark, and our typography.",
   path: "/brand",
 });
 
 export default function BrandPage() {
   return (
-    <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8">
       <BrandIntro />
       <Wordmark />
       <ColorPalette />

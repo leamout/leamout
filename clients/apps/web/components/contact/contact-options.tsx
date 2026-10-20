@@ -1,35 +1,88 @@
+import { Button } from "@leamout/ui/components/button";
 import Link from "next/link";
+import { consoleURL } from "@/lib/site";
+
+const issueURL = "https://github.com/leamout/leamout/issues/new";
 
 export function ContactOptions() {
   return (
-    <div className="grid gap-6 pb-20 md:grid-cols-2">
-      <section className="rounded-xl border border-border p-8">
-        <h2 className="text-2xl font-heading font-semibold">Building with Leamout?</h2>
-        <p className="my-5 leading-7 text-muted-foreground">
-          Start with the Leamout console and product documentation.
-          Include the affected organization, call timestamp and non-sensitive
-          diagnostic details when you contact support.
-        </p>
-        <Link
-          href="/docs"
-          className="font-medium underline decoration-brand-orange underline-offset-8"
+    <div className="py-20">
+      <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">
+        <section className="flex flex-col bg-card p-8 sm:p-10">
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
+            01 / Get building
+          </p>
+          <h2 className="mt-6 font-heading text-3xl font-semibold tracking-tight">
+            Explore Leamout
+          </h2>
+          <p className="mt-4 max-w-md flex-1 leading-7 text-muted-foreground">
+            Start with the documentation to understand SIP trunks, AI provider
+            connections, and the agent runtime. Create an organization when
+            you are ready to build.
+          </p>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <Button nativeButton={false} render={<a href={consoleURL + "/create-account"} />}>
+              Get started
+            </Button>
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={<Link href="/docs" />}
+            >
+              Read the docs
+            </Button>
+          </div>
+        </section>
+        <section className="flex flex-col bg-card p-8 sm:p-10">
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
+            02 / Feedback
+          </p>
+          <h2 className="mt-6 font-heading text-3xl font-semibold tracking-tight">
+            Share a product issue
+          </h2>
+          <p className="mt-4 max-w-md flex-1 leading-7 text-muted-foreground">
+            For non-sensitive bugs or feature requests, use the public issue
+            tracker. Include a clear description and reproduction steps, but
+            never post API keys, call recordings, customer information, or
+            provider credentials.
+          </p>
+          <div className="mt-9">
+            <Button
+              variant="outline"
+              nativeButton={false}
+              render={
+                <a
+                  href={issueURL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                />
+              }
+            >
+              Open a GitHub issue
+            </Button>
+          </div>
+        </section>
+      </div>
+
+      <section className="mt-6 flex flex-col justify-between gap-6 rounded-xl border border-border bg-brand-surface p-8 sm:p-10 lg:flex-row lg:items-center">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
+            Private security reports
+          </p>
+          <h2 className="mt-3 font-heading text-2xl font-semibold tracking-tight">
+            Found a potential vulnerability?
+          </h2>
+          <p className="mt-3 max-w-2xl leading-7 text-muted-foreground">
+            Please report vulnerabilities privately. Do not disclose security
+            issues through a public issue or discussion.
+          </p>
+        </div>
+        <a
+          className="shrink-0 font-medium text-foreground underline decoration-brand-orange underline-offset-8 transition-colors hover:text-brand-orange"
+          href="mailto:security@leamout.com"
         >
-          Read the documentation
-        </Link>
-      </section>
-      <section className="rounded-xl border border-border p-8">
-        <h2 className="text-2xl font-heading font-semibold">Questions and feedback</h2>
-        <p className="my-5 leading-7 text-muted-foreground">
-          Questions about Leamout should go through the documented
-          support channels. Never publish credentials, recordings, personal
-          information or vulnerability reports in a public issue.
-        </p>
-        <Link
-          href="/contact"
-          className="font-medium underline decoration-brand-orange underline-offset-8"
-        >
-          Cloud contact information
-        </Link>
+          security@leamout.com
+        </a>
       </section>
     </div>
   );
