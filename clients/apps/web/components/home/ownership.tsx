@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function Ownership() {
   return (
-    <section className="marketing-light border-b border-border bg-background text-foreground">
+    <section className="theme-light border-b border-border bg-background text-foreground">
       <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-6 lg:px-8 lg:py-28">
         <div className="grid gap-10 rounded-2xl border border-border bg-card p-7 sm:p-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:p-14">
           <div>

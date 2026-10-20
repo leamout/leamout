@@ -31,7 +31,7 @@ const callPath = [
 
 export function PlatformArchitecture() {
   return (
-    <section className="marketing-light border-y border-border bg-background text-foreground">
+    <section className="theme-light border-y border-border bg-background text-foreground">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:px-8">
         <p className="font-mono text-xs uppercase tracking-widest text-foreground">
           How a call moves through Leamout

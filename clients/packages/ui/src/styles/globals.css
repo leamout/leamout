@@ -12,6 +12,9 @@
   --font-heading: var(--font-plex-sans);
   --font-mono: var(--font-plex-mono);
   --color-brand-orange: var(--brand-orange);
+  --color-brand-graphite: var(--brand-graphite);
+  --color-brand-surface: var(--brand-surface);
+  --color-brand-offwhite: var(--brand-offwhite);
   --color-brand-gray: var(--brand-gray);
   --color-brand-charcoal: var(--brand-charcoal);
   --color-brand-white: var(--brand-white);
@@ -56,148 +59,155 @@
 }
 
 :root {
+  color-scheme: light;
+  --brand-graphite: #101316;
+  --brand-surface: #1c2226;
+  --brand-offwhite: #f5f6f4;
   --brand-orange: #f43e01;
-  --brand-gray: #69695d;
-  --brand-charcoal: #302b28;
-  --brand-white: #ffffff;
 
-  --background: var(--brand-white);
-  --foreground: var(--brand-charcoal);
-  --card: var(--brand-white);
-  --card-foreground: var(--brand-charcoal);
-  --popover: var(--brand-white);
-  --popover-foreground: var(--brand-charcoal);
-  --primary: var(--brand-charcoal);
-  --primary-foreground: var(--brand-white);
+  /* Compatibility aliases for existing components. */
+  --brand-charcoal: var(--brand-graphite);
+  --brand-white: var(--brand-offwhite);
+  --brand-gray: color-mix(
+    in srgb,
+    var(--brand-graphite) 70%,
+    var(--brand-offwhite)
+  );
+  --radius: 0.5rem;
+}
+
+:root,
+.theme-light {
+  color-scheme: light;
+  --background: var(--brand-offwhite);
+  --foreground: var(--brand-graphite);
+  --card: #ffffff;
+  --card-foreground: var(--brand-graphite);
+  --popover: #ffffff;
+  --popover-foreground: var(--brand-graphite);
+  --primary: var(--brand-orange);
+  --primary-foreground: var(--brand-graphite);
   --secondary: color-mix(
     in srgb,
-    var(--brand-gray) 10%,
-    var(--brand-white)
+    var(--brand-graphite) 7%,
+    var(--brand-offwhite)
   );
-  --secondary-foreground: var(--brand-charcoal);
-  --muted: color-mix(in srgb, var(--brand-gray) 8%, var(--brand-white));
-  --muted-foreground: var(--brand-gray);
-  --accent: color-mix(in srgb, var(--brand-orange) 10%, var(--brand-white));
-  --accent-foreground: var(--brand-charcoal);
+  --secondary-foreground: var(--brand-graphite);
+  --muted: color-mix(
+    in srgb,
+    var(--brand-graphite) 7%,
+    var(--brand-offwhite)
+  );
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--brand-graphite) 72%,
+    var(--brand-offwhite)
+  );
+  --accent: color-mix(
+    in srgb,
+    var(--brand-graphite) 7%,
+    var(--brand-offwhite)
+  );
+  --accent-foreground: var(--brand-graphite);
   --destructive: #b42318;
-  --border: color-mix(in srgb, var(--brand-gray) 25%, var(--brand-white));
-  --input: color-mix(in srgb, var(--brand-gray) 30%, var(--brand-white));
+  --border: color-mix(
+    in srgb,
+    var(--brand-graphite) 18%,
+    var(--brand-offwhite)
+  );
+  --input: color-mix(
+    in srgb,
+    var(--brand-graphite) 25%,
+    var(--brand-offwhite)
+  );
   --ring: var(--brand-orange);
   --chart-1: var(--brand-orange);
-  --chart-2: var(--brand-gray);
-  --chart-3: var(--brand-charcoal);
+  --chart-2: var(--brand-graphite);
+  --chart-3: var(--brand-surface);
   --chart-4: color-mix(
     in srgb,
     var(--brand-orange) 55%,
-    var(--brand-charcoal)
+    var(--brand-graphite)
   );
-  --chart-5: color-mix(in srgb, var(--brand-gray) 45%, var(--brand-white));
-  --radius: 0.5rem;
-  --sidebar: color-mix(in srgb, var(--brand-gray) 5%, var(--brand-white));
-  --sidebar-foreground: var(--brand-charcoal);
-  --sidebar-primary: var(--brand-charcoal);
-  --sidebar-primary-foreground: var(--brand-white);
-  --sidebar-accent: color-mix(
+  --chart-5: color-mix(
     in srgb,
-    var(--brand-orange) 10%,
-    var(--brand-white)
+    var(--brand-graphite) 55%,
+    var(--brand-offwhite)
   );
-  --sidebar-accent-foreground: var(--brand-charcoal);
-  --sidebar-border: color-mix(
-    in srgb,
-    var(--brand-gray) 25%,
-    var(--brand-white)
-  );
+  --sidebar: var(--brand-offwhite);
+  --sidebar-foreground: var(--brand-graphite);
+  --sidebar-primary: var(--brand-orange);
+  --sidebar-primary-foreground: var(--brand-graphite);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--brand-graphite);
+  --sidebar-border: var(--border);
   --sidebar-ring: var(--brand-orange);
 }
 
 .dark {
-  --background: var(--brand-charcoal);
-  --foreground: var(--brand-white);
-  --card: color-mix(
-    in srgb,
-    var(--brand-charcoal) 92%,
-    var(--brand-white)
-  );
-  --card-foreground: var(--brand-white);
-  --popover: color-mix(
-    in srgb,
-    var(--brand-charcoal) 92%,
-    var(--brand-white)
-  );
-  --popover-foreground: var(--brand-white);
-  --primary: var(--brand-white);
-  --primary-foreground: var(--brand-charcoal);
-  --secondary: color-mix(
-    in srgb,
-    var(--brand-gray) 40%,
-    var(--brand-charcoal)
-  );
-  --secondary-foreground: var(--brand-white);
-  --muted: color-mix(
-    in srgb,
-    var(--brand-gray) 32%,
-    var(--brand-charcoal)
-  );
+  color-scheme: dark;
+  --background: var(--brand-graphite);
+  --foreground: var(--brand-offwhite);
+  --card: var(--brand-surface);
+  --card-foreground: var(--brand-offwhite);
+  --popover: var(--brand-surface);
+  --popover-foreground: var(--brand-offwhite);
+  --primary: var(--brand-orange);
+  --primary-foreground: var(--brand-graphite);
+  --secondary: var(--brand-surface);
+  --secondary-foreground: var(--brand-offwhite);
+  --muted: var(--brand-surface);
   --muted-foreground: color-mix(
     in srgb,
-    var(--brand-gray) 70%,
-    var(--brand-white)
+    var(--brand-offwhite) 67%,
+    var(--brand-surface)
   );
-  --accent: color-mix(
-    in srgb,
-    var(--brand-orange) 18%,
-    var(--brand-charcoal)
-  );
-  --accent-foreground: var(--brand-white);
+  --accent: var(--brand-surface);
+  --accent-foreground: var(--brand-offwhite);
   --destructive: #ff8a80;
   --border: color-mix(
     in srgb,
-    var(--brand-gray) 40%,
-    var(--brand-charcoal)
+    var(--brand-offwhite) 14%,
+    var(--brand-surface)
   );
   --input: color-mix(
     in srgb,
-    var(--brand-gray) 50%,
-    var(--brand-charcoal)
+    var(--brand-offwhite) 20%,
+    var(--brand-surface)
   );
   --ring: var(--brand-orange);
   --chart-1: var(--brand-orange);
-  --chart-2: color-mix(in srgb, var(--brand-gray) 65%, var(--brand-white));
-  --chart-3: var(--brand-white);
+  --chart-2: var(--brand-offwhite);
+  --chart-3: var(--brand-surface);
   --chart-4: color-mix(
     in srgb,
-    var(--brand-orange) 60%,
-    var(--brand-white)
+    var(--brand-orange) 55%,
+    var(--brand-offwhite)
   );
   --chart-5: color-mix(
     in srgb,
-    var(--brand-gray) 45%,
-    var(--brand-charcoal)
+    var(--brand-graphite) 55%,
+    var(--brand-offwhite)
   );
-  --sidebar: color-mix(
-    in srgb,
-    var(--brand-charcoal) 94%,
-    var(--brand-white)
-  );
-  --sidebar-foreground: var(--brand-white);
-  --sidebar-primary: var(--brand-white);
-  --sidebar-primary-foreground: var(--brand-charcoal);
+  --sidebar: var(--brand-surface);
+  --sidebar-foreground: var(--brand-offwhite);
+  --sidebar-primary: var(--brand-orange);
+  --sidebar-primary-foreground: var(--brand-graphite);
   --sidebar-accent: color-mix(
     in srgb,
-    var(--brand-orange) 18%,
-    var(--brand-charcoal)
+    var(--brand-offwhite) 12%,
+    var(--brand-surface)
   );
-  --sidebar-accent-foreground: var(--brand-white);
-  --sidebar-border: color-mix(
-    in srgb,
-    var(--brand-gray) 40%,
-    var(--brand-charcoal)
-  );
+  --sidebar-accent-foreground: var(--brand-offwhite);
+  --sidebar-border: var(--border);
   --sidebar-ring: var(--brand-orange);
 }
 
 @layer base {
+  ::selection {
+    background: var(--brand-orange);
+    color: var(--brand-graphite);
+  }
   * {
     @apply border-border outline-ring/50;
   }

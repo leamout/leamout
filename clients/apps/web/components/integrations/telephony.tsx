@@ -1,6 +1,6 @@
 export function IntegrationsTelephony() {
   return (
-    <section className="marketing-light border-y border-border bg-background text-foreground">
+    <section className="theme-light border-y border-border bg-background text-foreground">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 sm:px-6 lg:grid-cols-[1fr_1fr] lg:gap-16 lg:px-8">
         <div>
           <p className="font-mono text-xs uppercase tracking-widest text-foreground">

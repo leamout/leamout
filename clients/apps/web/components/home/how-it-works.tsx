@@ -25,7 +25,7 @@ const callPath = [
 
 export function HowItWorks() {
   return (
-    <section className="marketing-light border-b border-border bg-background text-foreground">
+    <section className="theme-light border-b border-border bg-background text-foreground">
       <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-6 lg:px-8 lg:py-28">
         <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
