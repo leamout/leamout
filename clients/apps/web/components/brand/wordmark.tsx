@@ -6,7 +6,7 @@ export function Wordmark() {
           Leamout<span className="text-brand-orange">.</span>
         </span>
       </div>
-      <div className="flex min-h-52 items-center justify-center rounded-xl bg-brand-charcoal text-white">
+      <div className="flex min-h-52 items-center justify-center rounded-xl bg-brand-charcoal text-brand-white">
         <span className="text-5xl font-semibold tracking-tight">
           Leamout<span className="text-brand-orange">.</span>
         </span>

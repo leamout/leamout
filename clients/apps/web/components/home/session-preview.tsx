@@ -54,7 +54,7 @@ export function SessionPreview() {
             <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               Realtime audio
             </p>
-            <span className="font-mono text-[10px] text-[#FF8E6D]">
+            <span className="font-mono text-[10px] text-brand-orange">
               AUDIO / RTP
             </span>
           </div>
@@ -70,7 +70,8 @@ export function SessionPreview() {
               x2="320"
               y1="35"
               y2="35"
-              stroke="#514841"
+              stroke="#F5F6F4"
+              opacity="0.18"
               strokeDasharray="3 6"
             />
             {waveformBars.map((bar) => (
@@ -81,7 +82,8 @@ export function SessionPreview() {
                 width="3"
                 height={bar.height}
                 rx="1.5"
-                fill={bar.x > 226 ? "#F43E01" : "#998C85"}
+                fill={bar.x > 226 ? "#F43E01" : "#F5F6F4"}
+                opacity={bar.x > 226 ? 1 : 0.35}
               />
             ))}
           </svg>

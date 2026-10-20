@@ -41,7 +41,7 @@ export function AIProviders() {
         {providerGroups.map((group) => (
           <div
             key={group.role}
-            className="rounded-xl border border-border p-6 sm:p-8"
+            className="rounded-xl border border-border bg-card p-6 sm:p-8"
           >
             <h3 className="text-xl font-semibold">{group.role}</h3>
             <p className="mt-3 text-sm leading-7 text-muted-foreground">

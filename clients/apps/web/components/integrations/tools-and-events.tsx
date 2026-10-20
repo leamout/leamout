@@ -2,9 +2,9 @@ import Link from "next/link";
 
 export function ToolsAndEvents() {
   return (
-    <section className="border-t border-border bg-muted/20">
+    <section className="marketing-light border-t border-border bg-background text-foreground">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:px-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-brand-orange">
+        <p className="font-mono text-xs uppercase tracking-widest text-foreground">
           Your applications
         </p>
         <h2 className="mt-4 max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">

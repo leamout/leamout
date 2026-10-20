@@ -10,7 +10,7 @@ export function HomeCallToAction() {
           aria-hidden="true"
           className="absolute inset-x-0 top-0 h-1 bg-brand-orange"
         />
-        <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#FF8E6D]">
+        <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
           Start building
         </p>
         <h2 className="mt-5 max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">

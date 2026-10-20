@@ -31,9 +31,9 @@ const callPath = [
 
 export function PlatformArchitecture() {
   return (
-    <section className="border-y border-border bg-muted/20">
+    <section className="marketing-light border-y border-border bg-background text-foreground">
       <div className="mx-auto max-w-6xl px-5 py-20 sm:px-6 lg:px-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-brand-orange">
+        <p className="font-mono text-xs uppercase tracking-widest text-foreground">
           How a call moves through Leamout
         </p>
         <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -47,10 +47,10 @@ export function PlatformArchitecture() {
           {callPath.map((step) => (
             <li
               key={step.number}
-              className="flex h-full flex-col rounded-xl border border-border bg-background p-6"
+              className="flex h-full flex-col rounded-xl border border-border border-t-2 border-t-brand-orange bg-card p-6"
             >
               <div className="flex items-center justify-between gap-4">
-                <span className="font-mono text-sm text-brand-orange">
+                <span className="font-mono text-sm text-foreground">
                   {step.number}
                 </span>
                 <span className="text-xs text-muted-foreground">
@@ -64,9 +64,9 @@ export function PlatformArchitecture() {
             </li>
           ))}
         </ol>
-        <div className="mt-4 grid gap-4 rounded-xl border border-border bg-background p-6 sm:grid-cols-[1fr_2fr] sm:items-center">
+        <div className="mt-4 grid gap-4 rounded-xl border border-border bg-card p-6 sm:grid-cols-[1fr_2fr] sm:items-center">
           <div>
-            <p className="font-mono text-xs uppercase tracking-widest text-brand-orange">
+            <p className="font-mono text-xs uppercase tracking-widest text-foreground">
               Control plane
             </p>
             <h3 className="mt-2 text-lg font-semibold">

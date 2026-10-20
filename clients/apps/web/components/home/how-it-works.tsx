@@ -25,11 +25,11 @@ const callPath = [
 
 export function HowItWorks() {
   return (
-    <section className="border-b border-border bg-[#26211F]">
+    <section className="marketing-light border-b border-border bg-background text-foreground">
       <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-6 lg:px-8 lg:py-28">
         <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#FF8E6D]">
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-foreground">
               A call through Leamout
             </p>
             <h2 className="mt-5 max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -46,13 +46,13 @@ export function HowItWorks() {
           {callPath.map((step) => (
             <li
               key={step.number}
-              className="relative min-h-56 border border-border bg-background p-6"
+              className="relative min-h-56 border border-border bg-card p-6"
             >
               <span
                 aria-hidden="true"
                 className="absolute inset-x-0 top-0 h-0.5 bg-brand-orange"
               />
-              <span className="font-mono text-xs text-[#FF8E6D]">
+              <span className="font-mono text-xs text-foreground">
                 {step.number}
               </span>
               <h3 className="mt-12 text-xl font-semibold">{step.title}</h3>
@@ -64,7 +64,7 @@ export function HowItWorks() {
         </ol>
         <div className="mt-3 flex flex-col gap-4 border border-border bg-card px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-widest text-[#FF8E6D]">
+            <p className="font-mono text-[11px] uppercase tracking-widest text-foreground">
               Leamout control plane
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -73,7 +73,7 @@ export function HowItWorks() {
           </div>
           <Link
             href="/platform"
-            className="shrink-0 text-sm font-medium text-foreground underline decoration-brand-orange underline-offset-8 hover:text-[#FF8E6D]"
+            className="shrink-0 text-sm font-medium text-foreground underline decoration-brand-orange underline-offset-8 hover:text-foreground"
           >
             Explore the platform
           </Link>

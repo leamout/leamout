@@ -2,11 +2,11 @@ import Link from "next/link";
 
 export function Ownership() {
   return (
-    <section className="border-b border-border">
+    <section className="marketing-light border-b border-border bg-background text-foreground">
       <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-6 lg:px-8 lg:py-28">
         <div className="grid gap-10 rounded-2xl border border-border bg-card p-7 sm:p-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16 lg:p-14">
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#FF8E6D]">
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-foreground">
               Your infrastructure, connected
             </p>
             <h2 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -18,7 +18,7 @@ export function Ownership() {
             </p>
             <Link
               href="/integrations"
-              className="mt-8 inline-block font-medium text-foreground underline decoration-brand-orange underline-offset-8 hover:text-[#FF8E6D]"
+              className="mt-8 inline-block font-medium text-foreground underline decoration-brand-orange underline-offset-8 hover:text-foreground"
             >
               Explore integrations
             </Link>

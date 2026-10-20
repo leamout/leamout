@@ -32,7 +32,7 @@ const groups = [
 
 export function MarketingFooter() {
   return (
-    <footer className="border-t border-border bg-[#26211F]">
+    <footer className="border-t border-border bg-background">
       <div className="mx-auto max-w-[1200px] px-5 pt-16 pb-8 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-[1fr_1.5fr] lg:gap-20">
           <div>
@@ -50,7 +50,7 @@ export function MarketingFooter() {
               The carrier-grade runtime and control plane for autonomous voice
               agents.
             </p>
-            <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.15em] text-[#FF8E6D]">
+            <p className="mt-7 font-mono text-[11px] uppercase tracking-[0.15em] text-brand-orange">
               SIP-native. Provider-independent.
             </p>
           </div>

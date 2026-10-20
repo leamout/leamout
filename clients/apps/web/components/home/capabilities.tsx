@@ -28,7 +28,7 @@ export function Capabilities() {
     <section className="border-b border-border">
       <div className="mx-auto grid max-w-[1200px] gap-14 px-5 py-24 sm:px-6 lg:grid-cols-2 lg:items-center lg:gap-20 lg:px-8 lg:py-28">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#FF8E6D]">
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
             Realtime execution
           </p>
           <h2 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
@@ -68,7 +68,7 @@ export function Capabilities() {
                     className="absolute left-[15px] top-9 h-[calc(100%-2.25rem)] w-px bg-border"
                   />
                 )}
-                <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-background font-mono text-xs text-[#FF8E6D]">
+                <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-background font-mono text-xs text-brand-orange">
                   {event.step}
                 </span>
                 <div className="flex-1 border-b border-border pb-6 last:border-0">

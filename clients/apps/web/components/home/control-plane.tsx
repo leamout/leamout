@@ -8,7 +8,7 @@ const activities = [
 
 export function ControlPlane() {
   return (
-    <section className="border-b border-border bg-[#26211F]">
+    <section className="border-b border-border bg-card">
       <div className="mx-auto grid max-w-[1200px] gap-14 px-5 py-24 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-20 lg:px-8 lg:py-28">
         <div className="overflow-hidden rounded-2xl border border-border bg-background">
           <div className="flex items-center justify-between border-b border-border px-5 py-4">
@@ -68,7 +68,7 @@ export function ControlPlane() {
           </div>
         </div>
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.16em] text-[#FF8E6D]">
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
             One control plane
           </p>
           <h2 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">

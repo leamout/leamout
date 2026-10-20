@@ -1,25 +1,49 @@
 .leamout-marketing.dark {
   color-scheme: dark;
-  --background: #211d1b;
-  --foreground: #f8f7f5;
-  --card: #302b28;
-  --card-foreground: #f8f7f5;
-  --popover: #302b28;
-  --popover-foreground: #f8f7f5;
+  --brand-orange: #f43e01;
+  --brand-charcoal: #101316;
+  --brand-white: #f5f6f4;
+  --background: #101316;
+  --foreground: #f5f6f4;
+  --card: #1c2226;
+  --card-foreground: #f5f6f4;
+  --popover: #1c2226;
+  --popover-foreground: #f5f6f4;
   --primary: #f43e01;
-  --primary-foreground: #171310;
-  --secondary: #403936;
-  --secondary-foreground: #f8f7f5;
-  --muted: #352f2c;
-  --muted-foreground: #c2bbb6;
-  --accent: #403936;
-  --accent-foreground: #f8f7f5;
-  --border: #514841;
-  --input: #625852;
-  --ring: #ff8e6d;
+  --primary-foreground: #101316;
+  --secondary: #1c2226;
+  --secondary-foreground: #f5f6f4;
+  --muted: #1c2226;
+  --muted-foreground: #aab1b4;
+  --accent: #1c2226;
+  --accent-foreground: #f5f6f4;
+  --border: color-mix(in srgb, #f5f6f4 14%, #1c2226);
+  --input: color-mix(in srgb, #f5f6f4 20%, #1c2226);
+  --ring: #f43e01;
+}
+
+.leamout-marketing.dark .marketing-light {
+  color-scheme: light;
+  --background: #f5f6f4;
+  --foreground: #101316;
+  --card: #ffffff;
+  --card-foreground: #101316;
+  --popover: #ffffff;
+  --popover-foreground: #101316;
+  --primary: #f43e01;
+  --primary-foreground: #101316;
+  --secondary: color-mix(in srgb, #101316 7%, #f5f6f4);
+  --secondary-foreground: #101316;
+  --muted: color-mix(in srgb, #101316 7%, #f5f6f4);
+  --muted-foreground: #4a555a;
+  --accent: color-mix(in srgb, #101316 7%, #f5f6f4);
+  --accent-foreground: #101316;
+  --border: color-mix(in srgb, #101316 18%, #f5f6f4);
+  --input: color-mix(in srgb, #101316 25%, #f5f6f4);
+  --ring: #f43e01;
 }
 
 .leamout-marketing ::selection {
   background: #f43e01;
-  color: #171310;
+  color: #101316;
 }

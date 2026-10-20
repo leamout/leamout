@@ -1,9 +1,9 @@
 export function IntegrationsTelephony() {
   return (
-    <section className="border-y border-border bg-muted/20">
+    <section className="marketing-light border-y border-border bg-background text-foreground">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-20 sm:px-6 lg:grid-cols-[1fr_1fr] lg:gap-16 lg:px-8">
         <div>
-          <p className="font-mono text-xs uppercase tracking-widest text-brand-orange">
+          <p className="font-mono text-xs uppercase tracking-widest text-foreground">
             Telephony
           </p>
           <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -19,7 +19,7 @@ export function IntegrationsTelephony() {
             provider.
           </p>
         </div>
-        <div className="self-center rounded-xl border border-border bg-background p-6 sm:p-8">
+        <div className="self-center rounded-xl border border-border bg-card p-6 sm:p-8">
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
             Connection path
           </p>
@@ -36,7 +36,7 @@ export function IntegrationsTelephony() {
                     className="absolute left-[15px] top-9 h-[calc(100%-2.25rem)] w-px bg-border"
                   />
                 )}
-                <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-brand-orange/30 bg-background font-mono text-xs text-brand-orange">
+                <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-brand-orange bg-background font-mono text-xs text-foreground">
                   {number}
                 </span>
                 <div>
