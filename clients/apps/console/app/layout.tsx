@@ -3,7 +3,7 @@ import { TooltipProvider } from "@leamout/ui/components/tooltip";
 import type { Metadata } from "next";
 import "@leamout/ui/globals.css";
 import { QueryProvider } from "@/components/query-provider";
-import { plexMono, plexSans } from "@/lib/fonts";
+import { plexMono, plexSans, spaceGrotesk } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "Leamout",
@@ -19,7 +19,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${plexSans.variable} ${plexMono.variable}`}
+      className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable}`}
     >
       <body className="flex min-h-full flex-col bg-background text-foreground antialiased">
         <QueryProvider>

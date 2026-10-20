@@ -71,7 +71,7 @@ export function ControlPlane() {
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
             One control plane
           </p>
-          <h2 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h2 className="mt-5 text-balance text-4xl font-heading font-semibold tracking-tight sm:text-5xl">
             Operate the entire call, not just the prompt.
           </h2>
           <p className="mt-6 leading-8 text-muted-foreground">

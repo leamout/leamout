@@ -1,5 +1,5 @@
 import "@leamout/ui/globals.css";
-import { plexMono, plexSans } from "@/lib/fonts";
+import { plexMono, plexSans, spaceGrotesk } from "@/lib/fonts";
 import { constructMetadata } from "@/lib/metadata";
 import RootProviders from "./providers";
 
@@ -18,7 +18,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${plexSans.variable} ${plexMono.variable}`}
+      className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable}`}
     >
       <body className="bg-background text-foreground antialiased">
         <RootProviders>{children}</RootProviders>

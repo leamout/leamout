@@ -13,7 +13,7 @@ export function HomeCallToAction() {
         <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
           Start building
         </p>
-        <h2 className="mt-5 max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+        <h2 className="mt-5 max-w-2xl text-balance text-4xl font-heading font-semibold tracking-tight sm:text-5xl">
           Put your next voice agent on the line.
         </h2>
         <p className="mt-5 max-w-xl leading-8 text-muted-foreground">

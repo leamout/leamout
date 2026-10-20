@@ -29,7 +29,7 @@ export function PlatformCapabilities() {
           <p className="font-mono text-xs uppercase tracking-widest text-brand-orange">
             Built for live conversations
           </p>
-          <h2 className="mt-4 text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h2 className="mt-4 text-balance text-3xl font-heading font-semibold tracking-tight sm:text-4xl">
             The operational layer between telephony and AI.
           </h2>
           <p className="mt-6 leading-8 text-muted-foreground">

@@ -36,7 +36,7 @@ export function PlatformArchitecture() {
         <p className="font-mono text-xs uppercase tracking-widest text-foreground">
           How a call moves through Leamout
         </p>
-        <h2 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h2 className="mt-4 max-w-2xl text-3xl font-heading font-semibold tracking-tight sm:text-4xl">
           From a ringing phone to a responsive agent.
         </h2>
         <p className="mt-4 max-w-2xl leading-8 text-muted-foreground">

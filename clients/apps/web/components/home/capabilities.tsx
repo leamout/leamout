@@ -31,7 +31,7 @@ export function Capabilities() {
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
             Realtime execution
           </p>
-          <h2 className="mt-5 text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h2 className="mt-5 text-balance text-4xl font-heading font-semibold tracking-tight sm:text-5xl">
             More than a model on a phone call.
           </h2>
           <p className="mt-6 max-w-lg leading-8 text-muted-foreground">

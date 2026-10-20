@@ -32,7 +32,7 @@ export function HowItWorks() {
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-foreground">
               A call through Leamout
             </p>
-            <h2 className="mt-5 max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h2 className="mt-5 max-w-2xl text-balance text-4xl font-heading font-semibold tracking-tight sm:text-5xl">
               From the phone network to a live conversation.
             </h2>
           </div>

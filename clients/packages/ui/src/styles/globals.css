@@ -9,7 +9,7 @@
 
 @theme inline {
   --font-sans: var(--font-plex-sans);
-  --font-heading: var(--font-plex-sans);
+  --font-heading: var(--font-space-grotesk);
   --font-mono: var(--font-plex-mono);
   --color-brand-orange: var(--brand-orange);
   --color-brand-graphite: var(--brand-graphite);

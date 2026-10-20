@@ -1,7 +1,7 @@
 export function BillingExplanation() {
   return (
     <section className="py-16">
-      <h2 className="text-3xl font-semibold tracking-tight">
+      <h2 className="text-3xl font-heading font-semibold tracking-tight">
         Know what you are paying for.
       </h2>
       <div className="mt-8 grid gap-8 md:grid-cols-3">

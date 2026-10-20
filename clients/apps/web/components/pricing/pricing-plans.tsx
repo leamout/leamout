@@ -50,7 +50,7 @@ export default function Pricing({ signupHref }: { signupHref: string }) {
           </Badge>
           <h1
             id="pricing-title"
-            className="max-w-2xl text-balance text-4xl font-medium leading-tight tracking-tight sm:text-5xl"
+            className="max-w-2xl text-balance text-4xl font-heading font-medium leading-tight tracking-tight sm:text-5xl"
           >
             The right plan for your next conversation.
           </h1>

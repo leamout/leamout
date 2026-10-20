@@ -7,7 +7,7 @@ export function ToolsAndEvents() {
         <p className="font-mono text-xs uppercase tracking-widest text-foreground">
           Your applications
         </p>
-        <h2 className="mt-4 max-w-2xl text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h2 className="mt-4 max-w-2xl text-balance text-3xl font-heading font-semibold tracking-tight sm:text-4xl">
           Connect the conversation to your workflows.
         </h2>
         <div className="mt-12 grid gap-8 md:grid-cols-2">

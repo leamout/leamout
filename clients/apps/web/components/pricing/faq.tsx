@@ -1,7 +1,7 @@
 export function PricingFAQ() {
   return (
     <section className="border-t border-border py-12">
-      <h2 className="text-2xl font-semibold">Common questions</h2>
+      <h2 className="text-2xl font-heading font-semibold">Common questions</h2>
       {[
         [
           "Are carrier and AI costs included?",
