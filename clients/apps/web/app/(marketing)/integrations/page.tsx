@@ -1,0 +1,23 @@
+import { AIProviders } from "@/components/integrations/ai-providers";
+import { IntegrationsIntro } from "@/components/integrations/intro";
+import { IntegrationsTelephony } from "@/components/integrations/telephony";
+import { ToolsAndEvents } from "@/components/integrations/tools-and-events";
+import { constructMetadata } from "@/lib/metadata";
+
+export const metadata = constructMetadata({
+  title: "Integrations",
+  description:
+    "Connect SIP trunks, AI providers, tools, and webhooks to autonomous voice agents on Leamout.",
+  path: "/integrations",
+});
+
+export default function IntegrationsPage() {
+  return (
+    <>
+      <IntegrationsIntro />
+      <IntegrationsTelephony />
+      <AIProviders />
+      <ToolsAndEvents />
+    </>
+  );
+}

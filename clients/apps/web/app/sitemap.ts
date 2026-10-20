@@ -2,6 +2,8 @@ import type { MetadataRoute } from "next";
 
 const paths = [
   "/",
+  "/platform",
+  "/integrations",
   "/pricing",
   "/about",
   "/security",

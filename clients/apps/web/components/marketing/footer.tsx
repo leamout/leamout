@@ -4,6 +4,8 @@ const groups = [
   {
     title: "Resources",
     links: [
+      { label: "Platform", href: "/platform" },
+      { label: "Integrations", href: "/integrations" },
       { label: "Pricing", href: "/pricing" },
       { label: "Documentation", href: "/docs" },
       { label: "Security", href: "/security" },

@@ -18,9 +18,10 @@ import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 
 const links = [
+  { label: "Platform", href: "/platform" },
+  { label: "Integrations", href: "/integrations" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Documentation", href: "/docs" },
-  { label: "Contact", href: "/contact" },
+  { label: "Docs", href: "/docs" },
 ];
 
 export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
@@ -51,7 +52,7 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
           </Link>
           <NavigationMenu
             aria-label="Main navigation"
-            className="hidden md:flex"
+            className="hidden lg:flex"
           >
             <NavigationMenuList>
               {links.map((link) => (
@@ -84,13 +85,13 @@ export function MarketingHeader({ consoleURL }: { consoleURL: string }) {
           </div>
           <CollapsibleTrigger
             ref={trigger}
-            render={<Button variant="outline" className="md:hidden" />}
+            render={<Button variant="outline" className="lg:hidden" />}
           >
             {open ? "Close menu" : "Menu"}
           </CollapsibleTrigger>
         </div>
         <CollapsibleContent
-          className="border-t border-border md:hidden"
+          className="border-t border-border lg:hidden"
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               setOpen(false);
