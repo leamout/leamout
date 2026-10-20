@@ -1,12 +1,12 @@
 # Security Policy
 
-Security is a core requirement for Leamout. Monogo handles telephony signaling, realtime media, AI-provider credentials, tenant-scoped configuration, tool execution, and other infrastructure that may sit directly in a production voice path.
+Security is a core requirement for Leamout. Leamout handles telephony signaling, realtime media, AI-provider credentials, tenant-scoped configuration, tool execution, and other infrastructure that may sit directly in a production voice path.
 
 Please report security vulnerabilities privately and give maintainers a reasonable opportunity to investigate and remediate them before public disclosure.
 
 ## Supported versions
 
-Monogo is under active development. Security fixes are applied to the current `main` branch unless a maintained release line is explicitly documented.
+Leamout is under active development. Security fixes are applied to the current `main` branch unless a maintained release line is explicitly documented.
 
 | Version | Supported |
 | --- | --- |

@@ -9,7 +9,7 @@
 From the repository root:
 
 ```sh
-docker compose --env-file .env -f deploy/compose/docker.yaml up -d
+make deployment-up
 GRAFANA_ADMIN_PASSWORD=choose-a-strong-secret docker compose --env-file .env \
   -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml up -d
 ```
@@ -62,6 +62,76 @@ APP_ENV_FILE=../../server/.env.example docker compose \
 For additional infrastructure telemetry, use the observability overlay as
 described above. Leamout's operator deployment does not constitute a separate
 customer self-hosting product.
+
+## First managed deployment: operator checklist
+
+This is Leamout-operated infrastructure, not a customer self-hosting product.
+The Compose checks and synthetic acceptance tests do **not** establish that a
+live environment is ready for customer traffic.
+
+1. Provision DNS for `api.<DOMAIN>`, `auth.<DOMAIN>`,
+   `backoffice.<DOMAIN>`, and `turn.<DOMAIN>`. Host the console separately
+   at `console.<DOMAIN>`. Confirm public IPv4/NAT, firewalls, SIP signaling,
+   RTP, TURN and TLS reachability. Install the certificate/key files required
+   by OpenSIPS and Coturn under `/etc/leamout/certs/`, and configure the
+   Caddy ACME mount at `/var/lib/leamout/acme` as needed.
+2. Copy both example environment files as shown above. Generate **unique**
+   secrets for PostgreSQL, Keycloak, FreeSWITCH, media control, TURN, and
+   the Keycloak client. A URL-safe generator avoids characters that require
+   escaping in PostgreSQL URLs or Compose values:
+
+   ```sh
+   python3 -c 'import secrets; print(secrets.token_urlsafe(32))'
+   python3 -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())'
+   ```
+
+   Use the second command for `ENCRYPTION_KEY` only. **Back up this key
+   securely and never regenerate it for an existing database**; losing it can
+   make encrypted organization credentials unrecoverable.
+3. Set actual public URLs, `PUBLIC_IP`, TURN settings, and service
+   credentials. `POSTGRES_PASSWORD` in the root file must match the
+   password in `server/.env`'s `DATABASE_URL`; percent-encode URL-reserved
+   characters if necessary. Keep the Keycloak confidential-client secret
+   consistent with the imported realm.
+4. Restrict the environment files and run the fail-closed checks **before**
+   starting or upgrading services:
+
+   ```sh
+   chmod 600 .env server/.env
+   make deployment-preflight
+   make compose-validate
+   python3 tests/ops/validate.py
+   ```
+
+   The preflight checks example credentials, key strength and encoding,
+   public IP, DNS/origin consistency, database password consistency, and
+   accidental partial Polar configuration. It does not print secrets or
+   call external services.
+5. If this is an **upgrade**, back up PostgreSQL (including Keycloak's
+   database), NATS JetStream, Redis, and relevant persistent volumes **before**
+   running Compose. Verify that backups are restorable. The `migrate` service
+   applies migrations automatically on startup; rolling back application
+   containers does not roll back database schema changes.
+6. Start the stack and inspect service health and logs:
+
+   ```sh
+   make deployment-up
+   docker compose --env-file .env -f deploy/compose/docker.yaml ps
+   ```
+
+7. Before enabling customer traffic, verify live HTTPS/TLS and Keycloak
+   login/logout, API readiness (`https://api.<DOMAIN>/readyz`), private
+   metrics access controls, Alertmanager delivery, and a real organization
+   onboarding flow. Place an actual BYOC SIP call using a verified BYOA
+   integration; confirm two-way audio, interruption, tool execution, call
+   teardown, records and usage. Exercise a controlled restart and review
+   logs and alerts. Validate Polar checkout and webhooks before enabling
+   paid subscriptions.
+
+**Stop the rollout** if any environment preflight, migration, health,
+authentication, provider, SIP, or operational check fails. Restore from a
+verified backup or roll back only after assessing the migration compatibility;
+do not delete named volumes as a troubleshooting shortcut.
 
 ## Production reliability gates
 

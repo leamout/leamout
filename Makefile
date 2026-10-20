@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability backoffice-assets backoffice-generate
+.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability deployment-preflight deployment-up backoffice-assets backoffice-generate
 
 test: backoffice-generate
 	cd server && go test ./...
@@ -20,6 +20,13 @@ compose-validate:
 
 compose-validate-observability:
 	GRAFANA_ADMIN_PASSWORD=ci-only-placeholder APP_ENV_FILE=../../server/.env.example docker compose --env-file .env.example -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml config --quiet
+
+deployment-preflight:
+	python3 tests/ops/preflight.py --infra-env .env --app-env server/.env
+
+deployment-up: deployment-preflight
+	docker compose --env-file .env -f deploy/compose/docker.yaml config --quiet
+	docker compose --env-file .env -f deploy/compose/docker.yaml up -d --build
 
 backoffice-assets:
 	cd server/internal/backoffice && bun install --frozen-lockfile && bun run build
