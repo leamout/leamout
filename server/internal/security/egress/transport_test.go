@@ -1,6 +1,7 @@
 package egress
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -72,11 +73,14 @@ func TestProxyCannotBypassWebhookDestinationPolicy(t *testing.T) {
 
 	// A proxied CONNECT could otherwise ask the proxy to reach this private
 	// origin; direct dialing must reject it before making any network request.
-	request, err := http.NewRequest(http.MethodPost, "https://10.20.30.40/internal", nil)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://10.20.30.40/internal", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = client.Do(request)
+	response, err := client.Do(request)
+	if response != nil {
+		defer func() { _ = response.Body.Close() }()
+	}
 	if err == nil || !strings.Contains(err.Error(), "non-public address") {
 		t.Fatalf("private destination response error = %v, want policy rejection", err)
 	}
