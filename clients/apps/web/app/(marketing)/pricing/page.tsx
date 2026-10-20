@@ -7,15 +7,15 @@ import { consoleURL } from "@/lib/site";
 export const metadata = constructMetadata({
   title: "Pricing",
   description:
-    "Explore Leamout platform subscriptions for running autonomous voice agents with your own carriers and AI providers.",
+    "Compare Leamout subscriptions: runtime minutes, concurrent calls, voice agents, SIP trunks, and retention.",
   path: "/pricing",
 });
 
 export default function PricingPage() {
   return (
     <>
-      <PricingPlans signupHref={`${consoleURL}/create-account`} />
-      <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+      <PricingPlans signupHref={consoleURL + "/create-account"} />
+      <div className="mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8">
         <BillingExplanation />
         <PricingFAQ />
       </div>

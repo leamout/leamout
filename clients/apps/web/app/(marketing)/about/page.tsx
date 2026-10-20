@@ -7,13 +7,13 @@ import { constructMetadata } from "@/lib/metadata";
 export const metadata = constructMetadata({
   title: "About",
   description:
-    "Learn about Leamout and our mission to help developers run autonomous voice agents through Leamout using their own carriers and AI providers.",
+    "Why we are building Leamout: a managed, SIP-native runtime and control plane for autonomous voice agents.",
   path: "/about",
 });
 
 export default function AboutPage() {
   return (
-    <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8">
       <AboutIntro />
       <Mission />
       <Principles />
