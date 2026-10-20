@@ -114,6 +114,27 @@ services:
         condition: service_healthy
     networks: [edge, control]
 
+  backoffice:
+    build:
+      context: ../../server
+      dockerfile: Dockerfile
+      target: runtime
+    restart: unless-stopped
+    command: ["/leamout/backoffice"]
+    env_file:
+      - ${APP_ENV_FILE:-../../server/.env}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8082/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    networks: [control]
+
   worker:
     build:
       context: ../../server

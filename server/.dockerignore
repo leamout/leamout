@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+**/node_modules
+**/*_templ.go
+**/*_templ.txt
+internal/backoffice/assets/static/css/tailwindcss.css
+coverage.out

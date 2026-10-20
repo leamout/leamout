@@ -1,0 +1,71 @@
+package organizations
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/server/internal/backoffice/components"
+)
+
+templ Page(result List) {
+	@components.Layout("Organizations", "organizations", ListContent(result))
+}
+
+templ ListContent(result List) {
+	<div class="mb-8">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Customers</p>
+		<h1 class="mt-2 text-3xl font-bold">Organizations</h1>
+		<p class="mt-2 text-base-content/70">Inspect organizations, subscription state and resource counts across Leamout.</p>
+	</div>
+	@Filters(result.Filter)
+	@OrganizationTable(result.Organizations)
+	<nav class="mt-6 flex items-center justify-between" aria-label="Pagination">
+		<span class="text-sm text-base-content/60">Page { fmt.Sprint(result.Filter.Page) }</span>
+		<div class="flex gap-2">
+			if result.Filter.Page > 1 {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page-1)) }>Previous</a>
+			}
+			if result.HasNext {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page+1)) }>Next</a>
+			}
+		</div>
+	</nav>
+}
+
+templ DetailPage(organization Detail) {
+	@components.Layout(organization.Name, "organizations", DetailContent(organization))
+}
+
+templ DetailContent(organization Detail) {
+	<a class="link link-primary text-sm" href="/backoffice/organizations">Back to organizations</a>
+	<div class="mt-6 flex flex-wrap items-start justify-between gap-4">
+		<div>
+			<h1 class="text-3xl font-bold">{ organization.Name }</h1>
+			<p class="mt-2 font-mono text-sm text-base-content/60">{ organization.ID.String() }</p>
+		</div>
+		<span class="badge badge-outline badge-lg">{ organization.Status }</span>
+	</div>
+	<div class="mt-8 grid gap-4 md:grid-cols-3">
+		@CountCard("Active memberships", organization.ActiveMembers)
+		@CountCard("Voice agents", organization.Agents)
+		@CountCard("SIP trunks", organization.Trunks)
+	</div>
+	<div class="mt-8 grid gap-6 lg:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Subscription</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Plan", organization.PlanName)
+				@Field("Recorded status", organization.SubscriptionStatus)
+				@Field("Current period ends", organization.PeriodEnd)
+			</dl>
+			<p class="mt-4 text-sm text-base-content/60">Subscription records are shown for inspection. Effective access also depends on lifecycle and entitlement rules.</p>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Organization timeline</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Created", organization.CreatedAt)
+				@Field("Updated", organization.UpdatedAt)
+				@Field("Deleted", organization.DeletedAt)
+			</dl>
+		</section>
+	</div>
+}

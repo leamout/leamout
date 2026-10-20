@@ -2,6 +2,15 @@
 
 ARG GO_VERSION=1.26.9
 
+FROM oven/bun:1.3.14-alpine AS backoffice-assets
+
+WORKDIR /assets
+RUN apk add --no-cache nodejs
+COPY internal/backoffice/package.json internal/backoffice/bun.lock ./
+RUN bun install --frozen-lockfile
+COPY internal/backoffice ./
+RUN bun run build
+
 FROM golang:${GO_VERSION}-alpine AS build
 
 
@@ -16,6 +25,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+COPY --from=backoffice-assets /assets/assets/static ./internal/backoffice/assets/static
+RUN go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
 
 RUN set -eux; \
     CGO_ENABLED=0 GOOS=linux go build \
@@ -32,7 +43,12 @@ RUN set -eux; \
         -trimpath \
         -ldflags="-s -w" \
         -o /out/media \
-        ./cmd/media
+        ./cmd/media; \
+    CGO_ENABLED=0 GOOS=linux go build \
+        -trimpath \
+        -ldflags="-s -w" \
+        -o /out/backoffice \
+        ./cmd/backoffice
 
 FROM alpine:3.22 AS runtime
 
@@ -47,10 +63,11 @@ RUN apk add --no-cache \
 COPY --from=build /out/server /leamout/server
 COPY --from=build /out/worker /leamout/worker
 COPY --from=build /out/media /leamout/media
+COPY --from=build /out/backoffice /leamout/backoffice
 
 USER leamout
 
-EXPOSE 8080
+EXPOSE 8080 8082
 
 CMD ["/leamout/server"]
 # Atlas and the immutable migration set are built as a separate target so

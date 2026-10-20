@@ -1,0 +1,67 @@
+package organizations
+
+import "fmt"
+
+templ Filters(filter Filter) {
+	<form method="get" action="/backoffice/organizations" class="mb-6 flex flex-wrap items-end gap-4">
+		<label class="form-control flex-1 min-w-64">
+			<span class="mb-2 block text-sm font-medium">Name or organization ID</span>
+			<input class="input input-bordered w-full" type="search" name="q" value={ filter.Search } maxlength="200" placeholder="Search organizations"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Status</span>
+			<select name="status" class="select select-bordered">
+				<option value="" selected?={ filter.Status == "" }>All statuses</option>
+				<option value="active" selected?={ filter.Status == "active" }>Active</option>
+				<option value="disabled" selected?={ filter.Status == "disabled" }>Disabled</option>
+				<option value="deleted" selected?={ filter.Status == "deleted" }>Deleted</option>
+			</select>
+		</label>
+		<button class="btn btn-primary" type="submit">Search</button>
+		<a class="btn btn-ghost" href="/backoffice/organizations">Clear</a>
+	</form>
+}
+
+templ OrganizationTable(organizations []Organization) {
+	if len(organizations) == 0 {
+		<div class="alert" role="status">No organizations match these filters.</div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Organization</th>
+						<th scope="col">Status</th>
+						<th scope="col">Created</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, organization := range organizations {
+						<tr>
+							<td>
+								<a class="link link-primary font-medium" href={ templ.SafeURL("/backoffice/organizations/" + organization.ID.String()) }>{ organization.Name }</a>
+								<div class="mt-1 font-mono text-xs text-base-content/60">{ organization.ID.String() }</div>
+							</td>
+							<td><span class="badge badge-outline">{ organization.Status }</span></td>
+							<td>{ organization.CreatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ CountCard(label string, count int64) {
+	<section class="rounded-box border border-base-300 bg-base-100 p-6">
+		<h2 class="text-sm text-base-content/60">{ label }</h2>
+		<p class="mt-2 text-3xl font-semibold">{ fmt.Sprint(count) }</p>
+	</section>
+}
+
+templ Field(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-words font-medium">{ value }</dd>
+	</div>
+}
