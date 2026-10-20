@@ -115,7 +115,7 @@ live environment is ready for customer traffic.
 6. Start the stack and inspect service health and logs:
 
    ```sh
-   docker compose --env-file .env -f deploy/compose/docker.yaml up -d --build
+   make deployment-up
    docker compose --env-file .env -f deploy/compose/docker.yaml ps
    ```
 
