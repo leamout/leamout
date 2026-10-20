@@ -22,6 +22,8 @@ ORG_ID = "00000000-0000-0000-0000-000000001001"
 COMPOSE = [
     "docker",
     "compose",
+    "--env-file",
+    os.environ["APP_ENV_FILE"],
     "-f",
     "deploy/compose/docker.yaml",
     "-f",
