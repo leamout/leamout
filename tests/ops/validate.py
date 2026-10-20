@@ -29,6 +29,7 @@ def main():
     assert app["KEYCLOAK_ISSUER"] == f"https://auth.{domain}/realms/leamout"
     assert app["FRONTEND_URL"] in app["CORS_ORIGINS"].split(",")
     assert app["FRONTEND_URL"] != app["BACKEND_URL"]
+    assert app["TRUSTED_PROXY_CIDRS"] == "172.33.0.10/32"
 
     realm = json.loads(
         (ROOT / "deploy/keycloak/leamout-realm.json").read_text(encoding="utf-8")
@@ -48,6 +49,9 @@ def main():
     assert "KC_HOSTNAME: https://auth.${DOMAIN:-leamout.com}" in compose
     assert 'http://127.0.0.1:8081/readyz' in compose
     assert "172.32.0.0/24" in compose
+    assert "172.33.0.0/24" in compose
+    assert "KC_PROXY_TRUSTED_ADDRESSES: 172.33.0.10/32" in compose
+    assert "env_file:" not in compose, "services must use explicit environment allowlists"
 
     caddy = (ROOT / "deploy/Caddyfile").read_text(encoding="utf-8")
     assert re.search(r"@privateMetrics\s+path /metrics", caddy)

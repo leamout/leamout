@@ -29,8 +29,14 @@ jobs:
 
       - name: Check deployment files
         run: |
-          APP_ENV_FILE=../../server/.env.example docker compose \
-            --env-file .env.example -f deploy/compose/docker.yaml config --quiet
+          docker compose \
+            --env-file .env.example --env-file server/.env.example -f deploy/compose/docker.yaml config --quiet
+
+      - name: Verify resolved service secrets and network isolation
+        run: |
+          docker compose --env-file .env.example --env-file server/.env.example \
+            -f deploy/compose/docker.yaml config --format json \
+            | python3 tests/ops/assert_isolation.py
 
       - name: Validate Caddyfile
         run: |

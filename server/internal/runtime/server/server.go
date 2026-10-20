@@ -19,6 +19,10 @@ func Run(ctx context.Context) error {
 		return fmt.Errorf("load configuration: %w", err)
 	}
 
+	if err := cfg.ValidateForServer(); err != nil {
+		return fmt.Errorf("validate configuration: %w", err)
+	}
+
 	modules, err := newModules(ctx, cfg)
 	if err != nil {
 		return err

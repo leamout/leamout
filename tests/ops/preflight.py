@@ -99,6 +99,8 @@ def validate(infra: dict[str, str], app: dict[str, str]) -> list[str]:
     ]
     check(origins == [expected["FRONTEND_URL"]],
           "CORS_ORIGINS must contain only the deployed console HTTPS origin")
+    check(app.get("TRUSTED_PROXY_CIDRS") == "172.33.0.10/32",
+          "TRUSTED_PROXY_CIDRS must trust only the Compose Caddy proxy")
 
     turn_host = f"turn.{domain}"
     check(infra.get("TURN_REALM") == turn_host,
