@@ -289,6 +289,49 @@ func (s *Service) DeleteCredential(
 	)
 }
 
+// WithTx keeps provider binding writes in the same transaction as agent creation.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	scoped := *s
+	scoped.repo = NewRepository(s.repo.queries.WithTx(tx))
+	return &scoped
+}
+
+// ValidateBinding checks provider compatibility, configuration, and organization
+// ownership of the selected integration without creating any records.
+func (s *Service) ValidateBinding(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	role string,
+	req UpsertBindingRequest,
+) error {
+	role = strings.TrimSpace(role)
+	req.Provider = strings.TrimSpace(req.Provider)
+	if organizationID == uuid.Nil {
+		return apperror.NewBadRequest("organization_id is required")
+	}
+	kind, ok := roleKind(role)
+	if !ok || !s.supportsBinding(kind, req.Provider) {
+		return apperror.NewBadRequest("provider is not compatible with Voice Agent role")
+	}
+	if req.CredentialID == nil || *req.CredentialID == uuid.Nil {
+		return apperror.NewBadRequest("credential_id is required for BYOA")
+	}
+	if len(req.Config) == 0 {
+		req.Config = json.RawMessage(`{}`)
+	}
+	if err := s.validateProviderConfig(kind, req.Provider, req.Config); err != nil {
+		return err
+	}
+	credential, _, err := s.repo.GetCredentialCiphertext(ctx, organizationID, *req.CredentialID)
+	if err != nil {
+		return dbError(err, "AI provider credential not found")
+	}
+	if credential.Provider != req.Provider {
+		return apperror.NewBadRequest("credential provider does not match binding provider")
+	}
+	return nil
+}
+
 func (s *Service) UpsertBinding(
 	ctx context.Context,
 	organizationID uuid.UUID,
@@ -298,41 +341,14 @@ func (s *Service) UpsertBinding(
 ) (Binding, error) {
 	role = strings.TrimSpace(role)
 	req.Provider = strings.TrimSpace(req.Provider)
-
 	if organizationID == uuid.Nil || agentID == uuid.Nil {
-		return Binding{}, apperror.NewBadRequest(
-			"organization and voice agent ids are required",
-		)
+		return Binding{}, apperror.NewBadRequest("organization and voice agent ids are required")
 	}
-	kind, ok := roleKind(role)
-	if !ok || !s.supportsBinding(kind, req.Provider) {
-		return Binding{}, apperror.NewBadRequest(
-			"provider is not compatible with Voice Agent role",
-		)
-	}
-	if req.CredentialID == nil || *req.CredentialID == uuid.Nil {
-		return Binding{}, apperror.NewBadRequest("credential_id is required for BYOA")
-	}
-
-	if len(req.Config) == 0 {
-		req.Config = json.RawMessage(`{}`)
-	}
-	if err := s.validateProviderConfig(kind, req.Provider, req.Config); err != nil {
+	if err := s.ValidateBinding(ctx, organizationID, role, req); err != nil {
 		return Binding{}, err
 	}
-
-	credential, _, err := s.repo.GetCredentialCiphertext(
-		ctx,
-		organizationID,
-		*req.CredentialID,
-	)
-	if err != nil {
-		return Binding{}, dbError(err, "AI provider credential not found")
-	}
-	if credential.Provider != req.Provider {
-		return Binding{}, apperror.NewBadRequest(
-			"credential provider does not match binding provider",
-		)
+	if len(req.Config) == 0 {
+		req.Config = json.RawMessage(`{}`)
 	}
 
 	value, err := s.repo.UpsertBinding(

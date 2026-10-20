@@ -82,7 +82,7 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	conversationsRepository := conversations.NewRepository(queries)
 	conversationsService := conversations.NewService(conversationsRepository)
 
-	packageDeployer := manifest.NewDeployer(agentsService, toolsService, manifest.NewValidator())
+	packageDeployer := manifest.NewDeployer(agentsService, toolsService, providersService, deps.Database, manifest.NewValidator())
 
 	orchestrator := orchestration.NewService(
 		agentsService,

@@ -9,8 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	agentcontract "github.com/leamout/contracts/agent"
 	"github.com/leamout/leamout/server/internal/ai/agents"
+	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/ai/tools"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
@@ -19,11 +22,15 @@ type Deployer struct {
 	validator *Validator
 	agents    *agents.Service
 	tools     *tools.Service
+	providers *providers.Service
+	db        *pgxpool.Pool
 }
 
 func NewDeployer(
 	agentService *agents.Service,
 	toolService *tools.Service,
+	providerService *providers.Service,
+	db *pgxpool.Pool,
 	validator *Validator,
 ) *Deployer {
 	if validator == nil {
@@ -33,6 +40,8 @@ func NewDeployer(
 		validator: validator,
 		agents:    agentService,
 		tools:     toolService,
+		providers: providerService,
+		db:        db,
 	}
 }
 
@@ -45,13 +54,36 @@ func (d *Deployer) Deploy(
 	if organizationID == uuid.Nil {
 		return DeploymentResult{}, fmt.Errorf("organization id is required")
 	}
-	if d == nil || d.agents == nil || d.tools == nil {
+	if d == nil || d.agents == nil || d.tools == nil || d.providers == nil || d.db == nil {
 		return DeploymentResult{}, fmt.Errorf("agent manifest deployer is unavailable")
 	}
 	if err := d.validator.Validate(pkg); err != nil {
 		return DeploymentResult{}, err
 	}
+	if err := d.validateIntegrations(ctx, organizationID, pkg.Agent.Providers, input); err != nil {
+		return DeploymentResult{}, err
+	}
+	scoped, tx, err := d.begin(ctx)
+	if err != nil {
+		return DeploymentResult{}, err
+	}
+	defer rollbackDeployment(ctx, tx)
+	result, err := scoped.deploy(ctx, organizationID, pkg, input)
+	if err != nil {
+		return DeploymentResult{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return DeploymentResult{}, apperror.NewInternal("commit agent package deployment", err)
+	}
+	return result, nil
+}
 
+func (d *Deployer) deploy(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	pkg Package,
+	input DeploymentInput,
+) (DeploymentResult, error) {
 	bindings := make([]agents.ProviderBindingRequest, 0, len(pkg.Agent.Providers))
 	for _, binding := range pkg.Agent.Providers {
 		var integrationID *uuid.UUID
@@ -90,12 +122,10 @@ func (d *Deployer) Deploy(
 	for _, definition := range pkg.Tools {
 		req, err := toolCreateRequest(definition, input.Variables)
 		if err != nil {
-			_ = d.agents.Disable(ctx, organizationID, created.ID)
 			return DeploymentResult{}, err
 		}
 		_, secret, err := d.tools.Create(ctx, organizationID, created.ID, req)
 		if err != nil {
-			_ = d.agents.Disable(ctx, organizationID, created.ID)
 			return DeploymentResult{}, err
 		}
 		if secret != "" {
@@ -162,25 +192,34 @@ func (d *Deployer) DeployPortable(
 	if organizationID == uuid.Nil {
 		return PortableDeploymentResult{}, apperror.NewBadRequest("organization context required")
 	}
-	if d == nil || d.agents == nil || d.tools == nil || d.validator == nil {
+	if d == nil || d.agents == nil || d.tools == nil || d.providers == nil || d.db == nil || d.validator == nil {
 		return PortableDeploymentResult{}, apperror.NewServiceUnavailable("agent package deployer is unavailable", nil)
 	}
 	if err := d.validator.ValidatePortable(pkg); err != nil {
 		return PortableDeploymentResult{}, apperror.NewBadRequest(err.Error())
 	}
 
-	// Resolve and validate every referenced tool before any database writes.
-	// This catches missing variables and invalid resolved endpoints up front.
+	// Resolve tools and validate every organization integration before writing.
 	prepared, err := preparePortableTools(pkg, input.Variables)
 	if err != nil {
 		return PortableDeploymentResult{}, apperror.NewBadRequest(err.Error())
 	}
-
 	aliases := make([]string, 0, len(pkg.Agents))
 	for alias := range pkg.Agents {
 		aliases = append(aliases, alias)
 	}
 	sort.Strings(aliases)
+	for _, alias := range aliases {
+		if err := d.validateIntegrations(ctx, organizationID, pkg.Agents[alias].Providers, input); err != nil {
+			return PortableDeploymentResult{}, fmt.Errorf("agent %q: %w", alias, err)
+		}
+	}
+
+	scoped, tx, err := d.begin(ctx)
+	if err != nil {
+		return PortableDeploymentResult{}, err
+	}
+	defer rollbackDeployment(ctx, tx)
 
 	result := PortableDeploymentResult{
 		Agents: make(map[string]DeploymentResult, len(aliases)),
@@ -190,46 +229,74 @@ func (d *Deployer) DeployPortable(
 		},
 	}
 	for _, alias := range aliases {
-		created, deployErr := d.Deploy(
+		created, err := scoped.deploy(
 			ctx,
 			organizationID,
 			Package{
 				Agent: pkg.Agents[alias],
 				Tools: prepared[alias],
 			},
-			DeploymentInput{
-				Integrations: input.Integrations,
-			},
+			DeploymentInput{Integrations: input.Integrations},
 		)
-		if deployErr != nil {
-			// Disable agents installed earlier in this request, preserving
-			// their IDs for an administrator to inspect and clean up.
-			cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-			var cleanupError error
-			for _, previous := range aliases {
-				item, ok := result.Agents[previous]
-				if !ok {
-					continue
-				}
-				if disableErr := d.agents.Disable(cleanupCtx, organizationID, item.AgentID); disableErr != nil {
-					cleanupError = fmt.Errorf("disable %q: %w", previous, disableErr)
-				}
-			}
-			cancel()
-			if cleanupError != nil {
-				return PortableDeploymentResult{}, fmt.Errorf(
-					"deploy agent %q: %w; cleanup failed: %w",
-					alias,
-					deployErr,
-					cleanupError,
-				)
-			}
-			return PortableDeploymentResult{}, fmt.Errorf("deploy agent %q: %w", alias, deployErr)
+		if err != nil {
+			return PortableDeploymentResult{}, fmt.Errorf("deploy agent %q: %w", alias, err)
 		}
 		result.Agents[alias] = created
 		result.RoutingPlan.AgentIDs[alias] = created.AgentID
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return PortableDeploymentResult{}, apperror.NewInternal("commit portable agent deployment", err)
+	}
 	return result, nil
+}
+
+// validateIntegrations verifies that every binding points to an existing
+// organization-owned credential for the correct provider and role.
+func (d *Deployer) validateIntegrations(
+	ctx context.Context,
+	organizationID uuid.UUID,
+	bindings []agentcontract.ProviderBinding,
+	input DeploymentInput,
+) error {
+	for _, binding := range bindings {
+		credentialID := input.Integrations[binding.Provider]
+		if credentialID == uuid.Nil {
+			return apperror.NewBadRequest(fmt.Sprintf("AI integration for provider %q is required", binding.Provider))
+		}
+		if err := d.providers.ValidateBinding(
+			ctx,
+			organizationID,
+			string(binding.Role),
+			providers.UpsertBindingRequest{
+				Provider: binding.Provider,
+				CredentialID: &credentialID,
+				Config: binding.Config,
+			},
+		); err != nil {
+			return fmt.Errorf("provider %q: %w", binding.Provider, err)
+		}
+	}
+	return nil
+}
+
+func (d *Deployer) begin(ctx context.Context) (*Deployer, pgx.Tx, error) {
+	tx, err := d.db.Begin(ctx)
+	if err != nil {
+		return nil, nil, apperror.NewInternal("begin agent package deployment", err)
+	}
+	return &Deployer{
+		validator: d.validator,
+		agents: d.agents.WithTx(tx),
+		tools: d.tools.WithTx(tx),
+		providers: d.providers.WithTx(tx),
+		db: d.db,
+	}, tx, nil
+}
+
+func rollbackDeployment(ctx context.Context, tx pgx.Tx) {
+	rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	_ = tx.Rollback(rollbackCtx)
 }
 
 func preparePortableTools(

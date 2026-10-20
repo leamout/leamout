@@ -21,6 +21,13 @@ func NewService(repo *Repository, cipher *encryption.Cipher) *Service {
 	return &Service{repo: repo, cipher: cipher}
 }
 
+// WithTx ensures tool writes are rolled back with the package deployment.
+func (s *Service) WithTx(tx pgx.Tx) *Service {
+	scoped := *s
+	scoped.repo = NewRepository(s.repo.queries.WithTx(tx))
+	return &scoped
+}
+
 func (s *Service) Create(
 	ctx context.Context,
 	organizationID, agentID uuid.UUID,
