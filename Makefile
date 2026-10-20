@@ -1,4 +1,4 @@
-.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability deployment-preflight backoffice-assets backoffice-generate
+.PHONY: test test-race vet build sqlc compose-validate compose-validate-observability deployment-preflight deployment-up backoffice-assets backoffice-generate
 
 test: backoffice-generate
 	cd server && go test ./...
@@ -23,6 +23,10 @@ compose-validate-observability:
 
 deployment-preflight:
 	python3 tests/ops/preflight.py --infra-env .env --app-env server/.env
+
+deployment-up: deployment-preflight
+	docker compose --env-file .env -f deploy/compose/docker.yaml config --quiet
+	docker compose --env-file .env -f deploy/compose/docker.yaml up -d --build
 
 backoffice-assets:
 	cd server/internal/backoffice && bun install --frozen-lockfile && bun run build
