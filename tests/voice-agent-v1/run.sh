@@ -45,7 +45,7 @@ cleanup() {
         (
             cd "$REPO_ROOT" &&
                 $COMPOSE logs --no-color --tail=300 \
-                    server worker media freeswitch opensips rtpengine \
+                    keycloak keycloak-postgres server worker media freeswitch opensips rtpengine \
                     postgres redis nats voice-agent-v1-carrier voice-agent-v1-openai
         ) || true
     fi

@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -11,6 +12,7 @@ values = {
     "DOMAIN": os.environ["DOMAIN"],
     "FRONTEND_URL": "https://console.acceptance.invalid",
     "BACKEND_URL": "http://server:8080",
+    "BACKOFFICE_URL": "https://backoffice.acceptance.invalid",
     "KEYCLOAK_ISSUER": "https://keycloak:8443/realms/leamout",
     "KEYCLOAK_CLIENT_ID": "leamout-console",
     "KEYCLOAK_CLIENT_SECRET": "acceptance-keycloak-client-not-live",
@@ -37,6 +39,17 @@ for key in (
     "TURN_PUBLIC_URLS",
 ):
     values[key] = os.environ[key]
+
+# Realm imports resolve placeholders from this generated container environment.
+realm_path = Path(__file__).resolve().parents[1] / "deploy/keycloak/leamout-realm.json"
+required_variables = set(
+    re.findall(
+        r"\$\{([A-Z_][A-Z0-9_]*)\}", realm_path.read_text(encoding="utf-8")
+    )
+)
+missing_variables = sorted(key for key in required_variables if not values.get(key))
+if missing_variables:
+    raise SystemExit("Missing Keycloak realm variables: " + ", ".join(missing_variables))
 
 lines = []
 for key, value in values.items():
