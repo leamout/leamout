@@ -3,7 +3,7 @@ package organizations
 import "fmt"
 
 templ Filters(filter Filter) {
-	<form method="get" action="/backoffice/organizations" class="mb-6 flex flex-wrap items-end gap-4">
+	<form method="get" action="/organizations" class="mb-6 flex flex-wrap items-end gap-4">
 		<label class="form-control flex-1 min-w-64">
 			<span class="mb-2 block text-sm font-medium">Name or organization ID</span>
 			<input class="input input-bordered w-full" type="search" name="q" value={ filter.Search } maxlength="200" placeholder="Search organizations"/>
@@ -18,7 +18,7 @@ templ Filters(filter Filter) {
 			</select>
 		</label>
 		<button class="btn btn-primary" type="submit">Search</button>
-		<a class="btn btn-ghost" href="/backoffice/organizations">Clear</a>
+		<a class="btn btn-ghost" href="/organizations">Clear</a>
 	</form>
 }
 
@@ -39,7 +39,7 @@ templ OrganizationTable(organizations []Organization) {
 					for _, organization := range organizations {
 						<tr>
 							<td>
-								<a class="link link-primary font-medium" href={ templ.SafeURL("/backoffice/organizations/" + organization.ID.String()) }>{ organization.Name }</a>
+								<a class="link link-primary font-medium" href={ templ.SafeURL("/organizations/" + organization.ID.String()) }>{ organization.Name }</a>
 								<div class="mt-1 font-mono text-xs text-base-content/60">{ organization.ID.String() }</div>
 							</td>
 							<td><span class="badge badge-outline">{ organization.Status }</span></td>

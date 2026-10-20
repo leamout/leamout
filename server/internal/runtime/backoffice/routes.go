@@ -12,14 +12,14 @@ import (
 	"github.com/leamout/leamout/server/internal/observability/logging"
 )
 
-func newRouter(modules *modules, logger *logging.Logger, frontendURL string) (*chi.Mux, error) {
-	// Trust the configured public console origin, never forwarded request headers.
-	frontend, err := url.Parse(frontendURL)
-	if err != nil || frontend.Host == "" || frontend.User != nil || (frontend.Scheme != "http" && frontend.Scheme != "https") {
-		return nil, fmt.Errorf("frontend URL must be an absolute HTTP(S) URL")
+func newRouter(modules *modules, logger *logging.Logger, backofficeURL string) (*chi.Mux, error) {
+	// Trust the configured public backoffice origin, never forwarded request headers.
+	origin, err := url.Parse(backofficeURL)
+	if err != nil || origin.Host == "" || origin.User != nil || (origin.Scheme != "http" && origin.Scheme != "https") {
+		return nil, fmt.Errorf("backoffice URL must be an absolute HTTP(S) URL")
 	}
 	protection := http.NewCrossOriginProtection()
-	if err := protection.AddTrustedOrigin(frontend.Scheme + "://" + frontend.Host); err != nil {
+	if err := protection.AddTrustedOrigin(origin.Scheme + "://" + origin.Host); err != nil {
 		return nil, fmt.Errorf("configure backoffice origin protection: %w", err)
 	}
 	router := chi.NewRouter()
@@ -29,16 +29,17 @@ func newRouter(modules *modules, logger *logging.Logger, frontendURL string) (*c
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
-	static := http.StripPrefix("/backoffice", http.FileServerFS(assets.Public()))
-	router.Handle("/backoffice/static/*", static)
-	router.Handle("/backoffice/favicon.ico", static)
-	router.Route("/backoffice", func(protected chi.Router) {
+	static := http.FileServerFS(assets.Public())
+	router.Handle("/static/*", static)
+	router.Handle("/favicon.ico", static)
+	modules.authentication.Routes(router, protection.Handler)
+	router.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/log-in", http.StatusSeeOther)
+	})
+	router.Group(func(protected chi.Router) {
 		protected.Use(modules.authn.RequireSession)
 		protected.Use(requirePlatformAdmin(modules.queries, logger))
 		protected.Use(protection.Handler)
-		protected.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/backoffice/organizations", http.StatusSeeOther)
-		})
 		modules.organizations.Routes(protected)
 	})
 	return router, nil

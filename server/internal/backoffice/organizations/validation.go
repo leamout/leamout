@@ -37,5 +37,5 @@ func pageURL(filter Filter, page int32) string {
 	values.Set("q", filter.Search)
 	values.Set("status", filter.Status)
 	values.Set("page", strconv.FormatInt(int64(page), 10))
-	return "/backoffice/organizations?" + values.Encode()
+	return "/organizations?" + values.Encode()
 }

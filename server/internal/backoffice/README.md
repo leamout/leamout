@@ -1,17 +1,26 @@
 # Leamout Backoffice
 
-The operator interface is a separate Go HTTP process using Templ, Tailwind,
-DaisyUI and locally embedded assets. It listens on port 8082 and serves pages
-under `/backoffice`. The first feature is read-only organization inspection:
-name/ID search, lifecycle filters, 25-row pagination, resource counts and
-recorded subscription state. Deleted and disabled organizations remain visible.
+Backoffice is a standalone full-stack application built with Go, Templ, HTMX,
+TailwindCSS, DaisyUI and Hyperscript. The Go process serves HTML and embedded
+assets directly on port 8082. It does not require the Next.js console.
 
-## Local development
+The first feature provides organization name/ID search, lifecycle filters,
+25-row pagination and detail pages with resource counts and subscription state.
+Disabled and deleted organizations remain inspectable.
 
-Use the same migrated PostgreSQL database, `ENCRYPTION_KEY`, `KEYCLOAK_*` and
-`FRONTEND_URL` as the API. `APP_ENV` controls development HTTPS validation.
-The backoffice loads `server/.env` but does not require Redis, NATS, FreeSWITCH,
-TURN or payment credentials.
+## Development
+
+Backoffice uses `config.Load()` and `config.Config` from
+`internal/platform/config/config.go`, loading the shared `server/.env`. Supply
+all required shared application settings. Backoffice connects to PostgreSQL and
+Keycloak; it does not start the API, workers or telephony services.
+
+Set `BACKOFFICE_URL` to the public origin of this application (default
+`http://localhost:8082`). For local HTTP, use `APP_ENV=development` and a local
+Keycloak issuer. The configured Keycloak client must allow the exact redirect
+URI `${BACKOFFICE_URL}/auth/callback`. The realm template includes this URI
+alongside the existing API application's callback; existing realms require
+updating the allowed redirect URIs explicitly.
 
 From the repository root, with Go from `server/go.mod` and Bun 1.3.14 installed:
 
@@ -21,15 +30,21 @@ cd server
 go run ./cmd/backoffice
 ```
 
-Run the console and API normally. Sign in through the console's existing
-Keycloak login, then visit `http://localhost:3000/backoffice`. The console
-rewrites `/backoffice/*` to `BACKOFFICE_URL` (default `http://localhost:8082`).
-Use the same hostname for login and backoffice; the session cookie is host-only.
-An unauthenticated request receives 401; a signed-in non-operator receives 403.
-No separate login or credentials are issued by this process.
+Open `http://localhost:8082/log-in`. The Templ page starts the Keycloak flow at
+`/auth/login`; `/auth/callback` creates a host-only browser session and returns
+the operator to `/organizations`. The flow reuses the identity package's state,
+nonce, PKCE and encrypted session implementation. It requires no console login,
+console cookie or console proxy.
 
-An existing, verified operator account must be explicitly promoted by a trusted
-database administrator, using its exact user ID:
+The sign-out form posts to `/auth/logout`, revokes the current local session,
+clears its cookie and redirects to `/log-in`. Keycloak's SSO session remains
+available for subsequent sign-in. Signed backchannel logout events can be
+received at `/identity/backchannel-logout`; the existing API backchannel handler
+also revokes matching sessions in the shared database.
+
+Only active users with `is_platform_admin` may access organization pages.
+A trusted administrator must explicitly promote an existing, verified account
+using its exact ID:
 
 ```sql
 UPDATE users
@@ -37,44 +52,36 @@ SET is_platform_admin = TRUE, updated_at = NOW()
 WHERE id = '<verified-operator-user-id>' AND disabled_at IS NULL;
 ```
 
-There is no default operator account or automatic promotion. Removing the flag
-or disabling the user denies subsequent requests. Session resolution uses the
-normal encrypted Keycloak token refresh and revocation behavior.
+Removing the flag, disabling the user or revoking the session denies subsequent
+protected requests. No default administrator or automatic promotion is created.
 
 ## Deployment
 
-The shared server Docker image builds the asset bundle and generates Templ
-sources before compiling `/leamout/backoffice`. Compose includes an internal
-`backoffice:8082` service without a published host port. Configure the console's
-`BACKOFFICE_URL` at build time to a reachable private backoffice address (for a
-console on the Compose control network, `http://backoffice:8082`). The console
-must have network access to that service. Keep `FRONTEND_URL` equal to the public
-console origin. An external reverse proxy can equivalently forward
-`/backoffice/*`, preserving that prefix, on the console's HTTPS hostname.
+`server/.env.example` sets `BACKOFFICE_URL=https://backoffice.leamout.com`.
+Configure DNS for `backoffice.${DOMAIN}` and the matching Keycloak redirect URI.
+The Compose `backoffice` service runs `/leamout/backoffice`; Caddy proxies the
+backoffice hostname directly to `backoffice:8082`. No Next.js service or route
+is involved. The Docker build generates templates and the local asset bundle.
 
-Do not deploy this behind a different public hostname and expect the console's
-host-only cookie to work. There is no need to widen its cookie domain.
+## Structure
 
-## Boundaries
+- `cmd/backoffice`: process entry point.
+- `internal/runtime/backoffice`: composition, server, routes and operator access.
+- `internal/backoffice/auth`: Templ sign-in page and browser authentication routes.
+- `internal/backoffice/organizations`: models, repository, handlers, routes,
+  validation, pages and feature components.
+- `internal/backoffice/components`: shared shell and reusable UI.
+- `internal/backoffice/assets`: embedded local CSS, JavaScript and favicon.
+- `internal/database/queries/organizations.sql`: organization queries, including
+  explicit cross-organization backoffice read projections.
+- `internal/database/sqlc/organizations.sql.go`: generated query implementation.
 
-- `cmd/backoffice` starts the process.
-- `internal/runtime/backoffice` composes concrete dependencies, authentication,
-  database-backed operator authorization, origin protection and routes.
-- `assets` embeds static files; `components` contains the shared shell and UI.
-- `organizations` owns `model.go`, `repository.go`, `handler.go`, `routes.go`,
-  `validation.go`, `pages.templ` and `components.templ`.
-- Operator SQL is explicit cross-organization read projection SQL under
-  `internal/database/queries/backoffice_organizations.sql`.
-- Add `service.go` only when operator orchestration is needed. Future mutations
-  must use the owning domain rules and record operator audit events.
+Add a service only for real operator orchestration; future mutations should use
+the owning domain rules and record operator audit events. Resource counts include
+configured agents and trunks regardless of status. Subscription state is the
+stored record, not an effective entitlement calculation. Offset pagination uses
+a deterministic creation-time/ID order; concurrent insertions may shift pages.
 
-Only implemented navigation items are shown. Counts include configured agents
-and trunks regardless of their status; active memberships exclude disabled
-memberships. Subscription status is the stored record, not an entitlement
-calculation. Pagination uses a deterministic creation-time/ID order; concurrent
-insertions can shift offset-based pages.
-
-Generated `*_templ.go` and Tailwind CSS remain untracked. Generate templates
-before Go tests, builds, lint or vulnerability checks. Run `sqlc generate` after
-query changes. `TEST_DATABASE_URL` enables the PostgreSQL-backed access and
-organization tests, including revoked sessions and cross-organization reads.
+Templ output and generated Tailwind CSS remain untracked. Generate templates
+before Go checks and regenerate SQLC after query changes. `TEST_DATABASE_URL`
+enables PostgreSQL-backed access, revocation and organization acceptance tests.

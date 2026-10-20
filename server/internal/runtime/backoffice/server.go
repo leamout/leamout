@@ -14,7 +14,7 @@ import (
 func Run(ctx context.Context) error {
 	logger := logging.New().With("process", "backoffice")
 
-	cfg, err := config.LoadBackoffice()
+	cfg, err := config.Load()
 	if err != nil {
 		return fmt.Errorf("load configuration: %w", err)
 	}
@@ -25,7 +25,7 @@ func Run(ctx context.Context) error {
 	}
 	defer modules.postgres.Close()
 
-	router, err := newRouter(modules, logger, cfg.FrontendURL)
+	router, err := newRouter(modules, logger, cfg.BackofficeURL)
 	if err != nil {
 		return err
 	}

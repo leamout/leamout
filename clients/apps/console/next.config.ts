@@ -8,15 +8,7 @@ const nextConfig: NextConfig = {
       process.env.BACKEND_URL ?? "http://localhost:8080"
     ).replace(/\/+$/, "");
 
-    const backofficeURL = (
-      process.env.BACKOFFICE_URL ?? "http://localhost:8082"
-    ).replace(/\/+$/, "");
-
     return [
-      {
-        source: "/backoffice/:path*",
-        destination: `${backofficeURL}/backoffice/:path*`,
-      },
       { source: "/api/v1/:path*", destination: `${backendURL}/v1/:path*` },
     ];
   },
