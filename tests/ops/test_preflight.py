@@ -9,7 +9,7 @@ from preflight import read_env, validate
 
 
 DOMAIN = "leamout.com"
-STRONG = "X9mR5vQ2tS7zB4nL8pA6cY3wF1dK0hJ"
+STRONG = "X9mR5vQ2tS7zB4nL8pA6cY3wF1dK0hJ7"
 POSTGRES_PASSWORD = "P9ostgres5SecreT2ValueZ"
 ENCRYPTION_KEY = base64.urlsafe_b64encode(bytes(range(1, 33))).decode("ascii")
 
