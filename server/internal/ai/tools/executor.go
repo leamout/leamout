@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -18,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/security/egress"
 	"github.com/leamout/leamout/server/internal/telephony/calls"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
@@ -68,7 +67,7 @@ func NewExecutor(service *Service, callServices ...*calls.Service) *Executor {
 		service: service,
 		calls:   callService,
 		client: &http.Client{
-			Transport:     secureToolTransport(),
+			Transport:     egress.NewTransport(),
 			CheckRedirect: rejectToolRedirect,
 		},
 	}
@@ -422,116 +421,11 @@ func sameJSON(left, right []byte) bool {
 }
 
 func validateExecutionEndpoint(raw string) (*url.URL, error) {
-	endpoint, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil ||
-		endpoint.Scheme != "https" ||
-		endpoint.Hostname() == "" {
-		return nil, apperror.NewBadRequest(
-			"webhook tool execution requires an absolute HTTPS endpoint",
-		)
-	}
-	if endpoint.User != nil {
-		return nil, apperror.NewBadRequest(
-			"webhook tool endpoint cannot contain userinfo",
-		)
-	}
-	if endpoint.Fragment != "" {
-		return nil, apperror.NewBadRequest(
-			"webhook tool endpoint cannot contain a fragment",
-		)
+	endpoint, err := egress.ParseHTTPS(raw)
+	if err != nil {
+		return nil, apperror.NewBadRequest(err.Error())
 	}
 	return endpoint, nil
-}
-
-func secureToolTransport() *http.Transport {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	dialer := &net.Dialer{
-		Timeout:   5 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}
-	transport.DialContext = func(
-		ctx context.Context,
-		network, address string,
-	) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(address)
-		if err != nil {
-			return nil, fmt.Errorf("split tool endpoint address: %w", err)
-		}
-		addresses, err := resolveToolHost(ctx, host)
-		if err != nil {
-			return nil, err
-		}
-		var lastErr error
-		for _, ip := range addresses {
-			conn, dialErr := dialer.DialContext(
-				ctx,
-				network,
-				net.JoinHostPort(ip.String(), port),
-			)
-			if dialErr == nil {
-				return conn, nil
-			}
-			lastErr = dialErr
-		}
-		if lastErr == nil {
-			lastErr = fmt.Errorf(
-				"tool endpoint resolved to no dialable addresses",
-			)
-		}
-		return nil, fmt.Errorf("dial tool endpoint: %w", lastErr)
-	}
-	transport.MaxIdleConns = 20
-	transport.MaxIdleConnsPerHost = 2
-	transport.IdleConnTimeout = 30 * time.Second
-	transport.ResponseHeaderTimeout = 10 * time.Second
-	return transport
-}
-
-func resolveToolHost(ctx context.Context, host string) ([]netip.Addr, error) {
-	if parsed, err := netip.ParseAddr(host); err == nil {
-		if err := validateToolAddress(parsed); err != nil {
-			return nil, err
-		}
-		return []netip.Addr{parsed}, nil
-	}
-
-	addresses, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
-	if err != nil {
-		return nil, fmt.Errorf("resolve tool endpoint: %w", err)
-	}
-	if len(addresses) == 0 {
-		return nil, fmt.Errorf("tool endpoint resolved to no addresses")
-	}
-	for _, address := range addresses {
-		if err := validateToolAddress(address); err != nil {
-			return nil, err
-		}
-	}
-	return addresses, nil
-}
-
-func validateToolAddress(address netip.Addr) error {
-	address = address.Unmap()
-	if !address.IsValid() ||
-		!address.IsGlobalUnicast() ||
-		address.IsPrivate() ||
-		address.IsLoopback() ||
-		address.IsLinkLocalUnicast() ||
-		address.IsLinkLocalMulticast() ||
-		address.IsMulticast() ||
-		address.IsUnspecified() ||
-		isCarrierGradeNAT(address) {
-		return fmt.Errorf("tool endpoint resolves to a non-public address")
-	}
-	return nil
-}
-
-func isCarrierGradeNAT(address netip.Addr) bool {
-	if !address.Is4() {
-		return false
-	}
-	prefix := netip.MustParsePrefix("100.64.0.0/10")
-	return prefix.Contains(address)
 }
 
 func rejectToolRedirect(*http.Request, []*http.Request) error {
