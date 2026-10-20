@@ -1,8 +1,8 @@
 package trunks
 
 import (
-	"context"
 	"bufio"
+	"context"
 	"strings"
 	"sync"
 	"testing"

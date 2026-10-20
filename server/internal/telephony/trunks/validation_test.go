@@ -4,9 +4,9 @@ import "testing"
 
 func TestNormalizeHostEnforcesPublicSIPDestinations(t *testing.T) {
 	tests := []struct {
-		name string
-		host string
-		want string
+		name   string
+		host   string
+		want   string
 		reject bool
 	}{
 		{name: "public IPv4", host: "1.1.1.1", want: "1.1.1.1"},
