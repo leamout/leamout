@@ -9,7 +9,7 @@
 From the repository root:
 
 ```sh
-docker compose --env-file .env -f deploy/compose/docker.yaml up -d
+make deployment-up
 GRAFANA_ADMIN_PASSWORD=choose-a-strong-secret docker compose --env-file .env \
   -f deploy/compose/docker.yaml -f deploy/compose/observability.yaml up -d
 ```
