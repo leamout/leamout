@@ -10,11 +10,6 @@ import (
 	aicatalog "github.com/leamout/leamout/server/internal/ai/catalog"
 )
 
-type Package struct {
-	Agent agentcontract.Manifest
-	Tools []agentcontract.ToolDefinition
-}
-
 type Validator struct {
 	catalog *aicatalog.Catalog
 }

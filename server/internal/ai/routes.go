@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/leamout/leamout/server/internal/ai/agents"
+	"github.com/leamout/leamout/server/internal/ai/manifest"
 	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/ai/tools"
 )
@@ -13,4 +14,5 @@ func RegisterRoutes(router chi.Router, module *Module, organizationAccess func(s
 	agents.RegisterRoutes(router, module.Agents.Handler, organizationAccess("voice-agents"))
 	tools.RegisterRoutes(router, module.Tools.Handler, organizationAccess("voice-agents"))
 	providers.RegisterRoutes(router, module.Providers.Handler, organizationAccess("voice-agents"))
+	manifest.RegisterRoutes(router, module.Packages.Handler, organizationAccess("voice-agents"))
 }

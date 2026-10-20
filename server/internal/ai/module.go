@@ -7,6 +7,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/ai/agents"
 	"github.com/leamout/leamout/server/internal/ai/conversations"
+	"github.com/leamout/leamout/server/internal/ai/manifest"
 	"github.com/leamout/leamout/server/internal/ai/orchestration"
 	"github.com/leamout/leamout/server/internal/ai/providers"
 	"github.com/leamout/leamout/server/internal/ai/tools"
@@ -28,6 +29,12 @@ type Module struct {
 	Providers     ProvidersModule
 	Conversations ConversationsModule
 	Orchestration *orchestration.Service
+	Packages      PackagesModule
+}
+
+type PackagesModule struct {
+	Deployer *manifest.Deployer
+	Handler  *manifest.Handler
 }
 
 type AgentsModule struct {
@@ -75,6 +82,8 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 	conversationsRepository := conversations.NewRepository(queries)
 	conversationsService := conversations.NewService(conversationsRepository)
 
+	packageDeployer := manifest.NewDeployer(agentsService, toolsService, manifest.NewValidator())
+
 	orchestrator := orchestration.NewService(
 		agentsService,
 		conversationsService,
@@ -104,5 +113,9 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 			Service:    conversationsService,
 		},
 		Orchestration: orchestrator,
+		Packages: PackagesModule{
+			Deployer: packageDeployer,
+			Handler:  manifest.NewHandler(packageDeployer),
+		},
 	}
 }

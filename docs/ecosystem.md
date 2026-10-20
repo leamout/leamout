@@ -30,7 +30,29 @@ Standalone examples may use `agent.json` for a single `agent.Manifest`. Manifest
 
 The older, unused `server/internal/ai/packages` schema combined multiple agents, tools and routing into one object with string `"1"` for `schema_version`. It is not part of the portable contract and has been removed. Do not introduce another runtime-specific portable JSON model.
 
-`server/internal/ai/manifest` validates the shared agent/tool types and deploys an individual agent. The `leamout/agents` validator checks entire package directories, including tool and routing references. Multi-agent deployment orchestration is a separate runtime concern and must build on these same contract types.
+`server/internal/ai/manifest` validates the shared contracts, reads package directories, and deploys individual or multi-agent packages. The `leamout/agents` validator independently checks published templates, including tool and routing references.
+
+### Package deployment
+
+The organization-scoped `POST /agent-packages/deploy` endpoint (under the API router) accepts a JSON deployment envelope:
+
+```json
+{
+  "package": {
+    "agents": {
+      "receptionist": { "schema_version": 1, "name": "Receptionist", "engine": "realtime", "instructions": "Answer calls.", "providers": [{ "role": "realtime", "provider": "gemini" }] }
+    },
+    "tools": [],
+    "routing": { "schema_version": 1, "name": "Receptionist routing", "default_agent": "receptionist" }
+  },
+  "integrations": {},
+  "variables": {}
+}
+```
+
+The `agents` keys match the file stems in `agents/*.json` from the portable directory. `tools` and `routing` are the same canonical contract documents. The request must be authenticated with organization `voice-agents:write` access; it is limited to 1 MiB, 32 agents, and 128 shared tool definitions. The deployer validates every manifest, tool reference, routing alias and schedule, then resolves webhook variables before creating agents. Each agent gets only the tools listed in its manifest. The response returns agent IDs, per-agent webhook signing secrets (show once and store securely), and a `routing_plan` with the original routing manifest and resolved alias IDs.
+
+**Routing is not yet active.** The returned routing plan is not stored or attached to DIDs, and schedule-based agent switching is not implemented by telephony routing. Apply an appropriate default agent to the existing phone-number routing separately. Multi-agent installation is not an atomic database transaction: if a later agent fails, earlier agents are disabled, but these records still consume the organization agent quota until cleanup support exists. Operators should review deployments before retrying partial failures.
 
 ## Release policy
 
