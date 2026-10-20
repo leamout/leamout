@@ -21,6 +21,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Test deployment environment preflight
+        run: python3 -m unittest discover -s tests/ops -p 'test_preflight.py' -v
+
       - name: Check static deployment invariants
         run: python3 tests/ops/validate.py
 
