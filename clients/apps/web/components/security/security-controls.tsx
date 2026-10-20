@@ -1,29 +1,66 @@
+const controls = [
+  {
+    number: "01",
+    title: "Organization boundaries",
+    description:
+      "Resources, provider integrations, and access checks are tied to the authenticated organization context. Authorization is enforced on the server, not just by the console.",
+  },
+  {
+    number: "02",
+    title: "Secret handling",
+    description:
+      "Organization-owned provider credentials are encrypted at rest and excluded from public API responses. Secrets should not be copied into session snapshots, logs, or event payloads.",
+  },
+  {
+    number: "03",
+    title: "Agent and webhook execution",
+    description:
+      "Tool execution is scoped to configured permissions, and outbound webhook destinations are subject to egress policy. Voice agents must not receive unrestricted infrastructure access.",
+  },
+  {
+    number: "04",
+    title: "Call data and retention",
+    description:
+      "Call and recording access is organization-scoped. Retention follows the subscribed plan, with configurable retention policies on eligible plans.",
+  },
+];
+
 export function SecurityControls() {
   return (
-    <div className="grid gap-x-12 md:grid-cols-2">
-      {[
-        [
-          "Organization-scoped access",
-          "Resources and provider integrations belong to organizations. API access is checked against the authenticated identity and organization context.",
-        ],
-        [
-          "Provider credentials",
-          "Provider secrets are encrypted at rest and are not returned through the public API. Leamout operators protect the platform encryption keys.",
-        ],
-        [
-          "Retention controls",
-          "Retention limits follow your plan. Configurable policies are available on eligible plans, with scheduled cleanup for supported resources.",
-        ],
-        [
-          "Managed infrastructure",
-          "Leamout operates and maintains the hosting infrastructure, service certificates, updates and platform backups. Customers protect access to their own carrier and AI provider accounts.",
-        ],
-      ].map(([title, text]) => (
-        <section key={title} className="border-t border-border py-8">
-          <h2 className="text-xl font-semibold">{title}</h2>
-          <p className="mt-4 leading-8 text-muted-foreground">{text}</p>
-        </section>
-      ))}
-    </div>
+    <section className="border-b border-border py-20" aria-labelledby="security-controls-title">
+      <div className="mb-12 grid gap-6 md:grid-cols-2 md:items-end">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
+            The security model
+          </p>
+          <h2
+            id="security-controls-title"
+            className="mt-5 text-balance font-heading text-3xl font-semibold tracking-tight sm:text-4xl"
+          >
+            Built around explicit boundaries.
+          </h2>
+        </div>
+        <p className="max-w-md leading-7 text-muted-foreground">
+          Security is a system property, from the control plane to the media
+          runtime and the external services an agent can reach.
+        </p>
+      </div>
+      <div className="border-t border-border">
+        {controls.map(({ number, title, description }) => (
+          <div
+            key={number}
+            className="grid gap-4 border-b border-border py-7 md:grid-cols-[3rem_0.8fr_1.2fr] md:gap-12"
+          >
+            <span className="font-mono text-xs text-brand-orange">{number}</span>
+            <h3 className="font-heading text-xl font-medium tracking-tight sm:text-2xl">
+              {title}
+            </h3>
+            <p className="max-w-xl leading-7 text-muted-foreground">
+              {description}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

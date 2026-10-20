@@ -6,13 +6,13 @@ import { constructMetadata } from "@/lib/metadata";
 export const metadata = constructMetadata({
   title: "Security",
   description:
-    "Learn about security in Leamout, including access controls, credential handling, and deployment considerations for autonomous voice agents.",
+    "Explore Leamout's approach to organization boundaries, provider credentials, call security, and responsible vulnerability disclosure.",
   path: "/security",
 });
 
 export default function SecurityPage() {
   return (
-    <div className="mx-auto max-w-6xl px-5 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8">
       <SecurityIntro />
       <SecurityControls />
       <Implementation />
