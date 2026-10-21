@@ -16,7 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
-	"github.com/leamout/leamout/server/internal/security/egress"
+	"github.com/leamout/leamout/server/internal/security/sipegress"
 )
 
 type HealthCheckConfig struct {
@@ -131,7 +131,7 @@ type SIPOptionsProber struct {
 // Probe validates all DNS answers and dials a validated IP directly, so
 // a second DNS lookup cannot redirect the request to a private destination.
 func (p SIPOptionsProber) Probe(ctx context.Context, endpoint sqlc.TrunkEndpoint) (int32, error) {
-	addresses, err := egress.ResolveHost(ctx, endpoint.Host)
+	addresses, err := sipegress.ResolveHost(ctx, endpoint.Host)
 	if err != nil {
 		return 0, fmt.Errorf("reject SIP trunk endpoint %q: %w", endpoint.Host, err)
 	}
