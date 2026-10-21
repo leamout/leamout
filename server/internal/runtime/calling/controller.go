@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"unicode"
@@ -18,6 +19,7 @@ const (
 	openSIPSEgressPort       = 5060
 	leamoutCallIDVar         = "leamout_call_id"
 	routeURIHeaderVar        = "sip_h_X-Leamout-Route-URI"
+	pinnedRouteHeaderVar     = "sip_h_X-Leamout-Pinned-Route-URI"
 	trunkHeaderVar           = "sip_h_X-Leamout-Trunk-ID"
 	privacyHeaderVar         = "sip_h_X-Leamout-Privacy"
 	dtmfTypeVar              = "dtmf_type"
@@ -30,6 +32,7 @@ type OriginateRequest struct {
 	CallerID           string
 	TrunkID            uuid.UUID
 	Host               string
+	PinnedIP           string
 	Port               uint16
 	Transport          string
 	Privacy            bool
@@ -125,10 +128,25 @@ func egressVariables(req OriginateRequest, routeURI string) (map[string]string, 
 		return nil, fmt.Errorf("maximum duration cannot be negative")
 	}
 
+	pinnedIP, err := netip.ParseAddr(req.PinnedIP)
+	if err != nil || pinnedIP.Zone() != "" {
+		return nil, fmt.Errorf("pinned SIP egress address must be an IP literal")
+	}
+	if req.Port == 0 {
+		return nil, fmt.Errorf("pinned SIP egress port is required")
+	}
+	transport := strings.ToLower(strings.TrimSpace(req.Transport))
+	if transport != "udp" && transport != "tcp" && transport != "tls" {
+		return nil, fmt.Errorf("pinned SIP egress transport is invalid")
+	}
+	target := net.JoinHostPort(pinnedIP.Unmap().String(), strconv.Itoa(int(req.Port)))
+	pinnedURI := fmt.Sprintf("sip:%s;transport=%s", target, transport)
+
 	variables := map[string]string{
-		leamoutCallIDVar:  req.CallID.String(),
-		routeURIHeaderVar: routeURI,
-		trunkHeaderVar:    req.TrunkID.String(),
+		leamoutCallIDVar:    req.CallID.String(),
+		routeURIHeaderVar:   routeURI,
+		pinnedRouteHeaderVar: pinnedURI,
+		trunkHeaderVar:      req.TrunkID.String(),
 	}
 
 	if req.MaxDurationSeconds > 0 {
