@@ -1,4 +1,9 @@
-import { HomeStructuredData } from "@/components/home/structured-data";
+import { JsonLd } from "@/components/seo/json-ld";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { organizationSchema } from "@/lib/seo/organization";
+import { webpageSchema } from "@/lib/seo/webpage";
+import { websiteSchema } from "@/lib/seo/website";
+import { softwareSchema } from "@/lib/seo/software";
 import { constructMetadata } from "@/lib/metadata";
 import { HomeCallToAction } from "@/components/home/call-to-action";
 import { Capabilities } from "@/components/home/capabilities";
@@ -16,8 +21,8 @@ export const metadata = constructMetadata({
 
 export default function Home() {
   return (
-    <>
-      <HomeStructuredData />
+    <JsonLd nodes={[organizationSchema(), websiteSchema(), webpageSchema({ path: "/", name: "Leamout — SIP-Native Voice Agent Runtime & Control Plane", description: "SIP-native runtime and control plane for autonomous voice agents, programmable call control, real-time media, and AI orchestration." }), softwareSchema()]} />
+      <>
       <HomeHero />
       <HowItWorks />
       <Capabilities />
