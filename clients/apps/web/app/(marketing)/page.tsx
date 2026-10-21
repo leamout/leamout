@@ -1,5 +1,4 @@
 import { JsonLd } from "@/components/seo/json-ld";
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
 import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
@@ -21,7 +20,6 @@ export const metadata = constructMetadata({
 
 export default function Home() {
   return (
-    <JsonLd nodes={[organizationSchema(), websiteSchema(), webpageSchema({ path: "/", name: "Leamout — SIP-Native Voice Agent Runtime & Control Plane", description: "SIP-native runtime and control plane for autonomous voice agents, programmable call control, real-time media, and AI orchestration." }), softwareSchema()]} />
       <>
       <HomeHero />
       <HowItWorks />
