@@ -25,6 +25,7 @@ type Service struct {
 	planConcurrency     func(context.Context, uuid.UUID) (int64, bool, error)
 	runtimeAllowance    func(context.Context, uuid.UUID) error
 	recordingStorage    func(context.Context, uuid.UUID) error
+	egressPolicy egress.Policy
 }
 
 type routeAttemptMetrics interface {
@@ -75,6 +76,10 @@ func NewService(
 		admission:  admission,
 		metrics:    metrics,
 	}
+}
+
+func (s *Service) SetEgressPolicy(policy egress.Policy) {
+	s.egressPolicy = policy
 }
 
 func (s *Service) SetVoiceAgentReadinessCheck(
@@ -192,7 +197,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 				Class: calling.OriginateFailureCapacity, Err: admissionErr,
 			}
 		}
-		addresses, resolveErr := egress.ResolveHost(attemptCtx, route.Host)
+		addresses, resolveErr := s.egressPolicy.ResolveHost(attemptCtx, route.Host)
 		if resolveErr != nil {
 			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
 			return calling.OriginateResult{}, &calling.OriginateError{
