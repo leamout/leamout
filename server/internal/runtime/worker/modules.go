@@ -320,7 +320,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		callReconciliation:          callReconciliation,
 		sessionReconciliation:       sessionReconciliation,
 		sessionRecovery:             sessionRecovery,
-		toolExecutionReconciliation: &toolExecutionReconciliationJob{db: postgresClient.Pool()},
+		toolExecutionReconciliation: &toolExecutionReconciliationJob{queries: queries},
 		outbox:                      outboxJob,
 		webhookConsumer:             webhooks.NewConsumer(natsClient, webhookService),
 		webhookDelivery:             webhookDeliveryJob,
