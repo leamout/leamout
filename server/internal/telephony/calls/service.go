@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/runtime/calling"
-	"github.com/leamout/leamout/server/internal/security/sipegress"
+	"github.com/leamout/leamout/server/internal/security/egress"
 	"github.com/leamout/leamout/server/internal/telephony/routing"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
@@ -192,7 +192,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 				Class: calling.OriginateFailureCapacity, Err: admissionErr,
 			}
 		}
-		addresses, resolveErr := sipegress.ResolveHost(attemptCtx, route.Host)
+		addresses, resolveErr := egress.ResolveHost(attemptCtx, route.Host)
 		if resolveErr != nil {
 			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
 			return calling.OriginateResult{}, &calling.OriginateError{
