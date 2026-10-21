@@ -165,6 +165,12 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		Database:         postgresClient.Pool(),
 		PlanAgentLimit:   commercialModule.Limits.Service.MaxVoiceAgents,
 	})
+	sipPolicy, err := cfg.SIPEgressPolicy()
+	if err != nil {
+		closeDependencies()
+		return nil, err
+	}
+	telephonyModule.Calls.Service.SetEgressPolicy(sipPolicy)
 	telephonyModule.Calls.Service.SetVoiceAgentReadinessCheck(
 		aiModule.Agents.Service.RequireReady,
 	)
