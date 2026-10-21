@@ -18,6 +18,8 @@ export const metadata = constructMetadata({
 
 export default function BrandPage() {
   return (
+    <>
+      <JsonLd nodes={[organizationSchema(), websiteSchema(), webpageSchema({ path: "/brand", name: "Leamout Brand", description: "Explore Leamout’s brand identity, colors, wordmark, and typography." }), breadcrumbsSchema([{ name: "Home", path: "/" }, { name: "Brand", path: "/brand" }])]} />
       <div className="mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8">
       <BrandIntro />
       <Wordmark />
