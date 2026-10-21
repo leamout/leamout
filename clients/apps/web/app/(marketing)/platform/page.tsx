@@ -1,5 +1,5 @@
-import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { JsonLd } from "@/components/seo/json-ld";
 import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
@@ -18,7 +18,6 @@ export const metadata = constructMetadata({
 
 export default function PlatformPage() {
   return (
-    <JsonLd nodes={[organizationSchema(), websiteSchema(), webpageSchema({ path: "/platform", name: "Leamout Platform", description: "Explore Leamout's SIP-native runtime, realtime voice agents, call control, and AI orchestration." }), breadcrumbsSchema([{ name: "Home", path: "/" }, { name: "Platform", path: "/platform" }]), softwareSchema()]} />
       <>
       <PlatformIntro />
       <PlatformArchitecture />
