@@ -1,11 +1,11 @@
 import { AboutCallToAction } from "@/components/about/call-to-action";
 import { AboutIntro } from "@/components/about/intro";
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
-import { constructMetadata } from "@/lib/metadata";
-import { JsonLd } from "@/components/seo/json-ld";
 import { Mission } from "@/components/about/mission";
-import { organizationSchema } from "@/lib/seo/organization";
 import { Principles } from "@/components/about/principles";
+import { JsonLd } from "@/components/seo/json-ld";
+import { constructMetadata } from "@/lib/metadata";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
 
