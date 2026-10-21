@@ -6,6 +6,7 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { constructMetadata } from "@/lib/metadata";
 import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
 import { organizationSchema } from "@/lib/seo/organization";
+import { founderSchema } from "@/lib/seo/person";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
 
@@ -22,6 +23,7 @@ export default function AboutPage() {
       <JsonLd
         nodes={[
           organizationSchema(),
+          founderSchema(),
           websiteSchema(),
           webpageSchema({
             path: "/about",
