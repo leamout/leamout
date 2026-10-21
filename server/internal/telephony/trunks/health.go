@@ -126,12 +126,13 @@ func (j *HealthCheckJob) Check(ctx context.Context) error {
 type SIPOptionsProber struct {
 	Dialer    *net.Dialer
 	TLSConfig *tls.Config
+	Policy    egress.Policy
 }
 
 // Probe validates all DNS answers and dials a validated IP directly, so
 // a second DNS lookup cannot redirect the request to a private destination.
 func (p SIPOptionsProber) Probe(ctx context.Context, endpoint sqlc.TrunkEndpoint) (int32, error) {
-	addresses, err := egress.ResolveHost(ctx, endpoint.Host)
+	addresses, err := p.Policy.ResolveHost(ctx, endpoint.Host)
 	if err != nil {
 		return 0, fmt.Errorf("reject SIP trunk endpoint %q: %w", endpoint.Host, err)
 	}

@@ -45,6 +45,9 @@ func TestEgressVariablesCarryLeamoutIdentity(t *testing.T) {
 	variables, err := egressVariables(OriginateRequest{
 		CallID:             callID,
 		TrunkID:            trunkID,
+		Port:               5061,
+		Transport:          "tls",
+		PinnedIP:           "1.1.1.1",
 		Privacy:            true,
 		DTMFMode:           "rfc2833",
 		MediaEncryption:    "sdes_srtp",
@@ -57,6 +60,9 @@ func TestEgressVariablesCarryLeamoutIdentity(t *testing.T) {
 	if variables[leamoutCallIDVar] != callID.String() {
 		t.Fatalf("call id variable = %q", variables[leamoutCallIDVar])
 	}
+	if variables[pinnedRouteHeaderVar] != "sip:1.1.1.1:5061;transport=tls" {
+		t.Fatalf("pinned route = %q", variables[pinnedRouteHeaderVar])
+	}
 	if variables[trunkHeaderVar] != trunkID.String() {
 		t.Fatalf("trunk id variable = %q", variables[trunkHeaderVar])
 	}
@@ -68,6 +74,16 @@ func TestEgressVariablesCarryLeamoutIdentity(t *testing.T) {
 			"execute_on_answer variable = %q",
 			variables["execute_on_answer"],
 		)
+	}
+}
+
+func TestEgressVariablesRejectHostnamesAsPinnedIP(t *testing.T) {
+	_, err := egressVariables(
+		OriginateRequest{CallID: uuid.New(), TrunkID: uuid.New(), PinnedIP: "carrier.example.com", Port: 5060, Transport: "udp"},
+		"sip:carrier.example.com:5060;transport=udp",
+	)
+	if err == nil {
+		t.Fatal("expected pinned egress IP literal validation")
 	}
 }
 

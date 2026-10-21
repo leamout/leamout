@@ -50,6 +50,7 @@ type Config struct {
 	TURNPublicURLs        []string `env:"TURN_PUBLIC_URLS" envSeparator:"," envDefault:"stun:localhost:3478,turn:localhost:3478?transport=udp,turn:localhost:3478?transport=tcp"`
 	CORSOrigins           []string `env:"CORS_ORIGINS" envSeparator:"," envDefault:"http://localhost:3000,http://127.0.0.1:3000"`
 	TrustedProxyCIDRs     []string `env:"TRUSTED_PROXY_CIDRS" envSeparator:","`
+	SIPAllowedEgressIPs   []string `env:"SIP_ALLOWED_EGRESS_IPS" envSeparator:","`
 }
 
 func Load() (Config, error) {
@@ -101,6 +102,7 @@ func (c *Config) normalize() {
 	c.TURNPublicURLs = normalizeStrings(c.TURNPublicURLs)
 	c.CORSOrigins = normalizeStrings(c.CORSOrigins)
 	c.TrustedProxyCIDRs = normalizeStrings(c.TrustedProxyCIDRs)
+	c.SIPAllowedEgressIPs = normalizeStrings(c.SIPAllowedEgressIPs)
 }
 
 func normalizeStrings(values []string) []string {

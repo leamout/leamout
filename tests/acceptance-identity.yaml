@@ -22,10 +22,29 @@ services:
 
   server:
     environment:
+      # Only disposable acceptance overlays select this environment.
+      APP_ENV: acceptance
+      SIP_ALLOWED_EGRESS_IPS: '172.30.0.50'
       # Keep any suite-specific SSL_CERT_FILE (e.g. the mock AI provider CA).
       SSL_CERT_DIR: /identity-trust
     volumes:
       - ${APP_ENV_FILE:?APP_ENV_FILE is required}.identity/trust:/identity-trust:ro
+    extra_hosts:
+      - "byoc-v1-carrier:172.30.0.50"
+      - "voice-v1-carrier:172.30.0.50"
+      - "voice-agent-v1-carrier:172.30.0.50"
+      - "graceful-drain-carrier:172.30.0.50"
     depends_on:
       keycloak:
         condition: service_healthy
+
+  worker:
+    environment:
+      APP_ENV: acceptance
+      SIP_ALLOWED_EGRESS_IPS: '172.30.0.50'
+
+    extra_hosts:
+      - "byoc-v1-carrier:172.30.0.50"
+      - "voice-v1-carrier:172.30.0.50"
+      - "voice-agent-v1-carrier:172.30.0.50"
+      - "graceful-drain-carrier:172.30.0.50"

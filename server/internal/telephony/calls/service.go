@@ -3,11 +3,13 @@ package calls
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/runtime/calling"
+	"github.com/leamout/leamout/server/internal/security/egress"
 	"github.com/leamout/leamout/server/internal/telephony/routing"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
@@ -23,6 +25,7 @@ type Service struct {
 	planConcurrency     func(context.Context, uuid.UUID) (int64, bool, error)
 	runtimeAllowance    func(context.Context, uuid.UUID) error
 	recordingStorage    func(context.Context, uuid.UUID) error
+	egressPolicy        egress.Policy
 }
 
 type routeAttemptMetrics interface {
@@ -73,6 +76,10 @@ func NewService(
 		admission:  admission,
 		metrics:    metrics,
 	}
+}
+
+func (s *Service) SetEgressPolicy(policy egress.Policy) {
+	s.egressPolicy = policy
 }
 
 func (s *Service) SetVoiceAgentReadinessCheck(
@@ -190,10 +197,19 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 				Class: calling.OriginateFailureCapacity, Err: admissionErr,
 			}
 		}
+		addresses, resolveErr := s.egressPolicy.ResolveHost(attemptCtx, route.Host)
+		if resolveErr != nil {
+			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
+			return calling.OriginateResult{}, &calling.OriginateError{
+				Class: calling.OriginateFailureValidation,
+				Err:   fmt.Errorf("resolve public SIP trunk endpoint: %w", resolveErr),
+			}
+		}
 		result, originateErr := s.controller.Originate(attemptCtx, calling.OriginateRequest{
 			CallID: call.ID, Destination: req.ToURI, CallerID: req.FromURI,
-			TrunkID: route.TrunkID,
-			Host:    route.Host, Port: route.Port, Transport: route.Transport,
+			PinnedIP: addresses[0].String(),
+			TrunkID:  route.TrunkID,
+			Host:     route.Host, Port: route.Port, Transport: route.Transport,
 			Privacy: req.Privacy, DTMFMode: req.DTMFMode, MediaEncryption: req.MediaEncryption,
 		})
 		if originateErr != nil {

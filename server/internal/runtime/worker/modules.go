@@ -255,9 +255,15 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		return nil, fmt.Errorf("initialize idempotency cleanup: %w", err)
 	}
 
+	policy, err := cfg.SIPEgressPolicy()
+	if err != nil {
+		closeDependencies()
+		return nil, err
+	}
+	callsService.SetEgressPolicy(policy)
 	trunkHealth, err := trunks.NewHealthCheckJob(
 		trunks.NewRepository(queries),
-		trunks.SIPOptionsProber{},
+		trunks.SIPOptionsProber{Policy: policy},
 		trunks.DefaultHealthCheckConfig(),
 	)
 	if err != nil {
