@@ -260,7 +260,7 @@ func (e *Executor) replay(
 		return ExecuteResult{}, apperror.NewServiceUnavailable(message, nil)
 	case "processing":
 		return ExecuteResult{}, apperror.NewConflict(
-			"voice agent tool execution is still processing or has an uncertain outcome",
+			"voice agent tool execution is processing; outcome may be uncertain and must not be retried",
 		)
 	default:
 		return ExecuteResult{}, apperror.NewInternal(
@@ -348,6 +348,8 @@ func (e *Executor) executeWebhook(
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("User-Agent", "Leamout-Voice-Agent-Tools/1.0")
 	httpReq.Header.Set("X-Leamout-Tool-Call-ID", req.ToolCallID)
+	// Stable across control reconnects; cooperating receivers can deduplicate.
+	httpReq.Header.Set("Idempotency-Key", req.SessionID.String()+":"+req.ToolCallID)
 	httpReq.Header.Set("X-Leamout-Session-ID", req.SessionID.String())
 	httpReq.Header.Set("X-Leamout-Call-ID", req.CallID.String())
 	httpReq.Header.Set("X-Leamout-Timestamp", fmt.Sprintf("%d", now.Unix()))

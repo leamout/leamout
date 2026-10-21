@@ -36,28 +36,29 @@ import (
 )
 
 type modules struct {
-	billingReconciliation   *billing.ReconciliationJob
-	billingWebhooks         *billing.WebhookJob
-	emailDelivery           *email.Worker
-	postgres                *postgres.Client
-	redis                   *redisintegration.Client
-	nats                    *natsintegration.Client
-	freeSwitch              *freeswitch.Client
-	callsService            *calls.Service
-	callConsumer            *calls.Consumer
-	agentRuntime            *agent.Runtime
-	callReconciliation      *calls.ReconciliationJob
-	sessionReconciliation   *sessionReconciliationJob
-	sessionRecovery         *sessionRecoveryJob
-	outbox                  *outbox.PublisherJob
-	webhookConsumer         *webhooks.Consumer
-	webhookDelivery         *webhooks.DeliveryJob
-	recordingConsumer       *recordings.Consumer
-	recordingReconciliation *recordings.ReconciliationJob
-	recordingIngestion      *recordings.IngestionJob
-	idempotencyCleanup      *idempotency.CleanupJob
-	retentionCleanup        *retention.CleanupJob
-	trunkHealth             *trunks.HealthCheckJob
+	billingReconciliation       *billing.ReconciliationJob
+	billingWebhooks             *billing.WebhookJob
+	emailDelivery               *email.Worker
+	postgres                    *postgres.Client
+	redis                       *redisintegration.Client
+	nats                        *natsintegration.Client
+	freeSwitch                  *freeswitch.Client
+	callsService                *calls.Service
+	callConsumer                *calls.Consumer
+	agentRuntime                *agent.Runtime
+	callReconciliation          *calls.ReconciliationJob
+	sessionReconciliation       *sessionReconciliationJob
+	toolExecutionReconciliation *toolExecutionReconciliationJob
+	sessionRecovery             *sessionRecoveryJob
+	outbox                      *outbox.PublisherJob
+	webhookConsumer             *webhooks.Consumer
+	webhookDelivery             *webhooks.DeliveryJob
+	recordingConsumer           *recordings.Consumer
+	recordingReconciliation     *recordings.ReconciliationJob
+	recordingIngestion          *recordings.IngestionJob
+	idempotencyCleanup          *idempotency.CleanupJob
+	retentionCleanup            *retention.CleanupJob
+	trunkHealth                 *trunks.HealthCheckJob
 }
 
 func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) (*modules, error) {
@@ -306,28 +307,29 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 	emailDelivery := email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
 	return &modules{
-		billingReconciliation:   billingJob,
-		billingWebhooks:         billingWebhookJob,
-		emailDelivery:           emailDelivery,
-		postgres:                postgresClient,
-		redis:                   redisClient,
-		nats:                    natsClient,
-		freeSwitch:              freeSwitch,
-		callsService:            callsService,
-		callConsumer:            callConsumer,
-		agentRuntime:            agentRuntime,
-		callReconciliation:      callReconciliation,
-		sessionReconciliation:   sessionReconciliation,
-		sessionRecovery:         sessionRecovery,
-		outbox:                  outboxJob,
-		webhookConsumer:         webhooks.NewConsumer(natsClient, webhookService),
-		webhookDelivery:         webhookDeliveryJob,
-		recordingConsumer:       recordings.NewConsumer(recordingsService),
-		recordingReconciliation: recordingReconciliation,
-		recordingIngestion:      recordingIngestion,
-		idempotencyCleanup:      idempotencyCleanup,
-		retentionCleanup:        retentionCleanup,
-		trunkHealth:             trunkHealth,
+		billingReconciliation:       billingJob,
+		billingWebhooks:             billingWebhookJob,
+		emailDelivery:               emailDelivery,
+		postgres:                    postgresClient,
+		redis:                       redisClient,
+		nats:                        natsClient,
+		freeSwitch:                  freeSwitch,
+		callsService:                callsService,
+		callConsumer:                callConsumer,
+		agentRuntime:                agentRuntime,
+		callReconciliation:          callReconciliation,
+		sessionReconciliation:       sessionReconciliation,
+		sessionRecovery:             sessionRecovery,
+		toolExecutionReconciliation: &toolExecutionReconciliationJob{queries: queries},
+		outbox:                      outboxJob,
+		webhookConsumer:             webhooks.NewConsumer(natsClient, webhookService),
+		webhookDelivery:             webhookDeliveryJob,
+		recordingConsumer:           recordings.NewConsumer(recordingsService),
+		recordingReconciliation:     recordingReconciliation,
+		recordingIngestion:          recordingIngestion,
+		idempotencyCleanup:          idempotencyCleanup,
+		retentionCleanup:            retentionCleanup,
+		trunkHealth:                 trunkHealth,
 	}, nil
 }
 
