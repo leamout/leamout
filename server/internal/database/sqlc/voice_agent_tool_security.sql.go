@@ -295,6 +295,29 @@ func (q *Queries) MarkVoiceAgentToolExecutionSucceeded(ctx context.Context, arg 
 	return result.RowsAffected(), nil
 }
 
+const reconcileUncertainVoiceAgentToolExecutions = `-- name: ReconcileUncertainVoiceAgentToolExecutions :execrows
+UPDATE voice_agent_tool_executions
+SET
+    state = 'failed',
+    error_message = 'Tool outcome uncertain after an interrupted execution; the action may have completed. Do not retry automatically.',
+    completed_at = NOW(),
+    updated_at = NOW()
+WHERE state = 'processing'
+  AND started_at <= $1::timestamptz
+`
+
+// The worker may die after a webhook or call-control operation took effect,
+// but before its result could be stored. Never automatically replay that
+// operation: make the uncertainty durable after the maximum execution window.
+// The processing predicate also protects a result committed concurrently.
+func (q *Queries) ReconcileUncertainVoiceAgentToolExecutions(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, reconcileUncertainVoiceAgentToolExecutions, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const rotateVoiceAgentToolSigningSecret = `-- name: RotateVoiceAgentToolSigningSecret :execrows
 INSERT INTO voice_agent_tool_secrets (
     tool_id,
@@ -339,27 +362,6 @@ func (q *Queries) RotateVoiceAgentToolSigningSecret(ctx context.Context, arg Rot
 		arg.OrganizationID,
 		arg.VoiceAgentID,
 	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const reconcileUncertainVoiceAgentToolExecutions = `-- name: ReconcileUncertainVoiceAgentToolExecutions :execrows
-UPDATE voice_agent_tool_executions
-SET
-    state = 'failed',
-    error_message = 'Tool outcome uncertain after an interrupted execution; the action may have completed. Do not retry automatically.',
-    completed_at = NOW(),
-    updated_at = NOW()
-WHERE state = 'processing'
-  AND started_at <= $1::timestamptz
-`
-
-// ReconcileUncertainVoiceAgentToolExecutions marks overdue, unresolved
-// executions as uncertain without dispatching the underlying action again.
-func (q *Queries) ReconcileUncertainVoiceAgentToolExecutions(ctx context.Context, cutoff pgtype.Timestamptz) (int64, error) {
-	result, err := q.db.Exec(ctx, reconcileUncertainVoiceAgentToolExecutions, cutoff)
 	if err != nil {
 		return 0, err
 	}
