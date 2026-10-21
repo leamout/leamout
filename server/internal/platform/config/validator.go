@@ -10,7 +10,9 @@ import (
 )
 
 func (c Config) Validate() error {
-	if err := c.Polar.Validate(); err != nil { return err }
+	if err := c.Polar.Validate(); err != nil {
+		return err
+	}
 	_, err := c.SIPEgressPolicy()
 	return err
 }

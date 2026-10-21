@@ -1,10 +1,10 @@
 package egress
 
 import (
- "fmt"
- "net/netip"
- "net/url"
- "strings"
+	"fmt"
+	"net/netip"
+	"net/url"
+	"strings"
 )
 
 // ParseHTTPS rejects non-HTTPS, ambiguous, or credential-bearing webhook URLs.
@@ -31,14 +31,16 @@ func ParseHTTPS(raw string) (*url.URL, error) {
 // ValidateAddress excludes non-public ranges, including IPv4-mapped IPv6 and
 // carrier-grade NAT space.
 func ValidateAddress(address netip.Addr) error {
- return (Policy{}).ValidateAddress(address)
+	return (Policy{}).ValidateAddress(address)
 }
 
 func (p Policy) ValidateAddress(address netip.Addr) error {
 	address = address.Unmap()
- for _, allowed := range p.AdditionalAllowedIPs {
-  if allowed.IsValid() && address == allowed.Unmap() { return nil }
- }
+	for _, allowed := range p.AdditionalAllowedIPs {
+		if allowed.IsValid() && address == allowed.Unmap() {
+			return nil
+		}
+	}
 	if !address.IsValid() ||
 		!address.IsGlobalUnicast() ||
 		address.IsPrivate() ||

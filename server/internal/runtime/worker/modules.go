@@ -256,7 +256,10 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	}
 
 	policy, err := cfg.SIPEgressPolicy()
-	if err != nil { closeDependencies(); return nil, err }
+	if err != nil {
+		closeDependencies()
+		return nil, err
+	}
 	callsService.SetEgressPolicy(policy)
 	trunkHealth, err := trunks.NewHealthCheckJob(
 		trunks.NewRepository(queries),

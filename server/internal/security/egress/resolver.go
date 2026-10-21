@@ -37,4 +37,3 @@ func (p Policy) ResolveHost(ctx context.Context, host string) ([]netip.Addr, err
 	}
 	return addresses, nil
 }
-

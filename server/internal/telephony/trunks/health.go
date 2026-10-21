@@ -126,7 +126,7 @@ func (j *HealthCheckJob) Check(ctx context.Context) error {
 type SIPOptionsProber struct {
 	Dialer    *net.Dialer
 	TLSConfig *tls.Config
-	Policy egress.Policy
+	Policy    egress.Policy
 }
 
 // Probe validates all DNS answers and dials a validated IP directly, so

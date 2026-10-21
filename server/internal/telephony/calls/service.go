@@ -25,7 +25,7 @@ type Service struct {
 	planConcurrency     func(context.Context, uuid.UUID) (int64, bool, error)
 	runtimeAllowance    func(context.Context, uuid.UUID) error
 	recordingStorage    func(context.Context, uuid.UUID) error
-	egressPolicy egress.Policy
+	egressPolicy        egress.Policy
 }
 
 type routeAttemptMetrics interface {

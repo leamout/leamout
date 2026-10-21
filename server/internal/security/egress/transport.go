@@ -50,4 +50,3 @@ func NewTransport() *http.Transport {
 	transport.ResponseHeaderTimeout = 10 * time.Second
 	return transport
 }
-
