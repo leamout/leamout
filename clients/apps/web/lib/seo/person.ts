@@ -6,7 +6,8 @@ export function founderSchema(): SchemaNode {
   return {
     "@type": "Person",
     "@id": FOUNDER_ID,
-    name: "King Coffey Vidzro",
+    name: "Coffey Vidzro",
+    alternateName: "King Coffey Vidzro",
     url: "https://vidzro.com",
     jobTitle: "Founder",
     worksFor: { "@id": "https://leamout.com/#organization" },
