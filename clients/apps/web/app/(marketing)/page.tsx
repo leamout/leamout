@@ -1,12 +1,12 @@
-import { Capabilities } from "@/components/home/capabilities";
-import { constructMetadata } from "@/lib/metadata";
-import { ControlPlane } from "@/components/home/control-plane";
 import { HomeCallToAction } from "@/components/home/call-to-action";
+import { Capabilities } from "@/components/home/capabilities";
+import { ControlPlane } from "@/components/home/control-plane";
 import { HomeHero } from "@/components/home/hero";
 import { HowItWorks } from "@/components/home/how-it-works";
-import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSchema } from "@/lib/seo/organization";
 import { Ownership } from "@/components/home/ownership";
+import { JsonLd } from "@/components/seo/json-ld";
+import { constructMetadata } from "@/lib/metadata";
+import { organizationSchema } from "@/lib/seo/organization";
 import { softwareSchema } from "@/lib/seo/software";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
