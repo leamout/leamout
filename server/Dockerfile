@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-ARG GO_VERSION=1.26.9
+ARG GO_VERSION=1.26.10
 
 FROM oven/bun:1.3.14-alpine AS backoffice-assets
 
