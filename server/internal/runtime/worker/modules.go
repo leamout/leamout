@@ -48,6 +48,7 @@ type modules struct {
 	agentRuntime            *agent.Runtime
 	callReconciliation      *calls.ReconciliationJob
 	sessionReconciliation   *sessionReconciliationJob
+	toolExecutionReconciliation *toolExecutionReconciliationJob
 	sessionRecovery         *sessionRecoveryJob
 	outbox                  *outbox.PublisherJob
 	webhookConsumer         *webhooks.Consumer
@@ -319,6 +320,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		callReconciliation:      callReconciliation,
 		sessionReconciliation:   sessionReconciliation,
 		sessionRecovery:         sessionRecovery,
+		toolExecutionReconciliation: &toolExecutionReconciliationJob{db: postgresClient.Pool()},
 		outbox:                  outboxJob,
 		webhookConsumer:         webhooks.NewConsumer(natsClient, webhookService),
 		webhookDelivery:         webhookDeliveryJob,
