@@ -203,8 +203,8 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		result, originateErr := s.controller.Originate(attemptCtx, calling.OriginateRequest{
 			CallID: call.ID, Destination: req.ToURI, CallerID: req.FromURI,
 			PinnedIP: addresses[0].String(),
-			TrunkID: route.TrunkID,
-			Host:    route.Host, Port: route.Port, Transport: route.Transport,
+			TrunkID:  route.TrunkID,
+			Host:     route.Host, Port: route.Port, Transport: route.Transport,
 			Privacy: req.Privacy, DTMFMode: req.DTMFMode, MediaEncryption: req.MediaEncryption,
 		})
 		if originateErr != nil {

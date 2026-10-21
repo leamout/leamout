@@ -12,8 +12,8 @@ import (
 const acceptanceCarrierIP = "172.30.0.50"
 
 var acceptanceCarriers = map[string]struct{}{
-	"byoc-v1-carrier": {},
-	"voice-v1-carrier": {},
+	"byoc-v1-carrier":        {},
+	"voice-v1-carrier":       {},
 	"voice-agent-v1-carrier": {},
 	"graceful-drain-carrier": {},
 }
@@ -62,4 +62,3 @@ func IsAcceptanceFixture(host string) bool {
 	_, ok := acceptanceCarriers[host]
 	return ok && os.Getenv("APP_ENV") == "acceptance"
 }
-

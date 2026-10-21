@@ -143,10 +143,10 @@ func egressVariables(req OriginateRequest, routeURI string) (map[string]string, 
 	pinnedURI := fmt.Sprintf("sip:%s;transport=%s", target, transport)
 
 	variables := map[string]string{
-		leamoutCallIDVar:    req.CallID.String(),
-		routeURIHeaderVar:   routeURI,
+		leamoutCallIDVar:     req.CallID.String(),
+		routeURIHeaderVar:    routeURI,
 		pinnedRouteHeaderVar: pinnedURI,
-		trunkHeaderVar:      req.TrunkID.String(),
+		trunkHeaderVar:       req.TrunkID.String(),
 	}
 
 	if req.MaxDurationSeconds > 0 {
