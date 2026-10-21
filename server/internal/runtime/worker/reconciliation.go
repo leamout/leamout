@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/database/pgconv"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
 // sessionReconciliationJob repairs Voice Agent sessions left active after a
