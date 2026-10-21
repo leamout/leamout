@@ -1,13 +1,13 @@
-import { BrandIntro } from "@/components/brand/intro";
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
 import { ColorPalette } from "@/components/brand/color-palette";
-import { constructMetadata } from "@/lib/metadata";
-import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSchema } from "@/lib/seo/organization";
+import { BrandIntro } from "@/components/brand/intro";
 import { Typography } from "@/components/brand/typography";
+import { Wordmark } from "@/components/brand/wordmark";
+import { JsonLd } from "@/components/seo/json-ld";
+import { constructMetadata } from "@/lib/metadata";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
-import { Wordmark } from "@/components/brand/wordmark";
 
 export const metadata = constructMetadata({
   title: "Brand",
