@@ -1,11 +1,11 @@
 import { AIProviders } from "@/components/integrations/ai-providers";
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
-import { constructMetadata } from "@/lib/metadata";
 import { IntegrationsIntro } from "@/components/integrations/intro";
 import { IntegrationsTelephony } from "@/components/integrations/telephony";
-import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSchema } from "@/lib/seo/organization";
 import { ToolsAndEvents } from "@/components/integrations/tools-and-events";
+import { JsonLd } from "@/components/seo/json-ld";
+import { constructMetadata } from "@/lib/metadata";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
 
