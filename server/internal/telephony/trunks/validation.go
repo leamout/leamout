@@ -2,11 +2,11 @@ package trunks
 
 import (
 	"fmt"
-	"net"
 	"net/netip"
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/security/egress"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/listquery"
 )
@@ -280,8 +280,17 @@ func normalizeHost(value string) (string, error) {
 			"host must be a valid IP address or hostname",
 		)
 	}
-	if net.ParseIP(value) != nil {
-		return value, nil
+	if address, err := netip.ParseAddr(value); err == nil {
+		if err := egress.ValidateAddress(address); err != nil {
+			return "", apperror.NewBadRequest("SIP trunk endpoints must use public IP addresses")
+		}
+		return address.Unmap().String(), nil
+	}
+	if value == "localhost" ||
+		strings.HasSuffix(value, ".localhost") ||
+		strings.HasSuffix(value, ".local") ||
+		strings.HasSuffix(value, ".internal") {
+		return "", apperror.NewBadRequest("SIP trunk endpoint must use a public hostname")
 	}
 
 	for _, label := range strings.Split(value, ".") {

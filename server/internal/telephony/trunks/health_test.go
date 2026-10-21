@@ -1,8 +1,8 @@
 package trunks
 
 import (
+	"bufio"
 	"context"
-	"net"
 	"strings"
 	"sync"
 	"testing"
@@ -12,43 +12,34 @@ import (
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 )
 
-func TestSIPOptionsProberAcceptsAuthenticationChallenge(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	listener, err := (&net.ListenConfig{}).ListenPacket(ctx, "udp", "127.0.0.1:0")
+func TestReadSIPStatusAcceptsAuthenticationChallenge(t *testing.T) {
+	code, err := readSIPStatus(bufio.NewReader(strings.NewReader(
+		"SIP/2.0 401 Unauthorized\r\nContent-Length: 0\r\n\r\n",
+	)))
 	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() {
-		if err := listener.Close(); err != nil {
-			t.Errorf("close UDP listener: %v", err)
-		}
-	})
-	done := make(chan error, 1)
-	go func() {
-		buffer := make([]byte, 4096)
-		n, peer, err := listener.ReadFrom(buffer)
-		if err != nil {
-			done <- err
-			return
-		}
-		if !strings.HasPrefix(string(buffer[:n]), "OPTIONS sip:") {
-			done <- context.Canceled
-			return
-		}
-		_, err = listener.WriteTo([]byte("SIP/2.0 401 Unauthorized\r\nContent-Length: 0\r\n\r\n"), peer)
-		done <- err
-	}()
-	address := listener.LocalAddr().(*net.UDPAddr)
-	code, err := (SIPOptionsProber{}).Probe(ctx, sqlc.TrunkEndpoint{Host: "127.0.0.1", Port: int32(address.Port), Transport: "udp"})
-	if err != nil {
-		t.Fatalf("Probe() error = %v", err)
+		t.Fatalf("readSIPStatus() error = %v", err)
 	}
 	if code != 401 {
-		t.Fatalf("Probe() code = %d, want 401", code)
+		t.Fatalf("readSIPStatus() code = %d, want 401", code)
 	}
-	if err := <-done; err != nil {
-		t.Fatalf("server error = %v", err)
+}
+
+// The worker must reject private targets before opening TCP, TLS or UDP sockets,
+// including endpoints that were stored before public-host validation existed.
+func TestSIPOptionsProberBlocksPrivateTargets(t *testing.T) {
+	for _, host := range []string{"127.0.0.1", "::1", "10.0.0.5", "100.64.1.2", "169.254.169.254", "localhost"} {
+		for _, transport := range []string{"udp", "tcp", "tls"} {
+			t.Run(host+"/"+transport, func(t *testing.T) {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				_, err := (SIPOptionsProber{}).Probe(ctx, sqlc.TrunkEndpoint{
+					Host: host, Port: 5060, Transport: transport,
+				})
+				if err == nil || !strings.Contains(err.Error(), "non-public address") {
+					t.Fatalf("Probe() error = %v, want non-public address rejection", err)
+				}
+			})
+		}
 	}
 }
 
