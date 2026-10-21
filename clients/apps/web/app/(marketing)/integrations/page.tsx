@@ -1,8 +1,8 @@
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
 import { JsonLd } from "@/components/seo/json-ld";
 import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
 import { AIProviders } from "@/components/integrations/ai-providers";
 import { IntegrationsIntro } from "@/components/integrations/intro";
 import { IntegrationsTelephony } from "@/components/integrations/telephony";
@@ -18,7 +18,8 @@ export const metadata = constructMetadata({
 
 export default function IntegrationsPage() {
   return (
-      <>
+    <>
+      <JsonLd nodes={[organizationSchema(), websiteSchema(), webpageSchema({ path: "/integrations", name: "Leamout Integrations", description: "Connect SIP trunks, AI providers, tools, and webhooks to autonomous voice agents on Leamout." }), breadcrumbsSchema([{name:"Home",path:"/"},{name:"Integrations",path:"/integrations"}])]} />
       <IntegrationsIntro />
       <IntegrationsTelephony />
       <AIProviders />
