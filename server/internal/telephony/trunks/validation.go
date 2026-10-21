@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/security/sipegress"
+	"github.com/leamout/leamout/server/internal/security/egress"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/listquery"
 )
@@ -273,9 +273,6 @@ func normalizeChoice(
 
 func normalizeHost(value string) (string, error) {
 	value = strings.ToLower(strings.TrimSuffix(strings.TrimSpace(value), "."))
-	if sipegress.IsAcceptanceFixture(value) {
-		return value, nil
-	}
 	if value == "" ||
 		len(value) > 253 ||
 		strings.ContainsAny(value, " \t\r\n") {
@@ -284,7 +281,7 @@ func normalizeHost(value string) (string, error) {
 		)
 	}
 	if address, err := netip.ParseAddr(value); err == nil {
-		if err := sipegress.ValidateHost(address.String()); err != nil {
+		if err := egress.ValidateAddress(address); err != nil {
 			return "", apperror.NewBadRequest("SIP trunk endpoints must use public IP addresses")
 		}
 		return address.Unmap().String(), nil
