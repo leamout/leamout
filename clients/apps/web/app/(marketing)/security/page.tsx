@@ -1,10 +1,10 @@
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
-import { constructMetadata } from "@/lib/metadata";
 import { Implementation } from "@/components/security/implementation";
-import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSchema } from "@/lib/seo/organization";
-import { SecurityControls } from "@/components/security/security-controls";
 import { SecurityIntro } from "@/components/security/intro";
+import { SecurityControls } from "@/components/security/security-controls";
+import { JsonLd } from "@/components/seo/json-ld";
+import { constructMetadata } from "@/lib/metadata";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
 
