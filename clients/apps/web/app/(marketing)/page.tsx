@@ -7,6 +7,7 @@ import { Ownership } from "@/components/home/ownership";
 import { JsonLd } from "@/components/seo/json-ld";
 import { constructMetadata } from "@/lib/metadata";
 import { organizationSchema } from "@/lib/seo/organization";
+import { founderSchema } from "@/lib/seo/person";
 import { softwareSchema } from "@/lib/seo/software";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
@@ -24,6 +25,7 @@ export default function Home() {
       <JsonLd
         nodes={[
           organizationSchema(),
+          founderSchema(),
           websiteSchema(),
           webpageSchema({
             path: "/",
