@@ -6,10 +6,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/security/egress"
 )
 
 func (c Config) Validate() error {
-	return c.Polar.Validate()
+	if err := c.Polar.Validate(); err != nil { return err }
+	_, err := c.SIPEgressPolicy()
+	return err
 }
 
 // ValidateForServer requires only the secrets and connections used by the API.
@@ -92,4 +95,22 @@ func (c Config) TrustedProxyPrefixes() ([]netip.Prefix, error) {
 		result = append(result, prefix.Masked())
 	}
 	return result, nil
+}
+
+func (c Config) SIPEgressPolicy() (egress.Policy, error) {
+	policy := egress.Policy{}
+	if len(c.SIPAllowedEgressIPs) == 0 {
+		return policy, nil
+	}
+	if c.AppEnv != "acceptance" {
+		return policy, fmt.Errorf("SIP_ALLOWED_EGRESS_IPS is restricted to acceptance deployments")
+	}
+	for _, value := range c.SIPAllowedEgressIPs {
+		address, err := netip.ParseAddr(value)
+		if err != nil || address.Zone() != "" {
+			return egress.Policy{}, fmt.Errorf("invalid SIP_ALLOWED_EGRESS_IPS entry")
+		}
+		policy.AdditionalAllowedIPs = append(policy.AdditionalAllowedIPs, address.Unmap())
+	}
+	return policy, nil
 }
