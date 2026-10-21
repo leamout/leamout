@@ -22,6 +22,8 @@ services:
 
   server:
     environment:
+      # Only disposable acceptance overlays select this environment.
+      APP_ENV: acceptance
       # Keep any suite-specific SSL_CERT_FILE (e.g. the mock AI provider CA).
       SSL_CERT_DIR: /identity-trust
     volumes:
@@ -29,3 +31,7 @@ services:
     depends_on:
       keycloak:
         condition: service_healthy
+
+  worker:
+    environment:
+      APP_ENV: acceptance
