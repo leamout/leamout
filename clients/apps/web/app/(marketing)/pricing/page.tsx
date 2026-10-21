@@ -1,13 +1,13 @@
 import { BillingExplanation } from "@/components/pricing/billing-explanation";
-import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
-import { consoleURL } from "@/lib/site";
-import { constructMetadata } from "@/lib/metadata";
-import { JsonLd } from "@/components/seo/json-ld";
-import { organizationSchema } from "@/lib/seo/organization";
 import { PricingFAQ } from "@/components/pricing/faq";
+import PricingPlans from "@/components/pricing/pricing-plans";
+import { JsonLd } from "@/components/seo/json-ld";
+import { constructMetadata } from "@/lib/metadata";
+import { breadcrumbsSchema } from "@/lib/seo/breadcrumbs";
+import { organizationSchema } from "@/lib/seo/organization";
 import { webpageSchema } from "@/lib/seo/webpage";
 import { websiteSchema } from "@/lib/seo/website";
-import PricingPlans from "@/components/pricing/pricing-plans";
+import { consoleURL } from "@/lib/site";
 
 export const metadata = constructMetadata({
   title: "Pricing",
