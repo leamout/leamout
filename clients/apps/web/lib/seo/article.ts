@@ -1,7 +1,9 @@
-import { siteUrl, type SchemaNode } from "./schema";
 import type { BlogPost } from "@/lib/blog/model";
+import type { TechArticle } from "schema-dts";
 
-export function articleSchema(post: BlogPost): SchemaNode {
+import { siteUrl } from "./schema";
+
+export function articleSchema(post: BlogPost): TechArticle {
   return {
     "@type": "TechArticle",
     "@id": `${siteUrl(`/blog/${post.slug}`)}#article`,
