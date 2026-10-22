@@ -11,18 +11,14 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ApiError, errorMessage } from "@/lib/api";
+import { ApiError, api, errorMessage } from "@/lib/api";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { AgentForm } from "@/components/agents/agent-form";
 import { AgentProviderSettings } from "@/components/agents/agent-provider-settings";
 import { AgentReadiness } from "@/components/agents/agent-readiness";
 import { AgentRouting } from "@/components/agents/agent-routing";
 import { AgentTools } from "@/components/agents/agent-tools";
-import {
-  disableVoiceAgent,
-  getVoiceAgent,
-  voiceAgentKeys,
-} from "./api";
+import type { VoiceAgent } from "./types";
 
 const planned = [
   {
@@ -47,20 +43,28 @@ export function AgentDetails({ agentId }: { agentId: string }) {
   const [confirmDisable, setConfirmDisable] = useState(false);
 
   const query = useQuery({
-    queryKey: voiceAgentKeys.detail(organizationId, agentId),
-    queryFn: ({ signal }) => getVoiceAgent(organizationId, agentId, signal),
+    queryKey: ["voice-agents", organizationId, agentId],
+    queryFn: ({ signal }) =>
+      api<VoiceAgent>("/voice-agents/" + encodeURIComponent(agentId), {
+        organizationId,
+        signal,
+      }),
     enabled: organizationId !== "" && agentId !== "",
   });
 
   const disable = useMutation({
-    mutationFn: () => disableVoiceAgent(organizationId, agentId),
+    mutationFn: () =>
+      api<void>("/voice-agents/" + encodeURIComponent(agentId), {
+        method: "DELETE",
+        organizationId,
+      }),
     onSuccess: async () => {
       client.removeQueries({
-        queryKey: voiceAgentKeys.detail(organizationId, agentId),
+        queryKey: ["voice-agents", organizationId, agentId],
         exact: true,
       });
       await client.invalidateQueries({
-        queryKey: voiceAgentKeys.list(organizationId),
+        queryKey: ["voice-agents", organizationId],
       });
       router.replace("/agents");
     },

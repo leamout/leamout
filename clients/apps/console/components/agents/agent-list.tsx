@@ -14,8 +14,8 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { useOrganization } from "@/components/onboarding/organization-provider";
-import { errorMessage } from "@/lib/api";
-import { listVoiceAgents, voiceAgentKeys } from "./api";
+import { api, errorMessage } from "@/lib/api";
+import type { VoiceAgent } from "./types";
 
 function formattedDate(value: string): string {
   const date = new Date(value);
@@ -34,8 +34,12 @@ export function AgentList() {
   const [search, setSearch] = useState("");
   const [engine, setEngine] = useState("all");
   const query = useQuery({
-    queryKey: voiceAgentKeys.list(organizationId),
-    queryFn: ({ signal }) => listVoiceAgents(organizationId, signal),
+    queryKey: ["voice-agents", organizationId],
+    queryFn: ({ signal }) =>
+      api<{ voice_agents: VoiceAgent[] }>("/voice-agents/", {
+        organizationId,
+        signal,
+      }),
     enabled: organizationId !== "",
   });
   const agents = query.data?.voice_agents ?? [];

@@ -12,13 +12,8 @@ import { useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useOrganization } from "@/components/onboarding/organization-provider";
-import { errorMessage } from "@/lib/api";
-import {
-  createVoiceAgent,
-  updateVoiceAgent,
-  voiceAgentKeys,
-} from "./api";
-import type { VoiceAgent, VoiceAgentInput } from "./model";
+import { api, errorMessage } from "@/lib/api";
+import type { VoiceAgent, VoiceAgentInput } from "./types";
 
 function isJSONObject(value: string): boolean {
   try {
@@ -105,18 +100,30 @@ export function AgentForm({
       const payload = toRequest(values, agent);
       if (creating) {
         createKey.current ??= crypto.randomUUID();
-        return createVoiceAgent(organizationId, payload, createKey.current);
+        return api<VoiceAgent>("/voice-agents/", {
+          method: "POST",
+          organizationId,
+          idempotencyKey: createKey.current,
+          body: payload,
+        });
       }
       if (!agent) {
         throw new Error("The agent has not loaded.");
       }
-      return updateVoiceAgent(organizationId, agent.id, payload);
+      return api<VoiceAgent>(
+        "/voice-agents/" + encodeURIComponent(agent.id),
+        {
+          method: "PATCH",
+          organizationId,
+          body: payload,
+        },
+      );
     },
     onSuccess: async (saved) => {
       if (!organizationId) return;
-      client.setQueryData(voiceAgentKeys.detail(organizationId, saved.id), saved);
+      client.setQueryData(["voice-agents", organizationId, saved.id], saved);
       await client.invalidateQueries({
-        queryKey: voiceAgentKeys.list(organizationId),
+        queryKey: ["voice-agents", organizationId],
       });
       if (creating) {
         router.push("/agents/" + encodeURIComponent(saved.id));
