@@ -17,8 +17,8 @@ export function Mission() {
       </div>
       <div className="max-w-2xl space-y-6 text-base leading-8 text-muted-foreground sm:text-lg">
         <p>
-          Building an agent that can answer a call means handling much more
-          than a prompt. It means connecting telephony to AI, managing a live
+          Building an agent that can answer a call means handling much more than
+          a prompt. It means connecting telephony to AI, managing a live
           session, and keeping the application in control as the conversation
           unfolds.
         </p>

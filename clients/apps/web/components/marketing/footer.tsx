@@ -8,6 +8,7 @@ const groups = [
       { label: "Integrations", href: "/integrations" },
       { label: "Pricing", href: "/pricing" },
       { label: "Documentation", href: "/docs" },
+      { label: "Blog", href: "/blog" },
       { label: "Security", href: "/security" },
     ],
   },

@@ -9,7 +9,10 @@ export function HomeHero() {
       <div className="mx-auto grid max-w-[1200px] gap-14 px-5 py-20 sm:px-6 sm:py-24 lg:grid-cols-[0.95fr_1.05fr] lg:items-center lg:gap-16 lg:px-8 lg:py-28">
         <div>
           <p className="mb-7 flex items-center gap-3 font-mono text-xs font-medium uppercase tracking-[0.16em] text-foreground">
-            <span aria-hidden="true" className="size-2 rounded-full bg-brand-orange" />
+            <span
+              aria-hidden="true"
+              className="size-2 rounded-full bg-brand-orange"
+            />
             SIP-native voice infrastructure
           </p>
           <h1 className="text-balance font-heading text-5xl font-semibold leading-[1.06] tracking-tight sm:text-6xl xl:text-[5.25rem]">
@@ -26,7 +29,7 @@ export function HomeHero() {
             <Button
               size="lg"
               nativeButton={false}
-              render={<a href={consoleURL + "/create-account"} />}
+              render={<a href={`${consoleURL}/create-account`} />}
             >
               Get started
             </Button>

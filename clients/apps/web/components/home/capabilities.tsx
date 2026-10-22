@@ -35,9 +35,9 @@ export function Capabilities() {
             More than a model on a phone call.
           </h2>
           <p className="mt-6 max-w-lg leading-8 text-muted-foreground">
-            Voice agents need a runtime that connects conversational intelligence
-            with the realities of telephony: streaming media, changing call state,
-            interruptions, and external actions.
+            Voice agents need a runtime that connects conversational
+            intelligence with the realities of telephony: streaming media,
+            changing call state, interruptions, and external actions.
           </p>
           <div className="mt-9 divide-y divide-border border-t border-border">
             {capabilities.map((capability) => (
@@ -61,7 +61,10 @@ export function Capabilities() {
           </div>
           <ol className="mt-8">
             {exampleEvents.map((event, index) => (
-              <li key={event.step} className="relative flex gap-5 pb-9 last:pb-0">
+              <li
+                key={event.step}
+                className="relative flex gap-5 pb-9 last:pb-0"
+              >
                 {index < exampleEvents.length - 1 && (
                   <span
                     aria-hidden="true"

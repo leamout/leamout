@@ -1,20 +1,22 @@
-import { SITE_URL, siteUrl, type SchemaNode } from "./schema";
+import type { AboutPage, WebPage } from "schema-dts";
+
+import { SITE_URL, siteUrl } from "./schema";
+
+type PageOptions = {
+  path: string;
+  name: string;
+  description: string;
+  type?: "WebPage" | "AboutPage";
+};
 
 export function webpageSchema({
   path,
   name,
   description,
   type = "WebPage",
-}: {
-  path: string;
-  name: string;
-  description: string;
-  type?: "WebPage" | "AboutPage";
-}): SchemaNode {
+}: PageOptions): WebPage | AboutPage {
   const url = siteUrl(path);
-
-  return {
-    "@type": type,
+  const fields = {
     "@id": `${url}#webpage`,
     url,
     name,
@@ -23,4 +25,10 @@ export function webpageSchema({
     isPartOf: { "@id": `${SITE_URL}/#website` },
     about: { "@id": `${SITE_URL}/#organization` },
   };
+
+  if (type === "AboutPage") {
+    return { "@type": "AboutPage", ...fields };
+  }
+
+  return { "@type": "WebPage", ...fields };
 }

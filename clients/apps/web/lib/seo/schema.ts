@@ -1,22 +1,19 @@
-export const SITE_URL = "https://leamout.com";
+import type { Graph } from "schema-dts";
 
-export type SchemaNode = Record<string, unknown> & {
-  "@type": string;
-  "@id"?: string;
-};
+export const SITE_URL = "https://leamout.com";
 
 export function siteUrl(path = "/"): string {
   return new URL(path, SITE_URL).toString();
 }
 
-export function schemaGraph(nodes: SchemaNode[]) {
+export function schemaGraph(nodes: Graph["@graph"]): Graph {
   return {
     "@context": "https://schema.org",
     "@graph": nodes,
   };
 }
 
-// Escape script-ending sequences before embedding the JSON in HTML.
-export function serializeSchema(nodes: SchemaNode[]): string {
+// Escape angle brackets before embedding JSON-LD in an HTML script element.
+export function serializeSchema(nodes: Graph["@graph"]): string {
   return JSON.stringify(schemaGraph(nodes)).replace(/</g, "\\u003c");
 }

@@ -1,0 +1,27 @@
+export const metadata = {
+  title: "Why SIP-native infrastructure matters for voice agents",
+  description:
+    "An engineering perspective on connecting existing telephony systems to real-time AI without surrendering call control.",
+  category: "Architecture",
+  author: "Coffey Vidzro",
+  publishedAt: "2026-10-22",
+  status: "published",
+}
+
+Voice AI systems have to solve two different problems: generating an intelligent response and maintaining a reliable telephone call. Treating the call as an afterthought makes control, interoperability, and observability harder.
+
+## The signaling and media boundary
+
+SIP negotiates and manages sessions; RTP carries audio. Real-time AI introduces another processing path for speech detection, transcription, reasoning, and synthesis. An agent runtime needs a clear boundary between these concerns.
+
+Leamout's architecture uses OpenSIPS for SIP signaling, FreeSWITCH for call and media control, RTPengine for RTP handling, and Go services to orchestrate sessions and agents. These are architectural choices, not a claim of production availability.
+
+## Why bring your own carrier?
+
+Organizations may already have SIP trunks, numbers, or PBX infrastructure. BYOC keeps that connectivity under customer control while the agent runtime focuses on streaming media and AI orchestration.
+
+## What we're still building
+
+Leamout is under active development, and the backend has not yet been publicly deployed. The difficult work is not simply connecting an LLM to audio; it is managing interruptions, tool execution, state recovery, and call lifecycle events predictably.
+
+We'll document those trade-offs as the system develops.

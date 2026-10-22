@@ -17,11 +17,14 @@ export function ContactOptions() {
           </h2>
           <p className="mt-4 max-w-md flex-1 leading-7 text-muted-foreground">
             Start with the documentation to understand SIP trunks, AI provider
-            connections, and the agent runtime. Create an organization when
-            you are ready to build.
+            connections, and the agent runtime. Create an organization when you
+            are ready to build.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Button nativeButton={false} render={<a href={consoleURL + "/create-account"} />}>
+            <Button
+              nativeButton={false}
+              render={<a href={`${consoleURL}/create-account`} />}
+            >
               Get started
             </Button>
             <Button
@@ -51,11 +54,7 @@ export function ContactOptions() {
               variant="outline"
               nativeButton={false}
               render={
-                <a
-                  href={issueURL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                />
+                <a href={issueURL} target="_blank" rel="noopener noreferrer" />
               }
             >
               Open a GitHub issue

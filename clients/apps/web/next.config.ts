@@ -1,7 +1,14 @@
+import createMDX from "@next/mdx";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@leamout/ui"],
+  pageExtensions: ["ts", "tsx", "md", "mdx"],
+  outputFileTracingIncludes: {
+    "/blog": ["./content/*.mdx"],
+    "/blog/*": ["./content/*.mdx"],
+    "/sitemap.xml": ["./content/*.mdx"],
+  },
 
   async headers() {
     return [
@@ -58,4 +65,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const withMDX = createMDX({});
+
+export default withMDX(nextConfig);

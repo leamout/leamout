@@ -1,7 +1,9 @@
-import { SITE_URL, siteUrl, type SchemaNode } from "./schema";
+import type { SoftwareApplication } from "schema-dts";
+
+import { SITE_URL, siteUrl } from "./schema";
 
 // Descriptive schema only. Do not invent ratings, downloads, prices, or a release status.
-export function softwareSchema(): SchemaNode {
+export function softwareSchema(): SoftwareApplication {
   return {
     "@type": "SoftwareApplication",
     "@id": `${SITE_URL}/#software`,

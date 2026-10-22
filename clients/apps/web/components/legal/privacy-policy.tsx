@@ -17,8 +17,8 @@ export function PrivacyPolicy() {
       <section className="border-t border-border py-8">
         <h2 className="text-xl font-semibold">Managed service context</h2>
         <p className="mt-4 leading-8 text-muted-foreground">
-          Leamout is operated by Leamout. The approved privacy policy
-          will describe how service data is processed, protected and retained,
+          Leamout is operated by Leamout. The approved privacy policy will
+          describe how service data is processed, protected and retained,
           including the responsibilities of customers and service providers.
         </p>
       </section>

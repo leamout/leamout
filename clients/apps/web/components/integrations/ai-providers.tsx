@@ -33,8 +33,8 @@ export function AIProviders() {
         </h2>
         <p className="mt-5 leading-8 text-muted-foreground">
           Leamout supports composable speech pipelines and integrated realtime
-          models. Configure provider integrations using your own credentials
-          and select them for each agent.
+          models. Configure provider integrations using your own credentials and
+          select them for each agent.
         </p>
       </div>
       <div className="mt-12 grid gap-4 sm:grid-cols-2">

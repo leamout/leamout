@@ -1,6 +1,9 @@
 export function Wordmark() {
   return (
-    <section className="border-b border-border py-20" aria-labelledby="brand-wordmark-title">
+    <section
+      className="border-b border-border py-20"
+      aria-labelledby="brand-wordmark-title"
+    >
       <div className="mb-9 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
@@ -14,8 +17,8 @@ export function Wordmark() {
           </h2>
         </div>
         <p className="max-w-sm leading-7 text-muted-foreground">
-          The name stays legible on dark and light surfaces. The orange point
-          is a restrained finishing detail.
+          The name stays legible on dark and light surfaces. The orange point is
+          a restrained finishing detail.
         </p>
       </div>
       <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">

@@ -27,7 +27,11 @@ export function IntegrationsTelephony() {
             {[
               ["01", "Your carrier or PBX", "Existing numbers and SIP service"],
               ["02", "Leamout SIP edge", "Call signaling and realtime media"],
-              ["03", "Leamout voice agent", "Conversation, tools, and call control"],
+              [
+                "03",
+                "Leamout voice agent",
+                "Conversation, tools, and call control",
+              ],
             ].map(([number, title, description], index) => (
               <li key={number} className="relative flex gap-5 pb-7 last:pb-0">
                 {index < 2 && (

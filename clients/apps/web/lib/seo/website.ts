@@ -1,6 +1,8 @@
-import { SITE_URL, type SchemaNode } from "./schema";
+import type { WebSite } from "schema-dts";
 
-export function websiteSchema(): SchemaNode {
+import { SITE_URL } from "./schema";
+
+export function websiteSchema(): WebSite {
   return {
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,

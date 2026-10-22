@@ -1,7 +1,9 @@
-import { FOUNDER_ID } from "./person";
-import { SITE_URL, type SchemaNode } from "./schema";
+import type { Organization } from "schema-dts";
 
-export function organizationSchema(): SchemaNode {
+import { FOUNDER_ID } from "./person";
+import { SITE_URL } from "./schema";
+
+export function organizationSchema(): Organization {
   return {
     "@type": "Organization",
     "@id": `${SITE_URL}/#organization`,
