@@ -114,8 +114,22 @@ export function TrunkForm({
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="trunk-name">Trunk name</FieldLabel>
-            <Input {...field} id="trunk-name" required maxLength={255} />
-            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+            <Input
+              {...field}
+              id="trunk-name"
+              required
+              maxLength={255}
+              aria-invalid={fieldState.invalid}
+              aria-describedby={
+                fieldState.invalid ? "trunk-name-error" : undefined
+              }
+            />
+            {fieldState.invalid && (
+              <FieldError
+                id="trunk-name-error"
+                errors={[fieldState.error]}
+              />
+            )}
           </Field>
         )}
       />
@@ -146,10 +160,16 @@ export function TrunkForm({
         </Field>
       </div>
 
-      <label className="flex items-center gap-3 text-sm">
-        <input type="checkbox" {...form.register("inboundEnabled")} />
-        Allow inbound calls
-      </label>
+      <Field orientation="horizontal">
+        <input
+          id="trunk-inbound-enabled"
+          type="checkbox"
+          {...form.register("inboundEnabled")}
+        />
+        <FieldLabel htmlFor="trunk-inbound-enabled">
+          Allow inbound calls
+        </FieldLabel>
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Controller
@@ -161,11 +181,20 @@ export function TrunkForm({
               <Input
                 {...field}
                 id="trunk-cps"
+                aria-invalid={fieldState.invalid}
+                aria-describedby={
+                  fieldState.invalid ? "trunk-cps-error" : undefined
+                }
                 type="number"
                 min={1}
                 step={1}
               />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+              <FieldError
+                id="trunk-cps-error"
+                errors={[fieldState.error]}
+              />
+            )}
             </Field>
           )}
         />
@@ -180,11 +209,20 @@ export function TrunkForm({
               <Input
                 {...field}
                 id="trunk-concurrent"
+                aria-invalid={fieldState.invalid}
+                aria-describedby={
+                  fieldState.invalid ? "trunk-concurrent-error" : undefined
+                }
                 type="number"
                 min={1}
                 step={1}
               />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+              <FieldError
+                id="trunk-concurrent-error"
+                errors={[fieldState.error]}
+              />
+            )}
             </Field>
           )}
         />

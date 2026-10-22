@@ -156,12 +156,21 @@ export function PhoneNumberForm({
               <Input
                 {...field}
                 id="number-e164"
+                aria-invalid={fieldState.invalid}
+                aria-describedby={
+                  fieldState.invalid ? "number-e164-error" : undefined
+                }
                 type="tel"
                 readOnly={!creating}
                 required
                 placeholder="+233201234567"
               />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+              <FieldError
+                id="number-e164-error"
+                errors={[fieldState.error]}
+              />
+            )}
             </Field>
           )}
         />
@@ -174,12 +183,21 @@ export function PhoneNumberForm({
               <Input
                 {...field}
                 id="number-country"
+                aria-invalid={fieldState.invalid}
+                aria-describedby={
+                  fieldState.invalid ? "number-country-error" : undefined
+                }
                 readOnly={!creating}
                 required
                 maxLength={2}
                 placeholder="GH"
               />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              {fieldState.invalid && (
+              <FieldError
+                id="number-country-error"
+                errors={[fieldState.error]}
+              />
+            )}
             </Field>
           )}
         />
@@ -211,10 +229,16 @@ export function PhoneNumberForm({
         )}
       </Field>
 
-      <label className="flex items-center gap-3 text-sm">
-        <input type="checkbox" {...form.register("voiceEnabled")} />
-        Enable voice
-      </label>
+      <Field orientation="horizontal">
+        <input
+          id="phone-voice-enabled"
+          type="checkbox"
+          {...form.register("voiceEnabled")}
+        />
+        <FieldLabel htmlFor="phone-voice-enabled">
+          Enable voice
+        </FieldLabel>
+      </Field>
       <Button
         type="submit"
         disabled={

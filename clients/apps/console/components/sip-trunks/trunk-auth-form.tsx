@@ -1,12 +1,81 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 import type { SipTrunk, TrunkSourceIP } from "./types";
+
+const authSchema = (inbound: boolean) =>
+  z
+    .object({
+      method: z.enum(["ip", "none", "digest"]),
+      username: z.string().trim().max(255),
+      realm: z.string().trim().max(255),
+      secret: z.string().max(4096),
+    })
+    .superRefine((values, context) => {
+      if (
+        (inbound && values.method === "none") ||
+        (!inbound && values.method === "ip")
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["method"],
+          message: "Select a supported authentication method.",
+        });
+      }
+
+      if (values.method === "digest") {
+        if (!values.username) {
+          context.addIssue({
+            code: "custom",
+            path: ["username"],
+            message: "Enter a digest username.",
+          });
+        }
+        if (!values.realm || /[\r\n]/.test(values.realm)) {
+          context.addIssue({
+            code: "custom",
+            path: ["realm"],
+            message: "Enter a valid digest realm.",
+          });
+        }
+        if (!values.secret) {
+          context.addIssue({
+            code: "custom",
+            path: ["secret"],
+            message: "Enter a new digest password.",
+          });
+        }
+      }
+    });
+
+type AuthValues = z.infer<ReturnType<typeof authSchema>>;
+
+const sourceIPSchema = z.object({
+  cidr: z
+    .string()
+    .trim()
+    .refine(
+      (value) =>
+        z.union([z.cidrv4(), z.cidrv6()]).safeParse(value).success,
+      "Enter a valid IPv4 or IPv6 network prefix.",
+    ),
+});
+
+type SourceIPValues = z.infer<typeof sourceIPSchema>;
 
 export function TrunkAuthForm({
   inbound,
@@ -19,15 +88,26 @@ export function TrunkAuthForm({
   const organizationId = selected?.id ?? "";
   const client = useQueryClient();
   const trunkPath = "/trunks/" + encodeURIComponent(trunk.id);
-  const [method, setMethod] = useState<"ip" | "none" | "digest">(
-    inbound ? trunk.inbound_auth_method : trunk.outbound_auth_method,
-  );
-  const [username, setUsername] = useState("");
-  const [realm, setRealm] = useState("");
-  const [secret, setSecret] = useState("");
-  const [cidr, setCidr] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
   const sourcesKey = ["trunk-source-ips", organizationId, trunk.id];
+  const prefix = inbound ? "inbound" : "outbound";
+
+  const form = useForm<AuthValues>({
+    resolver: zodResolver(authSchema(inbound)),
+    defaultValues: {
+      method: inbound ? trunk.inbound_auth_method : trunk.outbound_auth_method,
+      username: (inbound ? trunk.inbound_username : trunk.outbound_username) ?? "",
+      realm: (inbound ? trunk.inbound_realm : trunk.outbound_realm) ?? "",
+      secret: "",
+    },
+  });
+
+  const sourceForm = useForm<SourceIPValues>({
+    resolver: zodResolver(sourceIPSchema),
+    defaultValues: { cidr: "" },
+  });
+
+  const method = form.watch("method");
 
   const sources = useQuery({
     queryKey: sourcesKey,
@@ -40,39 +120,40 @@ export function TrunkAuthForm({
   });
 
   const save = useMutation({
-    mutationFn: () =>
+    mutationFn: (values: AuthValues) =>
       api<void>(trunkPath + (inbound ? "/inbound-auth" : "/outbound-auth"), {
         method: "PUT",
         organizationId,
         body:
-          method === "digest"
+          values.method === "digest"
             ? {
                 method: "digest",
-                username: username.trim(),
-                realm: realm.trim(),
-                secret,
+                username: values.username,
+                realm: values.realm,
+                secret: values.secret,
               }
-            : { method },
+            : { method: values.method },
       }),
     onSuccess: async () => {
-      setSecret("");
       await client.invalidateQueries({
         queryKey: ["trunks", organizationId, trunk.id],
       });
-      await client.invalidateQueries({ queryKey: ["trunks", organizationId] });
+      await client.invalidateQueries({
+        queryKey: ["trunks", organizationId],
+      });
     },
-    onSettled: () => setSecret(""),
+    onSettled: () => form.setValue("secret", ""),
   });
 
   const addIP = useMutation({
-    mutationFn: () =>
+    mutationFn: (values: SourceIPValues) =>
       api<TrunkSourceIP>(trunkPath + "/source-ips", {
         method: "POST",
         organizationId,
-        body: { cidr: cidr.trim() },
+        body: { cidr: values.cidr },
       }),
     onSuccess: async () => {
-      setCidr("");
+      sourceForm.reset();
       await client.invalidateQueries({ queryKey: sourcesKey });
     },
   });
@@ -89,77 +170,127 @@ export function TrunkAuthForm({
     },
   });
 
-  const prefix = inbound ? "inbound" : "outbound";
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (method === "digest" && (!username.trim() || !realm.trim() || !secret)) {
-      return;
-    }
-    save.mutate();
-  }
-
   return (
     <section className="space-y-5">
-      <form className="max-w-2xl space-y-4" onSubmit={submit}>
+      <form
+        className="max-w-2xl space-y-5"
+        onSubmit={form.handleSubmit((values) => save.mutate(values))}
+      >
         <h2 className="text-lg font-semibold">
           {inbound ? "Inbound" : "Outbound"} authentication
         </h2>
-        <p className="text-sm text-muted-foreground">
+        <FieldDescription>
           Current method:{" "}
           {inbound ? trunk.inbound_auth_method : trunk.outbound_auth_method}.
-          Existing secrets are never returned by the API. Enter new credentials
-          to replace them.
-        </p>
-        <label className="block space-y-2 text-sm">
-          Method
+          Existing secrets are never returned by the API. Enter new
+          credentials to replace them.
+        </FieldDescription>
+
+        <Field data-invalid={Boolean(form.formState.errors.method)}>
+          <FieldLabel htmlFor={prefix + "-method"}>Method</FieldLabel>
           <select
             id={prefix + "-method"}
-            className="block h-10 w-full rounded-md border bg-background px-3"
-            value={method}
-            onChange={(event) => setMethod(event.target.value as typeof method)}
+            className="h-10 w-full rounded-md border bg-background px-3"
+            aria-invalid={Boolean(form.formState.errors.method)}
+            {...form.register("method")}
           >
             <option value={inbound ? "ip" : "none"}>
               {inbound ? "Source IP allowlist" : "No digest authentication"}
             </option>
             <option value="digest">Digest authentication</option>
           </select>
-        </label>
+          {form.formState.errors.method && (
+            <FieldError errors={[form.formState.errors.method]} />
+          )}
+        </Field>
 
         {method === "digest" && (
           <div className="space-y-4">
-            <label className="block space-y-2 text-sm">
-              Username
-              <Input
-                value={username}
-                onChange={(event) => setUsername(event.target.value)}
-                required
-                maxLength={255}
-                autoComplete="off"
-              />
-            </label>
-            <label className="block space-y-2 text-sm">
-              Realm
-              <Input
-                value={realm}
-                onChange={(event) => setRealm(event.target.value)}
-                required
-                maxLength={255}
-                autoComplete="off"
-              />
-            </label>
-            <label className="block space-y-2 text-sm">
-              New password
-              <Input
-                type="password"
-                value={secret}
-                onChange={(event) => setSecret(event.target.value)}
-                required
-                maxLength={4096}
-                autoComplete="new-password"
-              />
-            </label>
+            <Controller
+              name="username"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={prefix + "-username"}>
+                    Username
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id={prefix + "-username"}
+                    autoComplete="off"
+                    maxLength={255}
+                    required
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby={
+                      fieldState.invalid ? prefix + "-username-error" : undefined
+                    }
+                  />
+                  {fieldState.invalid && (
+                    <FieldError
+                      id={prefix + "-username-error"}
+                      errors={[fieldState.error]}
+                    />
+                  )}
+                </Field>
+              )}
+            />
+            <Controller
+              name="realm"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={prefix + "-realm"}>
+                    Realm
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id={prefix + "-realm"}
+                    autoComplete="off"
+                    maxLength={255}
+                    required
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby={
+                      fieldState.invalid ? prefix + "-realm-error" : undefined
+                    }
+                  />
+                  {fieldState.invalid && (
+                    <FieldError
+                      id={prefix + "-realm-error"}
+                      errors={[fieldState.error]}
+                    />
+                  )}
+                </Field>
+              )}
+            />
+            <Controller
+              name="secret"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={prefix + "-secret"}>
+                    New password
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id={prefix + "-secret"}
+                    type="password"
+                    autoComplete="new-password"
+                    maxLength={4096}
+                    required
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby={
+                      fieldState.invalid ? prefix + "-secret-error" : undefined
+                    }
+                  />
+                  {fieldState.invalid && (
+                    <FieldError
+                      id={prefix + "-secret-error"}
+                      errors={[fieldState.error]}
+                    />
+                  )}
+                </Field>
+              )}
+            />
           </div>
         )}
 
@@ -181,13 +312,18 @@ export function TrunkAuthForm({
       {inbound && (
         <div className="max-w-2xl space-y-4 border-t pt-5">
           <h3 className="font-semibold">Allowed source networks</h3>
-          <p className="text-sm text-muted-foreground">
-            Used for inbound source IP authentication.
-          </p>
+          <FieldDescription>
+            Source IP networks for inbound authentication.
+          </FieldDescription>
           {sources.isPending ? (
             <p role="status">Loading source networks…</p>
           ) : sources.isError ? (
-            <p role="alert">{errorMessage(sources.error)}</p>
+            <div role="alert" className="space-y-3">
+              <p>{errorMessage(sources.error)}</p>
+              <Button variant="outline" onClick={() => void sources.refetch()}>
+                Retry
+              </Button>
+            </div>
           ) : sources.data?.source_ips.length ? (
             <ul className="space-y-2">
               {sources.data.source_ips.map((item) => (
@@ -231,24 +367,43 @@ export function TrunkAuthForm({
 
           <form
             className="flex flex-wrap items-end gap-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (cidr.trim()) {
-                addIP.mutate();
-              }
-            }}
+            onSubmit={sourceForm.handleSubmit((values) => addIP.mutate(values))}
           >
-            <label className="min-w-56 flex-1 space-y-2 text-sm">
-              Network in CIDR notation
-              <Input
-                value={cidr}
-                onChange={(event) => setCidr(event.target.value)}
-                required
-                placeholder="203.0.113.0/24"
-              />
-            </label>
-            <Button disabled={addIP.isPending || !organizationId} type="submit">
-              Add network
+            <Controller
+              name="cidr"
+              control={sourceForm.control}
+              render={({ field, fieldState }) => (
+                <Field
+                  className="min-w-56 flex-1"
+                  data-invalid={fieldState.invalid}
+                >
+                  <FieldLabel htmlFor="inbound-cidr">
+                    Network in CIDR notation
+                  </FieldLabel>
+                  <Input
+                    {...field}
+                    id="inbound-cidr"
+                    placeholder="203.0.113.0/24"
+                    required
+                    aria-invalid={fieldState.invalid}
+                    aria-describedby={
+                      fieldState.invalid ? "inbound-cidr-error" : undefined
+                    }
+                  />
+                  {fieldState.invalid && (
+                    <FieldError
+                      id="inbound-cidr-error"
+                      errors={[fieldState.error]}
+                    />
+                  )}
+                </Field>
+              )}
+            />
+            <Button
+              type="submit"
+              disabled={addIP.isPending || !organizationId}
+            >
+              {addIP.isPending ? "Adding…" : "Add network"}
             </Button>
           </form>
           {(addIP.isError || removeIP.isError) && (

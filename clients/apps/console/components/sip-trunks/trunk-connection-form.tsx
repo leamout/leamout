@@ -1,29 +1,67 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, useState } from "react";
+import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 import type { TrunkEndpoint } from "./types";
+
+const schema = z.object({
+  host: z
+    .string()
+    .trim()
+    .min(1, "Enter a public hostname or IP address.")
+    .max(253, "Host must be 253 characters or fewer.")
+    .refine(
+      (value) => !/[\s/]/.test(value) && !value.includes("://"),
+      "Enter a hostname or IP without a scheme or path.",
+    ),
+  port: z.string().refine(
+    (value) =>
+      /^\d+$/.test(value) &&
+      Number(value) >= 1 &&
+      Number(value) <= 65535,
+    "Enter a port between 1 and 65535.",
+  ),
+  transport: z.enum(["udp", "tcp", "tls"]),
+  direction: z.enum(["inbound", "outbound", "bidirectional"]),
+});
+
+type EndpointValues = z.infer<typeof schema>;
+
+const defaultValues: EndpointValues = {
+  host: "",
+  port: "5060",
+  transport: "udp",
+  direction: "bidirectional",
+};
 
 export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
   const { selected } = useOrganization();
   const organizationId = selected?.id ?? "";
   const client = useQueryClient();
   const base = "/trunks/" + encodeURIComponent(trunkId) + "/endpoints";
-  const key = ["trunk-endpoints", organizationId, trunkId];
-  const [host, setHost] = useState("");
-  const [port, setPort] = useState("5060");
-  const [transport, setTransport] = useState<"udp" | "tcp" | "tls">("udp");
-  const [direction, setDirection] = useState<
-    "inbound" | "outbound" | "bidirectional"
-  >("bidirectional");
+  const queryKey = ["trunk-endpoints", organizationId, trunkId];
   const [removing, setRemoving] = useState<string | null>(null);
 
+  const form = useForm<EndpointValues>({
+    resolver: zodResolver(schema),
+    defaultValues,
+  });
+
   const endpoints = useQuery({
-    queryKey: key,
+    queryKey,
     queryFn: ({ signal }) =>
       api<{ endpoints: TrunkEndpoint[] }>(base, {
         organizationId,
@@ -33,20 +71,20 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
   });
 
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (values: EndpointValues) =>
       api<TrunkEndpoint>(base, {
         method: "POST",
         organizationId,
         body: {
-          host: host.trim(),
-          port: Number(port),
-          transport,
-          direction,
+          host: values.host.trim(),
+          port: Number(values.port),
+          transport: values.transport,
+          direction: values.direction,
         },
       }),
     onSuccess: async () => {
-      setHost("");
-      await client.invalidateQueries({ queryKey: key });
+      form.reset();
+      await client.invalidateQueries({ queryKey });
     },
   });
 
@@ -57,7 +95,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
         organizationId,
         body: { enabled },
       }),
-    onSuccess: () => client.invalidateQueries({ queryKey: key }),
+    onSuccess: () => client.invalidateQueries({ queryKey }),
   });
 
   const remove = useMutation({
@@ -68,22 +106,9 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
       }),
     onSuccess: async () => {
       setRemoving(null);
-      await client.invalidateQueries({ queryKey: key });
+      await client.invalidateQueries({ queryKey });
     },
   });
-
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (
-      host.trim() &&
-      Number.isInteger(Number(port)) &&
-      Number(port) > 0 &&
-      Number(port) <= 65535
-    ) {
-      create.mutate();
-    }
-  }
 
   return (
     <div className="space-y-7">
@@ -98,7 +123,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
       {endpoints.isPending ? (
         <p role="status">Loading endpoints…</p>
       ) : endpoints.isError ? (
-        <div role="alert">
+        <div role="alert" className="space-y-3">
           <p>{errorMessage(endpoints.error)}</p>
           <Button variant="outline" onClick={() => void endpoints.refetch()}>
             Retry
@@ -177,64 +202,104 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
       )}
 
       <form
-        className="max-w-2xl space-y-4 rounded-lg border p-5"
-        onSubmit={submit}
+        className="max-w-2xl space-y-5 rounded-lg border p-5"
+        onSubmit={form.handleSubmit((values) => create.mutate(values))}
       >
         <h3 className="font-semibold">Add endpoint</h3>
+
         <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
-          <label className="space-y-2 text-sm">
-            Hostname or public IP
-            <Input
-              value={host}
-              onChange={(event) => setHost(event.target.value)}
-              required
-              placeholder="sip.carrier.example"
-            />
-          </label>
-          <label className="space-y-2 text-sm">
-            Port
-            <Input
-              value={port}
-              onChange={(event) => setPort(event.target.value)}
-              required
-              type="number"
-              min={1}
-              max={65535}
-              step={1}
-            />
-          </label>
+          <Controller
+            name="host"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="endpoint-host">
+                  Hostname or public IP
+                </FieldLabel>
+                <Input
+                  {...field}
+                  id="endpoint-host"
+                  aria-invalid={fieldState.invalid}
+                  aria-describedby={
+                    fieldState.invalid ? "endpoint-host-error" : undefined
+                  }
+                  required
+                  placeholder="sip.carrier.example"
+                />
+                {fieldState.invalid && (
+                  <FieldError
+                    id="endpoint-host-error"
+                    errors={[fieldState.error]}
+                  />
+                )}
+              </Field>
+            )}
+          />
+          <Controller
+            name="port"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="endpoint-port">Port</FieldLabel>
+                <Input
+                  {...field}
+                  id="endpoint-port"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  step={1}
+                  aria-invalid={fieldState.invalid}
+                  aria-describedby={
+                    fieldState.invalid ? "endpoint-port-error" : undefined
+                  }
+                  required
+                />
+                {fieldState.invalid && (
+                  <FieldError
+                    id="endpoint-port-error"
+                    errors={[fieldState.error]}
+                  />
+                )}
+              </Field>
+            )}
+          />
         </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="space-y-2 text-sm">
-            Transport
+          <Field>
+            <FieldLabel htmlFor="endpoint-transport">Transport</FieldLabel>
             <select
-              className="block h-10 w-full rounded-md border bg-background px-3"
-              value={transport}
-              onChange={(event) =>
-                setTransport(event.target.value as typeof transport)
-              }
+              id="endpoint-transport"
+              className="h-10 w-full rounded-md border bg-background px-3"
+              {...form.register("transport")}
             >
               <option value="udp">UDP</option>
               <option value="tcp">TCP</option>
               <option value="tls">TLS</option>
             </select>
-          </label>
-          <label className="space-y-2 text-sm">
-            Direction
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="endpoint-direction">Direction</FieldLabel>
             <select
-              className="block h-10 w-full rounded-md border bg-background px-3"
-              value={direction}
-              onChange={(event) =>
-                setDirection(event.target.value as typeof direction)
-              }
+              id="endpoint-direction"
+              className="h-10 w-full rounded-md border bg-background px-3"
+              {...form.register("direction")}
             >
               <option value="bidirectional">Bidirectional</option>
               <option value="inbound">Inbound</option>
               <option value="outbound">Outbound</option>
             </select>
-          </label>
+          </Field>
         </div>
-        <Button disabled={!organizationId || create.isPending} type="submit">
+
+        <FieldDescription>
+          Endpoints must use a public hostname or IP. The backend also validates
+          the host before saving.
+        </FieldDescription>
+        <Button
+          type="submit"
+          disabled={!organizationId || create.isPending}
+        >
           {create.isPending ? "Adding…" : "Add endpoint"}
         </Button>
         {create.isError && (
