@@ -35,7 +35,7 @@ export default function PricingPage() {
           ]),
         ]}
       />
-      <PricingPlans signupHref={consoleURL + "/create-account"} />
+      <PricingPlans signupHref={`${consoleURL}/create-account`} />
       <div className="mx-auto max-w-[1200px] px-5 sm:px-6 lg:px-8">
         <BillingExplanation />
         <PricingFAQ />

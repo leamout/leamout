@@ -24,7 +24,7 @@ export function HomeCallToAction() {
           <Button
             size="lg"
             nativeButton={false}
-            render={<a href={consoleURL + "/create-account"} />}
+            render={<a href={`${consoleURL}/create-account`} />}
           >
             Get started
           </Button>

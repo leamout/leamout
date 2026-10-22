@@ -1,6 +1,6 @@
 declare module "*.mdx" {
-  import type { BlogMetadata } from "@/lib/blog";
   import type { ComponentType } from "react";
+  import type { BlogMetadata } from "@/lib/blog";
 
   export const metadata: BlogMetadata;
 

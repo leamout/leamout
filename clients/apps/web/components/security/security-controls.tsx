@@ -27,7 +27,10 @@ const controls = [
 
 export function SecurityControls() {
   return (
-    <section className="border-b border-border py-20" aria-labelledby="security-controls-title">
+    <section
+      className="border-b border-border py-20"
+      aria-labelledby="security-controls-title"
+    >
       <div className="mb-12 grid gap-6 md:grid-cols-2 md:items-end">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
@@ -51,7 +54,9 @@ export function SecurityControls() {
             key={number}
             className="grid gap-4 border-b border-border py-7 md:grid-cols-[3rem_0.8fr_1.2fr] md:gap-12"
           >
-            <span className="font-mono text-xs text-brand-orange">{number}</span>
+            <span className="font-mono text-xs text-brand-orange">
+              {number}
+            </span>
             <h3 className="font-heading text-xl font-medium tracking-tight sm:text-2xl">
               {title}
             </h3>

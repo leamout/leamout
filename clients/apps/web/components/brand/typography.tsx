@@ -46,8 +46,12 @@ export function Typography() {
               {family.number}
             </span>
             <div>
-              <h3 className="font-heading text-xl font-medium">{family.name}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{family.role}</p>
+              <h3 className="font-heading text-xl font-medium">
+                {family.name}
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {family.role}
+              </p>
             </div>
             <p className={family.className}>{family.sample}</p>
           </div>

@@ -22,8 +22,8 @@ export function ToolsAndEvents() {
           <div className="border-t border-border pt-6">
             <h3 className="text-xl font-semibold">Webhooks and call events</h3>
             <p className="mt-4 leading-8 text-muted-foreground">
-              Receive events from Leamout and connect call activity to your
-              own systems, monitoring, and operational workflows.
+              Receive events from Leamout and connect call activity to your own
+              systems, monitoring, and operational workflows.
             </p>
           </div>
         </div>

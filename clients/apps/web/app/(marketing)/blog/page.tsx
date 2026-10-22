@@ -1,9 +1,9 @@
-import { ArticleCard } from "@/components/blog/article-card";
-import { getPosts } from "@/lib/blog";
-import { constructMetadata } from "@/lib/metadata";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArticleCard } from "@/components/blog/article-card";
+import { getPosts } from "@/lib/blog";
+import { constructMetadata } from "@/lib/metadata";
 
 type Props = {
   searchParams: Promise<{ page?: string | string[] }>;
@@ -29,7 +29,9 @@ function pageNumber(value: string | string[] | undefined): number {
   return page;
 }
 
-export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+export async function generateMetadata({
+  searchParams,
+}: Props): Promise<Metadata> {
   const page = pageNumber((await searchParams).page);
 
   return constructMetadata({

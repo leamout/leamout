@@ -36,8 +36,8 @@ export function AboutIntro() {
           </h1>
           <p className="mt-8 max-w-xl text-lg leading-8 text-muted-foreground">
             A phone call is a live system. Signaling, audio, interruptions,
-            model responses, and tools have to work together while someone is
-            on the line.
+            model responses, and tools have to work together while someone is on
+            the line.
           </p>
           <p className="mt-5 max-w-xl text-lg leading-8 text-muted-foreground">
             We are building Leamout to make that infrastructure accessible
@@ -50,11 +50,17 @@ export function AboutIntro() {
             <span className="font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
               Anatomy of a voice call
             </span>
-            <span className="size-2 rounded-full bg-brand-orange" aria-hidden="true" />
+            <span
+              className="size-2 rounded-full bg-brand-orange"
+              aria-hidden="true"
+            />
           </div>
           <ol className="divide-y divide-border px-6">
             {callLayers.map((layer) => (
-              <li key={layer.number} className="grid grid-cols-[2.5rem_1fr] gap-4 py-6">
+              <li
+                key={layer.number}
+                className="grid grid-cols-[2.5rem_1fr] gap-4 py-6"
+              >
                 <span className="pt-1 font-mono text-xs tabular-nums text-brand-orange">
                   {layer.number}
                 </span>

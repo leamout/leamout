@@ -21,10 +21,7 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       />
     ),
     p: (props) => (
-      <p
-        {...props}
-        className="my-5 leading-8 text-muted-foreground"
-      />
+      <p {...props} className="my-5 leading-8 text-muted-foreground" />
     ),
     a: (props) => (
       <a
@@ -33,8 +30,12 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
       />
     ),
     ul: (props) => <ul {...props} className="my-5 list-disc space-y-2 pl-6" />,
-    ol: (props) => <ol {...props} className="my-5 list-decimal space-y-2 pl-6" />,
-    li: (props) => <li {...props} className="leading-7 text-muted-foreground" />,
+    ol: (props) => (
+      <ol {...props} className="my-5 list-decimal space-y-2 pl-6" />
+    ),
+    li: (props) => (
+      <li {...props} className="leading-7 text-muted-foreground" />
+    ),
     blockquote: (props) => (
       <blockquote
         {...props}

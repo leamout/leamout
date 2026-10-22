@@ -28,7 +28,10 @@ const questions = [
 
 export function PricingFAQ() {
   return (
-    <section className="border-t border-border py-20" aria-labelledby="pricing-faq-title">
+    <section
+      className="border-t border-border py-20"
+      aria-labelledby="pricing-faq-title"
+    >
       <div className="grid gap-10 lg:grid-cols-[0.75fr_1.25fr] lg:gap-20">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
@@ -46,7 +49,10 @@ export function PricingFAQ() {
         </div>
         <div className="border-t border-border">
           {questions.map(({ question, answer }) => (
-            <details key={question} className="group border-b border-border py-5">
+            <details
+              key={question}
+              className="group border-b border-border py-5"
+            >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-6 text-left font-medium leading-7 outline-none focus-visible:ring-2 focus-visible:ring-brand-orange [&::-webkit-details-marker]:hidden">
                 <span>{question}</span>
                 <span

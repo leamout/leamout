@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { ArticleContent } from "@/components/blog/article-content";
 import { ArticleHeader } from "@/components/blog/article-header";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -6,8 +8,6 @@ import { constructMetadata } from "@/lib/metadata";
 import { articleSchema } from "@/lib/seo/article";
 import { organizationSchema } from "@/lib/seo/organization";
 import { founderSchema } from "@/lib/seo/person";
-import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 type Props = {
   params: Promise<{ slug: string }>;

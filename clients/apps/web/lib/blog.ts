@@ -23,9 +23,12 @@ export type BlogPost = BlogMetadata & {
 function validateMetadata(slug: string, metadata: BlogMetadata): void {
   if (
     !metadata ||
-    [metadata.title, metadata.description, metadata.category, metadata.author].some(
-      (value) => typeof value !== "string" || value.trim().length === 0,
-    ) ||
+    [
+      metadata.title,
+      metadata.description,
+      metadata.category,
+      metadata.author,
+    ].some((value) => typeof value !== "string" || value.trim().length === 0) ||
     !/^\d{4}-\d{2}-\d{2}$/.test(metadata.publishedAt) ||
     !["draft", "published"].includes(metadata.status)
   ) {

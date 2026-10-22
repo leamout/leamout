@@ -68,7 +68,8 @@ export function HowItWorks() {
               Leamout control plane
             </p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Configure agents, manage routing, inspect calls, and receive events.
+              Configure agents, manage routing, inspect calls, and receive
+              events.
             </p>
           </div>
           <Link

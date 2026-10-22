@@ -32,7 +32,10 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
         <div className="mb-12 grid gap-7 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
           <div>
             <p className="mb-6 flex items-center gap-3 font-mono text-xs uppercase tracking-[0.16em]">
-              <span className="size-2 rounded-full bg-brand-orange" aria-hidden="true" />
+              <span
+                className="size-2 rounded-full bg-brand-orange"
+                aria-hidden="true"
+              />
               Straightforward pricing
             </p>
             <h1
@@ -45,9 +48,8 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
             </h1>
           </div>
           <p className="max-w-md text-lg leading-8 text-muted-foreground lg:justify-self-end">
-            Choose the capacity you need to run autonomous voice agents.
-            Leamout manages the runtime; you connect your SIP carrier and AI
-            providers.
+            Choose the capacity you need to run autonomous voice agents. Leamout
+            manages the runtime; you connect your SIP carrier and AI providers.
           </p>
         </div>
 
@@ -86,7 +88,7 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
                 <div className="mt-7">
                   <p className="flex flex-wrap items-baseline gap-x-1.5">
                     <span className="font-heading text-5xl font-semibold tabular-nums tracking-tight">
-                      {"$" + plan.price.toLocaleString("en-US")}
+                      {`$${plan.price.toLocaleString("en-US")}`}
                     </span>
                     <span className="text-sm text-muted-foreground">
                       / month
@@ -104,7 +106,7 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
                   render={
                     <a
                       href={signupHref}
-                      aria-label={"Get started with " + plan.name}
+                      aria-label={`Get started with ${plan.name}`}
                     />
                   }
                 >
@@ -123,10 +125,17 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
                   </p>
                   <dl className="mt-6 space-y-3">
                     {[
-                      ["Concurrent calls", plan.concurrency.toLocaleString("en-US")],
+                      [
+                        "Concurrent calls",
+                        plan.concurrency.toLocaleString("en-US"),
+                      ],
                       ["Voice agents", plan.agents.toLocaleString("en-US")],
                       ["SIP trunks", plan.trunks.toLocaleString("en-US")],
-                      ["Retention", plan.retention + (plan.retention === 1 ? " day" : " days")],
+                      [
+                        "Retention",
+                        plan.retention +
+                          (plan.retention === 1 ? " day" : " days"),
+                      ],
                     ].map(([label, value]) => (
                       <div
                         key={label}
@@ -151,8 +160,8 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
 
         <div className="mt-6 flex flex-col justify-between gap-5 text-sm text-muted-foreground sm:flex-row sm:items-center">
           <p>
-            Every plan runs on the same managed Leamout platform. Carrier and
-            AI usage charges are separate where applicable.
+            Every plan runs on the same managed Leamout platform. Carrier and AI
+            usage charges are separate where applicable.
           </p>
           <Link
             href="/contact"

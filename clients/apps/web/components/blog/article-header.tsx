@@ -1,15 +1,14 @@
 import type { BlogMetadata } from "@/lib/blog";
 
 export function ArticleHeader({ metadata }: { metadata: BlogMetadata }) {
-  const date = new Date(`${metadata.publishedAt}T00:00:00.000Z`).toLocaleDateString(
-    "en-US",
-    {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      timeZone: "UTC",
-    },
-  );
+  const date = new Date(
+    `${metadata.publishedAt}T00:00:00.000Z`,
+  ).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 
   return (
     <header className="border-b border-border pb-10">

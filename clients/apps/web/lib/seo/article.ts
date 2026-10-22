@@ -1,5 +1,5 @@
-import type { BlogMetadata } from "@/lib/blog";
 import type { TechArticle } from "schema-dts";
+import type { BlogMetadata } from "@/lib/blog";
 
 import { siteUrl } from "./schema";
 

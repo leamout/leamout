@@ -21,7 +21,10 @@ const principles = [
 
 export function Principles() {
   return (
-    <section className="border-b border-border py-20" aria-labelledby="about-principles">
+    <section
+      className="border-b border-border py-20"
+      aria-labelledby="about-principles"
+    >
       <div className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">

@@ -1,5 +1,5 @@
-import { getPosts } from "@/lib/blog";
 import type { MetadataRoute } from "next";
+import { getPosts } from "@/lib/blog";
 
 const paths = [
   "/",

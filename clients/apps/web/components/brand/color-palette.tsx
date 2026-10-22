@@ -2,12 +2,19 @@ const colors = [
   { name: "Graphite", hex: "#101316", use: "Foundation and deep backgrounds" },
   { name: "Surface", hex: "#1C2226", use: "Panels and layered content" },
   { name: "Off-white", hex: "#F5F6F4", use: "Text and light canvases" },
-  { name: "Leamout Orange", hex: "#F43E01", use: "Actions and deliberate accents" },
+  {
+    name: "Leamout Orange",
+    hex: "#F43E01",
+    use: "Actions and deliberate accents",
+  },
 ];
 
 export function ColorPalette() {
   return (
-    <section className="border-b border-border py-20" aria-labelledby="brand-colors-title">
+    <section
+      className="border-b border-border py-20"
+      aria-labelledby="brand-colors-title"
+    >
       <div className="mb-9 flex flex-col justify-between gap-5 md:flex-row md:items-end">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
@@ -32,12 +39,14 @@ export function ColorPalette() {
               className="h-44 border-b border-border"
               style={{ backgroundColor: hex }}
               role="img"
-              aria-label={name + " color sample"}
+              aria-label={`${name} color sample`}
             />
             <div className="space-y-2 p-6">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="font-heading text-lg font-medium">{name}</h3>
-                <code className="font-mono text-xs text-muted-foreground">{hex}</code>
+                <code className="font-mono text-xs text-muted-foreground">
+                  {hex}
+                </code>
               </div>
               <p className="text-sm leading-6 text-muted-foreground">{use}</p>
             </div>
