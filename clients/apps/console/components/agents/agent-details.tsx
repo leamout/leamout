@@ -142,7 +142,7 @@ export function AgentDetails({ agentId }: { agentId: string }) {
           <AgentProviderSettings />
         </TabsContent>
         <TabsContent value="routing">
-          <AgentRouting />
+          <AgentRouting agentId={agent.id} />
         </TabsContent>
         <TabsContent value="tools">
           <AgentTools agentId={agent.id} />

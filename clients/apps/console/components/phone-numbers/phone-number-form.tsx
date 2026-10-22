@@ -2,163 +2,265 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldLabel,
-} from "@leamout/ui/components/field";
+import { Field, FieldError, FieldLabel } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
-import Link from "next/link";
-import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
+import { useRef } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import type {
-  PhoneNumber,
-  ResourceOption,
-} from "@/components/phone-numbers/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import type { SipTrunk } from "@/components/sip-trunks/types";
+import { api, errorMessage } from "@/lib/api";
+import type { PhoneNumber } from "./types";
 
 const schema = z.object({
   number: z
     .string()
     .trim()
-    .regex(
-      /^\+[1-9][0-9]{6,14}$/,
-      "Enter a phone number in E.164 format, such as +233201234567.",
-    ),
+    .regex(/^\+[1-9][0-9]{6,14}$/, "Use E.164 format, e.g. +233201234567."),
   countryCode: z
     .string()
     .trim()
-    .regex(/^[A-Za-z]{2}$/, "Enter a two-letter country code, such as GH."),
+    .regex(/^[A-Za-z]{2}$/, "Use a two-letter country code."),
   trunkId: z.string(),
   voiceEnabled: z.boolean(),
 });
 
+type Values = z.infer<typeof schema>;
+
 export function PhoneNumberForm({
-  number,
   creating = false,
-  trunks = [],
+  number,
 }: {
-  number?: PhoneNumber;
   creating?: boolean;
-  trunks?: ResourceOption[];
+  number?: PhoneNumber;
 }) {
-  const [notice, setNotice] = useState("");
-  const options =
-    number?.trunk && !trunks.some((trunk) => trunk.id === number.trunk?.id)
-      ? [number.trunk, ...trunks]
-      : trunks;
-  const form = useForm<z.infer<typeof schema>>({
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
+  const client = useQueryClient();
+  const router = useRouter();
+  const idempotencyKey = useRef<string | null>(null);
+
+  const trunks = useQuery({
+    queryKey: ["trunks", organizationId],
+    queryFn: ({ signal }) =>
+      api<{ trunks: SipTrunk[] }>("/trunks/", {
+        organizationId,
+        signal,
+      }),
+    enabled: Boolean(organizationId),
+  });
+
+  const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: {
       number: number?.number ?? "",
-      countryCode: number?.countryCode ?? "",
-      trunkId: number?.trunk?.id ?? "",
-      voiceEnabled: number?.voiceEnabled ?? false,
+      countryCode: number?.country_code ?? "",
+      trunkId: number?.trunk_id ?? "",
+      voiceEnabled: number?.voice_enabled ?? false,
     },
   });
+
+  const save = useMutation({
+    mutationFn: async (values: Values) => {
+      const path = "/numbers/" + encodeURIComponent(number?.id ?? "");
+
+      if (creating) {
+        idempotencyKey.current ??= crypto.randomUUID();
+
+        return api<PhoneNumber>("/numbers/", {
+          method: "POST",
+          organizationId,
+          idempotencyKey: idempotencyKey.current,
+          body: {
+            number: values.number.trim(),
+            country_code: values.countryCode.trim().toUpperCase(),
+            ...(values.trunkId ? { trunk_id: values.trunkId } : {}),
+            voice_enabled: values.voiceEnabled,
+          },
+        });
+      }
+
+      if (!number) {
+        throw new Error("Phone number not loaded.");
+      }
+
+      // Reject unsupported unassignment before issuing any writes.
+      if (!values.trunkId && number.trunk_id) {
+        throw new Error(
+          "The backend does not support clearing the assigned trunk.",
+        );
+      }
+
+      // Voice capability and trunk assignment use separate endpoints.
+      let result = number;
+
+      if (values.voiceEnabled !== number.voice_enabled) {
+        result = await api<PhoneNumber>(path, {
+          method: "PATCH",
+          organizationId,
+          body: { voice_enabled: values.voiceEnabled },
+        });
+      }
+
+      if (values.trunkId && values.trunkId !== number.trunk_id) {
+        result = await api<PhoneNumber>(path + "/trunk", {
+          method: "PATCH",
+          organizationId,
+          body: { trunk_id: values.trunkId },
+        });
+      }
+
+      return result;
+    },
+    onSuccess: async (saved) => {
+      client.setQueryData(["numbers", organizationId, saved.id], saved);
+      await client.invalidateQueries({
+        queryKey: ["numbers", organizationId],
+      });
+
+      if (creating) {
+        router.push("/phone-numbers/" + encodeURIComponent(saved.id));
+      } else {
+        form.reset({
+          number: saved.number,
+          countryCode: saved.country_code,
+          trunkId: saved.trunk_id ?? "",
+          voiceEnabled: saved.voice_enabled,
+        });
+      }
+    },
+  });
+
   return (
     <form
-      className="max-w-2xl space-y-6"
+      className="max-w-2xl space-y-5"
       noValidate
-      onChange={() => setNotice("")}
-      onSubmit={form.handleSubmit(() =>
-        setNotice(
-          creating
-            ? "Preview only. No phone number was connected."
-            : "Preview only. Changes were not saved.",
-        ),
-      )}
+      onChange={() => {
+        if (creating) {
+          idempotencyKey.current = null;
+        }
+      }}
+      onSubmit={form.handleSubmit((values) => save.mutate(values))}
     >
-      {(["number", "countryCode"] as const).map((name) => (
+      <div className="grid gap-4 sm:grid-cols-2">
         <Controller
-          key={name}
-          name={name}
           control={form.control}
+          name="number"
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={`phone-${name}`}>
-                {name === "number" ? "Phone number" : "Country code"}
+              <FieldLabel htmlFor="number-e164">
+                Phone number (E.164)
               </FieldLabel>
               <Input
                 {...field}
-                id={`phone-${name}`}
-                type={name === "number" ? "tel" : "text"}
-                readOnly={!creating}
-                placeholder={name === "number" ? "+233201234567" : "GH"}
+                id="number-e164"
                 aria-invalid={fieldState.invalid}
                 aria-describedby={
-                  fieldState.invalid ? `phone-${name}-error` : undefined
+                  fieldState.invalid ? "number-e164-error" : undefined
                 }
+                type="tel"
+                readOnly={!creating}
+                required
+                placeholder="+233201234567"
               />
               {fieldState.invalid && (
-                <FieldError
-                  id={`phone-${name}-error`}
-                  errors={[fieldState.error]}
-                />
-              )}
+              <FieldError
+                id="number-e164-error"
+                errors={[fieldState.error]}
+              />
+            )}
             </Field>
           )}
         />
-      ))}
-      <Controller
-        name="trunkId"
-        control={form.control}
-        render={({ field }) => (
-          <Field>
-            <FieldLabel htmlFor="phone-trunk">SIP trunk</FieldLabel>
-            <select
-              {...field}
-              id="phone-trunk"
-              className="h-9 rounded-md border bg-background px-3"
-            >
-              <option value="">Unassigned</option>
-              {options.map((trunk) => (
-                <option key={trunk.id} value={trunk.id}>
-                  {trunk.name}
-                </option>
-              ))}
-            </select>
-            <FieldDescription>
-              {options.length
-                ? "Choose the trunk carrying this existing number."
-                : "Trunk options have not been loaded."}{" "}
-              <Link href="/sip-trunks" className="underline">
-                Manage SIP trunks
-              </Link>
-            </FieldDescription>
-          </Field>
-        )}
-      />
-      <Controller
-        name="voiceEnabled"
-        control={form.control}
-        render={({ field }) => (
-          <Field>
-            <label
-              htmlFor="phone-voice"
-              className="flex items-center gap-3 text-sm font-medium"
-            >
-              <input
-                id="phone-voice"
-                type="checkbox"
-                name={field.name}
-                ref={field.ref}
-                onBlur={field.onBlur}
-                checked={field.value}
-                onChange={(event) => field.onChange(event.target.checked)}
+        <Controller
+          control={form.control}
+          name="countryCode"
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="number-country">Country code</FieldLabel>
+              <Input
+                {...field}
+                id="number-country"
+                aria-invalid={fieldState.invalid}
+                aria-describedby={
+                  fieldState.invalid ? "number-country-error" : undefined
+                }
+                readOnly={!creating}
+                required
+                maxLength={2}
+                placeholder="GH"
               />
-              Enable voice
-            </label>
-          </Field>
+              {fieldState.invalid && (
+              <FieldError
+                id="number-country-error"
+                errors={[fieldState.error]}
+              />
+            )}
+            </Field>
+          )}
+        />
+      </div>
+
+      <Field>
+        <FieldLabel htmlFor="number-trunk">SIP trunk</FieldLabel>
+        <select
+          id="number-trunk"
+          className="h-10 w-full rounded-md border bg-background px-3"
+          {...form.register("trunkId")}
+        >
+          <option value="">Unassigned</option>
+          {trunks.data?.trunks.map((trunk) => (
+            <option key={trunk.id} value={trunk.id}>
+              {trunk.name}
+            </option>
+          ))}
+        </select>
+        {trunks.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage(trunks.error)}
+          </p>
         )}
-      />
-      <Button type="submit" disabled={!creating && !number}>
-        {creating ? "Connect phone number" : "Save changes"}
+        {number?.trunk_id && (
+          <p className="text-xs text-muted-foreground">
+            A trunk can be changed, but not cleared using the current API.
+          </p>
+        )}
+      </Field>
+
+      <Field orientation="horizontal">
+        <input
+          id="phone-voice-enabled"
+          type="checkbox"
+          {...form.register("voiceEnabled")}
+        />
+        <FieldLabel htmlFor="phone-voice-enabled">
+          Enable voice
+        </FieldLabel>
+      </Field>
+      <Button
+        type="submit"
+        disabled={
+          save.isPending || !organizationId || trunks.isPending || trunks.isError
+        }
+      >
+        {save.isPending
+          ? "Saving…"
+          : creating
+            ? "Connect existing number"
+            : "Save changes"}
       </Button>
-      <p role="status" className="text-sm text-muted-foreground">
-        {notice}
-      </p>
+      {save.isSuccess && !creating && (
+        <p role="status" className="text-sm">
+          Phone number updated.
+        </p>
+      )}
+      {save.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {errorMessage(save.error)}
+        </p>
+      )}
     </form>
   );
 }
