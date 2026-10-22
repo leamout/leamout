@@ -1,8 +1,8 @@
-import { type SchemaNode } from "./schema";
+import type { Person } from "schema-dts";
 
 export const FOUNDER_ID = "https://vidzro.com/#person";
 
-export function founderSchema(): SchemaNode {
+export function founderSchema(): Person {
   return {
     "@type": "Person",
     "@id": FOUNDER_ID,
