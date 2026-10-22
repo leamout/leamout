@@ -19,6 +19,6 @@ Set the backend `FRONTEND_URL` to this console's public origin (for local `bun d
 | Webhooks | `/webhooks`, `/webhooks/new`, `/webhooks/[webhookId]` |
 | Settings | `/settings/profile`, `/settings/security`, `/settings/members`, `/settings/organization`, `/settings/api-keys`, `/settings/storage` |
 
-New resource routes are title and description placeholders pending UI design. Agent configuration will use tabs within agent details. Call diagnostics stay within call details; webhook delivery history stays within endpoint details.
+Voice Agent listing, creation, editing, and disabling are connected to the Go API. Readiness, provider assignments, routing, tools, agent testing, and activity remain separate integration work. Other resource pages are UI previews unless otherwise noted. Call diagnostics stay within call details; webhook delivery history stays within endpoint details.
 
 `/sip-trunks` replaces `/connections`. Number purchasing and provisioning, billing pages, and deployment operations pages are deferred until their scope is defined.
