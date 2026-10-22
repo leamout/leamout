@@ -1,103 +1,126 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
-import { Field, FieldError, FieldLabel } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
-import { useState } from "react";
-import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, type FormEvent } from "react";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { api, errorMessage } from "@/lib/api";
+import type { TrunkEndpoint } from "./types";
 
-const schema = z.object({
-  host: z
-    .string()
-    .trim()
-    .min(1, "Enter a hostname or IP address.")
-    .refine(
-      (value) => !/[\s/]/.test(value),
-      "Enter a host without a scheme or path.",
-    ),
-  port: z
-    .string()
-    .refine(
-      (value) =>
-        /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535,
-      "Enter a port between 1 and 65535.",
-    ),
-  transport: z.enum(["udp", "tcp", "tls"]),
-});
-
-export function TrunkConnectionForm() {
-  const [notice, setNotice] = useState("");
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
-    defaultValues: { host: "", port: "5060", transport: "udp" },
+export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
+  const client = useQueryClient();
+  const base = "/trunks/" + encodeURIComponent(trunkId) + "/endpoints";
+  const key = ["trunk-endpoints", organizationId, trunkId];
+  const [host, setHost] = useState("");
+  const [port, setPort] = useState("5060");
+  const [transport, setTransport] = useState<"udp" | "tcp" | "tls">("udp");
+  const [direction, setDirection] = useState<"inbound" | "outbound" | "bidirectional">("bidirectional");
+  const [removing, setRemoving] = useState<string | null>(null);
+  const endpoints = useQuery({
+    queryKey: key,
+    queryFn: ({ signal }) => api<{ endpoints: TrunkEndpoint[] }>(base, { organizationId, signal }),
+    enabled: Boolean(organizationId),
   });
-
+  const create = useMutation({
+    mutationFn: () => api<TrunkEndpoint>(base, {
+      method: "POST",
+      organizationId,
+      body: { host: host.trim(), port: Number(port), transport, direction },
+    }),
+    onSuccess: async () => {
+      setHost("");
+      await client.invalidateQueries({ queryKey: key });
+    },
+  });
+  const toggle = useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      api<TrunkEndpoint>(base + "/" + encodeURIComponent(id), {
+        method: "PATCH", organizationId, body: { enabled },
+      }),
+    onSuccess: () => client.invalidateQueries({ queryKey: key }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api<void>(base + "/" + encodeURIComponent(id), {
+      method: "DELETE", organizationId,
+    }),
+    onSuccess: async () => {
+      setRemoving(null);
+      await client.invalidateQueries({ queryKey: key });
+    },
+  });
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (host.trim() && Number.isInteger(Number(port)) && Number(port) > 0 && Number(port) <= 65535) create.mutate();
+  }
   return (
-    <form
-      className="max-w-2xl space-y-6"
-      noValidate
-      onChange={() => setNotice("")}
-      onSubmit={form.handleSubmit(() =>
-        setNotice("Preview only. No endpoint was added."),
+    <div className="space-y-7">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">SIP endpoints</h2>
+        <p className="text-sm text-muted-foreground">Configure public carrier hosts. Health statuses reflect backend observations, not connection guarantees.</p>
+      </div>
+      {endpoints.isPending ? <p role="status">Loading endpoints…</p> : endpoints.isError ? (
+        <div role="alert"><p>{errorMessage(endpoints.error)}</p>
+          <Button variant="outline" onClick={() => void endpoints.refetch()}>Retry</Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {endpoints.data?.endpoints.length ? endpoints.data.endpoints.map((item) => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4">
+              <div className="space-y-1">
+                <p className="font-medium">{item.host}:{item.port} · {item.transport.toUpperCase()}</p>
+                <p className="text-xs text-muted-foreground">
+                  {item.direction} · {item.enabled ? "Enabled" : "Disabled"} · Health: {item.health_status}
+                  {item.last_error ? " · " + item.last_error : ""}
+                </p>
+                {item.last_checked_at && <p className="text-xs text-muted-foreground">Last checked: {new Date(item.last_checked_at).toLocaleString()}</p>}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" disabled={toggle.isPending || remove.isPending}
+                  onClick={() => toggle.mutate({ id: item.id, enabled: !item.enabled })}>
+                  {item.enabled ? "Disable" : "Enable"}
+                </Button>
+                {removing === item.id ? (
+                  <>
+                    <Button variant="destructive" disabled={remove.isPending} onClick={() => remove.mutate(item.id)}>Confirm</Button>
+                    <Button variant="outline" onClick={() => setRemoving(null)}>Cancel</Button>
+                  </>
+                ) : <Button variant="outline" onClick={() => setRemoving(item.id)}>Remove</Button>}
+              </div>
+            </div>
+          )) : <p className="rounded-lg border border-dashed p-5 text-sm text-muted-foreground">No endpoints configured.</p>}
+        </div>
       )}
-    >
-      <h2 className="text-lg font-semibold">Add endpoint</h2>
-      <p className="text-sm text-muted-foreground">
-        Endpoint health and existing endpoints have not been loaded.
-      </p>
-      {(["host", "port", "transport"] as const).map((name) => (
-        <Controller
-          key={name}
-          name={name}
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={`endpoint-${name}`}>
-                {name === "host"
-                  ? "Hostname or IP address"
-                  : name === "port"
-                    ? "Port"
-                    : "Transport"}
-              </FieldLabel>
-              {name === "transport" ? (
-                <select
-                  {...field}
-                  id={`endpoint-${name}`}
-                  className="h-9 rounded-md border bg-background px-3"
-                >
-                  {["udp", "tcp", "tls"].map((value) => (
-                    <option key={value} value={value}>
-                      {value.toUpperCase()}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  {...field}
-                  id={`endpoint-${name}`}
-                  type={name === "port" ? "number" : "text"}
-                  aria-invalid={fieldState.invalid}
-                  aria-describedby={
-                    fieldState.invalid ? `endpoint-${name}-error` : undefined
-                  }
-                />
-              )}
-              {fieldState.invalid && (
-                <FieldError
-                  id={`endpoint-${name}-error`}
-                  errors={[fieldState.error]}
-                />
-              )}
-            </Field>
-          )}
-        />
-      ))}
-      <Button type="submit">Add endpoint</Button>
-      <p role="status" className="text-sm text-muted-foreground">
-        {notice}
-      </p>
-    </form>
+      <form className="max-w-2xl space-y-4 rounded-lg border p-5" onSubmit={submit}>
+        <h3 className="font-semibold">Add endpoint</h3>
+        <div className="grid gap-4 sm:grid-cols-[1fr_8rem]">
+          <label className="space-y-2 text-sm">Hostname or public IP
+            <Input value={host} onChange={(e) => setHost(e.target.value)} required placeholder="sip.carrier.example" />
+          </label>
+          <label className="space-y-2 text-sm">Port
+            <Input value={port} onChange={(e) => setPort(e.target.value)} required type="number" min={1} max={65535} step={1} />
+          </label>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2 text-sm">Transport
+            <select className="block h-10 w-full rounded-md border bg-background px-3" value={transport}
+              onChange={(e) => setTransport(e.target.value as typeof transport)}>
+              <option value="udp">UDP</option><option value="tcp">TCP</option><option value="tls">TLS</option>
+            </select>
+          </label>
+          <label className="space-y-2 text-sm">Direction
+            <select className="block h-10 w-full rounded-md border bg-background px-3" value={direction}
+              onChange={(e) => setDirection(e.target.value as typeof direction)}>
+              <option value="bidirectional">Bidirectional</option><option value="inbound">Inbound</option><option value="outbound">Outbound</option>
+            </select>
+          </label>
+        </div>
+        <Button disabled={!organizationId || create.isPending} type="submit">{create.isPending ? "Adding…" : "Add endpoint"}</Button>
+        {create.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(create.error)}</p>}
+      </form>
+      {(toggle.isError || remove.isError) && <p role="alert" className="text-sm text-destructive">{errorMessage(toggle.error ?? remove.error)}</p>}
+    </div>
   );
 }
