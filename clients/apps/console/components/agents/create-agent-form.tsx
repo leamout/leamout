@@ -6,8 +6,9 @@ export function CreateAgentForm() {
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Create agent</h1>
         <p className="text-muted-foreground">
-          Start with a name and description. Models, voice, and call behavior
-          are configured in agent details.
+          Choose a conversation engine, define the agent instructions, and save
+          its configuration. Provider assignments and readiness are configured
+          separately.
         </p>
       </div>
       <AgentForm creating />

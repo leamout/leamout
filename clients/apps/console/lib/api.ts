@@ -19,7 +19,7 @@ type Envelope<T> = {
 export async function api<T>(
   path: string,
   options: {
-    method?: "GET" | "POST" | "DELETE";
+    method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
     body?: unknown;
     signal?: AbortSignal;
     organizationId?: string;

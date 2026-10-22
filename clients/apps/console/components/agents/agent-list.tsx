@@ -10,29 +10,39 @@ import {
   TableHeader,
   TableRow,
 } from "@leamout/ui/components/table";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { errorMessage } from "@/lib/api";
+import { listVoiceAgents, voiceAgentKeys } from "./api";
 
-export type AgentListItem = {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  ready: boolean;
-  configuration: string;
-  updated: string;
-};
+function formattedDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : date.toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+}
 
-export function AgentList({ agents = [] }: { agents?: AgentListItem[] }) {
+export function AgentList() {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [engine, setEngine] = useState("all");
+  const query = useQuery({
+    queryKey: voiceAgentKeys.list(organizationId),
+    queryFn: ({ signal }) => listVoiceAgents(organizationId, signal),
+    enabled: organizationId !== "",
+  });
+  const agents = query.data?.voice_agents ?? [];
   const filtered = agents.filter(
     (agent) =>
-      `${agent.name} ${agent.description}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) &&
-      (status === "all" ||
-        (status === "enabled" ? agent.enabled : !agent.enabled)),
+      agent.name.toLowerCase().includes(search.trim().toLowerCase()) &&
+      (engine === "all" || agent.engine === engine),
   );
 
   return (
@@ -41,7 +51,7 @@ export function AgentList({ agents = [] }: { agents?: AgentListItem[] }) {
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">Agents</h1>
           <p className="text-muted-foreground">
-            Configure your autonomous voice agents.
+            Create and configure autonomous voice agents in your organization.
           </p>
         </div>
         <Button render={<Link href="/agents/new" />}>Create agent</Button>
@@ -56,82 +66,87 @@ export function AgentList({ agents = [] }: { agents?: AgentListItem[] }) {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by name or description"
+            placeholder="Search by name"
           />
         </div>
         <div className="space-y-2">
-          <label htmlFor="agent-status" className="block text-sm font-medium">
-            Status
+          <label htmlFor="agent-engine" className="block text-sm font-medium">
+            Engine
           </label>
           <select
-            id="agent-status"
+            id="agent-engine"
             className="h-9 rounded-md border bg-background px-3 text-sm"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            value={engine}
+            onChange={(event) => setEngine(event.target.value)}
           >
-            <option value="all">All statuses</option>
-            <option value="enabled">Enabled</option>
-            <option value="disabled">Disabled</option>
+            <option value="all">All engines</option>
+            <option value="realtime">Realtime</option>
+            <option value="composable">Composable</option>
           </select>
         </div>
       </div>
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>AI configuration</TableHead>
-              <TableHead>Updated</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((agent) => (
-              <TableRow key={agent.id}>
-                <TableCell>
-                  <Link
-                    className="font-medium underline-offset-4 hover:underline"
-                    href={`/agents/${encodeURIComponent(agent.id)}`}
-                  >
-                    {agent.name}
-                  </Link>
-                  <p className="text-sm text-muted-foreground">
-                    {agent.description}
-                  </p>
-                </TableCell>
-                <TableCell>
-                  {agent.enabled ? "Enabled" : "Disabled"}
-                  <p className="text-xs text-muted-foreground">
-                    {agent.ready ? "Ready" : "Setup required"}
-                  </p>
-                </TableCell>
-                <TableCell>{agent.configuration}</TableCell>
-                <TableCell>{agent.updated}</TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && (
+      {query.isError ? (
+        <div className="space-y-3 rounded-lg border p-6" role="alert">
+          <p>{errorMessage(query.error)}</p>
+          <Button variant="outline" onClick={() => void query.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : query.isPending ? (
+        <p role="status" className="rounded-lg border p-6 text-muted-foreground">
+          Loading agents…
+        </p>
+      ) : (
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="h-40 text-center">
-                  <p className="font-medium">
-                    {agents.length === 0
-                      ? "No agents to display"
-                      : "No matching agents"}
-                  </p>
-                  <p className="mt-2 text-muted-foreground">
-                    {agents.length === 0
-                      ? "Your agents will appear here when account integration is connected."
-                      : "Try another search or status filter."}
-                  </p>
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Engine</TableHead>
+                <TableHead>Language</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Updated</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Enabled status and call readiness are separate. This page is a UI
-        preview.
-      </p>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((agent) => (
+                <TableRow key={agent.id}>
+                  <TableCell>
+                    <Link
+                      className="font-medium underline-offset-4 hover:underline"
+                      href={"/agents/" + encodeURIComponent(agent.id)}
+                    >
+                      {agent.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    {agent.engine === "composable" ? "STT → LLM → TTS" : "Realtime"}
+                  </TableCell>
+                  <TableCell>{agent.language}</TableCell>
+                  <TableCell>{agent.status}</TableCell>
+                  <TableCell>{formattedDate(agent.updated_at)}</TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-40 text-center">
+                    <p className="font-medium">
+                      {agents.length === 0
+                        ? "No agents yet"
+                        : "No matching agents"}
+                    </p>
+                    <p className="mt-2 text-muted-foreground">
+                      {agents.length === 0
+                        ? "Create your first Voice Agent to get started."
+                        : "Try another name or engine filter."}
+                    </p>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }
