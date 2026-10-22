@@ -1,5 +1,5 @@
+import { getPosts } from "@/lib/blog";
 import type { MetadataRoute } from "next";
-import { posts } from "@/lib/blog/posts";
 
 const paths = [
   "/",
@@ -13,8 +13,11 @@ const paths = [
   "/blog",
 ];
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  return [...paths, ...posts.map((post) => `/blog/${post.slug}`)].map((path) => ({
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const posts = await getPosts();
+  const articlePaths = posts.map((post) => `/blog/${post.slug}`);
+
+  return [...paths, ...articlePaths].map((path) => ({
     url: new URL(path, "https://leamout.com").toString(),
   }));
 }

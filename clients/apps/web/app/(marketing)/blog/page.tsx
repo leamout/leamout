@@ -1,15 +1,52 @@
 import { ArticleCard } from "@/components/blog/article-card";
-import { posts } from "@/lib/blog/posts";
+import { blogPage, getPosts } from "@/lib/blog";
 import { constructMetadata } from "@/lib/metadata";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
 
-export const metadata = constructMetadata({
-  title: "Blog",
-  description:
-    "Engineering notes on SIP-native voice agents, real-time media, and the infrastructure behind Leamout.",
-  path: "/blog",
-});
+type Props = {
+  searchParams: Promise<{ page?: string | string[] }>;
+};
 
-export default function BlogPage() {
+function pageNumber(value: string | string[] | undefined): number {
+  if (value === undefined) {
+    return 1;
+  }
+
+  if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
+    notFound();
+  }
+
+  const page = Number(value);
+
+  if (!Number.isSafeInteger(page)) {
+    notFound();
+  }
+
+  return page;
+}
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const page = pageNumber((await searchParams).page);
+
+  return constructMetadata({
+    title: page === 1 ? "Blog" : `Blog — Page ${page}`,
+    description:
+      "Engineering notes on SIP-native voice agents, real-time media, and the infrastructure behind Leamout.",
+    path: page === 1 ? "/blog" : `/blog?page=${page}`,
+  });
+}
+
+export default async function BlogPage({ searchParams }: Props) {
+  const page = pageNumber((await searchParams).page);
+  const allPosts = await getPosts();
+  const { posts, pageCount } = blogPage(allPosts, page);
+
+  if (page > pageCount) {
+    notFound();
+  }
+
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-6 lg:px-8">
       <p className="font-mono text-xs uppercase tracking-widest text-brand-orange">
@@ -27,6 +64,25 @@ export default function BlogPage() {
           <ArticleCard key={post.slug} post={post} />
         ))}
       </div>
+      <nav className="mt-10 flex items-center justify-between border-t border-border pt-8" aria-label="Blog pages">
+        {page > 1 ? (
+          <Link href={page === 2 ? "/blog" : `/blog?page=${page - 1}`} rel="prev" className="text-sm hover:text-brand-orange">
+            Previous
+          </Link>
+        ) : (
+          <span />
+        )}
+        <span className="text-sm text-muted-foreground">
+          Page {page} of {pageCount}
+        </span>
+        {page < pageCount ? (
+          <Link href={`/blog?page=${page + 1}`} rel="next" className="text-sm hover:text-brand-orange">
+            Next
+          </Link>
+        ) : (
+          <span />
+        )}
+      </nav>
     </div>
   );
 }

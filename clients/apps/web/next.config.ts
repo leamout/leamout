@@ -4,6 +4,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   transpilePackages: ["@leamout/ui"],
   pageExtensions: ["ts", "tsx", "md", "mdx"],
+  outputFileTracingIncludes: {
+    "/blog": ["./content/blog/**/*.mdx"],
+    "/blog/*": ["./content/blog/**/*.mdx"],
+  },
 
   async headers() {
     return [
@@ -60,6 +64,10 @@ const nextConfig: NextConfig = {
   },
 };
 
-const withMDX = createMDX({});
+const withMDX = createMDX({
+  options: {
+    remarkPlugins: ["remark-frontmatter"],
+  },
+});
 
 export default withMDX(nextConfig);

@@ -1,5 +1,7 @@
+import { ArticleContent } from "@/components/blog/article-content";
+import { ArticleHeader } from "@/components/blog/article-header";
 import { JsonLd } from "@/components/seo/json-ld";
-import { getPost, posts } from "@/lib/blog/posts";
+import { getPost, getPosts } from "@/lib/blog";
 import { constructMetadata } from "@/lib/metadata";
 import { articleSchema } from "@/lib/seo/article";
 import { organizationSchema } from "@/lib/seo/organization";
@@ -13,22 +15,23 @@ type Props = {
 
 export const dynamicParams = false;
 
-export function generateStaticParams() {
+export async function generateStaticParams() {
+  const posts = await getPosts();
   return posts.map(({ slug }) => ({ slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPost(slug);
 
   if (!post) {
-    return {};
+    notFound();
   }
 
   const metadata = constructMetadata({
     title: post.title,
     description: post.description,
-    path: `/blog/${slug}`,
+    path: `/blog/${post.slug}`,
   });
 
   return {
@@ -45,35 +48,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogArticlePage({ params }: Props) {
   const { slug } = await params;
-  const post = getPost(slug);
+  const post = await getPost(slug);
 
   if (!post) {
     notFound();
   }
 
-  // Keep the MDX import statically analyzable for the Next.js compiler.
-  if (slug !== "why-sip-native-voice-agents") {
-    notFound();
-  }
-
-  const { default: Article } = await import(
-    "@/content/blog/why-sip-native-voice-agents.mdx"
-  );
+  // The slug has been validated against the published MDX files.
+  // Next.js bundles matching local MDX modules at build time.
+  const { default: Article } = await import(`@/content/blog/${post.slug}.mdx`);
 
   return (
     <article className="mx-auto max-w-3xl px-5 py-20 sm:px-6">
       <JsonLd
         nodes={[organizationSchema(), founderSchema(), articleSchema(post)]}
       />
-      <p className="font-mono text-xs uppercase tracking-wider text-brand-orange">
-        {post.category} · <time dateTime={post.publishedAt}>{post.publishedAt}</time>
-      </p>
-      <p className="mt-3 text-sm text-muted-foreground">
-        By <a className="underline underline-offset-4" href="https://vidzro.com">{post.author}</a>
-      </p>
-      <div className="mt-10">
+      <ArticleHeader post={post} />
+      <ArticleContent>
         <Article />
-      </div>
+      </ArticleContent>
     </article>
   );
 }

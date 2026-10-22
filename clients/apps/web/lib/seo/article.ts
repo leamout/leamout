@@ -1,4 +1,4 @@
-import type { BlogPost } from "@/lib/blog/model";
+import type { BlogPost } from "@/lib/blog";
 import type { TechArticle } from "schema-dts";
 
 import { siteUrl } from "./schema";
