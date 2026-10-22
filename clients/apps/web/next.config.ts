@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/blog": ["./content/*.mdx"],
     "/blog/*": ["./content/*.mdx"],
+    "/sitemap.xml": ["./content/*.mdx"],
   },
 
   async headers() {
@@ -64,10 +65,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-const withMDX = createMDX({
-  options: {
-    remarkPlugins: ["remark-frontmatter"],
-  },
-});
+const withMDX = createMDX({});
 
 export default withMDX(nextConfig);

@@ -1,5 +1,6 @@
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 import { ArticleCard } from "@/components/blog/article-card";
-import { blogPage, getPosts } from "@/lib/blog";
 import { constructMetadata } from "@/lib/metadata";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -8,6 +9,8 @@ import { notFound } from "next/navigation";
 type Props = {
   searchParams: Promise<{ page?: string | string[] }>;
 };
+
+const PAGE_SIZE = 12;
 
 function pageNumber(value: string | string[] | undefined): number {
   if (value === undefined) {
@@ -40,12 +43,40 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 
 export default async function BlogPage({ searchParams }: Props) {
   const page = pageNumber((await searchParams).page);
-  const allPosts = await getPosts();
-  const { posts, pageCount } = blogPage(allPosts, page);
+  const directory = path.join(process.cwd(), "content");
+  const files = await readdir(directory);
+
+  const slugs = files
+    .filter((file) => /^[a-z0-9]+(?:-[a-z0-9]+)*\.mdx$/.test(file))
+    .map((file) => file.slice(0, -4));
+
+  const posts = (
+    await Promise.all(
+      slugs.map(async (slug) => {
+        const { metadata } = await import(`@/content/${slug}.mdx`);
+
+        if (metadata.status !== "published") {
+          return null;
+        }
+
+        return { slug, ...metadata };
+      }),
+    )
+  )
+    .filter((post): post is NonNullable<typeof post> => post !== null)
+    .sort(
+      (a, b) =>
+        b.publishedAt.localeCompare(a.publishedAt) ||
+        a.slug.localeCompare(b.slug),
+    );
+
+  const pageCount = Math.max(1, Math.ceil(posts.length / PAGE_SIZE));
 
   if (page > pageCount) {
     notFound();
   }
+
+  const visiblePosts = posts.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="mx-auto max-w-[1200px] px-5 py-20 sm:px-6 lg:px-8">
@@ -60,13 +91,20 @@ export default async function BlogPage({ searchParams }: Props) {
         infrastructure for autonomous voice agents.
       </p>
       <div className="mt-16">
-        {posts.map((post) => (
+        {visiblePosts.map((post) => (
           <ArticleCard key={post.slug} post={post} />
         ))}
       </div>
-      <nav className="mt-10 flex items-center justify-between border-t border-border pt-8" aria-label="Blog pages">
+      <nav
+        aria-label="Blog pages"
+        className="mt-10 flex items-center justify-between border-t border-border pt-8"
+      >
         {page > 1 ? (
-          <Link href={page === 2 ? "/blog" : `/blog?page=${page - 1}`} rel="prev" className="text-sm hover:text-brand-orange">
+          <Link
+            href={page === 2 ? "/blog" : `/blog?page=${page - 1}`}
+            rel="prev"
+            className="text-sm hover:text-brand-orange"
+          >
             Previous
           </Link>
         ) : (
@@ -76,7 +114,11 @@ export default async function BlogPage({ searchParams }: Props) {
           Page {page} of {pageCount}
         </span>
         {page < pageCount ? (
-          <Link href={`/blog?page=${page + 1}`} rel="next" className="text-sm hover:text-brand-orange">
+          <Link
+            href={`/blog?page=${page + 1}`}
+            rel="next"
+            className="text-sm hover:text-brand-orange"
+          >
             Next
           </Link>
         ) : (
