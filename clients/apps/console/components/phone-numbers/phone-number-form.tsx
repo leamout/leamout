@@ -15,7 +15,7 @@ import type { SipTrunk } from "@/components/sip-trunks/types";
 import type { PhoneNumber } from "./types";
 
 const schema = z.object({
-  number: z.string().trim().regex(/^\\+[1-9][0-9]{6,14}$/, "Use E.164 format, e.g. +233201234567."),
+  number: z.string().trim().regex(/^\+[1-9][0-9]{6,14}$/, "Use E.164 format, e.g. +233201234567."),
   countryCode: z.string().trim().regex(/^[A-Za-z]{2}$/, "Use a two-letter country code."),
   trunkId: z.string(),
   voiceEnabled: z.boolean(),
@@ -59,6 +59,10 @@ export function PhoneNumberForm({ creating = false, number }: { creating?: boole
         });
       }
       if (!number) throw new Error("Phone number not loaded.");
+      // Reject unsupported unassignment before issuing any writes.
+      if (!values.trunkId && number.trunk_id) {
+        throw new Error("The backend does not support clearing the assigned trunk.");
+      }
       // The backend uses separate endpoints for voice capability and trunk assignment.
       let result = number;
       if (values.voiceEnabled !== number.voice_enabled) {
@@ -70,9 +74,6 @@ export function PhoneNumberForm({ creating = false, number }: { creating?: boole
         result = await api<PhoneNumber>(path + "/trunk", {
           method: "PATCH", organizationId, body: { trunk_id: values.trunkId },
         });
-      }
-      if (!values.trunkId && number.trunk_id) {
-        throw new Error("The backend does not support clearing the assigned trunk.");
       }
       return result;
     },

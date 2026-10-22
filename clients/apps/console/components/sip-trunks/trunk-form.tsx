@@ -13,7 +13,7 @@ import { api, errorMessage } from "@/lib/api";
 import type { SipTrunk } from "./types";
 
 const limit = z.string().refine(
-  (value) => value === "" || (/^\\d+$/.test(value) && Number(value) > 0 && Number(value) <= 2147483647),
+  (value) => value === "" || (/^\d+$/.test(value) && Number(value) > 0 && Number(value) <= 2147483647),
   "Enter a positive integer.",
 );
 
