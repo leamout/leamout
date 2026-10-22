@@ -56,7 +56,7 @@ export default async function BlogArticlePage({ params }: Props) {
 
   // The slug has been validated against the published MDX files.
   // Next.js bundles matching local MDX modules at build time.
-  const { default: Article } = await import(`@/content/blog/${post.slug}.mdx`);
+  const { default: Article } = await import(`@/content/${slug}.mdx`);
 
   return (
     <article className="mx-auto max-w-3xl px-5 py-20 sm:px-6">

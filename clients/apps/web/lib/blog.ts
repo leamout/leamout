@@ -5,7 +5,7 @@ import path from "node:path";
 import { cache } from "react";
 import matter from "gray-matter";
 
-const directory = path.join(process.cwd(), "content", "blog");
+const directory = path.join(process.cwd(), "content");
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 export const BLOG_PAGE_SIZE = 12;

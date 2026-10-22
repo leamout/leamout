@@ -5,8 +5,8 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@leamout/ui"],
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   outputFileTracingIncludes: {
-    "/blog": ["./content/blog/**/*.mdx"],
-    "/blog/*": ["./content/blog/**/*.mdx"],
+    "/blog": ["./content/*.mdx"],
+    "/blog/*": ["./content/*.mdx"],
   },
 
   async headers() {
