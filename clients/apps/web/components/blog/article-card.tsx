@@ -1,17 +1,7 @@
+import type { BlogPost } from "@/lib/blog";
 import Link from "next/link";
 
-type ArticleCardProps = {
-  post: {
-    slug: string;
-    title: string;
-    description: string;
-    category: string;
-    author: string;
-    publishedAt: string;
-  };
-};
-
-export function ArticleCard({ post }: ArticleCardProps) {
+export function ArticleCard({ post }: { post: BlogPost }) {
   return (
     <article className="border-t border-border py-8">
       <p className="font-mono text-xs uppercase tracking-wider text-brand-orange">

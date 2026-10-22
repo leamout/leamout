@@ -1,14 +1,6 @@
-type ArticleHeaderProps = {
-  metadata: {
-    title: string;
-    description: string;
-    category: string;
-    author: string;
-    publishedAt: string;
-  };
-};
+import type { BlogMetadata } from "@/lib/blog";
 
-export function ArticleHeader({ metadata }: ArticleHeaderProps) {
+export function ArticleHeader({ metadata }: { metadata: BlogMetadata }) {
   const date = new Date(`${metadata.publishedAt}T00:00:00.000Z`).toLocaleDateString(
     "en-US",
     {

@@ -1,10 +1,11 @@
+import type { BlogMetadata } from "@/lib/blog";
 import type { TechArticle } from "schema-dts";
 
 import { siteUrl } from "./schema";
 
 export function articleSchema(
   slug: string,
-  metadata: { title: string; description: string; publishedAt: string },
+  metadata: BlogMetadata,
 ): TechArticle {
   return {
     "@type": "TechArticle",

@@ -1,6 +1,5 @@
-import { readdir } from "node:fs/promises";
-import path from "node:path";
 import { ArticleCard } from "@/components/blog/article-card";
+import { getPosts } from "@/lib/blog";
 import { constructMetadata } from "@/lib/metadata";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -43,32 +42,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
 
 export default async function BlogPage({ searchParams }: Props) {
   const page = pageNumber((await searchParams).page);
-  const directory = path.join(process.cwd(), "content");
-  const files = await readdir(directory);
-
-  const slugs = files
-    .filter((file) => /^[a-z0-9]+(?:-[a-z0-9]+)*\.mdx$/.test(file))
-    .map((file) => file.slice(0, -4));
-
-  const posts = (
-    await Promise.all(
-      slugs.map(async (slug) => {
-        const { metadata } = await import(`@/content/${slug}.mdx`);
-
-        if (metadata.status !== "published") {
-          return null;
-        }
-
-        return { slug, ...metadata };
-      }),
-    )
-  )
-    .filter((post): post is NonNullable<typeof post> => post !== null)
-    .sort(
-      (a, b) =>
-        b.publishedAt.localeCompare(a.publishedAt) ||
-        a.slug.localeCompare(b.slug),
-    );
+  const posts = await getPosts();
 
   const pageCount = Math.max(1, Math.ceil(posts.length / PAGE_SIZE));
 
