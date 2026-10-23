@@ -24,7 +24,6 @@ CERT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/leamout-voice-agent-v1.XXXXXX")
 export VOICE_AGENT_V1_SUITE_DIR="$SCRIPT_DIR"
 export VOICE_AGENT_V1_CERT_DIR="$CERT_DIR"
 
-. "$REPO_ROOT/tests/acceptance-identity.sh"
 
 # Generate an isolated application env file; never require or overwrite server/.env.
 APP_ENV_FILE=$(mktemp)
@@ -45,7 +44,7 @@ cleanup() {
         (
             cd "$REPO_ROOT" &&
                 $COMPOSE logs --no-color --tail=300 \
-                    keycloak keycloak-postgres server worker media freeswitch opensips rtpengine \
+                    server worker media freeswitch opensips rtpengine \
                     postgres redis nats voice-agent-v1-carrier voice-agent-v1-openai
         ) || true
     fi

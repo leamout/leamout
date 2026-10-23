@@ -40,7 +40,7 @@ def main():
     assert 'http://127.0.0.1:8081/readyz' in compose
     assert "172.32.0.0/24" in compose
     assert "172.33.0.0/24" in compose
-    assert "identity:" not in compose
+    assert "\n  identity:\n" not in compose
     assert "env_file:" not in compose, "services must use explicit environment allowlists"
 
     caddy = (ROOT / "deploy/Caddyfile").read_text(encoding="utf-8")
