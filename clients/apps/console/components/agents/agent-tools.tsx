@@ -1,56 +1,57 @@
+"use client";
+
+import { Button } from "@leamout/ui/components/button";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { api, errorMessage } from "@/lib/api";
 import type { Tool } from "@/components/tools/types";
 
-export function AgentTools({
-  agentId,
-  tools = [],
-}: {
-  agentId: string;
-  tools?: Tool[];
-}) {
-  const owned = tools.filter((tool) => tool.agent.id === agentId);
+export function AgentTools({ agentId }: { agentId: string }) {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
+  const tools = useQuery({
+    queryKey: ["agent-tools", organizationId, agentId],
+    queryFn: ({ signal }) => api<{ tools: Tool[] }>(
+      "/voice-agents/" + encodeURIComponent(agentId) + "/tools/",
+      { organizationId, signal },
+    ),
+    enabled: Boolean(organizationId),
+  });
+
   return (
-    <section className="space-y-6" aria-labelledby="agent-tools-title">
+    <section className="space-y-5">
       <div className="space-y-2">
-        <h2 id="agent-tools-title" className="text-lg font-semibold">
-          Agent tools
-        </h2>
+        <h2 className="text-lg font-semibold">Agent tools</h2>
         <p className="text-sm text-muted-foreground">
-          Tools are owned by an agent. Review their configuration and
-          availability during conversations.
+          Built-in actions and signed webhook tool calls available to this Agent.
         </p>
-        <Link href="/tools/new" className="text-sm hover:underline">
-          Create a tool
+        <Link className="text-sm underline" href={"/tools/new?agent_id=" + encodeURIComponent(agentId)}>
+          Create tool for this Agent
         </Link>
       </div>
-      {owned.length ? (
+      {tools.isPending ? <p role="status">Loading Agent tools…</p> : tools.isError ? (
+        <div role="alert" className="space-y-3">
+          <p>{errorMessage(tools.error)}</p>
+          <Button variant="outline" onClick={() => void tools.refetch()}>Retry</Button>
+        </div>
+      ) : tools.data.tools.length ? (
         <ul className="space-y-3">
-          {owned.map((tool) => (
+          {tools.data.tools.map((tool) => (
             <li key={tool.id} className="space-y-2 rounded-lg border p-4">
-              <Link
-                href={`/tools/${encodeURIComponent(tool.id)}`}
-                className="font-medium hover:underline"
-              >
-                {tool.name}
-              </Link>
-              <p className="text-sm text-muted-foreground">
-                {tool.description}
-              </p>
-              <p className="text-sm">
-                {tool.type} · {tool.enabled ? "Enabled" : "Disabled"} ·{" "}
-                {tool.timeoutMs} ms
-              </p>
+              <Link className="font-medium hover:underline" href={
+                "/tools/" + encodeURIComponent(tool.id) + "?agent_id=" + encodeURIComponent(agentId)
+              }>{tool.name}</Link>
+              <p className="text-sm text-muted-foreground">{tool.description}</p>
+              <p className="text-sm">{tool.type} · {tool.enabled ? "Enabled" : "Disabled"} · {tool.timeout_ms} ms</p>
             </li>
           ))}
         </ul>
       ) : (
         <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-          No agent tools to display. Tool data is not connected.
+          No tools attached to this Agent.
         </p>
       )}
-      <p className="text-sm text-muted-foreground">
-        UI preview. Tool execution is not connected.
-      </p>
     </section>
   );
 }
