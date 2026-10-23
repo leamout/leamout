@@ -1,7 +1,13 @@
-import Link from "next/link";
-import { ToolForm } from "@/components/tools/tool-form";
+"use client";
 
-export function CreateToolForm() {
+import Link from "next/link";
+import { ToolForm } from "./tool-form";
+
+export function CreateToolForm({
+  agentId = "",
+}: {
+  agentId?: string;
+}) {
   return (
     <div className="space-y-6">
       <Link
@@ -11,12 +17,12 @@ export function CreateToolForm() {
         Back to tools
       </Link>
       <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Create tool</h1>
+        <h1 className="text-3xl font-semibold">Create tool</h1>
         <p className="text-muted-foreground">
-          Define an action and the agent that owns it.
+          Define a tool owned by one Voice Agent.
         </p>
       </div>
-      <ToolForm creating />
+      <ToolForm creating initialAgentId={agentId} />
     </div>
   );
 }
