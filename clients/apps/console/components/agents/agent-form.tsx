@@ -18,7 +18,9 @@ import type { VoiceAgent, VoiceAgentInput } from "./types";
 function isJSONObject(value: string): boolean {
   try {
     const parsed: unknown = JSON.parse(value);
-    return parsed !== null && !Array.isArray(parsed) && typeof parsed === "object";
+    return (
+      parsed !== null && !Array.isArray(parsed) && typeof parsed === "object"
+    );
   } catch {
     return false;
   }
@@ -110,14 +112,11 @@ export function AgentForm({
       if (!agent) {
         throw new Error("The agent has not loaded.");
       }
-      return api<VoiceAgent>(
-        "/voice-agents/" + encodeURIComponent(agent.id),
-        {
-          method: "PATCH",
-          organizationId,
-          body: payload,
-        },
-      );
+      return api<VoiceAgent>(`/voice-agents/${encodeURIComponent(agent.id)}`, {
+        method: "PATCH",
+        organizationId,
+        body: payload,
+      });
     },
     onSuccess: async (saved) => {
       if (!organizationId) return;
@@ -126,7 +125,7 @@ export function AgentForm({
         queryKey: ["voice-agents", organizationId],
       });
       if (creating) {
-        router.push("/agents/" + encodeURIComponent(saved.id));
+        router.push(`/agents/${encodeURIComponent(saved.id)}`);
         return;
       }
       form.reset(defaults(saved));
@@ -151,9 +150,7 @@ export function AgentForm({
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="agent-name">Name</FieldLabel>
             <Input {...field} id="agent-name" required maxLength={255} />
-            {fieldState.invalid && (
-              <FieldError errors={[fieldState.error]} />
-            )}
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
         )}
       />
@@ -182,9 +179,7 @@ export function AgentForm({
               maxLength={20000}
               placeholder="Describe the agent's role, behavior, and constraints."
             />
-            {fieldState.invalid && (
-              <FieldError errors={[fieldState.error]} />
-            )}
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
         )}
       />
@@ -196,9 +191,7 @@ export function AgentForm({
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor="agent-language">Language</FieldLabel>
               <Input {...field} id="agent-language" required maxLength={64} />
-              {fieldState.invalid && (
-                <FieldError errors={[fieldState.error]} />
-              )}
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
         />
@@ -209,9 +202,7 @@ export function AgentForm({
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor="agent-voice">Voice (optional)</FieldLabel>
               <Input {...field} id="agent-voice" maxLength={255} />
-              {fieldState.invalid && (
-                <FieldError errors={[fieldState.error]} />
-              )}
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
         />
@@ -261,9 +252,7 @@ export function AgentForm({
               spellCheck={false}
               className="font-mono"
             />
-            {fieldState.invalid && (
-              <FieldError errors={[fieldState.error]} />
-            )}
+            {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
         )}
       />

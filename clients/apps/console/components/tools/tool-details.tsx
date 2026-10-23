@@ -24,7 +24,7 @@ export function ToolDetails({
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRotate, setConfirmRotate] = useState(false);
-  const base = "/voice-agents/" + encodeURIComponent(agentId) + "/tools/";
+  const base = `/voice-agents/${encodeURIComponent(agentId)}/tools/`;
 
   const tools = useQuery({
     queryKey: ["agent-tools", organizationId, agentId],
@@ -41,7 +41,7 @@ export function ToolDetails({
   const rotate = useMutation({
     mutationFn: () =>
       api<{ signing_secret: string }>(
-        base + encodeURIComponent(toolId) + "/rotate-signing-secret",
+        `${base + encodeURIComponent(toolId)}/rotate-signing-secret`,
         {
           method: "POST",
           organizationId,
@@ -126,7 +126,7 @@ export function ToolDetails({
         </p>
         <Link
           className="text-sm underline"
-          href={"/agents/" + encodeURIComponent(agentId)}
+          href={`/agents/${encodeURIComponent(agentId)}`}
         >
           View Agent
         </Link>
@@ -147,10 +147,7 @@ export function ToolDetails({
             />
           )}
           {!confirmRotate ? (
-            <Button
-              variant="outline"
-              onClick={() => setConfirmRotate(true)}
-            >
+            <Button variant="outline" onClick={() => setConfirmRotate(true)}>
               Rotate secret…
             </Button>
           ) : (
@@ -162,27 +159,19 @@ export function ToolDetails({
               >
                 Confirm rotation
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setConfirmRotate(false)}
-              >
+              <Button variant="outline" onClick={() => setConfirmRotate(false)}>
                 Cancel
               </Button>
             </div>
           )}
-          {rotate.isError && (
-            <p role="alert">{errorMessage(rotate.error)}</p>
-          )}
+          {rotate.isError && <p role="alert">{errorMessage(rotate.error)}</p>}
         </section>
       )}
 
       <section className="space-y-3 border-t pt-6">
         <h2 className="font-semibold">Remove tool</h2>
         {!confirmDelete ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmDelete(true)}
-          >
+          <Button variant="outline" onClick={() => setConfirmDelete(true)}>
             Remove tool…
           </Button>
         ) : (
@@ -194,17 +183,12 @@ export function ToolDetails({
             >
               Confirm removal
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDelete(false)}
-            >
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
           </div>
         )}
-        {remove.isError && (
-          <p role="alert">{errorMessage(remove.error)}</p>
-        )}
+        {remove.isError && <p role="alert">{errorMessage(remove.error)}</p>}
       </section>
     </div>
   );

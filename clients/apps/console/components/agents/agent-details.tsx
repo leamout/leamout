@@ -11,13 +11,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ApiError, api, errorMessage } from "@/lib/api";
-import { useOrganization } from "@/components/onboarding/organization-provider";
 import { AgentForm } from "@/components/agents/agent-form";
 import { AgentProviderSettings } from "@/components/agents/agent-provider-settings";
 import { AgentReadiness } from "@/components/agents/agent-readiness";
 import { AgentRouting } from "@/components/agents/agent-routing";
 import { AgentTools } from "@/components/agents/agent-tools";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { ApiError, api, errorMessage } from "@/lib/api";
 import type { VoiceAgent } from "./types";
 
 const planned = [
@@ -29,7 +29,8 @@ const planned = [
   {
     value: "activity",
     title: "Activity",
-    description: "Call history and diagnostics will appear in Calls when connected.",
+    description:
+      "Call history and diagnostics will appear in Calls when connected.",
     href: "/calls",
     link: "View calls",
   },
@@ -45,7 +46,7 @@ export function AgentDetails({ agentId }: { agentId: string }) {
   const query = useQuery({
     queryKey: ["voice-agents", organizationId, agentId],
     queryFn: ({ signal }) =>
-      api<VoiceAgent>("/voice-agents/" + encodeURIComponent(agentId), {
+      api<VoiceAgent>(`/voice-agents/${encodeURIComponent(agentId)}`, {
         organizationId,
         signal,
       }),
@@ -54,7 +55,7 @@ export function AgentDetails({ agentId }: { agentId: string }) {
 
   const disable = useMutation({
     mutationFn: () =>
-      api<void>("/voice-agents/" + encodeURIComponent(agentId), {
+      api<void>(`/voice-agents/${encodeURIComponent(agentId)}`, {
         method: "DELETE",
         organizationId,
       }),
@@ -82,7 +83,10 @@ export function AgentDetails({ agentId }: { agentId: string }) {
         <Button variant="outline" onClick={() => void query.refetch()}>
           Try again
         </Button>
-        <Link href="/agents" className="block text-sm underline underline-offset-4">
+        <Link
+          href="/agents"
+          className="block text-sm underline underline-offset-4"
+        >
           Back to agents
         </Link>
       </div>
@@ -153,10 +157,7 @@ export function AgentDetails({ agentId }: { agentId: string }) {
               <h2 className="text-lg font-semibold">{section.title}</h2>
               <p className="text-muted-foreground">{section.description}</p>
               {section.href && (
-                <Button
-                  variant="outline"
-                  render={<Link href={section.href} />}
-                >
+                <Button variant="outline" render={<Link href={section.href} />}>
                   {section.link}
                 </Button>
               )}
@@ -165,7 +166,10 @@ export function AgentDetails({ agentId }: { agentId: string }) {
         ))}
       </Tabs>
 
-      <section className="space-y-3 border-t pt-8" aria-labelledby="disable-title">
+      <section
+        className="space-y-3 border-t pt-8"
+        aria-labelledby="disable-title"
+      >
         <h2 id="disable-title" className="text-lg font-semibold">
           Disable agent
         </h2>

@@ -33,7 +33,7 @@ export function PhoneNumberRoutingForm({ number }: { number: PhoneNumber }) {
       const all = await Promise.all(
         (agents.data?.voice_agents ?? []).map((agent) =>
           api<{ bindings: AgentNumberBinding[] }>(
-            "/voice-agents/" + encodeURIComponent(agent.id) + "/bindings",
+            `/voice-agents/${encodeURIComponent(agent.id)}/bindings`,
             {
               organizationId,
               signal,
@@ -54,7 +54,7 @@ export function PhoneNumberRoutingForm({ number }: { number: PhoneNumber }) {
   const bind = useMutation({
     mutationFn: () =>
       api<AgentNumberBinding>(
-        "/voice-agents/" + encodeURIComponent(selectedAgentId) + "/bindings",
+        `/voice-agents/${encodeURIComponent(selectedAgentId)}/bindings`,
         {
           method: "POST",
           organizationId,
@@ -123,9 +123,7 @@ export function PhoneNumberRoutingForm({ number }: { number: PhoneNumber }) {
             Assigned Agent:{" "}
             <Link
               className="font-medium underline"
-              href={
-                "/agents/" + encodeURIComponent(assigned.voice_agent_id)
-              }
+              href={`/agents/${encodeURIComponent(assigned.voice_agent_id)}`}
             >
               {assignedName ?? assigned.voice_agent_id}
             </Link>
@@ -143,10 +141,7 @@ export function PhoneNumberRoutingForm({ number }: { number: PhoneNumber }) {
               >
                 Confirm unbind
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setConfirmUnbind(false)}
-              >
+              <Button variant="outline" onClick={() => setConfirmUnbind(false)}>
                 Cancel
               </Button>
             </div>
@@ -180,7 +175,9 @@ export function PhoneNumberRoutingForm({ number }: { number: PhoneNumber }) {
             assignment before switching.
           </p>
           <Button
-            disabled={!selectedAgentId || bind.isPending || !number.voice_enabled}
+            disabled={
+              !selectedAgentId || bind.isPending || !number.voice_enabled
+            }
             onClick={() => bind.mutate()}
           >
             {bind.isPending ? "Assigning…" : "Assign Agent"}

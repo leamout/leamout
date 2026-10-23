@@ -110,7 +110,7 @@ export function TrunkList() {
                   <TableCell>
                     <Link
                       className="font-medium hover:underline"
-                      href={"/sip-trunks/" + encodeURIComponent(trunk.id)}
+                      href={`/sip-trunks/${encodeURIComponent(trunk.id)}`}
                     >
                       {trunk.name}
                     </Link>

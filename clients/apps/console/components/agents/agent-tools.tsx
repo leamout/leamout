@@ -15,7 +15,7 @@ export function AgentTools({ agentId }: { agentId: string }) {
     queryKey: ["agent-tools", organizationId, agentId],
     queryFn: ({ signal }) =>
       api<{ tools: Tool[] }>(
-        "/voice-agents/" + encodeURIComponent(agentId) + "/tools/",
+        `/voice-agents/${encodeURIComponent(agentId)}/tools/`,
         {
           organizationId,
           signal,
@@ -34,7 +34,7 @@ export function AgentTools({ agentId }: { agentId: string }) {
         </p>
         <Link
           className="text-sm underline"
-          href={"/tools/new?agent_id=" + encodeURIComponent(agentId)}
+          href={`/tools/new?agent_id=${encodeURIComponent(agentId)}`}
         >
           Create tool for this Agent
         </Link>

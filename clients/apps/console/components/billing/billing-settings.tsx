@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import { BillingOverview } from "./billing-overview";
 import {
@@ -23,7 +24,6 @@ import {
   hasConfirmedSubscription,
 } from "./presentation";
 import type { AvailablePlan, BillingStatus, Organization } from "./types";
-import { useOrganization } from "@/components/onboarding/organization-provider";
 
 const checkoutPollAttempts = 10;
 const checkoutPollInterval = 3_000;
@@ -75,7 +75,9 @@ export function BillingSettings() {
               value={selected?.id ?? ""}
               disabled={busy}
               onChange={(event) => {
-                if (organizationContext.selectOrganization(event.target.value)) {
+                if (
+                  organizationContext.selectOrganization(event.target.value)
+                ) {
                   const query = new URLSearchParams({
                     organization: event.target.value,
                   });

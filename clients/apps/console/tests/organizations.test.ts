@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   findActiveOrganization,
+  type Organization,
   organizationStorageKey,
   readOrganizationSelection,
   writeOrganizationSelection,
-  type Organization,
 } from "../lib/organizations";
 
 const organizations: Organization[] = [
@@ -79,8 +79,5 @@ test("switching between organization IDs never selects a disabled organization",
   );
   assert.equal(readOrganizationSelection(local, "user-b"), null);
 
-  assert.equal(
-    findActiveOrganization(organizations, "org-disabled"),
-    null,
-  );
+  assert.equal(findActiveOrganization(organizations, "org-disabled"), null);
 });

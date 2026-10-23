@@ -10,9 +10,7 @@ export function RequireOrganization({ children }: { children: ReactNode }) {
   const router = useRouter();
   const organization = useOrganization();
   const loading =
-    !organization.ready ||
-    organization.isPending ||
-    organization.isFetching;
+    !organization.ready || organization.isPending || organization.isFetching;
   const redirect = !loading && !organization.isError && !organization.selected;
 
   useEffect(() => {
@@ -31,7 +29,9 @@ export function RequireOrganization({ children }: { children: ReactNode }) {
   if (loading || redirect) {
     return (
       <div className="m-auto p-6 text-sm text-muted-foreground" role="status">
-        {redirect ? "Choose an organization to continue…" : "Loading organization…"}
+        {redirect
+          ? "Choose an organization to continue…"
+          : "Loading organization…"}
       </div>
     );
   }

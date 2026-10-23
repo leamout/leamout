@@ -64,7 +64,7 @@ export function PhoneNumberForm({
 
   const save = useMutation({
     mutationFn: async (values: Values) => {
-      const path = "/numbers/" + encodeURIComponent(number?.id ?? "");
+      const path = `/numbers/${encodeURIComponent(number?.id ?? "")}`;
 
       if (creating) {
         idempotencyKey.current ??= crypto.randomUUID();
@@ -105,7 +105,7 @@ export function PhoneNumberForm({
       }
 
       if (values.trunkId && values.trunkId !== number.trunk_id) {
-        result = await api<PhoneNumber>(path + "/trunk", {
+        result = await api<PhoneNumber>(`${path}/trunk`, {
           method: "PATCH",
           organizationId,
           body: { trunk_id: values.trunkId },
@@ -121,7 +121,7 @@ export function PhoneNumberForm({
       });
 
       if (creating) {
-        router.push("/phone-numbers/" + encodeURIComponent(saved.id));
+        router.push(`/phone-numbers/${encodeURIComponent(saved.id)}`);
       } else {
         form.reset({
           number: saved.number,
@@ -166,11 +166,11 @@ export function PhoneNumberForm({
                 placeholder="+233201234567"
               />
               {fieldState.invalid && (
-              <FieldError
-                id="number-e164-error"
-                errors={[fieldState.error]}
-              />
-            )}
+                <FieldError
+                  id="number-e164-error"
+                  errors={[fieldState.error]}
+                />
+              )}
             </Field>
           )}
         />
@@ -193,11 +193,11 @@ export function PhoneNumberForm({
                 placeholder="GH"
               />
               {fieldState.invalid && (
-              <FieldError
-                id="number-country-error"
-                errors={[fieldState.error]}
-              />
-            )}
+                <FieldError
+                  id="number-country-error"
+                  errors={[fieldState.error]}
+                />
+              )}
             </Field>
           )}
         />
@@ -235,14 +235,15 @@ export function PhoneNumberForm({
           type="checkbox"
           {...form.register("voiceEnabled")}
         />
-        <FieldLabel htmlFor="phone-voice-enabled">
-          Enable voice
-        </FieldLabel>
+        <FieldLabel htmlFor="phone-voice-enabled">Enable voice</FieldLabel>
       </Field>
       <Button
         type="submit"
         disabled={
-          save.isPending || !organizationId || trunks.isPending || trunks.isError
+          save.isPending ||
+          !organizationId ||
+          trunks.isPending ||
+          trunks.isError
         }
       >
         {save.isPending

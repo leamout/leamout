@@ -12,20 +12,14 @@ import Link from "next/link";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { ApiError, api, errorMessage } from "@/lib/api";
 import {
+  type Call,
+  type CallRecording,
   callDurationSeconds,
   formatCallDate,
   formatDuration,
-  type Call,
-  type CallRecording,
 } from "./types";
 
-function Detail({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0 space-y-1">
       <dt className="text-sm text-muted-foreground">{label}</dt>
@@ -41,7 +35,7 @@ export function CallDetails({ callId }: { callId: string }) {
   const call = useQuery({
     queryKey: ["calls", organizationId, callId],
     queryFn: ({ signal }) =>
-      api<Call>("/calls/" + encodeURIComponent(callId), {
+      api<Call>(`/calls/${encodeURIComponent(callId)}`, {
         organizationId,
         signal,
       }),
@@ -90,9 +84,8 @@ export function CallDetails({ callId }: { callId: string }) {
     { label: "Answered", value: item.answered_at },
     { label: "Ended", value: item.ended_at },
     { label: "Last updated", value: item.updated_at },
-  ].filter(
-    (entry): entry is { label: string; value: string } =>
-      Boolean(entry.value),
+  ].filter((entry): entry is { label: string; value: string } =>
+    Boolean(entry.value),
   );
 
   return (
@@ -144,7 +137,9 @@ export function CallDetails({ callId }: { callId: string }) {
       {item.hangup_reason && (
         <section className="space-y-2 rounded-lg border p-5">
           <h2 className="font-semibold">
-            {item.state === "failed" ? "Failure / hangup reason" : "Hangup reason"}
+            {item.state === "failed"
+              ? "Failure / hangup reason"
+              : "Hangup reason"}
           </h2>
           <p className="break-words text-sm">{item.hangup_reason}</p>
         </section>
@@ -164,8 +159,8 @@ export function CallDetails({ callId }: { callId: string }) {
           <section className="space-y-4 rounded-lg border p-6">
             <h2 className="text-lg font-semibold">Persisted milestones</h2>
             <p className="text-sm text-muted-foreground">
-              These are call record timestamps, not an event-by-event SIP
-              trace. Missing timestamps are omitted.
+              These are call record timestamps, not an event-by-event SIP trace.
+              Missing timestamps are omitted.
             </p>
             <ol className="space-y-4">
               {timeline.map((event) => (
@@ -193,14 +188,17 @@ export function CallDetails({ callId }: { callId: string }) {
             </div>
             <dl className="grid gap-5 sm:grid-cols-2">
               <Detail label="Call ID" value={item.id} />
-              <Detail label="SIP Call-ID" value={item.sip_call_id || "Not recorded"} />
+              <Detail
+                label="SIP Call-ID"
+                value={item.sip_call_id || "Not recorded"}
+              />
               <Detail
                 label="Voice Agent"
                 value={
                   item.voice_agent_id ? (
                     <Link
                       className="underline underline-offset-4"
-                      href={"/agents/" + encodeURIComponent(item.voice_agent_id)}
+                      href={`/agents/${encodeURIComponent(item.voice_agent_id)}`}
                     >
                       {item.voice_agent_id}
                     </Link>
@@ -215,7 +213,7 @@ export function CallDetails({ callId }: { callId: string }) {
                   item.trunk_id ? (
                     <Link
                       className="underline underline-offset-4"
-                      href={"/sip-trunks/" + encodeURIComponent(item.trunk_id)}
+                      href={`/sip-trunks/${encodeURIComponent(item.trunk_id)}`}
                     >
                       {item.trunk_id}
                     </Link>
@@ -229,7 +227,10 @@ export function CallDetails({ callId }: { callId: string }) {
                 value={item.trunk_endpoint_id || "Not attributed"}
               />
               <Detail label="Media state" value={item.media_state} />
-              <Detail label="Answered" value={formatCallDate(item.answered_at)} />
+              <Detail
+                label="Answered"
+                value={formatCallDate(item.answered_at)}
+              />
               <Detail label="Ended" value={formatCallDate(item.ended_at)} />
               <Detail
                 label="Hangup reason"
@@ -265,16 +266,17 @@ export function CallDetails({ callId }: { callId: string }) {
                     key={recording.id}
                     className="space-y-2 rounded-md border p-4"
                   >
-                    <p className="break-all font-mono text-sm">{recording.id}</p>
+                    <p className="break-all font-mono text-sm">
+                      {recording.id}
+                    </p>
                     <p className="text-sm text-muted-foreground">
-                      {recording.status} · {recording.format ?? "Format unknown"}
-                      {" "}· {formatDuration(recording.duration_seconds ?? null)}
+                      {recording.status} ·{" "}
+                      {recording.format ?? "Format unknown"} ·{" "}
+                      {formatDuration(recording.duration_seconds ?? null)}
                     </p>
                     <Link
                       className="text-sm underline underline-offset-4"
-                      href={
-                        "/recordings/" + encodeURIComponent(recording.id)
-                      }
+                      href={`/recordings/${encodeURIComponent(recording.id)}`}
                     >
                       View recording
                     </Link>
@@ -298,8 +300,8 @@ export function CallDetails({ callId }: { callId: string }) {
           <section className="space-y-3 rounded-lg border p-6">
             <h2 className="text-lg font-semibold">Transcript and tools</h2>
             <p className="text-sm text-muted-foreground">
-              Per-call transcripts, turn history, and tool-execution traces
-              are not available from the current organization call API. No
+              Per-call transcripts, turn history, and tool-execution traces are
+              not available from the current organization call API. No
               conversation content or tool result is inferred from call state.
             </p>
           </section>

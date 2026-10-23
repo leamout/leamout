@@ -27,13 +27,13 @@ const schema = z.object({
       (value) => !/[\s/]/.test(value) && !value.includes("://"),
       "Enter a hostname or IP without a scheme or path.",
     ),
-  port: z.string().refine(
-    (value) =>
-      /^\d+$/.test(value) &&
-      Number(value) >= 1 &&
-      Number(value) <= 65535,
-    "Enter a port between 1 and 65535.",
-  ),
+  port: z
+    .string()
+    .refine(
+      (value) =>
+        /^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 65535,
+      "Enter a port between 1 and 65535.",
+    ),
   transport: z.enum(["udp", "tcp", "tls"]),
   direction: z.enum(["inbound", "outbound", "bidirectional"]),
 });
@@ -51,7 +51,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
   const { selected } = useOrganization();
   const organizationId = selected?.id ?? "";
   const client = useQueryClient();
-  const base = "/trunks/" + encodeURIComponent(trunkId) + "/endpoints";
+  const base = `/trunks/${encodeURIComponent(trunkId)}/endpoints`;
   const queryKey = ["trunk-endpoints", organizationId, trunkId];
   const [removing, setRemoving] = useState<string | null>(null);
 
@@ -90,7 +90,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
 
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      api<TrunkEndpoint>(base + "/" + encodeURIComponent(id), {
+      api<TrunkEndpoint>(`${base}/${encodeURIComponent(id)}`, {
         method: "PATCH",
         organizationId,
         body: { enabled },
@@ -100,7 +100,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
 
   const remove = useMutation({
     mutationFn: (id: string) =>
-      api<void>(base + "/" + encodeURIComponent(id), {
+      api<void>(`${base}/${encodeURIComponent(id)}`, {
         method: "DELETE",
         organizationId,
       }),
@@ -144,7 +144,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
                   <p className="text-xs text-muted-foreground">
                     {item.direction} · {item.enabled ? "Enabled" : "Disabled"} ·
                     Health: {item.health_status}
-                    {item.last_error ? " · " + item.last_error : ""}
+                    {item.last_error ? ` · ${item.last_error}` : ""}
                   </p>
                   {item.last_checked_at && (
                     <p className="text-xs text-muted-foreground">
@@ -296,10 +296,7 @@ export function TrunkConnectionForm({ trunkId }: { trunkId: string }) {
           Endpoints must use a public hostname or IP. The backend also validates
           the host before saving.
         </FieldDescription>
-        <Button
-          type="submit"
-          disabled={!organizationId || create.isPending}
-        >
+        <Button type="submit" disabled={!organizationId || create.isPending}>
           {create.isPending ? "Adding…" : "Add endpoint"}
         </Button>
         {create.isError && (

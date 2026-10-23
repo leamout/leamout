@@ -33,7 +33,7 @@ export function CredentialActions({
     defaultValues: { secret: "" },
   });
 
-  const path = "/ai-integrations/" + encodeURIComponent(credential.id);
+  const path = `/ai-integrations/${encodeURIComponent(credential.id)}`;
   const refresh = () =>
     client.invalidateQueries({
       queryKey: ["ai-integrations", organizationId],
@@ -46,13 +46,13 @@ export function CredentialActions({
         connection_state: string;
         verified_at?: string | null;
         failure_code?: string | null;
-      }>(path + "/verify", { method: "POST", organizationId }),
+      }>(`${path}/verify`, { method: "POST", organizationId }),
     onSuccess: refresh,
   });
 
   const rotate = useMutation({
     mutationFn: (values: Values) =>
-      api<AIIntegration>(path + "/rotate", {
+      api<AIIntegration>(`${path}/rotate`, {
         method: "POST",
         organizationId,
         body: { secret: values.secret.trim() },
@@ -65,8 +65,7 @@ export function CredentialActions({
   });
 
   const remove = useMutation({
-    mutationFn: () =>
-      api<void>(path, { method: "DELETE", organizationId }),
+    mutationFn: () => api<void>(path, { method: "DELETE", organizationId }),
     onSuccess: async () => {
       setConfirmDelete(false);
       await refresh();
@@ -106,7 +105,7 @@ export function CredentialActions({
       {verify.isSuccess && (
         <p role="status" className="text-sm">
           Verification completed: {verify.data.connection_state}
-          {verify.data.failure_code ? " · " + verify.data.failure_code : ""}
+          {verify.data.failure_code ? ` · ${verify.data.failure_code}` : ""}
         </p>
       )}
       {verify.isError && (
@@ -126,12 +125,12 @@ export function CredentialActions({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={"rotate-" + credential.id}>
+                <FieldLabel htmlFor={`rotate-${credential.id}`}>
                   Replacement API key
                 </FieldLabel>
                 <Input
                   {...field}
-                  id={"rotate-" + credential.id}
+                  id={`rotate-${credential.id}`}
                   type="password"
                   autoComplete="new-password"
                   aria-invalid={fieldState.invalid}

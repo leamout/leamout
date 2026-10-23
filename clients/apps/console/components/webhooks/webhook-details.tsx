@@ -25,7 +25,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRotate, setConfirmRotate] = useState(false);
-  const path = "/webhooks/" + encodeURIComponent(webhookId);
+  const path = `/webhooks/${encodeURIComponent(webhookId)}`;
   const key = ["webhooks", organizationId, webhookId];
 
   const endpoint = useQuery({
@@ -40,7 +40,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
 
   const test = useMutation({
     mutationFn: () =>
-      api<{ response_status: number }>(path + "/test", {
+      api<{ response_status: number }>(`${path}/test`, {
         method: "POST",
         organizationId,
       }),
@@ -48,7 +48,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
 
   const rotate = useMutation({
     mutationFn: () =>
-      api<WebhookSecretResponse>(path + "/rotate-secret", {
+      api<WebhookSecretResponse>(`${path}/rotate-secret`, {
         method: "POST",
         organizationId,
       }),
@@ -102,9 +102,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
 
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold">Webhook endpoint</h1>
-        <p className="break-all text-muted-foreground">
-          {endpoint.data.url}
-        </p>
+        <p className="break-all text-muted-foreground">{endpoint.data.url}</p>
         <p className="font-mono text-xs text-muted-foreground">
           {endpoint.data.id}
         </p>
@@ -150,9 +148,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
                 Endpoint returned HTTP {test.data.response_status}.
               </p>
             )}
-            {test.isError && (
-              <p role="alert">{errorMessage(test.error)}</p>
-            )}
+            {test.isError && <p role="alert">{errorMessage(test.error)}</p>}
 
             <h2 className="text-lg font-semibold">Signing secret</h2>
             <p className="text-sm text-muted-foreground">
@@ -167,10 +163,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
             )}
 
             {!confirmRotate ? (
-              <Button
-                variant="outline"
-                onClick={() => setConfirmRotate(true)}
-              >
+              <Button variant="outline" onClick={() => setConfirmRotate(true)}>
                 Rotate signing secret…
               </Button>
             ) : (
@@ -190,9 +183,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
                 </Button>
               </div>
             )}
-            {rotate.isError && (
-              <p role="alert">{errorMessage(rotate.error)}</p>
-            )}
+            {rotate.isError && <p role="alert">{errorMessage(rotate.error)}</p>}
           </section>
         </TabsContent>
       </Tabs>
@@ -203,10 +194,7 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
           Removing an endpoint disables it and cancels pending deliveries.
         </p>
         {!confirmDelete ? (
-          <Button
-            variant="outline"
-            onClick={() => setConfirmDelete(true)}
-          >
+          <Button variant="outline" onClick={() => setConfirmDelete(true)}>
             Remove endpoint…
           </Button>
         ) : (
@@ -218,17 +206,12 @@ export function WebhookDetails({ webhookId }: { webhookId: string }) {
             >
               Confirm removal
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmDelete(false)}
-            >
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>
               Cancel
             </Button>
           </div>
         )}
-        {remove.isError && (
-          <p role="alert">{errorMessage(remove.error)}</p>
-        )}
+        {remove.isError && <p role="alert">{errorMessage(remove.error)}</p>}
       </section>
     </div>
   );

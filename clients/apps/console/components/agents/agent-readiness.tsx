@@ -3,8 +3,8 @@
 import { Button } from "@leamout/ui/components/button";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useOrganization } from "@/components/onboarding/organization-provider";
 import type { AgentReadinessReport } from "@/components/ai-providers/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 
 export function AgentReadiness({ agentId }: { agentId: string }) {
@@ -15,7 +15,7 @@ export function AgentReadiness({ agentId }: { agentId: string }) {
     queryKey: ["agent-readiness", organizationId, agentId],
     queryFn: ({ signal }) =>
       api<AgentReadinessReport>(
-        "/voice-agents/" + encodeURIComponent(agentId) + "/readiness",
+        `/voice-agents/${encodeURIComponent(agentId)}/readiness`,
         { organizationId, signal },
       ),
     enabled: Boolean(organizationId) && Boolean(agentId),

@@ -23,20 +23,20 @@ export function WebhookDeliveries({ webhookId }: { webhookId: string }) {
   const client = useQueryClient();
   const [offset, setOffset] = useState(0);
   const [retrying, setRetrying] = useState<string | null>(null);
-  const base = "/webhooks/" + encodeURIComponent(webhookId) + "/deliveries";
+  const base = `/webhooks/${encodeURIComponent(webhookId)}/deliveries`;
   const key = ["webhook-deliveries", organizationId, webhookId, offset];
   const deliveries = useQuery({
     queryKey: key,
     queryFn: ({ signal }) =>
       api<{ deliveries: WebhookDelivery[] }>(
-        base + "?limit=" + pageSize + "&offset=" + offset,
+        `${base}?limit=${pageSize}&offset=${offset}`,
         { organizationId, signal },
       ),
     enabled: Boolean(organizationId),
   });
   const retry = useMutation({
     mutationFn: (id: string) =>
-      api<WebhookDelivery>(base + "/" + encodeURIComponent(id) + "/retry", {
+      api<WebhookDelivery>(`${base}/${encodeURIComponent(id)}/retry`, {
         method: "POST",
         organizationId,
       }),
@@ -76,13 +76,13 @@ export function WebhookDeliveries({ webhookId }: { webhookId: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
-                <TableHead>Delivery / Event</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Attempts</TableHead>
-                <TableHead>Replays</TableHead>
-                <TableHead>Response</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
+                  <TableHead>Delivery / Event</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Attempts</TableHead>
+                  <TableHead>Replays</TableHead>
+                  <TableHead>Response</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((item) => (
@@ -116,12 +116,18 @@ export function WebhookDeliveries({ webhookId }: { webhookId: string }) {
                           >
                             Confirm retry
                           </Button>
-                          <Button variant="outline" onClick={() => setRetrying(null)}>
+                          <Button
+                            variant="outline"
+                            onClick={() => setRetrying(null)}
+                          >
                             Cancel
                           </Button>
                         </div>
                       ) : (
-                        <Button variant="outline" onClick={() => setRetrying(item.id)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setRetrying(item.id)}
+                        >
                           Retry…
                         </Button>
                       )}

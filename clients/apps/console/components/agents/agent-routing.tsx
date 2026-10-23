@@ -17,7 +17,7 @@ export function AgentRouting({ agentId }: { agentId: string }) {
   const client = useQueryClient();
   const [phoneNumberId, setPhoneNumberId] = useState("");
   const [removing, setRemoving] = useState<string | null>(null);
-  const path = "/voice-agents/" + encodeURIComponent(agentId) + "/bindings";
+  const path = `/voice-agents/${encodeURIComponent(agentId)}/bindings`;
   const bindingKey = ["agent-number-bindings", organizationId, agentId];
 
   const bindings = useQuery({
@@ -55,7 +55,7 @@ export function AgentRouting({ agentId }: { agentId: string }) {
 
   const remove = useMutation({
     mutationFn: (id: string) =>
-      api<void>(path + "/" + encodeURIComponent(id), {
+      api<void>(`${path}/${encodeURIComponent(id)}`, {
         method: "DELETE",
         organizationId,
       }),
@@ -162,10 +162,7 @@ export function AgentRouting({ agentId }: { agentId: string }) {
         onSubmit={submit}
         className="max-w-xl space-y-3 rounded-lg border p-5"
       >
-        <label
-          htmlFor="binding-number"
-          className="block text-sm font-medium"
-        >
+        <label htmlFor="binding-number" className="block text-sm font-medium">
           Assign existing phone number
         </label>
         <select

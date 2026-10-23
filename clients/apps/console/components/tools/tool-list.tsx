@@ -13,8 +13,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { useOrganization } from "@/components/onboarding/organization-provider";
 import type { VoiceAgent } from "@/components/agents/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 import type { Tool } from "./types";
 
@@ -42,7 +42,7 @@ export function ToolList() {
       const rows = await Promise.all(
         (agents.data?.voice_agents ?? []).map((agent) =>
           api<{ tools: Tool[] }>(
-            "/voice-agents/" + encodeURIComponent(agent.id) + "/tools/",
+            `/voice-agents/${encodeURIComponent(agent.id)}/tools/`,
             { organizationId, signal },
           ),
         ),
@@ -56,17 +56,18 @@ export function ToolList() {
       [],
   );
   const items = tools.data ?? [];
-  const filtered = items.filter((item) =>
-    (
-      item.name +
-      " " +
-      item.description +
-      " " +
-      (agentNames.get(item.voice_agent_id) ?? "")
-    )
-      .toLowerCase()
-      .includes(search.trim().toLowerCase()) &&
-    (type === "all" || item.type === type),
+  const filtered = items.filter(
+    (item) =>
+      (
+        item.name +
+        " " +
+        item.description +
+        " " +
+        (agentNames.get(item.voice_agent_id) ?? "")
+      )
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()) &&
+      (type === "all" || item.type === type),
   );
 
   return (
@@ -78,9 +79,7 @@ export function ToolList() {
             Manage tools attached to Voice Agents.
           </p>
         </div>
-        <Button render={<Link href="/tools/new" />}>
-          Create tool
-        </Button>
+        <Button render={<Link href="/tools/new" />}>Create tool</Button>
       </div>
       <div className="flex gap-4">
         <label className="flex-1 space-y-2 text-sm">
@@ -124,12 +123,12 @@ export function ToolList() {
           <Table>
             <TableHeader>
               <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Timeout</TableHead>
-            </TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Agent</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Timeout</TableHead>
+              </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((tool) => (

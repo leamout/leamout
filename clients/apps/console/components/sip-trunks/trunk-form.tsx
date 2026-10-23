@@ -12,14 +12,14 @@ import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 import type { SipTrunk } from "./types";
 
-const limit = z.string().refine(
-  (value) =>
-    value === "" ||
-    (/^\d+$/.test(value) &&
-      Number(value) > 0 &&
-      Number(value) <= 2147483647),
-  "Enter a positive integer.",
-);
+const limit = z
+  .string()
+  .refine(
+    (value) =>
+      value === "" ||
+      (/^\d+$/.test(value) && Number(value) > 0 && Number(value) <= 2147483647),
+    "Enter a positive integer.",
+  );
 
 const schema = z.object({
   name: z.string().trim().min(1).max(255),
@@ -73,7 +73,9 @@ export function TrunkForm({
       }
 
       return api<SipTrunk>(
-        creating ? "/trunks/" : "/trunks/" + encodeURIComponent(trunk?.id ?? ""),
+        creating
+          ? "/trunks/"
+          : `/trunks/${encodeURIComponent(trunk?.id ?? "")}`,
         {
           method: creating ? "POST" : "PATCH",
           organizationId,
@@ -88,7 +90,7 @@ export function TrunkForm({
       });
 
       if (creating) {
-        router.push("/sip-trunks/" + encodeURIComponent(saved.id));
+        router.push(`/sip-trunks/${encodeURIComponent(saved.id)}`);
       } else {
         form.reset({
           name: saved.name,
@@ -125,10 +127,7 @@ export function TrunkForm({
               }
             />
             {fieldState.invalid && (
-              <FieldError
-                id="trunk-name-error"
-                errors={[fieldState.error]}
-              />
+              <FieldError id="trunk-name-error" errors={[fieldState.error]} />
             )}
           </Field>
         )}
@@ -190,11 +189,8 @@ export function TrunkForm({
                 step={1}
               />
               {fieldState.invalid && (
-              <FieldError
-                id="trunk-cps-error"
-                errors={[fieldState.error]}
-              />
-            )}
+                <FieldError id="trunk-cps-error" errors={[fieldState.error]} />
+              )}
             </Field>
           )}
         />
@@ -218,11 +214,11 @@ export function TrunkForm({
                 step={1}
               />
               {fieldState.invalid && (
-              <FieldError
-                id="trunk-concurrent-error"
-                errors={[fieldState.error]}
-              />
-            )}
+                <FieldError
+                  id="trunk-concurrent-error"
+                  errors={[fieldState.error]}
+                />
+              )}
             </Field>
           )}
         />

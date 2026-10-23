@@ -142,7 +142,6 @@ test("forbidden billing responses reject instead of returning successful data", 
   }
 });
 
-
 test("organization listing and creation use the existing tenancy endpoints", async () => {
   const originalFetch = globalThis.fetch;
   const calls: { path: string; options?: RequestInit }[] = [];
@@ -150,9 +149,15 @@ test("organization listing and creation use the existing tenancy endpoints", asy
     calls.push({ path: String(path), options });
     return Response.json({
       success: true,
-      data: options?.method === "POST"
-        ? { id: "org-new", name: "Voice Labs", status: "active", role: "owner" }
-        : [],
+      data:
+        options?.method === "POST"
+          ? {
+              id: "org-new",
+              name: "Voice Labs",
+              status: "active",
+              role: "owner",
+            }
+          : [],
     });
   };
 
@@ -172,7 +177,10 @@ test("organization listing and creation use the existing tenancy endpoints", asy
     assert.deepEqual(JSON.parse(String(calls[1].options?.body)), {
       name: "Voice Labs",
     });
-    assert.equal(new Headers(calls[1].options?.headers).get("Authorization"), null);
+    assert.equal(
+      new Headers(calls[1].options?.headers).get("Authorization"),
+      null,
+    );
     assert.equal(calls[1].options?.credentials, "same-origin");
   } finally {
     globalThis.fetch = originalFetch;

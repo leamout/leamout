@@ -19,15 +19,15 @@ import {
 } from "@leamout/ui/components/table";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useOrganization } from "@/components/onboarding/organization-provider";
-import type { AIIntegration } from "@/components/ai-providers/types";
 import type { VoiceAgent } from "@/components/agents/types";
+import type { AIIntegration } from "@/components/ai-providers/types";
 import {
+  type Call,
   callDurationSeconds,
   formatCallDate,
   formatDuration,
-  type Call,
 } from "@/components/calls/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 import type { PhoneNumber } from "@/components/phone-numbers/types";
 import type { SipTrunk } from "@/components/sip-trunks/types";
 import { api, errorMessage } from "@/lib/api";
@@ -124,7 +124,8 @@ export function OverviewDashboard() {
   const activeTrunks =
     trunks.data?.trunks.filter((trunk) => trunk.status === "active") ?? [];
   const activeAgents =
-    agents.data?.voice_agents.filter((agent) => agent.status === "active") ?? [];
+    agents.data?.voice_agents.filter((agent) => agent.status === "active") ??
+    [];
   const registeredNumbers = numbers.data?.numbers ?? [];
 
   const metrics = [
@@ -157,7 +158,9 @@ export function OverviewDashboard() {
     number: numbers.data ? registeredNumbers.length > 0 : null,
   };
 
-  const completed = Object.values(setup).filter((value) => value === true).length;
+  const completed = Object.values(setup).filter(
+    (value) => value === true,
+  ).length;
   const known = Object.values(setup).filter((value) => value !== null).length;
 
   const errors = [
@@ -174,7 +177,7 @@ export function OverviewDashboard() {
           <h1 className="text-3xl font-semibold tracking-tight">Overview</h1>
           <p className="text-muted-foreground">
             {selected
-              ? "Organization: " + selected.name
+              ? `Organization: ${selected.name}`
               : "Select an organization to review your workspace."}
           </p>
         </div>
@@ -184,8 +187,7 @@ export function OverviewDashboard() {
       {errors.length > 0 && (
         <div role="alert" className="space-y-3 rounded-lg border p-4">
           <p>
-            Some workspace data could not be loaded:{" "}
-            {errorMessage(errors[0])}
+            Some workspace data could not be loaded: {errorMessage(errors[0])}
           </p>
           <Button
             variant="outline"
@@ -282,7 +284,10 @@ export function OverviewDashboard() {
             >
               {calls.isFetching ? "Refreshing…" : "Refresh"}
             </Button>
-            <Link href="/calls" className="text-sm underline underline-offset-4">
+            <Link
+              href="/calls"
+              className="text-sm underline underline-offset-4"
+            >
               View all calls
             </Link>
           </div>
@@ -299,11 +304,16 @@ export function OverviewDashboard() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {["Call", "Agent", "Direction", "State", "Started", "Talk time"].map(
-                    (label) => (
-                      <TableHead key={label}>{label}</TableHead>
-                    ),
-                  )}
+                  {[
+                    "Call",
+                    "Agent",
+                    "Direction",
+                    "State",
+                    "Started",
+                    "Talk time",
+                  ].map((label) => (
+                    <TableHead key={label}>{label}</TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -311,7 +321,7 @@ export function OverviewDashboard() {
                   <TableRow key={call.id}>
                     <TableCell>
                       <Link
-                        href={"/calls/" + encodeURIComponent(call.id)}
+                        href={`/calls/${encodeURIComponent(call.id)}`}
                         className="font-mono text-xs hover:underline"
                       >
                         {call.id}
@@ -319,9 +329,9 @@ export function OverviewDashboard() {
                     </TableCell>
                     <TableCell>
                       {call.voice_agent_id
-                        ? activeAgents.find(
+                        ? (activeAgents.find(
                             (agent) => agent.id === call.voice_agent_id,
-                          )?.name ?? call.voice_agent_id
+                          )?.name ?? call.voice_agent_id)
                         : "—"}
                     </TableCell>
                     <TableCell>{call.direction}</TableCell>

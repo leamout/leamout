@@ -38,9 +38,10 @@ export function ProviderDetails({ providerId }: { providerId: string }) {
     );
   }
 
-  const credentials = integrations.data?.ai_integrations.filter(
-    (item) => item.provider === providerId,
-  ) ?? [];
+  const credentials =
+    integrations.data?.ai_integrations.filter(
+      (item) => item.provider === providerId,
+    ) ?? [];
 
   return (
     <div className="space-y-8">
@@ -87,13 +88,16 @@ export function ProviderDetails({ providerId }: { providerId: string }) {
         ) : credentials.length ? (
           <ul className="space-y-3">
             {credentials.map((credential) => (
-              <li key={credential.id} className="space-y-3 rounded-lg border p-5">
+              <li
+                key={credential.id}
+                className="space-y-3 rounded-lg border p-5"
+              >
                 <div className="space-y-1">
                   <p className="font-medium">{credential.name}</p>
                   <p className="text-sm text-muted-foreground">
                     Connection: {credential.connection_state}
                     {credential.failure_code
-                      ? " · " + credential.failure_code
+                      ? ` · ${credential.failure_code}`
                       : ""}
                   </p>
                   <p className="text-sm text-muted-foreground">

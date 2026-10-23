@@ -24,7 +24,7 @@ export function TrunkDetails({ trunkId }: { trunkId: string }) {
   const client = useQueryClient();
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
-  const path = "/trunks/" + encodeURIComponent(trunkId);
+  const path = `/trunks/${encodeURIComponent(trunkId)}`;
 
   const query = useQuery({
     queryKey: ["trunks", organizationId, trunkId],
@@ -34,7 +34,7 @@ export function TrunkDetails({ trunkId }: { trunkId: string }) {
 
   const validate = useMutation({
     mutationFn: () =>
-      api<TrunkValidation>(path + "/validate", {
+      api<TrunkValidation>(`${path}/validate`, {
         method: "POST",
         organizationId,
       }),
@@ -148,9 +148,9 @@ export function TrunkDetails({ trunkId }: { trunkId: string }) {
         </TabsContent>
         <TabsContent value="authentication">
           <div className="space-y-10">
-            <TrunkAuthForm key={"in-" + trunk.id} inbound trunk={trunk} />
+            <TrunkAuthForm key={`in-${trunk.id}`} inbound trunk={trunk} />
             <TrunkAuthForm
-              key={"out-" + trunk.id}
+              key={`out-${trunk.id}`}
               inbound={false}
               trunk={trunk}
             />

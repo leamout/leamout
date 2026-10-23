@@ -97,7 +97,10 @@ export function AgentList() {
           </Button>
         </div>
       ) : query.isPending ? (
-        <p role="status" className="rounded-lg border p-6 text-muted-foreground">
+        <p
+          role="status"
+          className="rounded-lg border p-6 text-muted-foreground"
+        >
           Loading agents…
         </p>
       ) : (
@@ -118,13 +121,15 @@ export function AgentList() {
                   <TableCell>
                     <Link
                       className="font-medium underline-offset-4 hover:underline"
-                      href={"/agents/" + encodeURIComponent(agent.id)}
+                      href={`/agents/${encodeURIComponent(agent.id)}`}
                     >
                       {agent.name}
                     </Link>
                   </TableCell>
                   <TableCell>
-                    {agent.engine === "composable" ? "STT → LLM → TTS" : "Realtime"}
+                    {agent.engine === "composable"
+                      ? "STT → LLM → TTS"
+                      : "Realtime"}
                   </TableCell>
                   <TableCell>{agent.language}</TableCell>
                   <TableCell>{agent.status}</TableCell>

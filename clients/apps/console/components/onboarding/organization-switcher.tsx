@@ -59,7 +59,7 @@ export function OrganizationSwitcher() {
                 tooltip="Switch organization"
                 aria-label={
                   selected
-                    ? "Switch organization, current: " + selected.name
+                    ? `Switch organization, current: ${selected.name}`
                     : "Choose organization"
                 }
                 className="data-[popup-open]:bg-sidebar-accent data-[popup-open]:text-sidebar-accent-foreground"

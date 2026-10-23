@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { api } from "../lib/api";
 import {
+  type Call,
+  type CallRecording,
   callDurationSeconds,
   formatCallDate,
   formatDuration,
-  type Call,
-  type CallRecording,
 } from "../components/calls/types";
+import { api } from "../lib/api";
 
 const baseCall: Call = {
   id: "call-a",
@@ -42,9 +42,7 @@ test("Call list, detail, and recording filters use organization scoped GETs", as
     }
     return Response.json({
       success: true,
-      data: target.includes("/calls/?")
-        ? { calls: [baseCall] }
-        : baseCall,
+      data: target.includes("/calls/?") ? { calls: [baseCall] } : baseCall,
     });
   };
 
@@ -57,10 +55,9 @@ test("Call list, detail, and recording filters use organization scoped GETs", as
       voice_agent_id: "agent-a",
     });
 
-    const list = await api<{ calls: Call[] }>(
-      "/calls/?" + params.toString(),
-      { organizationId: "org-a" },
-    );
+    const list = await api<{ calls: Call[] }>(`/calls/?${params.toString()}`, {
+      organizationId: "org-a",
+    });
     const detail = await api<Call>("/calls/call-a", {
       organizationId: "org-a",
     });
@@ -105,10 +102,7 @@ test("Call duration uses only persisted answered and ended timestamps", () => {
   assert.equal(formatDuration(65), "1m 5s");
   assert.equal(formatDuration(3661), "1h 1m 1s");
   assert.equal(formatDuration(null), "—");
-  assert.equal(
-    callDurationSeconds({ ...baseCall, answered_at: null }),
-    null,
-  );
+  assert.equal(callDurationSeconds({ ...baseCall, answered_at: null }), null);
   assert.equal(
     callDurationSeconds({ ...baseCall, ended_at: null, state: "active" }),
     null,

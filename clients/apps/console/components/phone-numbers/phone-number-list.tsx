@@ -36,7 +36,7 @@ export function PhoneNumberList() {
   const numbers = query.data?.numbers ?? [];
   const filtered = numbers.filter(
     (number) =>
-      (number.number + " " + number.country_code)
+      `${number.number} ${number.country_code}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()) &&
       (voice === "all" || number.voice_enabled === (voice === "enabled")),
@@ -110,7 +110,7 @@ export function PhoneNumberList() {
                 <TableRow key={number.id}>
                   <TableCell>
                     <Link
-                      href={"/phone-numbers/" + encodeURIComponent(number.id)}
+                      href={`/phone-numbers/${encodeURIComponent(number.id)}`}
                       className="font-medium hover:underline"
                     >
                       {number.number}
@@ -125,9 +125,7 @@ export function PhoneNumberList() {
                     {number.trunk_id ? (
                       <Link
                         className="hover:underline"
-                        href={
-                          "/sip-trunks/" + encodeURIComponent(number.trunk_id)
-                        }
+                        href={`/sip-trunks/${encodeURIComponent(number.trunk_id)}`}
                       >
                         {number.trunk_id}
                       </Link>
@@ -154,8 +152,8 @@ export function PhoneNumberList() {
         </div>
       )}
       <p className="text-xs text-muted-foreground">
-        Phone number purchasing and provisioning are not included. Register
-        only numbers you control.
+        Phone number purchasing and provisioning are not included. Register only
+        numbers you control.
       </p>
     </div>
   );

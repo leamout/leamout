@@ -69,8 +69,7 @@ const sourceIPSchema = z.object({
     .string()
     .trim()
     .refine(
-      (value) =>
-        z.union([z.cidrv4(), z.cidrv6()]).safeParse(value).success,
+      (value) => z.union([z.cidrv4(), z.cidrv6()]).safeParse(value).success,
       "Enter a valid IPv4 or IPv6 network prefix.",
     ),
 });
@@ -87,7 +86,7 @@ export function TrunkAuthForm({
   const { selected } = useOrganization();
   const organizationId = selected?.id ?? "";
   const client = useQueryClient();
-  const trunkPath = "/trunks/" + encodeURIComponent(trunk.id);
+  const trunkPath = `/trunks/${encodeURIComponent(trunk.id)}`;
   const [removing, setRemoving] = useState<string | null>(null);
   const sourcesKey = ["trunk-source-ips", organizationId, trunk.id];
   const prefix = inbound ? "inbound" : "outbound";
@@ -96,7 +95,8 @@ export function TrunkAuthForm({
     resolver: zodResolver(authSchema(inbound)),
     defaultValues: {
       method: inbound ? trunk.inbound_auth_method : trunk.outbound_auth_method,
-      username: (inbound ? trunk.inbound_username : trunk.outbound_username) ?? "",
+      username:
+        (inbound ? trunk.inbound_username : trunk.outbound_username) ?? "",
       realm: (inbound ? trunk.inbound_realm : trunk.outbound_realm) ?? "",
       secret: "",
     },
@@ -112,7 +112,7 @@ export function TrunkAuthForm({
   const sources = useQuery({
     queryKey: sourcesKey,
     queryFn: ({ signal }) =>
-      api<{ source_ips: TrunkSourceIP[] }>(trunkPath + "/source-ips", {
+      api<{ source_ips: TrunkSourceIP[] }>(`${trunkPath}/source-ips`, {
         organizationId,
         signal,
       }),
@@ -147,7 +147,7 @@ export function TrunkAuthForm({
 
   const addIP = useMutation({
     mutationFn: (values: SourceIPValues) =>
-      api<TrunkSourceIP>(trunkPath + "/source-ips", {
+      api<TrunkSourceIP>(`${trunkPath}/source-ips`, {
         method: "POST",
         organizationId,
         body: { cidr: values.cidr },
@@ -160,7 +160,7 @@ export function TrunkAuthForm({
 
   const removeIP = useMutation({
     mutationFn: (id: string) =>
-      api<void>(trunkPath + "/source-ips/" + encodeURIComponent(id), {
+      api<void>(`${trunkPath}/source-ips/${encodeURIComponent(id)}`, {
         method: "DELETE",
         organizationId,
       }),
@@ -182,14 +182,14 @@ export function TrunkAuthForm({
         <FieldDescription>
           Current method:{" "}
           {inbound ? trunk.inbound_auth_method : trunk.outbound_auth_method}.
-          Existing secrets are never returned by the API. Enter new
-          credentials to replace them.
+          Existing secrets are never returned by the API. Enter new credentials
+          to replace them.
         </FieldDescription>
 
         <Field data-invalid={Boolean(form.formState.errors.method)}>
-          <FieldLabel htmlFor={prefix + "-method"}>Method</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-method`}>Method</FieldLabel>
           <select
-            id={prefix + "-method"}
+            id={`${prefix}-method`}
             className="h-10 w-full rounded-md border bg-background px-3"
             aria-invalid={Boolean(form.formState.errors.method)}
             {...form.register("method")}
@@ -211,23 +211,25 @@ export function TrunkAuthForm({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={prefix + "-username"}>
+                  <FieldLabel htmlFor={`${prefix}-username`}>
                     Username
                   </FieldLabel>
                   <Input
                     {...field}
-                    id={prefix + "-username"}
+                    id={`${prefix}-username`}
                     autoComplete="off"
                     maxLength={255}
                     required
                     aria-invalid={fieldState.invalid}
                     aria-describedby={
-                      fieldState.invalid ? prefix + "-username-error" : undefined
+                      fieldState.invalid
+                        ? `${prefix}-username-error`
+                        : undefined
                     }
                   />
                   {fieldState.invalid && (
                     <FieldError
-                      id={prefix + "-username-error"}
+                      id={`${prefix}-username-error`}
                       errors={[fieldState.error]}
                     />
                   )}
@@ -239,23 +241,21 @@ export function TrunkAuthForm({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={prefix + "-realm"}>
-                    Realm
-                  </FieldLabel>
+                  <FieldLabel htmlFor={`${prefix}-realm`}>Realm</FieldLabel>
                   <Input
                     {...field}
-                    id={prefix + "-realm"}
+                    id={`${prefix}-realm`}
                     autoComplete="off"
                     maxLength={255}
                     required
                     aria-invalid={fieldState.invalid}
                     aria-describedby={
-                      fieldState.invalid ? prefix + "-realm-error" : undefined
+                      fieldState.invalid ? `${prefix}-realm-error` : undefined
                     }
                   />
                   {fieldState.invalid && (
                     <FieldError
-                      id={prefix + "-realm-error"}
+                      id={`${prefix}-realm-error`}
                       errors={[fieldState.error]}
                     />
                   )}
@@ -267,24 +267,24 @@ export function TrunkAuthForm({
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={prefix + "-secret"}>
+                  <FieldLabel htmlFor={`${prefix}-secret`}>
                     New password
                   </FieldLabel>
                   <Input
                     {...field}
-                    id={prefix + "-secret"}
+                    id={`${prefix}-secret`}
                     type="password"
                     autoComplete="new-password"
                     maxLength={4096}
                     required
                     aria-invalid={fieldState.invalid}
                     aria-describedby={
-                      fieldState.invalid ? prefix + "-secret-error" : undefined
+                      fieldState.invalid ? `${prefix}-secret-error` : undefined
                     }
                   />
                   {fieldState.invalid && (
                     <FieldError
-                      id={prefix + "-secret-error"}
+                      id={`${prefix}-secret-error`}
                       errors={[fieldState.error]}
                     />
                   )}
@@ -399,10 +399,7 @@ export function TrunkAuthForm({
                 </Field>
               )}
             />
-            <Button
-              type="submit"
-              disabled={addIP.isPending || !organizationId}
-            >
+            <Button type="submit" disabled={addIP.isPending || !organizationId}>
               {addIP.isPending ? "Adding…" : "Add network"}
             </Button>
           </form>

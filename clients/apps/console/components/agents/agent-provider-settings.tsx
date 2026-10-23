@@ -2,19 +2,14 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@leamout/ui/components/field";
-import { Input } from "@leamout/ui/components/input";
+import { Field, FieldError, FieldLabel } from "@leamout/ui/components/field";
 import { Textarea } from "@leamout/ui/components/textarea";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { useOrganization } from "@/components/onboarding/organization-provider";
+import type { VoiceAgent } from "@/components/agents/types";
 import {
   providerCatalog,
   providerName,
@@ -24,13 +19,15 @@ import type {
   AIIntegration,
   ProviderRole,
 } from "@/components/ai-providers/types";
-import type { VoiceAgent } from "@/components/agents/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 
 function isJSONObject(value: string): boolean {
   try {
     const parsed: unknown = JSON.parse(value);
-    return parsed !== null && !Array.isArray(parsed) && typeof parsed === "object";
+    return (
+      parsed !== null && !Array.isArray(parsed) && typeof parsed === "object"
+    );
   } catch {
     return false;
   }
@@ -72,7 +69,8 @@ function ProviderRoleForm({
   const provider = form.watch("provider");
   const options = providerCatalog.filter((entry) => entry.roles.includes(role));
   const matchingCredentials = credentials.filter(
-    (entry) => entry.provider === provider && entry.connection_state === "ready",
+    (entry) =>
+      entry.provider === provider && entry.connection_state === "ready",
   );
 
   const refresh = async () => {
@@ -135,7 +133,7 @@ function ProviderRoleForm({
       <h3 className="font-semibold uppercase">{role}</h3>
       <p className="text-sm text-muted-foreground">
         {binding
-          ? "Current assignment: " + providerName(binding.provider)
+          ? `Current assignment: ${providerName(binding.provider)}`
           : "No provider assigned."}
       </p>
       <form
@@ -145,9 +143,9 @@ function ProviderRoleForm({
         onChange={() => setSaved(false)}
       >
         <Field data-invalid={Boolean(form.formState.errors.provider)}>
-          <FieldLabel htmlFor={"provider-" + role}>Provider</FieldLabel>
+          <FieldLabel htmlFor={`provider-${role}`}>Provider</FieldLabel>
           <select
-            id={"provider-" + role}
+            id={`provider-${role}`}
             className="h-10 w-full rounded-md border bg-background px-3"
             aria-invalid={Boolean(form.formState.errors.provider)}
             {...form.register("provider", {
@@ -166,11 +164,11 @@ function ProviderRoleForm({
           )}
         </Field>
         <Field data-invalid={Boolean(form.formState.errors.credentialId)}>
-          <FieldLabel htmlFor={"credential-" + role}>
+          <FieldLabel htmlFor={`credential-${role}`}>
             Verified organization credential
           </FieldLabel>
           <select
-            id={"credential-" + role}
+            id={`credential-${role}`}
             className="h-10 w-full rounded-md border bg-background px-3"
             aria-invalid={Boolean(form.formState.errors.credentialId)}
             {...form.register("credentialId")}
@@ -199,20 +197,18 @@ function ProviderRoleForm({
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={"config-" + role}>
+              <FieldLabel htmlFor={`config-${role}`}>
                 Provider configuration (JSON)
               </FieldLabel>
               <Textarea
                 {...field}
-                id={"config-" + role}
+                id={`config-${role}`}
                 className="font-mono"
                 rows={5}
                 spellCheck={false}
                 aria-invalid={fieldState.invalid}
               />
-              {fieldState.invalid && (
-                <FieldError errors={[fieldState.error]} />
-              )}
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
         />
@@ -221,9 +217,13 @@ function ProviderRoleForm({
           provider-specific settings and credential ownership.
         </p>
         <Button type="submit" disabled={save.isPending || !organizationId}>
-          {save.isPending ? "Saving…" : "Save " + role.toUpperCase()}
+          {save.isPending ? "Saving…" : `Save ${role.toUpperCase()}`}
         </Button>
-        {saved && <p role="status" className="text-sm">Assignment saved.</p>}
+        {saved && (
+          <p role="status" className="text-sm">
+            Assignment saved.
+          </p>
+        )}
         {save.isError && (
           <p role="alert" className="text-sm text-destructive">
             {errorMessage(save.error)}
@@ -246,10 +246,7 @@ function ProviderRoleForm({
               >
                 Confirm removal
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setConfirmRemove(false)}
-              >
+              <Button variant="outline" onClick={() => setConfirmRemove(false)}>
                 Cancel
               </Button>
             </div>
@@ -268,7 +265,7 @@ function ProviderRoleForm({
 export function AgentProviderSettings({ agent }: { agent: VoiceAgent }) {
   const { selected } = useOrganization();
   const organizationId = selected?.id ?? "";
-  const path = "/voice-agents/" + encodeURIComponent(agent.id) + "/providers/";
+  const path = `/voice-agents/${encodeURIComponent(agent.id)}/providers/`;
   const roles: ProviderRole[] =
     agent.engine === "realtime" ? ["realtime"] : ["stt", "llm", "tts"];
 
@@ -299,8 +296,8 @@ export function AgentProviderSettings({ agent }: { agent: VoiceAgent }) {
         <p className="text-sm text-muted-foreground">
           {agent.engine === "realtime"
             ? "Configure one realtime provider for this Agent."
-            : "Configure STT, LLM, and TTS providers for this Agent."}
-          {" "}Each role requires a verified organization integration.
+            : "Configure STT, LLM, and TTS providers for this Agent."}{" "}
+          Each role requires a verified organization integration.
         </p>
         <Link href="/ai-providers" className="text-sm underline">
           Manage provider credentials
@@ -347,7 +344,9 @@ export function AgentProviderSettings({ agent }: { agent: VoiceAgent }) {
               />
             );
           })}
-          {bindings.data.providers.some((item) => !roles.includes(item.role)) && (
+          {bindings.data.providers.some(
+            (item) => !roles.includes(item.role),
+          ) && (
             <p className="text-sm text-muted-foreground">
               This Agent has bindings for a different engine. Use its
               Configuration tab to review the engine or remove incompatible

@@ -6,8 +6,7 @@ export default async function Page({
   searchParams: Promise<{ agent_id?: string | string[] }>;
 }) {
   const params = await searchParams;
-  const agentId =
-    typeof params.agent_id === "string" ? params.agent_id : "";
+  const agentId = typeof params.agent_id === "string" ? params.agent_id : "";
 
   return <CreateToolForm agentId={agentId} />;
 }

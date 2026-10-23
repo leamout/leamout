@@ -26,16 +26,16 @@ test("Tools and webhooks use existing organization-scoped backend routes", async
         parameters: {},
       },
     });
-    await api(toolPath + "tool-a", {
+    await api(`${toolPath}tool-a`, {
       method: "PATCH",
-      organizationId, body: { enabled: false },
+      organizationId,
+      body: { enabled: false },
     });
-    await api(toolPath + "tool-a/rotate-signing-secret", {
+    await api(`${toolPath}tool-a/rotate-signing-secret`, {
       method: "POST",
       organizationId,
     });
-    await api(toolPath + "tool-a", { method: "DELETE",
-      organizationId });
+    await api(`${toolPath}tool-a`, { method: "DELETE", organizationId });
     await api("/webhooks/", { organizationId });
     await api("/webhooks/", {
       method: "POST",
@@ -49,20 +49,22 @@ test("Tools and webhooks use existing organization-scoped backend routes", async
     await api("/webhooks/webhook-a", { organizationId });
     await api("/webhooks/webhook-a", {
       method: "PATCH",
-      organizationId, body: { enabled: false },
+      organizationId,
+      body: { enabled: false },
     });
     await api("/webhooks/webhook-a/rotate-secret", {
       method: "POST",
       organizationId,
     });
     await api("/webhooks/webhook-a/test", { method: "POST", organizationId });
-    await api("/webhooks/webhook-a/deliveries?limit=50&offset=0", { organizationId });
+    await api("/webhooks/webhook-a/deliveries?limit=50&offset=0", {
+      organizationId,
+    });
     await api("/webhooks/webhook-a/deliveries/delivery-a/retry", {
       method: "POST",
       organizationId,
     });
-    await api("/webhooks/webhook-a", { method: "DELETE",
-      organizationId });
+    await api("/webhooks/webhook-a", { method: "DELETE", organizationId });
 
     assert.deepEqual(
       calls.map(({ path, options }) => [options.method, path]),
@@ -82,10 +84,7 @@ test("Tools and webhooks use existing organization-scoped backend routes", async
         ["POST", "/api/v1/webhooks/webhook-a/rotate-secret"],
         ["POST", "/api/v1/webhooks/webhook-a/test"],
         ["GET", "/api/v1/webhooks/webhook-a/deliveries?limit=50&offset=0"],
-        [
-          "POST",
-          "/api/v1/webhooks/webhook-a/deliveries/delivery-a/retry",
-        ],
+        ["POST", "/api/v1/webhooks/webhook-a/deliveries/delivery-a/retry"],
         ["DELETE", "/api/v1/webhooks/webhook-a"],
       ],
     );

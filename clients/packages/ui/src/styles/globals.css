@@ -93,21 +93,13 @@
     var(--brand-offwhite)
   );
   --secondary-foreground: var(--brand-graphite);
-  --muted: color-mix(
-    in srgb,
-    var(--brand-graphite) 7%,
-    var(--brand-offwhite)
-  );
+  --muted: color-mix(in srgb, var(--brand-graphite) 7%, var(--brand-offwhite));
   --muted-foreground: color-mix(
     in srgb,
     var(--brand-graphite) 72%,
     var(--brand-offwhite)
   );
-  --accent: color-mix(
-    in srgb,
-    var(--brand-graphite) 7%,
-    var(--brand-offwhite)
-  );
+  --accent: color-mix(in srgb, var(--brand-graphite) 7%, var(--brand-offwhite));
   --accent-foreground: var(--brand-graphite);
   --destructive: #b42318;
   --border: color-mix(
@@ -115,20 +107,12 @@
     var(--brand-graphite) 18%,
     var(--brand-offwhite)
   );
-  --input: color-mix(
-    in srgb,
-    var(--brand-graphite) 25%,
-    var(--brand-offwhite)
-  );
+  --input: color-mix(in srgb, var(--brand-graphite) 25%, var(--brand-offwhite));
   --ring: var(--brand-orange);
   --chart-1: var(--brand-orange);
   --chart-2: var(--brand-graphite);
   --chart-3: var(--brand-surface);
-  --chart-4: color-mix(
-    in srgb,
-    var(--brand-orange) 55%,
-    var(--brand-graphite)
-  );
+  --chart-4: color-mix(in srgb, var(--brand-orange) 55%, var(--brand-graphite));
   --chart-5: color-mix(
     in srgb,
     var(--brand-graphite) 55%,
@@ -165,25 +149,13 @@
   --accent: var(--brand-surface);
   --accent-foreground: var(--brand-offwhite);
   --destructive: #ff8a80;
-  --border: color-mix(
-    in srgb,
-    var(--brand-offwhite) 14%,
-    var(--brand-surface)
-  );
-  --input: color-mix(
-    in srgb,
-    var(--brand-offwhite) 20%,
-    var(--brand-surface)
-  );
+  --border: color-mix(in srgb, var(--brand-offwhite) 14%, var(--brand-surface));
+  --input: color-mix(in srgb, var(--brand-offwhite) 20%, var(--brand-surface));
   --ring: var(--brand-orange);
   --chart-1: var(--brand-orange);
   --chart-2: var(--brand-offwhite);
   --chart-3: var(--brand-surface);
-  --chart-4: color-mix(
-    in srgb,
-    var(--brand-orange) 55%,
-    var(--brand-offwhite)
-  );
+  --chart-4: color-mix(in srgb, var(--brand-orange) 55%, var(--brand-offwhite));
   --chart-5: color-mix(
     in srgb,
     var(--brand-graphite) 55%,

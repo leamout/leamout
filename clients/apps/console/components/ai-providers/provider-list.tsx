@@ -92,12 +92,14 @@ export function ProviderList() {
                     <TableCell>
                       <Link
                         className="font-medium hover:underline"
-                        href={"/ai-providers/" + encodeURIComponent(provider.id)}
+                        href={`/ai-providers/${encodeURIComponent(provider.id)}`}
                       >
                         {provider.name}
                       </Link>
                     </TableCell>
-                    <TableCell>{provider.roles.join(", ").toUpperCase()}</TableCell>
+                    <TableCell>
+                      {provider.roles.join(", ").toUpperCase()}
+                    </TableCell>
                     <TableCell>{credentials.length}</TableCell>
                     <TableCell>{ready}</TableCell>
                   </TableRow>

@@ -9,14 +9,14 @@ import {
   FieldLabel,
 } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
-import Link from "next/link";
 import { useMutation } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Controller, useForm } from "react-hook-form";
+import { z } from "zod";
 import { api, errorMessage } from "@/lib/api";
 import type { Organization } from "@/lib/organizations";
 import { useOrganization } from "./organization-provider";
-import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
 
 const organizationSchema = z.object({
   name: z.string().trim().min(1, "Enter an organization name."),
@@ -56,10 +56,7 @@ export function CreateOrganizationForm() {
           A workspace for your team, voice agents, and connections.
         </p>
       </div>
-      <form
-        className="space-y-4"
-        onSubmit={form.handleSubmit(onSubmit)}
-      >
+      <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
         <Controller
           name="name"
           control={form.control}
@@ -92,11 +89,7 @@ export function CreateOrganizationForm() {
             </Field>
           )}
         />
-        <Button
-          className="w-full"
-          type="submit"
-          disabled={create.isPending}
-        >
+        <Button className="w-full" type="submit" disabled={create.isPending}>
           Create organization
         </Button>
         {create.isError && (

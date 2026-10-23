@@ -23,7 +23,7 @@ export function PhoneNumberDetails({ numberId }: { numberId: string }) {
   const client = useQueryClient();
   const router = useRouter();
   const [confirm, setConfirm] = useState(false);
-  const path = "/numbers/" + encodeURIComponent(numberId);
+  const path = `/numbers/${encodeURIComponent(numberId)}`;
 
   const number = useQuery({
     queryKey: ["numbers", organizationId, numberId],

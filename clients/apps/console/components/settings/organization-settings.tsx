@@ -2,11 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@leamout/ui/components/field";
+import { Field, FieldError, FieldLabel } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
@@ -37,17 +33,17 @@ function OrganizationForm({
 
   const save = useMutation({
     mutationFn: (values: Values) =>
-      api<Organization>("/organizations/" + encodeURIComponent(organization.id), {
-        method: "PATCH",
-        organizationId: organization.id,
-        body: { name: values.name.trim() },
-      }),
+      api<Organization>(
+        `/organizations/${encodeURIComponent(organization.id)}`,
+        {
+          method: "PATCH",
+          organizationId: organization.id,
+          body: { name: values.name.trim() },
+        },
+      ),
     onSuccess: async (value) => {
       form.reset({ name: value.name });
-      client.setQueryData(
-        ["organizations", value.id],
-        value,
-      );
+      client.setQueryData(["organizations", value.id], value);
       await client.invalidateQueries({ queryKey: ["organizations"] });
     },
   });
@@ -107,10 +103,13 @@ export function OrganizationSettings() {
   const organization = useQuery({
     queryKey: ["organization-details", organizationId],
     queryFn: ({ signal }) =>
-      api<Organization>("/organizations/" + encodeURIComponent(organizationId), {
-        organizationId,
-        signal,
-      }),
+      api<Organization>(
+        `/organizations/${encodeURIComponent(organizationId)}`,
+        {
+          organizationId,
+          signal,
+        },
+      ),
     enabled: Boolean(organizationId),
   });
 
@@ -136,7 +135,9 @@ export function OrganizationSettings() {
           <dl className="grid gap-4 rounded-lg border p-5 sm:grid-cols-2">
             <div>
               <dt className="text-sm text-muted-foreground">Organization ID</dt>
-              <dd className="break-all font-mono text-xs">{organization.data.id}</dd>
+              <dd className="break-all font-mono text-xs">
+                {organization.data.id}
+              </dd>
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Your role</dt>
@@ -144,13 +145,17 @@ export function OrganizationSettings() {
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Status</dt>
-              <dd className="font-medium capitalize">{organization.data.status}</dd>
+              <dd className="font-medium capitalize">
+                {organization.data.status}
+              </dd>
             </div>
             <div>
               <dt className="text-sm text-muted-foreground">Created</dt>
-              <dd>{organization.data.created_at
-                ? new Date(organization.data.created_at).toLocaleString()
-                : "—"}</dd>
+              <dd>
+                {organization.data.created_at
+                  ? new Date(organization.data.created_at).toLocaleString()
+                  : "—"}
+              </dd>
             </div>
           </dl>
           <OrganizationForm

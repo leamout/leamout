@@ -22,9 +22,7 @@ export function OrganizationSelector() {
   }
 
   const loading =
-    !organization.ready ||
-    organization.isPending ||
-    organization.isFetching;
+    !organization.ready || organization.isPending || organization.isFetching;
 
   return (
     <div className="space-y-6">
@@ -72,7 +70,11 @@ export function OrganizationSelector() {
           </p>
         </div>
       )}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <Button className="w-full" render={<Link href="/create-organization" />}>
         Create organization
       </Button>

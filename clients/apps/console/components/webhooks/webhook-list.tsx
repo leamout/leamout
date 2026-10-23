@@ -3,7 +3,12 @@
 import { Button } from "@leamout/ui/components/button";
 import { Input } from "@leamout/ui/components/input";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@leamout/ui/components/table";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -29,7 +34,7 @@ export function WebhookList() {
   const items = endpoints.data?.webhooks ?? [];
   const filtered = items.filter(
     (item) =>
-      (item.url + " " + item.subscribed_events.join(" "))
+      `${item.url} ${item.subscribed_events.join(" ")}`
         .toLowerCase()
         .includes(search.trim().toLowerCase()) &&
       (status === "all" || item.enabled === (status === "enabled")),
@@ -44,9 +49,7 @@ export function WebhookList() {
             Send organization platform events to your HTTPS endpoints.
           </p>
         </div>
-        <Button render={<Link href="/webhooks/new" />}>
-          Create endpoint
-        </Button>
+        <Button render={<Link href="/webhooks/new" />}>Create endpoint</Button>
       </div>
       <div className="flex flex-wrap gap-4">
         <label className="flex-1 space-y-2 text-sm">
@@ -97,12 +100,14 @@ export function WebhookList() {
                   <TableCell>
                     <Link
                       className="break-all font-medium hover:underline"
-                      href={"/webhooks/" + encodeURIComponent(endpoint.id)}
+                      href={`/webhooks/${encodeURIComponent(endpoint.id)}`}
                     >
                       {endpoint.url}
                     </Link>
                   </TableCell>
-                  <TableCell>{endpoint.enabled ? "Enabled" : "Disabled"}</TableCell>
+                  <TableCell>
+                    {endpoint.enabled ? "Enabled" : "Disabled"}
+                  </TableCell>
                   <TableCell>{endpoint.subscribed_events.join(", ")}</TableCell>
                   <TableCell>{endpoint.consecutive_failures}</TableCell>
                 </TableRow>
@@ -110,7 +115,9 @@ export function WebhookList() {
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={4} className="py-12 text-center">
-                    {items.length ? "No matching endpoints." : "No webhooks configured."}
+                    {items.length
+                      ? "No matching endpoints."
+                      : "No webhooks configured."}
                   </TableCell>
                 </TableRow>
               )}

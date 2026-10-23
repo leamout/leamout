@@ -43,22 +43,22 @@ export function MembersSettings() {
     resolver: zodResolver(schema),
     defaultValues: { email: "", role: "member" },
   });
-  const base = "/organizations/" + encodeURIComponent(organizationId);
+  const base = `/organizations/${encodeURIComponent(organizationId)}`;
   const members = useQuery({
     queryKey: ["organization-members", organizationId],
     queryFn: ({ signal }) =>
-      api<Member[]>(base + "/members/", { organizationId, signal }),
+      api<Member[]>(`${base}/members/`, { organizationId, signal }),
     enabled: Boolean(organizationId),
   });
   const invitations = useQuery({
     queryKey: ["organization-invitations", organizationId],
     queryFn: ({ signal }) =>
-      api<Invitation[]>(base + "/invitations/", { organizationId, signal }),
+      api<Invitation[]>(`${base}/invitations/`, { organizationId, signal }),
     enabled: Boolean(organizationId) && canManage,
   });
   const invite = useMutation({
     mutationFn: (values: z.infer<typeof schema>) =>
-      api<Invitation>(base + "/invitations/", {
+      api<Invitation>(`${base}/invitations/`, {
         method: "POST",
         organizationId,
         body: values,
@@ -72,7 +72,7 @@ export function MembersSettings() {
   });
   const update = useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: string }) =>
-      api<Member>(base + "/members/" + encodeURIComponent(userId), {
+      api<Member>(`${base}/members/${encodeURIComponent(userId)}`, {
         method: "PATCH",
         organizationId,
         body: { role },
@@ -86,7 +86,7 @@ export function MembersSettings() {
   });
   const remove = useMutation({
     mutationFn: (userId: string) =>
-      api<void>(base + "/members/" + encodeURIComponent(userId), {
+      api<void>(`${base}/members/${encodeURIComponent(userId)}`, {
         method: "DELETE",
         organizationId,
       }),
@@ -99,7 +99,7 @@ export function MembersSettings() {
   });
   const revoke = useMutation({
     mutationFn: (id: string) =>
-      api<void>(base + "/invitations/" + encodeURIComponent(id), {
+      api<void>(`${base}/invitations/${encodeURIComponent(id)}`, {
         method: "DELETE",
         organizationId,
       }),
@@ -134,7 +134,10 @@ export function MembersSettings() {
         ) : members.data.length ? (
           <ul className="space-y-3">
             {members.data.map((member) => (
-              <li key={member.user_id} className="space-y-3 rounded-lg border p-4">
+              <li
+                key={member.user_id}
+                className="space-y-3 rounded-lg border p-4"
+              >
                 <p className="break-all font-mono text-xs">{member.user_id}</p>
                 <p className="text-sm text-muted-foreground">
                   {member.role} · {member.status}
@@ -149,18 +152,25 @@ export function MembersSettings() {
                           onClick={() =>
                             update.mutate({
                               userId: member.user_id,
-                              role: member.role === "admin" ? "member" : "admin",
+                              role:
+                                member.role === "admin" ? "member" : "admin",
                             })
                           }
                         >
                           Set {member.role === "admin" ? "member" : "admin"}
                         </Button>
-                        <Button variant="outline" onClick={() => setEditing(null)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditing(null)}
+                        >
                           Cancel
                         </Button>
                       </>
                     ) : (
-                      <Button variant="outline" onClick={() => setEditing(member.user_id)}>
+                      <Button
+                        variant="outline"
+                        onClick={() => setEditing(member.user_id)}
+                      >
                         Change role…
                       </Button>
                     )}
@@ -173,12 +183,18 @@ export function MembersSettings() {
                         >
                           Confirm removal
                         </Button>
-                        <Button variant="outline" onClick={() => setRemoving(null)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setRemoving(null)}
+                        >
                           Cancel
                         </Button>
                       </>
                     ) : (
-                      <Button variant="outline" onClick={() => setRemoving(member.user_id)}>
+                      <Button
+                        variant="outline"
+                        onClick={() => setRemoving(member.user_id)}
+                      >
                         Remove…
                       </Button>
                     )}
@@ -211,7 +227,9 @@ export function MembersSettings() {
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="invite-email">Email address</FieldLabel>
+                    <FieldLabel htmlFor="invite-email">
+                      Email address
+                    </FieldLabel>
                     <Input
                       {...field}
                       id="invite-email"
@@ -240,7 +258,9 @@ export function MembersSettings() {
                 {invite.isPending ? "Sending…" : "Send invitation"}
               </Button>
               {invite.isSuccess && (
-                <p role="status">Invitation created and queued for email delivery.</p>
+                <p role="status">
+                  Invitation created and queued for email delivery.
+                </p>
               )}
               {invite.isError && (
                 <p role="alert" className="text-sm text-destructive">
@@ -259,7 +279,10 @@ export function MembersSettings() {
             ) : invitations.data.length ? (
               <ul className="space-y-3">
                 {invitations.data.map((invitation) => (
-                  <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+                  <li
+                    key={invitation.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"
+                  >
                     <div>
                       <p className="font-medium">{invitation.email}</p>
                       <p className="text-sm text-muted-foreground">
@@ -269,15 +292,25 @@ export function MembersSettings() {
                     </div>
                     {revoking === invitation.id ? (
                       <div className="flex gap-2">
-                        <Button variant="destructive" disabled={revoke.isPending} onClick={() => revoke.mutate(invitation.id)}>
+                        <Button
+                          variant="destructive"
+                          disabled={revoke.isPending}
+                          onClick={() => revoke.mutate(invitation.id)}
+                        >
                           Confirm revoke
                         </Button>
-                        <Button variant="outline" onClick={() => setRevoking(null)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setRevoking(null)}
+                        >
                           Cancel
                         </Button>
                       </div>
                     ) : (
-                      <Button variant="outline" onClick={() => setRevoking(invitation.id)}>
+                      <Button
+                        variant="outline"
+                        onClick={() => setRevoking(invitation.id)}
+                      >
                         Revoke…
                       </Button>
                     )}
@@ -289,9 +322,7 @@ export function MembersSettings() {
                 No pending invitations.
               </p>
             )}
-            {revoke.isError && (
-              <p role="alert">{errorMessage(revoke.error)}</p>
-            )}
+            {revoke.isError && <p role="alert">{errorMessage(revoke.error)}</p>}
           </section>
         </>
       )}

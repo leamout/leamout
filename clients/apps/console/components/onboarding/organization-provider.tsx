@@ -120,7 +120,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     // Never reuse organization-scoped cached data when switching tenants.
     queryClient.removeQueries({
       predicate: (query) =>
-        query.queryKey[0] !== "session" && query.queryKey[0] !== "organizations",
+        query.queryKey[0] !== "session" &&
+        query.queryKey[0] !== "organizations",
     });
     return true;
   }

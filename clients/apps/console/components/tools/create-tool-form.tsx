@@ -3,11 +3,7 @@
 import Link from "next/link";
 import { ToolForm } from "./tool-form";
 
-export function CreateToolForm({
-  agentId = "",
-}: {
-  agentId?: string;
-}) {
+export function CreateToolForm({ agentId = "" }: { agentId?: string }) {
   return (
     <div className="space-y-6">
       <Link

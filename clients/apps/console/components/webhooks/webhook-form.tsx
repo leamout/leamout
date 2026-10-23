@@ -2,11 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@leamout/ui/components/field";
+import { Field, FieldError, FieldLabel } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
 import { Textarea } from "@leamout/ui/components/textarea";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,18 +11,25 @@ import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
-import type { WebhookEndpoint, WebhookSecretResponse } from "./types";
 import { SecretReveal } from "./secret-reveal";
+import type { WebhookEndpoint, WebhookSecretResponse } from "./types";
 
 const schema = z.object({
   url: z.url().refine((value) => {
     const parsed = new URL(value);
     return parsed.protocol === "https:" && !parsed.username && !parsed.password;
   }, "Enter an HTTPS URL without credentials."),
-  events: z.string().trim().min(1, "Enter at least one event.").refine(
-    (value) => value.split("\n").every((name) => name.trim() && !/\s/.test(name.trim())),
-    "Use one event type per line.",
-  ),
+  events: z
+    .string()
+    .trim()
+    .min(1, "Enter at least one event.")
+    .refine(
+      (value) =>
+        value
+          .split("\n")
+          .every((name) => name.trim() && !/\s/.test(name.trim())),
+      "Use one event type per line.",
+    ),
   enabled: z.boolean(),
 });
 
@@ -71,7 +74,7 @@ export function WebhookForm({
         throw new Error("Webhook endpoint not loaded.");
       }
       const saved = await api<WebhookEndpoint>(
-        "/webhooks/" + encodeURIComponent(endpoint.id),
+        `/webhooks/${encodeURIComponent(endpoint.id)}`,
         { method: "PATCH", organizationId, body },
       );
       return { webhook: saved, signing_secret: "" };
@@ -81,7 +84,9 @@ export function WebhookForm({
         ["webhooks", organizationId, value.webhook.id],
         value.webhook,
       );
-      await client.invalidateQueries({ queryKey: ["webhooks", organizationId] });
+      await client.invalidateQueries({
+        queryKey: ["webhooks", organizationId],
+      });
       if (!creating) {
         form.reset({
           url: value.webhook.url,
@@ -111,9 +116,7 @@ export function WebhookForm({
                 type="url"
                 aria-invalid={fieldState.invalid}
               />
-              {fieldState.invalid && (
-                <FieldError errors={[fieldState.error]} />
-              )}
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
         />
@@ -132,9 +135,7 @@ export function WebhookForm({
                 className="font-mono"
                 aria-invalid={fieldState.invalid}
               />
-              {fieldState.invalid && (
-                <FieldError errors={[fieldState.error]} />
-              )}
+              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
         />
@@ -146,10 +147,7 @@ export function WebhookForm({
           />
           <FieldLabel htmlFor="webhook-enabled">Enable endpoint</FieldLabel>
         </Field>
-        <Button
-          type="submit"
-          disabled={!organizationId || save.isPending}
-        >
+        <Button type="submit" disabled={!organizationId || save.isPending}>
           {save.isPending
             ? "Saving…"
             : creating
@@ -161,9 +159,7 @@ export function WebhookForm({
             {errorMessage(save.error)}
           </p>
         )}
-        {save.isSuccess && !creating && (
-          <p role="status">Endpoint updated.</p>
-        )}
+        {save.isSuccess && !creating && <p role="status">Endpoint updated.</p>}
       </form>
       {creating && save.data && (
         <div className="space-y-3">
@@ -174,7 +170,9 @@ export function WebhookForm({
           <Button
             variant="outline"
             onClick={() =>
-              router.push("/webhooks/" + encodeURIComponent(save.data.webhook.id))
+              router.push(
+                `/webhooks/${encodeURIComponent(save.data.webhook.id)}`,
+              )
             }
           >
             View endpoint

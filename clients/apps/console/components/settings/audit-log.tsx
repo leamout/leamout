@@ -47,7 +47,7 @@ export function AuditLog() {
     queryKey: ["audit-events", organizationId, offset],
     queryFn: ({ signal }) =>
       api<{ audit_events: AuditEvent[] }>(
-        "/audit-events/?limit=" + pageSize + "&offset=" + offset,
+        `/audit-events/?limit=${pageSize}&offset=${offset}`,
         { organizationId, signal },
       ),
     enabled: Boolean(organizationId),
@@ -141,96 +141,102 @@ export function AuditLog() {
           </Button>
         </div>
       ) : (
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {["Occurred (UTC)", "Action", "Actor", "Resource", "Details"].map(
-                (label) => (
-                  <TableHead key={label}>{label}</TableHead>
-                ),
-              )}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((event) => (
-              <TableRow key={event.id}>
-                <TableCell className="align-top whitespace-nowrap">
-                  {formatTime(event.occurred_at)}
-                </TableCell>
-                <TableCell className="align-top font-medium">
-                  {event.action}
-                </TableCell>
-                <TableCell className="align-top">
-                  <p>{event.actor_type}</p>
-                  <p className="mt-1 max-w-48 break-all text-xs text-muted-foreground">
-                    {event.actor_id}
-                  </p>
-                </TableCell>
-                <TableCell className="align-top">
-                  <p>{event.target_type}</p>
-                  <p className="mt-1 max-w-48 break-all text-xs text-muted-foreground">
-                    {event.target_id}
-                  </p>
-                </TableCell>
-                <TableCell className="align-top">
-                  <details className="max-w-sm whitespace-normal">
-                    <summary className="cursor-pointer font-medium">
-                      View event details
-                    </summary>
-                    <dl className="mt-3 space-y-3 text-xs">
-                      <div>
-                        <dt className="text-muted-foreground">Event ID</dt>
-                        <dd className="mt-1 break-all">{event.id}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">
-                          Organization ID
-                        </dt>
-                        <dd className="mt-1 break-all">
-                          {event.organization_id}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Timestamp</dt>
-                        <dd className="mt-1 break-all">{event.occurred_at}</dd>
-                      </div>
-                      <div>
-                        <dt className="text-muted-foreground">Metadata</dt>
-                        <dd className="mt-1">
-                          {event.metadata == null ? (
-                            "No metadata available."
-                          ) : (
-                            <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 whitespace-pre-wrap break-all">
-                              {JSON.stringify(event.metadata, null, 2)}
-                            </pre>
-                          )}
-                        </dd>
-                      </div>
-                    </dl>
-                  </details>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && (
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="h-40 text-center">
-                  <p className="font-medium">
-                    {events.length === 0
-                      ? "No audit events to display"
-                      : "No matching events"}
-                  </p>
-                  <p className="mt-2 text-muted-foreground">
-                    {events.length === 0
-                      ? "Organization activity will appear here."
-                      : "Try another search or filter."}
-                  </p>
-                </TableCell>
+                {[
+                  "Occurred (UTC)",
+                  "Action",
+                  "Actor",
+                  "Resource",
+                  "Details",
+                ].map((label) => (
+                  <TableHead key={label}>{label}</TableHead>
+                ))}
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell className="align-top whitespace-nowrap">
+                    {formatTime(event.occurred_at)}
+                  </TableCell>
+                  <TableCell className="align-top font-medium">
+                    {event.action}
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <p>{event.actor_type}</p>
+                    <p className="mt-1 max-w-48 break-all text-xs text-muted-foreground">
+                      {event.actor_id}
+                    </p>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <p>{event.target_type}</p>
+                    <p className="mt-1 max-w-48 break-all text-xs text-muted-foreground">
+                      {event.target_id}
+                    </p>
+                  </TableCell>
+                  <TableCell className="align-top">
+                    <details className="max-w-sm whitespace-normal">
+                      <summary className="cursor-pointer font-medium">
+                        View event details
+                      </summary>
+                      <dl className="mt-3 space-y-3 text-xs">
+                        <div>
+                          <dt className="text-muted-foreground">Event ID</dt>
+                          <dd className="mt-1 break-all">{event.id}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">
+                            Organization ID
+                          </dt>
+                          <dd className="mt-1 break-all">
+                            {event.organization_id}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Timestamp</dt>
+                          <dd className="mt-1 break-all">
+                            {event.occurred_at}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-muted-foreground">Metadata</dt>
+                          <dd className="mt-1">
+                            {event.metadata == null ? (
+                              "No metadata available."
+                            ) : (
+                              <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 whitespace-pre-wrap break-all">
+                                {JSON.stringify(event.metadata, null, 2)}
+                              </pre>
+                            )}
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-40 text-center">
+                    <p className="font-medium">
+                      {events.length === 0
+                        ? "No audit events to display"
+                        : "No matching events"}
+                    </p>
+                    <p className="mt-2 text-muted-foreground">
+                      {events.length === 0
+                        ? "Organization activity will appear here."
+                        : "Try another search or filter."}
+                    </p>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">

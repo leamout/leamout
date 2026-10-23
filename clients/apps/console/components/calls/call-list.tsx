@@ -13,15 +13,15 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { useOrganization } from "@/components/onboarding/organization-provider";
 import type { VoiceAgent } from "@/components/agents/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
 import {
+  type Call,
   callDurationSeconds,
   callStates,
   formatCallDate,
   formatDuration,
-  type Call,
 } from "./types";
 
 const pageSize = 50;
@@ -46,7 +46,7 @@ export function CallList() {
       if (direction !== "all") params.set("direction", direction);
       if (agentId !== "all") params.set("voice_agent_id", agentId);
 
-      return api<{ calls: Call[] }>("/calls/?" + params.toString(), {
+      return api<{ calls: Call[] }>(`/calls/?${params.toString()}`, {
         organizationId,
         signal,
       });
@@ -66,7 +66,8 @@ export function CallList() {
 
   const items = calls.data?.calls ?? [];
   const agentNames = new Map(
-    agents.data?.voice_agents.map((agent) => [agent.id, agent.name] as const) ?? [],
+    agents.data?.voice_agents.map((agent) => [agent.id, agent.name] as const) ??
+      [],
   );
   const filtered = items.filter((call) =>
     [
@@ -74,7 +75,7 @@ export function CallList() {
       call.from_uri,
       call.to_uri,
       call.sip_call_id ?? "",
-      call.voice_agent_id ? agentNames.get(call.voice_agent_id) ?? "" : "",
+      call.voice_agent_id ? (agentNames.get(call.voice_agent_id) ?? "") : "",
     ]
       .join(" ")
       .toLowerCase()
@@ -213,7 +214,7 @@ export function CallList() {
                     <TableCell>
                       <Link
                         className="font-mono text-xs hover:underline"
-                        href={"/calls/" + encodeURIComponent(call.id)}
+                        href={`/calls/${encodeURIComponent(call.id)}`}
                       >
                         {call.id}
                       </Link>
@@ -222,10 +223,7 @@ export function CallList() {
                       {call.voice_agent_id ? (
                         <Link
                           className="hover:underline"
-                          href={
-                            "/agents/" +
-                            encodeURIComponent(call.voice_agent_id)
-                          }
+                          href={`/agents/${encodeURIComponent(call.voice_agent_id)}`}
                         >
                           {agentNames.get(call.voice_agent_id) ??
                             call.voice_agent_id}
@@ -273,7 +271,9 @@ export function CallList() {
               <Button
                 variant="outline"
                 disabled={offset === 0 || calls.isFetching}
-                onClick={() => setOffset((value) => Math.max(0, value - pageSize))}
+                onClick={() =>
+                  setOffset((value) => Math.max(0, value - pageSize))
+                }
               >
                 Previous
               </Button>

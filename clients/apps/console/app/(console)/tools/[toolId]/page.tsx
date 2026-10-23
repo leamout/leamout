@@ -6,8 +6,7 @@ export default async function Page({
 }: PageProps<"/tools/[toolId]">) {
   const { toolId } = await params;
   const query = await searchParams;
-  const agentId =
-    typeof query.agent_id === "string" ? query.agent_id : "";
+  const agentId = typeof query.agent_id === "string" ? query.agent_id : "";
 
   return <ToolDetails key={toolId} toolId={toolId} agentId={agentId} />;
 }
