@@ -87,3 +87,51 @@ WHERE va.id = sqlc.arg(id)
 -- name: CountOrganizationVoiceAgents :one
 SELECT COUNT(*)::bigint AS count FROM voice_agents
 WHERE organization_id = sqlc.arg(organization_id);
+
+-- Backoffice projections deliberately include disabled agents and organizations.
+-- name: ListBackofficeAgents :many
+SELECT
+    va.id,
+    va.name,
+    va.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    va.engine,
+    va.status,
+    va.language,
+    va.created_at
+FROM voice_agents AS va
+JOIN organizations AS o ON o.id = va.organization_id
+WHERE (
+    sqlc.arg(search)::text = ''
+    OR strpos(lower(va.name), lower(sqlc.arg(search)::text)) > 0
+    OR va.id::text = sqlc.arg(search)::text
+    OR strpos(lower(o.name), lower(sqlc.arg(search)::text)) > 0
+)
+  AND (sqlc.arg(status)::text = '' OR va.status = sqlc.arg(status)::text)
+  AND (sqlc.arg(engine)::text = '' OR va.engine = sqlc.arg(engine)::text)
+  AND (sqlc.narg(organization_id)::uuid IS NULL OR va.organization_id = sqlc.narg(organization_id)::uuid)
+ORDER BY va.created_at DESC, va.id DESC
+LIMIT sqlc.arg(page_limit)::int
+OFFSET sqlc.arg(page_offset)::int;
+
+-- name: GetBackofficeAgent :one
+SELECT
+    va.id,
+    va.name,
+    va.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    va.engine,
+    va.status,
+    va.language,
+    va.created_at,
+    va.updated_at,
+    va.instructions,
+    COALESCE(va.voice, '')::text AS voice,
+    va.interruption_policy,
+    va.recording_policy,
+    va.configuration_revision
+FROM voice_agents AS va
+JOIN organizations AS o ON o.id = va.organization_id
+WHERE va.id = sqlc.arg(id);

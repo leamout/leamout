@@ -8,6 +8,8 @@ templ Navigation(active string) {
 			<ul class="menu w-full gap-1">
 				<li><span class="menu-title">Customers</span></li>
 				@NavigationItem("Organizations", "/organizations", "organizations", active)
+				<li><span class="menu-title">Runtime</span></li>
+				@NavigationItem("Agents", "/agents", "agents", active)
 			</ul>
 			<p class="px-4 py-6 text-xs text-base-content/60">Platform operator access</p>
 		</aside>

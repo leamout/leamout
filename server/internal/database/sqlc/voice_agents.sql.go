@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const countOrganizationVoiceAgents = `-- name: CountOrganizationVoiceAgents :one
@@ -120,6 +121,69 @@ func (q *Queries) DisableVoiceAgent(ctx context.Context, arg DisableVoiceAgentPa
 	return err
 }
 
+const getBackofficeAgent = `-- name: GetBackofficeAgent :one
+SELECT
+    va.id,
+    va.name,
+    va.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    va.engine,
+    va.status,
+    va.language,
+    va.created_at,
+    va.updated_at,
+    va.instructions,
+    COALESCE(va.voice, '')::text AS voice,
+    va.interruption_policy,
+    va.recording_policy,
+    va.configuration_revision
+FROM voice_agents AS va
+JOIN organizations AS o ON o.id = va.organization_id
+WHERE va.id = $1
+`
+
+type GetBackofficeAgentRow struct {
+	ID                    uuid.UUID          `db:"id" json:"id"`
+	Name                  string             `db:"name" json:"name"`
+	OrganizationID        uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationName      string             `db:"organization_name" json:"organization_name"`
+	OrganizationStatus    string             `db:"organization_status" json:"organization_status"`
+	Engine                string             `db:"engine" json:"engine"`
+	Status                string             `db:"status" json:"status"`
+	Language              string             `db:"language" json:"language"`
+	CreatedAt             pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	Instructions          string             `db:"instructions" json:"instructions"`
+	Voice                 string             `db:"voice" json:"voice"`
+	InterruptionPolicy    string             `db:"interruption_policy" json:"interruption_policy"`
+	RecordingPolicy       string             `db:"recording_policy" json:"recording_policy"`
+	ConfigurationRevision int32              `db:"configuration_revision" json:"configuration_revision"`
+}
+
+func (q *Queries) GetBackofficeAgent(ctx context.Context, id uuid.UUID) (GetBackofficeAgentRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeAgent, id)
+	var i GetBackofficeAgentRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.OrganizationStatus,
+		&i.Engine,
+		&i.Status,
+		&i.Language,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Instructions,
+		&i.Voice,
+		&i.InterruptionPolicy,
+		&i.RecordingPolicy,
+		&i.ConfigurationRevision,
+	)
+	return i, err
+}
+
 const getVoiceAgentByID = `-- name: GetVoiceAgentByID :one
 SELECT va.id, va.organization_id, va.name, va.engine, va.instructions, va.voice, va.language, va.engine_config, va.interruption_policy, va.recording_policy, va.configuration_revision, va.status, va.created_at, va.updated_at
 FROM voice_agents AS va
@@ -157,6 +221,92 @@ func (q *Queries) GetVoiceAgentByID(ctx context.Context, arg GetVoiceAgentByIDPa
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeAgents = `-- name: ListBackofficeAgents :many
+SELECT
+    va.id,
+    va.name,
+    va.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    va.engine,
+    va.status,
+    va.language,
+    va.created_at
+FROM voice_agents AS va
+JOIN organizations AS o ON o.id = va.organization_id
+WHERE (
+    $1::text = ''
+    OR strpos(lower(va.name), lower($1::text)) > 0
+    OR va.id::text = $1::text
+    OR strpos(lower(o.name), lower($1::text)) > 0
+)
+  AND ($2::text = '' OR va.status = $2::text)
+  AND ($3::text = '' OR va.engine = $3::text)
+  AND ($4::uuid IS NULL OR va.organization_id = $4::uuid)
+ORDER BY va.created_at DESC, va.id DESC
+LIMIT $6::int
+OFFSET $5::int
+`
+
+type ListBackofficeAgentsParams struct {
+	Search         string     `db:"search" json:"search"`
+	Status         string     `db:"status" json:"status"`
+	Engine         string     `db:"engine" json:"engine"`
+	OrganizationID *uuid.UUID `db:"organization_id" json:"organization_id"`
+	PageOffset     int32      `db:"page_offset" json:"page_offset"`
+	PageLimit      int32      `db:"page_limit" json:"page_limit"`
+}
+
+type ListBackofficeAgentsRow struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	Name               string             `db:"name" json:"name"`
+	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationName   string             `db:"organization_name" json:"organization_name"`
+	OrganizationStatus string             `db:"organization_status" json:"organization_status"`
+	Engine             string             `db:"engine" json:"engine"`
+	Status             string             `db:"status" json:"status"`
+	Language           string             `db:"language" json:"language"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// Backoffice projections deliberately include disabled agents and organizations.
+func (q *Queries) ListBackofficeAgents(ctx context.Context, arg ListBackofficeAgentsParams) ([]ListBackofficeAgentsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeAgents,
+		arg.Search,
+		arg.Status,
+		arg.Engine,
+		arg.OrganizationID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeAgentsRow{}
+	for rows.Next() {
+		var i ListBackofficeAgentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.OrganizationStatus,
+			&i.Engine,
+			&i.Status,
+			&i.Language,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listVoiceAgentsByOrganizationID = `-- name: ListVoiceAgentsByOrganizationID :many

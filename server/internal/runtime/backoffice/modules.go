@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/leamout/leamout/server/internal/backoffice/agents"
 	backofficeauth "github.com/leamout/leamout/server/internal/backoffice/auth"
 	"github.com/leamout/leamout/server/internal/backoffice/organizations"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
@@ -24,6 +25,7 @@ type modules struct {
 	queries        *sqlc.Queries
 	authn          *middleware.AuthnMiddleware
 	organizations  *organizations.Handler
+	agents         *agents.Handler
 }
 
 func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) (*modules, error) {
@@ -49,5 +51,6 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		queries:        queries,
 		authn:          middleware.NewAuthnMiddleware(resolver),
 		organizations:  organizations.NewHandler(organizations.NewRepository(queries), logger),
+		agents:         agents.NewHandler(agents.NewRepository(queries), logger),
 	}, nil
 }

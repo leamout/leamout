@@ -49,6 +49,7 @@ templ DetailContent(organization Detail) {
 		@CountCard("Voice agents", organization.Agents)
 		@CountCard("SIP trunks", organization.Trunks)
 	</div>
+	<a class="btn btn-outline btn-sm mt-4" href={ templ.SafeURL("/agents?organization_id=" + organization.ID.String()) }>View agents</a>
 	<div class="mt-8 grid gap-6 lg:grid-cols-2">
 		<section class="rounded-box border border-base-300 bg-base-100 p-6">
 			<h2 class="text-lg font-semibold">Subscription</h2>

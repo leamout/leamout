@@ -1,0 +1,76 @@
+package agents
+
+templ Filters(filter Filter) {
+	<form method="get" action="/agents" class="mb-6 flex flex-wrap items-end gap-4">
+		<label class="form-control flex-1 min-w-64">
+			<span class="mb-2 block text-sm font-medium">Agent name, ID or organization name</span>
+			<input class="input input-bordered w-full" type="search" name="q" value={ filter.Search } maxlength="200" placeholder="Search agents"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Status</span>
+			<select name="status" class="select select-bordered">
+				<option value="" selected?={ filter.Status == "" }>All statuses</option>
+				<option value="active" selected?={ filter.Status == "active" }>Active</option>
+				<option value="disabled" selected?={ filter.Status == "disabled" }>Disabled</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Engine</span>
+			<select name="engine" class="select select-bordered">
+				<option value="" selected?={ filter.Engine == "" }>All engines</option>
+				<option value="composable" selected?={ filter.Engine == "composable" }>Composable</option>
+				<option value="realtime" selected?={ filter.Engine == "realtime" }>Realtime</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Organization ID</span>
+			<input class="input input-bordered" name="organization_id" value={ filter.OrganizationID } placeholder="All organizations"/>
+		</label>
+		<button class="btn btn-primary" type="submit">Search</button>
+		<a class="btn btn-ghost" href="/agents">Clear</a>
+	</form>
+}
+
+templ AgentTable(agents []Agent) {
+	if len(agents) == 0 {
+		<div class="alert" role="status">No agents match these filters.</div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Agent</th>
+						<th scope="col">Organization</th>
+						<th scope="col">Engine</th>
+						<th scope="col">Status</th>
+						<th scope="col">Created</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, agent := range agents {
+						<tr>
+							<td>
+								<a class="link link-primary font-medium" href={ templ.SafeURL("/agents/" + agent.ID.String()) }>{ agent.Name }</a>
+								<div class="mt-1 font-mono text-xs text-base-content/60">{ agent.ID.String() }</div>
+							</td>
+							<td>
+								<a class="link link-primary" href={ templ.SafeURL("/organizations/" + agent.OrganizationID.String()) }>{ agent.OrganizationName }</a>
+								<div class="mt-1 text-xs text-base-content/60">{ agent.OrganizationStatus }</div>
+							</td>
+							<td>{ agent.Engine }</td>
+							<td><span class="badge badge-outline">{ agent.Status }</span></td>
+							<td>{ agent.CreatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ Field(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-words font-medium">{ value }</dd>
+	</div>
+}
