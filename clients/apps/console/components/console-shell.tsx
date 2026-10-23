@@ -31,7 +31,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/auth/account-menu";
-import { useOrganization } from "@/components/onboarding/organization-provider";
+import { OrganizationSwitcher } from "@/components/onboarding/organization-switcher";
 import { SettingsSidebar } from "@/components/settings/settings-sidebar";
 
 const navigation = [
@@ -89,7 +89,6 @@ function Navigation() {
 
 export function ConsoleShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { selected } = useOrganization();
   const current =
     navigation.find((item) =>
       item.href === "/"
@@ -113,13 +112,7 @@ export function ConsoleShell({ children }: { children: React.ReactNode }) {
               Leamout
             </span>
           </Link>
-          <Link
-            href="/organizations"
-            className="truncate px-2 text-xs text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:hidden"
-            title="Switch organization"
-          >
-            {selected?.name ?? "Choose organization"} · Switch
-          </Link>
+          <OrganizationSwitcher />
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
