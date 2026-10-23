@@ -50,3 +50,37 @@ test("unavailable browser storage cannot crash onboarding", () => {
   assert.equal(readOrganizationSelection(storage, "user-a"), null);
   assert.equal(writeOrganizationSelection(storage, "user-a", "org-a"), false);
 });
+
+test("switching between organization IDs never selects a disabled organization", () => {
+  const storage = new Map<string, string>();
+  const local = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      storage.set(key, value);
+    },
+  };
+
+  assert.equal(writeOrganizationSelection(local, "user-a", "org-a"), true);
+  assert.equal(
+    findActiveOrganization(
+      organizations,
+      readOrganizationSelection(local, "user-a"),
+    )?.id,
+    "org-a",
+  );
+
+  assert.equal(writeOrganizationSelection(local, "user-a", "org-b"), true);
+  assert.equal(
+    findActiveOrganization(
+      organizations,
+      readOrganizationSelection(local, "user-a"),
+    )?.id,
+    "org-b",
+  );
+  assert.equal(readOrganizationSelection(local, "user-b"), null);
+
+  assert.equal(
+    findActiveOrganization(organizations, "org-disabled"),
+    null,
+  );
+});

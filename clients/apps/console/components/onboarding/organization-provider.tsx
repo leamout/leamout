@@ -64,10 +64,29 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
     sync();
     const onStorage = (event: StorageEvent) => {
-      if (event.key === organizationStorageKey(userId) || event.key === null) {
-        sync();
-        void queryClient.invalidateQueries({ queryKey: ["organizations", userId] });
+      if (event.key !== organizationStorageKey(userId) && event.key !== null) {
+        return;
       }
+
+      // The selection may have changed in another tab. Discard all tenant
+      // data before rendering the newly selected organization.
+      void queryClient.cancelQueries({
+        predicate: (query) =>
+          query.queryKey[0] !== "session" &&
+          query.queryKey[0] !== "organizations",
+      });
+      queryClient.removeQueries({
+        predicate: (query) =>
+          query.queryKey[0] !== "session" &&
+          query.queryKey[0] !== "organizations",
+      });
+      sync();
+      void queryClient.invalidateQueries({
+        queryKey: ["organizations", userId],
+      });
+
+      // Detail routes may refer to resources from the previous organization.
+      window.location.replace("/");
     };
 
     window.addEventListener("storage", onStorage);
@@ -92,6 +111,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    void queryClient.cancelQueries({
+      predicate: (query) =>
+        query.queryKey[0] !== "session" &&
+        query.queryKey[0] !== "organizations",
+    });
     setStored({ userId, organizationId });
     // Never reuse organization-scoped cached data when switching tenants.
     queryClient.removeQueries({
