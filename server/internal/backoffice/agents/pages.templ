@@ -1,0 +1,78 @@
+package agents
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/server/internal/backoffice/components"
+)
+
+templ Page(result List) {
+	@components.Layout("Agents", "agents", ListContent(result))
+}
+
+templ ListContent(result List) {
+	<div class="mb-8">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Runtime</p>
+		<h1 class="mt-2 text-3xl font-bold">Agents</h1>
+		<p class="mt-2 text-base-content/70">Inspect voice agents and their configuration across Leamout.</p>
+	</div>
+	@Filters(result.Filter)
+	@AgentTable(result.Agents)
+	<nav class="mt-6 flex items-center justify-between" aria-label="Pagination">
+		<span class="text-sm text-base-content/60">Page { fmt.Sprint(result.Filter.Page) }</span>
+		<div class="flex gap-2">
+			if result.Filter.Page > 1 {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page-1)) }>Previous</a>
+			}
+			if result.HasNext {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page+1)) }>Next</a>
+			}
+		</div>
+	</nav>
+}
+
+templ DetailPage(agent Detail) {
+	@components.Layout(agent.Name, "agents", DetailContent(agent))
+}
+
+templ DetailContent(agent Detail) {
+	<a class="link link-primary text-sm" href="/agents">Back to agents</a>
+	<div class="mt-6 flex flex-wrap items-start justify-between gap-4">
+		<div>
+			<h1 class="text-3xl font-bold">{ agent.Name }</h1>
+			<p class="mt-2 font-mono text-sm text-base-content/60">{ agent.ID.String() }</p>
+		</div>
+		<span class="badge badge-outline badge-lg">{ agent.Status }</span>
+	</div>
+	<div class="mt-8 grid gap-6 lg:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Configuration</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Engine", agent.Engine)
+				@Field("Language", agent.Language)
+				if agent.Voice != "" {
+					@Field("Voice", agent.Voice)
+				} else {
+					@Field("Voice", "Not configured")
+				}
+				@Field("Interruption policy", agent.InterruptionPolicy)
+				@Field("Recording policy", agent.RecordingPolicy)
+				@Field("Configuration revision", fmt.Sprint(agent.ConfigurationRevision))
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Organization and timeline</h2>
+			<a class="link link-primary mt-4 inline-block" href={ templ.SafeURL("/organizations/" + agent.OrganizationID.String()) }>{ agent.OrganizationName }</a>
+			<dl class="mt-4 grid gap-4">
+				@Field("Organization ID", agent.OrganizationID.String())
+				@Field("Organization status", agent.OrganizationStatus)
+				@Field("Created", agent.CreatedAt)
+				@Field("Updated", agent.UpdatedAt)
+			</dl>
+		</section>
+	</div>
+	<section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
+		<h2 class="text-lg font-semibold">Instructions</h2>
+		<p class="mt-4 whitespace-pre-wrap break-words">{ agent.Instructions }</p>
+	</section>
+}

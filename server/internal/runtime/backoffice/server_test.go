@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/leamout/leamout/server/internal/backoffice/agents"
 	backofficeauth "github.com/leamout/leamout/server/internal/backoffice/auth"
 	"github.com/leamout/leamout/server/internal/backoffice/organizations"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
@@ -34,11 +35,12 @@ func TestAnonymousRouteBoundary(t *testing.T) {
 		authentication: backofficeauth.NewHandler(&identityauth.Handler{}, nil, true),
 		authn:          middleware.NewAuthnMiddleware(authn.NewResolver(nil, nil)),
 		organizations:  organizations.NewHandler(nil, logger),
+		agents:         agents.NewHandler(nil, logger),
 	}, logger, "https://backoffice.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, path := range []string{"/organizations", "/organizations/" + uuid.NewString()} {
+	for _, path := range []string{"/organizations", "/organizations/" + uuid.NewString(), "/agents", "/agents/" + uuid.NewString()} {
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, path, nil)
 		r.Header.Set("Authorization", "Bearer organization-token")
 		w := httptest.NewRecorder()
@@ -62,6 +64,7 @@ func TestStandaloneAuthenticationRoutes(t *testing.T) {
 		authentication: backofficeauth.NewHandler(&identityauth.Handler{}, nil, true),
 		authn:          middleware.NewAuthnMiddleware(authn.NewResolver(nil, nil)),
 		organizations:  organizations.NewHandler(nil, logger),
+		agents:         agents.NewHandler(nil, logger),
 	}, logger, "https://backoffice.example.test")
 	if err != nil {
 		t.Fatal(err)
@@ -108,6 +111,7 @@ func TestBackofficeAccessAndOrganizations(t *testing.T) {
 		queries:        queries,
 		authn:          middleware.NewAuthnMiddleware(authn.NewResolver(sessions, nil)),
 		organizations:  organizations.NewHandler(organizations.NewRepository(queries), logger),
+		agents:         agents.NewHandler(agents.NewRepository(queries), logger),
 	}
 	router, err := newRouter(modules, logger, "https://backoffice.example.test")
 	if err != nil {
@@ -123,7 +127,7 @@ func TestBackofficeAccessAndOrganizations(t *testing.T) {
 		router.ServeHTTP(w, r)
 		return w
 	}
-	for _, path := range []string{"/organizations", "/organizations/" + uuid.NewString()} {
+	for _, path := range []string{"/organizations", "/organizations/" + uuid.NewString(), "/agents", "/agents/" + uuid.NewString()} {
 		if w := request(http.MethodGet, path, ""); w.Code != http.StatusUnauthorized {
 			t.Fatalf("anonymous %s: %d", path, w.Code)
 		}
@@ -146,8 +150,10 @@ func TestBackofficeAccessAndOrganizations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if w := request(http.MethodGet, "/organizations", cookie); w.Code != http.StatusForbidden {
-		t.Fatalf("non-admin status: %d", w.Code)
+	for _, path := range []string{"/organizations", "/agents", "/agents/" + uuid.NewString()} {
+		if w := request(http.MethodGet, path, cookie); w.Code != http.StatusForbidden {
+			t.Fatalf("non-admin status: %d", w.Code)
+		}
 	}
 	if _, err := pool.Exec(ctx, "UPDATE users SET is_platform_admin = TRUE WHERE id = $1", user.ID); err != nil {
 		t.Fatal(err)
@@ -194,11 +200,14 @@ func TestBackofficeAccessAndOrganizations(t *testing.T) {
 	if w := request(http.MethodGet, "/organizations?page=-1", cookie); w.Code != http.StatusBadRequest {
 		t.Fatalf("invalid filter status: %d", w.Code)
 	}
+	testAgentInspection(t, pool, cookie, request)
 	if _, err := pool.Exec(ctx, "UPDATE users SET is_platform_admin = FALSE WHERE id = $1", user.ID); err != nil {
 		t.Fatal(err)
 	}
-	if w := request(http.MethodGet, "/organizations", cookie); w.Code != http.StatusForbidden {
-		t.Fatal("operator revocation did not take immediate effect")
+	for _, path := range []string{"/organizations", "/agents", "/agents/" + uuid.NewString()} {
+		if w := request(http.MethodGet, path, cookie); w.Code != http.StatusForbidden {
+			t.Fatal("operator revocation did not take immediate effect")
+		}
 	}
 	if _, err := pool.Exec(ctx, "UPDATE users SET is_platform_admin = TRUE WHERE id = $1", user.ID); err != nil {
 		t.Fatal(err)
@@ -206,8 +215,10 @@ func TestBackofficeAccessAndOrganizations(t *testing.T) {
 	if _, err := pool.Exec(ctx, "UPDATE users SET disabled_at = NOW() WHERE id = $1", user.ID); err != nil {
 		t.Fatal(err)
 	}
-	if w := request(http.MethodGet, "/organizations", cookie); w.Code != http.StatusUnauthorized {
-		t.Fatal("disabled operator retained access")
+	for _, path := range []string{"/organizations", "/agents", "/agents/" + uuid.NewString()} {
+		if w := request(http.MethodGet, path, cookie); w.Code != http.StatusUnauthorized {
+			t.Fatal("disabled operator retained access")
+		}
 	}
 	if _, err := pool.Exec(ctx, "UPDATE users SET disabled_at = NULL WHERE id = $1", user.ID); err != nil {
 		t.Fatal(err)
@@ -219,8 +230,10 @@ func TestBackofficeAccessAndOrganizations(t *testing.T) {
 	if _, err := queries.GetSessionByID(ctx, stored.ID); err == nil {
 		t.Fatal("browser sign-out did not revoke the stored session")
 	}
-	if w := request(http.MethodGet, "/organizations", cookie); w.Code != http.StatusUnauthorized {
-		t.Fatal("revoked session retained operator access")
+	for _, path := range []string{"/organizations", "/agents", "/agents/" + uuid.NewString()} {
+		if w := request(http.MethodGet, path, cookie); w.Code != http.StatusUnauthorized {
+			t.Fatal("revoked session retained operator access")
+		}
 	}
 }
 

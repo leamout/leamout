@@ -4,9 +4,16 @@ Backoffice is a standalone full-stack application built with Go, Templ, HTMX,
 TailwindCSS, DaisyUI and Hyperscript. The Go process serves HTML and embedded
 assets directly on port 8082. It does not require the Next.js console.
 
-The first feature provides organization name/ID search, lifecycle filters,
+Organizations provide organization name/ID search, lifecycle filters,
 25-row pagination and detail pages with resource counts and subscription state.
 Disabled and deleted organizations remain inspectable.
+
+Agents provide platform-wide name/ID/organization-name search, status and engine
+filters, an exact organization filter, and 25-row pagination. Detail pages show
+instructions, voice settings, policies, configuration revision and the owning
+organization. Disabled agents and agents belonging to disabled or deleted
+organizations remain inspectable. These pages are read-only and exclude raw
+engine configuration and provider credentials.
 
 ## Development
 
@@ -42,7 +49,7 @@ available for subsequent sign-in. Signed backchannel logout events can be
 received at `/identity/backchannel-logout`; the existing API backchannel handler
 also revokes matching sessions in the shared database.
 
-Only active users with `is_platform_admin` may access organization pages.
+Only active users with `is_platform_admin` may access organization and agent pages.
 A trusted administrator must explicitly promote an existing, verified account
 using its exact ID:
 
@@ -70,11 +77,15 @@ is involved. The Docker build generates templates and the local asset bundle.
 - `internal/backoffice/auth`: Templ sign-in page and browser authentication routes.
 - `internal/backoffice/organizations`: models, repository, handlers, routes,
   validation, pages and feature components.
+- `internal/backoffice/agents`: agent models, repository, handlers, routes,
+  validation, pages and feature components.
 - `internal/backoffice/components`: shared shell and reusable UI.
 - `internal/backoffice/assets`: embedded local CSS, JavaScript and favicon.
 - `internal/database/queries/organizations.sql`: organization queries, including
   explicit cross-organization backoffice read projections.
-- `internal/database/sqlc/organizations.sql.go`: generated query implementation.
+- `internal/database/queries/voice_agents.sql`: agent queries, including
+  explicit cross-organization backoffice read projections.
+- `internal/database/sqlc`: generated query implementations.
 
 Add a service only for real operator orchestration; future mutations should use
 the owning domain rules and record operator audit events. Resource counts include

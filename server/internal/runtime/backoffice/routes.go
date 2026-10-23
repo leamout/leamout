@@ -41,6 +41,7 @@ func newRouter(modules *modules, logger *logging.Logger, backofficeURL string) (
 		protected.Use(requirePlatformAdmin(modules.queries, logger))
 		protected.Use(protection.Handler)
 		modules.organizations.Routes(protected)
+		modules.agents.Routes(protected)
 	})
 	return router, nil
 }
