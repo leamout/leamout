@@ -66,7 +66,7 @@ export function CallList() {
 
   const items = calls.data?.calls ?? [];
   const agentNames = new Map(
-    agents.data?.voice_agents.map((agent) => [agent.id, agent.name]) ?? [],
+    agents.data?.voice_agents.map((agent) => [agent.id, agent.name] as const) ?? [],
   );
   const filtered = items.filter((call) =>
     [
