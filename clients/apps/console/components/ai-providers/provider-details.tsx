@@ -1,33 +1,47 @@
-import Link from "next/link";
-import {
-  type ProviderAvailability,
-  type ProviderCredential,
-  providerCatalog,
-} from "@/components/ai-providers/catalog";
-import { ProviderCredentialForm } from "@/components/ai-providers/provider-credential-form";
+"use client";
 
-export function ProviderDetails({
-  providerId,
-  availability,
-  credentials,
-}: {
-  providerId: string;
-  availability?: ProviderAvailability;
-  credentials?: ProviderCredential[];
-}) {
+import { Button } from "@leamout/ui/components/button";
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { api, errorMessage } from "@/lib/api";
+import { providerCatalog, providerName } from "./catalog";
+import { CredentialActions } from "./credential-actions";
+import { ProviderCredentialForm } from "./provider-credential-form";
+import type { AIIntegration } from "./types";
+
+export function ProviderDetails({ providerId }: { providerId: string }) {
   const provider = providerCatalog.find((item) => item.id === providerId);
-  if (!provider)
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
+  const integrations = useQuery({
+    queryKey: ["ai-integrations", organizationId],
+    queryFn: ({ signal }) =>
+      api<{ ai_integrations: AIIntegration[] }>("/ai-integrations/", {
+        organizationId,
+        signal,
+      }),
+    enabled: Boolean(organizationId) && Boolean(provider),
+  });
+
+  if (!provider) {
     return (
       <div className="space-y-4">
         <h1 className="text-3xl font-semibold">Unknown provider</h1>
         <p className="text-muted-foreground">
-          This provider is not in the console preview catalog.
+          This provider is not in the Console's built-in catalog.
         </p>
         <Link href="/ai-providers" className="underline">
           Back to AI providers
         </Link>
       </div>
     );
+  }
+
+  const credentials = integrations.data?.ai_integrations.filter(
+    (item) => item.provider === providerId,
+  ) ?? [];
+
   return (
     <div className="space-y-8">
       <Link
@@ -38,68 +52,76 @@ export function ProviderDetails({
       </Link>
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">
-          {provider.name}
+          {providerName(providerId)}
         </h1>
         <p className="text-muted-foreground">
-          Manage organization BYOA credentials for this provider.
+          Organization-owned AI integrations and their verification state.
         </p>
+      </div>
+
+      <section className="space-y-2 rounded-lg border p-6">
+        <h2 className="font-semibold">Supported roles</h2>
         <p className="text-sm text-muted-foreground">
-          UI preview. Live provider data is not connected.
+          {provider.roles.join(", ").toUpperCase()}
         </p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <section className="space-y-2 rounded-lg border p-6">
-          <h2 className="font-semibold">Capabilities</h2>
-          <p className="text-sm text-muted-foreground">
-            {availability?.capabilities
-              ? availability.capabilities.join(", ") || "None available"
-              : "Provider capabilities have not been loaded."}
-          </p>
-        </section>
-        <section className="space-y-2 rounded-lg border p-6">
-          <h2 className="font-semibold">Platform default</h2>
-          <p className="text-sm text-muted-foreground">
-            {availability?.platformAvailable === undefined
-              ? "Availability has not been loaded."
-              : availability.platformAvailable
-                ? "A platform credential is available."
-                : "No platform credential is available. Configure organization BYOA credentials."}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Platform credentials are configured by the deployment operator.
-            Their secrets are never displayed here.
-          </p>
-        </section>
-      </div>
+        <p className="text-xs text-muted-foreground">
+          Provider configuration and role compatibility are checked by the Go
+          backend. Platform-owned credentials are not exposed by this API.
+        </p>
+      </section>
+
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Organization credentials</h2>
-        {credentials?.length ? (
+        {integrations.isPending ? (
+          <p role="status">Loading credentials…</p>
+        ) : integrations.isError ? (
+          <div role="alert" className="space-y-3">
+            <p>{errorMessage(integrations.error)}</p>
+            <Button
+              variant="outline"
+              onClick={() => void integrations.refetch()}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : credentials.length ? (
           <ul className="space-y-3">
             {credentials.map((credential) => (
-              <li key={credential.id} className="rounded-lg border p-4">
-                <p className="font-medium">{credential.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Connection: {credential.connectionState}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Verified: {credential.verifiedAt ?? "Not verified"}
-                </p>
+              <li key={credential.id} className="space-y-3 rounded-lg border p-5">
+                <div className="space-y-1">
+                  <p className="font-medium">{credential.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Connection: {credential.connection_state}
+                    {credential.failure_code
+                      ? " · " + credential.failure_code
+                      : ""}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Verified:{" "}
+                    {credential.verified_at
+                      ? new Date(credential.verified_at).toLocaleString()
+                      : "Never"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Assigned Agents: {credential.voice_agent_ids.length}
+                  </p>
+                </div>
+                <CredentialActions credential={credential} />
               </li>
             ))}
           </ul>
         ) : (
           <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
-            {credentials
-              ? "No organization credentials configured."
-              : "Organization credentials have not been loaded."}
+            No organization credentials configured for this provider.
           </p>
         )}
       </section>
-      <ProviderCredentialForm />
+
+      <ProviderCredentialForm providerId={provider.id} />
       <p className="text-sm text-muted-foreground">
-        Assign organization credentials or platform defaults from{" "}
+        Verify credentials before assigning them to an{" "}
         <Link href="/agents" className="underline">
-          agent configuration
+          Agent
         </Link>
         .
       </p>
