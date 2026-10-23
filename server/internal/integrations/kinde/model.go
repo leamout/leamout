@@ -1,7 +1,8 @@
-package keycloak
+package kinde
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -10,16 +11,16 @@ import (
 
 type Config struct {
 	Issuer       string `env:"ISSUER"`
-	ClientID     string `env:"CLIENT_ID" envDefault:"leamout-console"`
+	ClientID     string `env:"CLIENT_ID"`
 	ClientSecret string `env:"CLIENT_SECRET"`
 }
 
 type Client struct {
-	config         oauth2.Config
-	verifier       *oidc.IDTokenVerifier
-	http           *http.Client
-	issuer         string
-	logoutEndpoint string
+	config   oauth2.Config
+	http     *http.Client
+	issuer   string
+	mu       sync.Mutex
+	verifier *oidc.IDTokenVerifier
 }
 
 type Identity struct {
@@ -28,6 +29,8 @@ type Identity struct {
 	Email         string `json:"email"`
 	EmailVerified bool   `json:"email_verified"`
 	Name          string `json:"name"`
+	GivenName     string `json:"given_name"`
+	FamilyName    string `json:"family_name"`
 }
 
 type Tokens struct {
@@ -35,8 +38,4 @@ type Tokens struct {
 	IDToken    string       `json:"id_token"`
 	Nonce      string       `json:"nonce"`
 	ValidUntil time.Time    `json:"valid_until"`
-}
-
-type providerMetadata struct {
-	LogoutEndpoint string `json:"end_session_endpoint"`
 }

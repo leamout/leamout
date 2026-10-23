@@ -6,7 +6,7 @@ import (
 	"github.com/leamout/leamout/server/internal/identity/auth"
 	"github.com/leamout/leamout/server/internal/identity/session"
 	"github.com/leamout/leamout/server/internal/identity/users"
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 )
 
@@ -36,7 +36,7 @@ func New(
 	queries *sqlc.Queries,
 	development bool,
 	db *pgxpool.Pool,
-	client *keycloak.Client,
+	client *kinde.Client,
 	cipher *encryption.Cipher,
 	frontendURL string,
 ) *Module {

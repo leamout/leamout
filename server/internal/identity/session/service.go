@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 
 	"github.com/google/uuid"
@@ -26,11 +26,11 @@ const (
 type Service struct {
 	repo   *Repository
 	db     *pgxpool.Pool
-	client *keycloak.Client
+	client *kinde.Client
 	cipher *encryption.Cipher
 }
 
-func NewService(repo *Repository, db *pgxpool.Pool, client *keycloak.Client, cipher *encryption.Cipher) *Service {
+func NewService(repo *Repository, db *pgxpool.Pool, client *kinde.Client, cipher *encryption.Cipher) *Service {
 	return &Service{
 		repo:   repo,
 		db:     db,
@@ -39,8 +39,8 @@ func NewService(repo *Repository, db *pgxpool.Pool, client *keycloak.Client, cip
 	}
 }
 
-// Create stores a browser session backed exclusively by Keycloak tokens.
-func (s *Service) Create(ctx context.Context, userID uuid.UUID, subject string, identitySessionID string, tokens keycloak.Tokens) (string, sqlc.Session, error) {
+// Create stores a browser session backed by Kinde tokens.
+func (s *Service) Create(ctx context.Context, userID uuid.UUID, subject string, identitySessionID string, tokens kinde.Tokens) (string, sqlc.Session, error) {
 	if err := validateUserID(userID); err != nil {
 		return "", sqlc.Session{}, err
 	}
@@ -68,7 +68,7 @@ func (s *Service) Create(ctx context.Context, userID uuid.UUID, subject string, 
 	return value, created, err
 }
 
-func (s *Service) encrypt(userID uuid.UUID, tokens keycloak.Tokens) (string, error) {
+func (s *Service) encrypt(userID uuid.UUID, tokens kinde.Tokens) (string, error) {
 	data, err := json.Marshal(tokens)
 	if err != nil {
 		return "", fmt.Errorf("encode identity tokens: %w", err)
@@ -76,14 +76,14 @@ func (s *Service) encrypt(userID uuid.UUID, tokens keycloak.Tokens) (string, err
 	return s.cipher.EncryptForScope("identity-session:"+userID.String(), string(data))
 }
 
-func (s *Service) decrypt(stored sqlc.Session) (keycloak.Tokens, error) {
+func (s *Service) decrypt(stored sqlc.Session) (kinde.Tokens, error) {
 	data, err := s.cipher.DecryptForScope("identity-session:"+stored.UserID.String(), stored.TokensCiphertext)
 	if err != nil {
-		return keycloak.Tokens{}, ErrInvalidSession
+		return kinde.Tokens{}, ErrInvalidSession
 	}
-	var tokens keycloak.Tokens
+	var tokens kinde.Tokens
 	if err := json.Unmarshal([]byte(data), &tokens); err != nil {
-		return keycloak.Tokens{}, ErrInvalidSession
+		return kinde.Tokens{}, ErrInvalidSession
 	}
 	return tokens, nil
 }
@@ -112,7 +112,7 @@ func (s *Service) refresh(ctx context.Context, stored sqlc.Session) error {
 		return err
 	}
 	if !time.Now().Add(10 * time.Second).Before(tokens.ValidUntil) {
-		tokens, err = s.client.Refresh(ctx, tokens, stored.IdentitySubject, stored.IdentitySessionID)
+		tokens, err = s.client.Refresh(ctx, tokens, stored.IdentitySubject)
 		if err != nil {
 			return ErrInvalidSession
 		}

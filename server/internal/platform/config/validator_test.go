@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 )
 
 func TestValidateForServerNeedsOnlyAPIDependencies(t *testing.T) {
@@ -13,7 +13,7 @@ func TestValidateForServerNeedsOnlyAPIDependencies(t *testing.T) {
 		FreeSWITCHESLPassword: "esl-secret",
 		EncryptionKey:         "encryption-key",
 		TURNAuthSecret:        "turn-secret",
-		Keycloak: keycloak.Config{
+		Kinde: kinde.Config{
 			ClientSecret: "oidc-secret",
 		},
 	}
@@ -52,7 +52,7 @@ func TestValidateForBackofficeNeedsOnlyAdminDependencies(t *testing.T) {
 	cfg := Config{
 		DatabaseURL:   "postgres://db",
 		EncryptionKey: "encryption-key",
-		Keycloak: keycloak.Config{
+		Kinde: kinde.Config{
 			ClientSecret: "oidc-secret",
 		},
 	}
@@ -61,7 +61,7 @@ func TestValidateForBackofficeNeedsOnlyAdminDependencies(t *testing.T) {
 		t.Fatalf("backoffice should not require telephony, cache or event credentials: %v", err)
 	}
 
-	cfg.Keycloak.ClientSecret = ""
+	cfg.Kinde.ClientSecret = ""
 	if err := cfg.ValidateForBackoffice(); err == nil {
 		t.Fatal("backoffice must reject missing OIDC secret")
 	}

@@ -10,7 +10,7 @@ import (
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	identityauth "github.com/leamout/leamout/server/internal/identity/auth"
 	"github.com/leamout/leamout/server/internal/identity/session"
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	"github.com/leamout/leamout/server/internal/observability/logging"
 	"github.com/leamout/leamout/server/internal/platform/config"
@@ -33,9 +33,9 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	if err != nil {
 		return nil, fmt.Errorf("initialize session encryption: %w", err)
 	}
-	client, err := keycloak.New(ctx, cfg.Keycloak, cfg.BackofficeURL+"/auth/callback", cfg.IsDevelopment())
+	client, err := kinde.New(ctx, cfg.Kinde, cfg.BackofficeURL+"/auth/callback", cfg.IsDevelopment())
 	if err != nil {
-		return nil, fmt.Errorf("initialize Keycloak: %w", err)
+		return nil, fmt.Errorf("initialize Kinde: %w", err)
 	}
 	db, err := postgres.New(ctx, postgres.DefaultConfig(cfg.DatabaseURL))
 	if err != nil {
@@ -46,7 +46,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	resolver := authn.NewResolver(sessions, nil)
 	authentication := identityauth.NewHandler(queries, sessions, client, cipher, cfg.BackofficeURL, cfg.IsDevelopment())
 	return &modules{
-		authentication: backofficeauth.NewHandler(authentication, sessions, cfg.IsDevelopment()),
+		authentication: backofficeauth.NewHandler(authentication),
 		postgres:       db,
 		queries:        queries,
 		authn:          middleware.NewAuthnMiddleware(resolver),

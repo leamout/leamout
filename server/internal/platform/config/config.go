@@ -8,7 +8,7 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 )
 
 type PolarConfig struct {
@@ -29,7 +29,7 @@ type AWSConfig struct {
 }
 
 type Config struct {
-	Keycloak keycloak.Config `envPrefix:"KEYCLOAK_"`
+	Kinde    kinde.Config    `envPrefix:"KINDE_"`
 	AWS      AWSConfig       `envPrefix:"AWS_"`
 	Polar    PolarConfig     `envPrefix:"POLAR_"`
 

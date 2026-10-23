@@ -25,11 +25,11 @@ func (c Config) ValidateForServer() error {
 		"FREESWITCH_ESL_PASSWORD": c.FreeSWITCHESLPassword,
 		"ENCRYPTION_KEY":          c.EncryptionKey,
 		"TURN_AUTH_SECRET":        c.TURNAuthSecret,
-		"KEYCLOAK_CLIENT_SECRET":  c.Keycloak.ClientSecret,
+		"KINDE_CLIENT_SECRET":  c.Kinde.ClientSecret,
 	})
 }
 
-// ValidateForWorker excludes Keycloak and TURN secrets not used by background jobs.
+// ValidateForWorker excludes Kinde and TURN secrets not used by background jobs.
 func (c Config) ValidateForWorker() error {
 	return requireSettings(map[string]string{
 		"DATABASE_URL":            c.DatabaseURL,
@@ -46,7 +46,7 @@ func (c Config) ValidateForBackoffice() error {
 	return requireSettings(map[string]string{
 		"DATABASE_URL":           c.DatabaseURL,
 		"ENCRYPTION_KEY":         c.EncryptionKey,
-		"KEYCLOAK_CLIENT_SECRET": c.Keycloak.ClientSecret,
+		"KINDE_CLIENT_SECRET": c.Kinde.ClientSecret,
 	})
 }
 
@@ -59,7 +59,7 @@ func requireSettings(values map[string]string) error {
 		"MEDIA_CONTROL_TOKEN",
 		"ENCRYPTION_KEY",
 		"TURN_AUTH_SECRET",
-		"KEYCLOAK_CLIENT_SECRET",
+		"KINDE_CLIENT_SECRET",
 	} {
 		if value, ok := values[key]; ok && strings.TrimSpace(value) == "" {
 			return fmt.Errorf("%s is required", key)
