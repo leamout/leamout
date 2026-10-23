@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@leamout/ui/components/button";
 import { Input } from "@leamout/ui/components/input";
 import {
   Table,
@@ -9,18 +10,21 @@ import {
   TableHeader,
   TableRow,
 } from "@leamout/ui/components/table";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { api, errorMessage } from "@/lib/api";
 
 export type AuditEvent = {
   id: string;
-  organizationId: string;
-  actorType: string;
-  actorId: string;
+  organization_id: string;
+  actor_type: string;
+  actor_id: string;
   action: string;
-  targetType: string;
-  targetId: string;
+  target_type: string;
+  target_id: string;
   metadata: unknown;
-  occurredAt: string;
+  occurred_at: string;
 };
 
 function formatTime(value: string) {
@@ -33,24 +37,38 @@ function formatTime(value: string) {
   }).format(date);
 }
 
-export function AuditLog({ events = [] }: { events?: AuditEvent[] }) {
+export function AuditLog() {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
   const [search, setSearch] = useState("");
+  const [offset, setOffset] = useState(0);
+  const pageSize = 50;
+  const query = useQuery({
+    queryKey: ["audit-events", organizationId, offset],
+    queryFn: ({ signal }) =>
+      api<{ audit_events: AuditEvent[] }>(
+        "/audit-events/?limit=" + pageSize + "&offset=" + offset,
+        { organizationId, signal },
+      ),
+    enabled: Boolean(organizationId),
+  });
+  const events = query.data?.audit_events ?? [];
   const [actorType, setActorType] = useState("all");
   const [targetType, setTargetType] = useState("all");
   const actorTypes = [
-    ...new Set(events.map((event) => event.actorType)),
+    ...new Set(events.map((event) => event.actor_type)),
   ].sort();
   const targetTypes = [
-    ...new Set(events.map((event) => event.targetType)),
+    ...new Set(events.map((event) => event.target_type)),
   ].sort();
   const filtered = events
     .filter(
       (event) =>
-        `${event.id} ${event.action} ${event.actorId} ${event.targetId} ${event.targetType}`
+        `${event.id} ${event.action} ${event.actor_id} ${event.target_id} ${event.target_type}`
           .toLowerCase()
           .includes(search.trim().toLowerCase()) &&
-        (actorType === "all" || event.actorType === actorType) &&
-        (targetType === "all" || event.targetType === targetType),
+        (actorType === "all" || event.actor_type === actorType) &&
+        (targetType === "all" || event.target_type === targetType),
     )
     .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
 
@@ -113,6 +131,16 @@ export function AuditLog({ events = [] }: { events?: AuditEvent[] }) {
           </select>
         </div>
       </div>
+      {query.isPending ? (
+        <p role="status">Loading audit events…</p>
+      ) : query.isError ? (
+        <div role="alert" className="space-y-3">
+          <p>{errorMessage(query.error)}</p>
+          <Button variant="outline" onClick={() => void query.refetch()}>
+            Retry
+          </Button>
+        </div>
+      ) : (
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader>
@@ -128,21 +156,21 @@ export function AuditLog({ events = [] }: { events?: AuditEvent[] }) {
             {filtered.map((event) => (
               <TableRow key={event.id}>
                 <TableCell className="align-top whitespace-nowrap">
-                  {formatTime(event.occurredAt)}
+                  {formatTime(event.occurred_at)}
                 </TableCell>
                 <TableCell className="align-top font-medium">
                   {event.action}
                 </TableCell>
                 <TableCell className="align-top">
-                  <p>{event.actorType}</p>
+                  <p>{event.actor_type}</p>
                   <p className="mt-1 max-w-48 break-all text-xs text-muted-foreground">
-                    {event.actorId}
+                    {event.actor_id}
                   </p>
                 </TableCell>
                 <TableCell className="align-top">
-                  <p>{event.targetType}</p>
+                  <p>{event.target_type}</p>
                   <p className="mt-1 max-w-48 break-all text-xs text-muted-foreground">
-                    {event.targetId}
+                    {event.target_id}
                   </p>
                 </TableCell>
                 <TableCell className="align-top">
@@ -160,12 +188,12 @@ export function AuditLog({ events = [] }: { events?: AuditEvent[] }) {
                           Organization ID
                         </dt>
                         <dd className="mt-1 break-all">
-                          {event.organizationId}
+                          {event.organization_id}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Timestamp</dt>
-                        <dd className="mt-1 break-all">{event.occurredAt}</dd>
+                        <dd className="mt-1 break-all">{event.occurred_at}</dd>
                       </div>
                       <div>
                         <dt className="text-muted-foreground">Metadata</dt>
@@ -203,10 +231,28 @@ export function AuditLog({ events = [] }: { events?: AuditEvent[] }) {
           </TableBody>
         </Table>
       </div>
-      <p className="text-sm text-muted-foreground">
-        UI preview. Audit events are not connected. Filters apply to the
-        supplied preview events.
-      </p>
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Page {Math.floor(offset / pageSize) + 1}. Filters apply to this page.
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            disabled={offset === 0 || query.isFetching}
+            onClick={() => setOffset((value) => Math.max(0, value - pageSize))}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            disabled={query.isFetching || events.length < pageSize}
+            onClick={() => setOffset((value) => value + pageSize)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
