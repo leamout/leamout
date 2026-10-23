@@ -16,14 +16,23 @@ import {
   TableRow,
 } from "@leamout/ui/components/table";
 import Link from "next/link";
-import { type CallSummary, formatDuration } from "@/components/calls/types";
+import { formatDuration } from "@/components/calls/types";
+
+type RecentCallPreview = {
+  id: string;
+  agentName: string;
+  direction: "inbound" | "outbound";
+  status: string;
+  startedAt: string;
+  durationSeconds: number | null;
+};
 
 type OverviewData = {
   activeCalls?: number;
   callsToday?: number;
   failedCallsToday?: number;
   enabledAgents?: number;
-  recentCalls?: CallSummary[];
+  recentCalls?: RecentCallPreview[];
   setup?: Partial<Record<"provider" | "trunk" | "agent" | "number", boolean>>;
 };
 
