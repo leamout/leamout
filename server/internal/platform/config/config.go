@@ -29,7 +29,7 @@ type AWSConfig struct {
 }
 
 type Config struct {
-	Kinde    kinde.Config    `envPrefix:"KINDE_"`
+	Kinde    kinde.Config `envPrefix:"KINDE_"`
 	AWS      AWSConfig       `envPrefix:"AWS_"`
 	Polar    PolarConfig     `envPrefix:"POLAR_"`
 
