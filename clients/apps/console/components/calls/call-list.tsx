@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@leamout/ui/components/button";
 import { Input } from "@leamout/ui/components/input";
 import {
   Table,
@@ -9,65 +10,125 @@ import {
   TableHeader,
   TableRow,
 } from "@leamout/ui/components/table";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import { type CallSummary, formatDuration } from "@/components/calls/types";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import type { VoiceAgent } from "@/components/agents/types";
+import { api, errorMessage } from "@/lib/api";
+import {
+  callDurationSeconds,
+  callStates,
+  formatCallDate,
+  formatDuration,
+  type Call,
+} from "./types";
 
-export function CallList({ calls = [] }: { calls?: CallSummary[] }) {
+const pageSize = 50;
+
+export function CallList() {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("all");
+  const [state, setState] = useState("all");
   const [direction, setDirection] = useState("all");
-  const filtered = calls.filter(
-    (call) =>
-      `${call.id} ${call.agentName} ${call.from} ${call.to}`
-        .toLowerCase()
-        .includes(search.toLowerCase()) &&
-      (status === "all" || call.status === status) &&
-      (direction === "all" || call.direction === direction),
+  const [agentId, setAgentId] = useState("all");
+  const [offset, setOffset] = useState(0);
+
+  const calls = useQuery({
+    queryKey: ["calls", organizationId, state, direction, agentId, offset],
+    queryFn: ({ signal }) => {
+      const params = new URLSearchParams({
+        limit: String(pageSize),
+        offset: String(offset),
+      });
+      if (state !== "all") params.set("state", state);
+      if (direction !== "all") params.set("direction", direction);
+      if (agentId !== "all") params.set("voice_agent_id", agentId);
+
+      return api<{ calls: Call[] }>("/calls/?" + params.toString(), {
+        organizationId,
+        signal,
+      });
+    },
+    enabled: Boolean(organizationId),
+  });
+
+  const agents = useQuery({
+    queryKey: ["voice-agents", organizationId],
+    queryFn: ({ signal }) =>
+      api<{ voice_agents: VoiceAgent[] }>("/voice-agents/", {
+        organizationId,
+        signal,
+      }),
+    enabled: Boolean(organizationId),
+  });
+
+  const items = calls.data?.calls ?? [];
+  const agentNames = new Map(
+    agents.data?.voice_agents.map((agent) => [agent.id, agent.name]) ?? [],
+  );
+  const filtered = items.filter((call) =>
+    [
+      call.id,
+      call.from_uri,
+      call.to_uri,
+      call.sip_call_id ?? "",
+      call.voice_agent_id ? agentNames.get(call.voice_agent_id) ?? "" : "",
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(search.trim().toLowerCase()),
   );
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Calls</h1>
-        <p className="text-muted-foreground">
-          Review conversations, call outcomes, and runtime diagnostics.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-semibold tracking-tight">Calls</h1>
+          <p className="text-muted-foreground">
+            Review call outcomes and persisted SIP and routing diagnostics.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          disabled={calls.isFetching || !organizationId}
+          onClick={() => void calls.refetch()}
+        >
+          {calls.isFetching ? "Refreshing…" : "Refresh"}
+        </Button>
       </div>
-      <div className="flex flex-wrap gap-4">
-        <div className="min-w-48 flex-1 space-y-2">
-          <label htmlFor="call-search" className="text-sm font-medium">
-            Search calls
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <div className="space-y-2">
+          <label htmlFor="call-search" className="block text-sm font-medium">
+            Search current page
           </label>
           <Input
             id="call-search"
             type="search"
-            placeholder="Call ID, agent, or phone number"
+            placeholder="Call ID, SIP ID, or URI"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
         <div className="space-y-2">
-          <label htmlFor="call-status" className="block text-sm font-medium">
-            Status
+          <label htmlFor="call-state" className="block text-sm font-medium">
+            State
           </label>
           <select
-            id="call-status"
-            className="h-9 rounded-md border bg-background px-3 text-sm"
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
+            id="call-state"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={state}
+            onChange={(event) => {
+              setState(event.target.value);
+              setOffset(0);
+            }}
           >
-            <option value="all">All statuses</option>
-            {[
-              "queued",
-              "ringing",
-              "active",
-              "completed",
-              "failed",
-              "canceled",
-            ].map((value) => (
-              <option key={value} value={value}>
-                {value}
+            <option value="all">All states</option>
+            {callStates.map((item) => (
+              <option key={item} value={item}>
+                {item}
               </option>
             ))}
           </select>
@@ -78,77 +139,155 @@ export function CallList({ calls = [] }: { calls?: CallSummary[] }) {
           </label>
           <select
             id="call-direction"
-            className="h-9 rounded-md border bg-background px-3 text-sm"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
             value={direction}
-            onChange={(event) => setDirection(event.target.value)}
+            onChange={(event) => {
+              setDirection(event.target.value);
+              setOffset(0);
+            }}
           >
             <option value="all">All directions</option>
             <option value="inbound">Inbound</option>
             <option value="outbound">Outbound</option>
           </select>
         </div>
-      </div>
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {[
-                "Call",
-                "Agent",
-                "Direction",
-                "Status",
-                "From / To",
-                "Started",
-                "Duration",
-              ].map((label) => (
-                <TableHead key={label}>{label}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((call) => (
-              <TableRow key={call.id}>
-                <TableCell>
-                  <Link
-                    className="font-medium hover:underline"
-                    href={`/calls/${encodeURIComponent(call.id)}`}
-                  >
-                    {call.id}
-                  </Link>
-                </TableCell>
-                <TableCell>{call.agentName}</TableCell>
-                <TableCell className="capitalize">{call.direction}</TableCell>
-                <TableCell className="capitalize">{call.status}</TableCell>
-                <TableCell>
-                  <p>{call.from}</p>
-                  <p className="text-muted-foreground">{call.to}</p>
-                </TableCell>
-                <TableCell>{call.startedAt}</TableCell>
-                <TableCell>{formatDuration(call.durationSeconds)}</TableCell>
-              </TableRow>
+        <div className="space-y-2">
+          <label htmlFor="call-agent" className="block text-sm font-medium">
+            Agent
+          </label>
+          <select
+            id="call-agent"
+            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+            value={agentId}
+            disabled={agents.isPending || agents.isError}
+            onChange={(event) => {
+              setAgentId(event.target.value);
+              setOffset(0);
+            }}
+          >
+            <option value="all">All Agents</option>
+            {agents.data?.voice_agents.map((agent) => (
+              <option key={agent.id} value={agent.id}>
+                {agent.name}
+              </option>
             ))}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={7} className="h-40 text-center">
-                  <p className="font-medium">
-                    {calls.length === 0
-                      ? "No calls to display"
-                      : "No matching calls"}
-                  </p>
-                  <p className="mt-2 text-muted-foreground">
-                    {calls.length === 0
-                      ? "Call history will appear here when runtime integration is connected."
-                      : "Try another search or filter."}
-                  </p>
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+          </select>
+        </div>
       </div>
-      <p className="text-sm text-muted-foreground">
-        UI preview. Live call data is not connected.
-      </p>
+
+      {agents.isError && (
+        <p role="alert" className="text-sm text-muted-foreground">
+          Agent names are unavailable: {errorMessage(agents.error)}
+        </p>
+      )}
+
+      {calls.isPending ? (
+        <p role="status" className="rounded-lg border p-6">
+          Loading calls…
+        </p>
+      ) : calls.isError ? (
+        <div role="alert" className="space-y-3 rounded-lg border p-6">
+          <p>{errorMessage(calls.error)}</p>
+          <Button variant="outline" onClick={() => void calls.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Call</TableHead>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Direction</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead>From / To</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Talk time</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((call) => (
+                  <TableRow key={call.id}>
+                    <TableCell>
+                      <Link
+                        className="font-mono text-xs hover:underline"
+                        href={"/calls/" + encodeURIComponent(call.id)}
+                      >
+                        {call.id}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {call.voice_agent_id ? (
+                        <Link
+                          className="hover:underline"
+                          href={
+                            "/agents/" +
+                            encodeURIComponent(call.voice_agent_id)
+                          }
+                        >
+                          {agentNames.get(call.voice_agent_id) ??
+                            call.voice_agent_id}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="capitalize">
+                      {call.direction}
+                    </TableCell>
+                    <TableCell className="capitalize">{call.state}</TableCell>
+                    <TableCell>
+                      <p className="break-all">{call.from_uri}</p>
+                      <p className="break-all text-muted-foreground">
+                        {call.to_uri}
+                      </p>
+                    </TableCell>
+                    <TableCell>{formatCallDate(call.created_at)}</TableCell>
+                    <TableCell>
+                      {formatDuration(callDurationSeconds(call))}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!filtered.length && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="h-36 text-center">
+                      {items.length
+                        ? "No calls match this page search."
+                        : offset
+                          ? "No more calls on this page."
+                          : "No calls match these filters."}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              Page {Math.floor(offset / pageSize) + 1} · {items.length} calls
+              fetched. Search applies to this page only.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                disabled={offset === 0 || calls.isFetching}
+                onClick={() => setOffset((value) => Math.max(0, value - pageSize))}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                disabled={items.length < pageSize || calls.isFetching}
+                onClick={() => setOffset((value) => value + pageSize)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
