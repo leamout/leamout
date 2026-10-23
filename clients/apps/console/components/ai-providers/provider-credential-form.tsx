@@ -9,75 +9,125 @@ import {
   FieldLabel,
 } from "@leamout/ui/components/field";
 import { Input } from "@leamout/ui/components/input";
-import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { api, errorMessage } from "@/lib/api";
+import type { AIIntegration } from "./types";
 
 const schema = z.object({
-  name: z.string().trim().min(1, "Enter a credential name."),
+  name: z.string().trim().min(1, "Enter a credential name.").max(128),
   secret: z.string().trim().min(1, "Enter an API key."),
 });
 
-export function ProviderCredentialForm() {
-  const [notice, setNotice] = useState("");
-  const form = useForm<z.infer<typeof schema>>({
+type Values = z.infer<typeof schema>;
+
+export function ProviderCredentialForm({ providerId }: { providerId: string }) {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
+  const client = useQueryClient();
+  const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { name: "", secret: "" },
   });
+
+  const create = useMutation({
+    mutationFn: (values: Values) =>
+      api<AIIntegration>("/ai-integrations/", {
+        method: "POST",
+        organizationId,
+        body: {
+          provider: providerId,
+          name: values.name.trim(),
+          secret: values.secret.trim(),
+        },
+      }),
+    onSuccess: async () => {
+      form.reset();
+      await client.invalidateQueries({
+        queryKey: ["ai-integrations", organizationId],
+      });
+    },
+    onSettled: () => form.resetField("secret", { defaultValue: "" }),
+  });
+
   return (
     <form
-      className="max-w-2xl space-y-6"
+      className="max-w-2xl space-y-5"
       noValidate
-      onChange={() => setNotice("")}
-      onSubmit={form.handleSubmit(() => {
-        form.resetField("secret");
-        setNotice(
-          "Preview only. Credentials were not saved or verified. The API key field has been cleared.",
-        );
-      })}
+      onSubmit={form.handleSubmit((values) => create.mutate(values))}
     >
       <h2 className="text-lg font-semibold">Add organization credential</h2>
-      {(["name", "secret"] as const).map((name) => (
-        <Controller
-          key={name}
-          name={name}
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={`provider-${name}`}>
-                {name === "name" ? "Credential name" : "API key"}
-              </FieldLabel>
-              <Input
-                {...field}
-                id={`provider-${name}`}
-                type={name === "secret" ? "password" : "text"}
-                autoComplete={name === "secret" ? "new-password" : "off"}
-                required
-                aria-invalid={fieldState.invalid}
-                aria-describedby={
-                  fieldState.invalid ? `provider-${name}-error` : undefined
-                }
+      <Controller
+        name="name"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor="credential-name">Credential name</FieldLabel>
+            <Input
+              {...field}
+              id="credential-name"
+              aria-invalid={fieldState.invalid}
+              aria-describedby={
+                fieldState.invalid ? "credential-name-error" : undefined
+              }
+              maxLength={128}
+              autoComplete="off"
+              required
+            />
+            {fieldState.invalid && (
+              <FieldError
+                id="credential-name-error"
+                errors={[fieldState.error]}
               />
-              {fieldState.invalid && (
-                <FieldError
-                  id={`provider-${name}-error`}
-                  errors={[fieldState.error]}
-                />
-              )}
-              {name === "secret" && (
-                <FieldDescription>
-                  Preview input only. The key is not sent to a server or stored
-                  in browser storage.
-                </FieldDescription>
-              )}
-            </Field>
-          )}
-        />
-      ))}
-      <Button type="submit">Save credential</Button>
-      <p role="status" className="text-sm text-muted-foreground">
-        {notice}
-      </p>
+            )}
+          </Field>
+        )}
+      />
+      <Controller
+        name="secret"
+        control={form.control}
+        render={({ field, fieldState }) => (
+          <Field data-invalid={fieldState.invalid}>
+            <FieldLabel htmlFor="credential-secret">API key</FieldLabel>
+            <Input
+              {...field}
+              id="credential-secret"
+              type="password"
+              autoComplete="new-password"
+              aria-invalid={fieldState.invalid}
+              aria-describedby={
+                fieldState.invalid ? "credential-secret-error" : undefined
+              }
+              required
+            />
+            <FieldDescription>
+              Secrets are encrypted by the Go backend and cannot be retrieved
+              from this Console. Verify the integration after saving.
+            </FieldDescription>
+            {fieldState.invalid && (
+              <FieldError
+                id="credential-secret-error"
+                errors={[fieldState.error]}
+              />
+            )}
+          </Field>
+        )}
+      />
+      <Button type="submit" disabled={!organizationId || create.isPending}>
+        {create.isPending ? "Saving…" : "Save credential"}
+      </Button>
+      {create.isSuccess && (
+        <p role="status" className="text-sm">
+          Credential created. Use Verify to test the connection.
+        </p>
+      )}
+      {create.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {errorMessage(create.error)}
+        </p>
+      )}
     </form>
   );
 }

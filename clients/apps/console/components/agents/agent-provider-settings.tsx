@@ -1,135 +1,361 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@leamout/ui/components/button";
+import {
+  Field,
+  FieldError,
+  FieldLabel,
+} from "@leamout/ui/components/field";
+import { Input } from "@leamout/ui/components/input";
+import { Textarea } from "@leamout/ui/components/textarea";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
-import { PreviewSettingsForm } from "@/components/settings/preview-settings-form";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import {
+  providerCatalog,
+  providerName,
+} from "@/components/ai-providers/catalog";
+import type {
+  AgentProviderBinding,
+  AIIntegration,
+  ProviderRole,
+} from "@/components/ai-providers/types";
+import type { VoiceAgent } from "@/components/agents/types";
+import { api, errorMessage } from "@/lib/api";
 
-export type AgentProviderBinding = {
-  role: "realtime" | "stt" | "llm" | "tts";
-  provider: string;
-  credentialId?: string;
-};
+function isJSONObject(value: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed !== null && !Array.isArray(parsed) && typeof parsed === "object";
+  } catch {
+    return false;
+  }
+}
 
-export function AgentProviderSettings({
-  bindings = [],
+const schema = z.object({
+  provider: z.string().trim().min(1, "Select a provider."),
+  credentialId: z.uuid("Select an organization credential."),
+  config: z.string().refine(isJSONObject, "Enter a valid JSON object."),
+});
+
+type Values = z.infer<typeof schema>;
+
+function ProviderRoleForm({
+  role,
+  agentId,
+  organizationId,
+  credentials,
+  binding,
 }: {
-  bindings?: AgentProviderBinding[];
+  role: ProviderRole;
+  agentId: string;
+  organizationId: string;
+  credentials: AIIntegration[];
+  binding?: AgentProviderBinding;
 }) {
-  const [engine, setEngine] = useState("realtime");
-  const [notice, setNotice] = useState("");
-  const roles = engine === "realtime" ? ["realtime"] : ["stt", "llm", "tts"];
+  const client = useQueryClient();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const key = ["agent-provider-bindings", organizationId, agentId];
+  const form = useForm<Values>({
+    resolver: zodResolver(schema),
+    defaultValues: {
+      provider: binding?.provider ?? "",
+      credentialId: binding?.credential_id ?? "",
+      config: JSON.stringify(binding?.config ?? {}, null, 2),
+    },
+  });
+  const provider = form.watch("provider");
+  const options = providerCatalog.filter((entry) => entry.roles.includes(role));
+  const matchingCredentials = credentials.filter(
+    (entry) => entry.provider === provider && entry.connection_state === "ready",
+  );
+
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: key });
+    await client.invalidateQueries({
+      queryKey: ["agent-readiness", organizationId, agentId],
+    });
+    await client.invalidateQueries({
+      queryKey: ["ai-integrations", organizationId],
+    });
+  };
+
+  const save = useMutation({
+    mutationFn: (values: Values) =>
+      api<AgentProviderBinding>(
+        "/voice-agents/" +
+          encodeURIComponent(agentId) +
+          "/providers/" +
+          encodeURIComponent(role),
+        {
+          method: "PUT",
+          organizationId,
+          body: {
+            provider: values.provider,
+            credential_id: values.credentialId,
+            config: JSON.parse(values.config) as Record<string, unknown>,
+          },
+        },
+      ),
+    onSuccess: async (value) => {
+      form.reset({
+        provider: value.provider,
+        credentialId: value.credential_id ?? "",
+        config: JSON.stringify(value.config ?? {}, null, 2),
+      });
+      setSaved(true);
+      await refresh();
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: () =>
+      api<void>(
+        "/voice-agents/" +
+          encodeURIComponent(agentId) +
+          "/providers/" +
+          encodeURIComponent(role),
+        { method: "DELETE", organizationId },
+      ),
+    onSuccess: async () => {
+      setConfirmRemove(false);
+      setSaved(false);
+      form.reset({ provider: "", credentialId: "", config: "{}" });
+      await refresh();
+    },
+  });
+
+  return (
+    <section className="space-y-4 rounded-lg border p-6">
+      <h3 className="font-semibold uppercase">{role}</h3>
+      <p className="text-sm text-muted-foreground">
+        {binding
+          ? "Current assignment: " + providerName(binding.provider)
+          : "No provider assigned."}
+      </p>
+      <form
+        className="space-y-4"
+        noValidate
+        onSubmit={form.handleSubmit((values) => save.mutate(values))}
+        onChange={() => setSaved(false)}
+      >
+        <Field data-invalid={Boolean(form.formState.errors.provider)}>
+          <FieldLabel htmlFor={"provider-" + role}>Provider</FieldLabel>
+          <select
+            id={"provider-" + role}
+            className="h-10 w-full rounded-md border bg-background px-3"
+            aria-invalid={Boolean(form.formState.errors.provider)}
+            {...form.register("provider", {
+              onChange: () => form.setValue("credentialId", ""),
+            })}
+          >
+            <option value="">Choose provider</option>
+            {options.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </select>
+          {form.formState.errors.provider && (
+            <FieldError errors={[form.formState.errors.provider]} />
+          )}
+        </Field>
+        <Field data-invalid={Boolean(form.formState.errors.credentialId)}>
+          <FieldLabel htmlFor={"credential-" + role}>
+            Verified organization credential
+          </FieldLabel>
+          <select
+            id={"credential-" + role}
+            className="h-10 w-full rounded-md border bg-background px-3"
+            aria-invalid={Boolean(form.formState.errors.credentialId)}
+            {...form.register("credentialId")}
+          >
+            <option value="">Choose credential</option>
+            {matchingCredentials.map((credential) => (
+              <option key={credential.id} value={credential.id}>
+                {credential.name}
+              </option>
+            ))}
+          </select>
+          {form.formState.errors.credentialId && (
+            <FieldError errors={[form.formState.errors.credentialId]} />
+          )}
+          {!matchingCredentials.length && (
+            <p className="text-sm text-muted-foreground">
+              No verified credentials for this provider.{" "}
+              <Link href="/ai-providers" className="underline">
+                Manage integrations
+              </Link>
+            </p>
+          )}
+        </Field>
+        <Controller
+          name="config"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={"config-" + role}>
+                Provider configuration (JSON)
+              </FieldLabel>
+              <Textarea
+                {...field}
+                id={"config-" + role}
+                className="font-mono"
+                rows={5}
+                spellCheck={false}
+                aria-invalid={fieldState.invalid}
+              />
+              {fieldState.invalid && (
+                <FieldError errors={[fieldState.error]} />
+              )}
+            </Field>
+          )}
+        />
+        <p className="text-xs text-muted-foreground">
+          Enter provider configuration, not API secrets. The backend validates
+          provider-specific settings and credential ownership.
+        </p>
+        <Button type="submit" disabled={save.isPending || !organizationId}>
+          {save.isPending ? "Saving…" : "Save " + role.toUpperCase()}
+        </Button>
+        {saved && <p role="status" className="text-sm">Assignment saved.</p>}
+        {save.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage(save.error)}
+          </p>
+        )}
+      </form>
+
+      {binding && (
+        <div className="space-y-2 border-t pt-4">
+          {!confirmRemove ? (
+            <Button variant="outline" onClick={() => setConfirmRemove(true)}>
+              Remove assignment…
+            </Button>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="destructive"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate()}
+              >
+                Confirm removal
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setConfirmRemove(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+          {remove.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              {errorMessage(remove.error)}
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function AgentProviderSettings({ agent }: { agent: VoiceAgent }) {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
+  const path = "/voice-agents/" + encodeURIComponent(agent.id) + "/providers/";
+  const roles: ProviderRole[] =
+    agent.engine === "realtime" ? ["realtime"] : ["stt", "llm", "tts"];
+
+  const bindings = useQuery({
+    queryKey: ["agent-provider-bindings", organizationId, agent.id],
+    queryFn: ({ signal }) =>
+      api<{ providers: AgentProviderBinding[] }>(path, {
+        organizationId,
+        signal,
+      }),
+    enabled: Boolean(organizationId),
+  });
+
+  const integrations = useQuery({
+    queryKey: ["ai-integrations", organizationId],
+    queryFn: ({ signal }) =>
+      api<{ ai_integrations: AIIntegration[] }>("/ai-integrations/", {
+        organizationId,
+        signal,
+      }),
+    enabled: Boolean(organizationId),
+  });
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Provider assignments</h2>
         <p className="text-sm text-muted-foreground">
-          Every provider role needs a verified organization-owned AI
-          integration. Provider availability and role compatibility have not
-          been loaded.
+          {agent.engine === "realtime"
+            ? "Configure one realtime provider for this Agent."
+            : "Configure STT, LLM, and TTS providers for this Agent."}
+          {" "}Each role requires a verified organization integration.
         </p>
-        <Link href="/ai-providers" className="text-sm hover:underline">
+        <Link href="/ai-providers" className="text-sm underline">
           Manage provider credentials
         </Link>
       </div>
-      <div className="space-y-2">
-        <label
-          htmlFor="provider-engine-preview"
-          className="block text-sm font-medium"
-        >
-          Preview engine
-        </label>
-        <select
-          id="provider-engine-preview"
-          className="h-9 rounded-md border bg-background px-3"
-          value={engine}
-          onChange={(event) => {
-            setEngine(event.target.value);
-            setNotice("");
-          }}
-        >
-          <option value="realtime">Realtime</option>
-          <option value="composable">STT → LLM → TTS</option>
-        </select>
-      </div>
-      {roles.map((role) => {
-        const binding = bindings.find((value) => value.role === role);
-        return (
-          <section
-            key={role}
-            className="space-y-4 rounded-lg border p-6"
-            aria-label={`${role} provider assignment`}
+
+      {bindings.isPending || integrations.isPending ? (
+        <p role="status">Loading provider assignments…</p>
+      ) : bindings.isError || integrations.isError ? (
+        <div role="alert" className="space-y-3">
+          <p>{errorMessage(bindings.error ?? integrations.error)}</p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              void bindings.refetch();
+              void integrations.refetch();
+            }}
           >
-            <h3 className="font-semibold uppercase">{role}</h3>
-            <p className="text-sm text-muted-foreground">
-              {binding
-                ? `Current provider: ${binding.provider} · ${binding.credentialId ? `Credential ${binding.credentialId}` : "Organization integration required"}`
-                : "Current assignment has not been loaded."}
-            </p>
-            <PreviewSettingsForm
-              fields={[
-                { name: "provider", label: "Provider ID", required: true },
-                {
-                  name: "credentialId",
-                  label: "Organization credential ID", required: true,
-                },
-                {
-                  name: "config",
-                  label: "Provider configuration (JSON)",
-                  type: "textarea",
-                },
-              ]}
-              action="Preview provider assignment"
-              validate={(values) => {
-                const errors: { field: string; message: string }[] = [];
-                if (
-                  !z.uuid().safeParse(values.credentialId.trim()).success
-                )
-                  errors.push({
-                    field: "credentialId",
-                    message: "Enter a valid credential UUID.",
-                  });
-                if (values.config.trim()) {
-                  try {
-                    const config = JSON.parse(values.config);
-                    if (
-                      config === null ||
-                      Array.isArray(config) ||
-                      typeof config !== "object"
-                    )
-                      throw new Error();
-                  } catch {
-                    errors.push({
-                      field: "config",
-                      message: "Enter a valid JSON object.",
-                    });
-                  }
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <>
+          {roles.map((role) => {
+            const binding = bindings.data.providers.find(
+              (item) => item.role === role,
+            );
+            return (
+              <ProviderRoleForm
+                key={
+                  agent.id +
+                  "-" +
+                  role +
+                  "-" +
+                  (binding?.id ?? "none") +
+                  "-" +
+                  organizationId
                 }
-                return errors;
-              }}
-            />
-            <p className="text-xs text-muted-foreground">
-              Select a verified organization integration for every role.
-              Do not enter API secrets in provider configuration.
+                role={role}
+                agentId={agent.id}
+                organizationId={organizationId}
+                credentials={integrations.data.ai_integrations}
+                binding={binding}
+              />
+            );
+          })}
+          {bindings.data.providers.some((item) => !roles.includes(item.role)) && (
+            <p className="text-sm text-muted-foreground">
+              This Agent has bindings for a different engine. Use its
+              Configuration tab to review the engine or remove incompatible
+              bindings when you switch back.
             </p>
-            <Button
-              variant="outline"
-              disabled={!binding}
-              onClick={() =>
-                setNotice(
-                  `Removal preview only. The ${role} assignment was not removed.`,
-                )
-              }
-            >
-              Preview assignment removal
-            </Button>
-          </section>
-        );
-      })}
-      <p role="status" className="text-sm text-muted-foreground">
-        {notice}
-      </p>
+          )}
+        </>
+      )}
     </div>
   );
 }

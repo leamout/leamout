@@ -136,10 +136,10 @@ export function AgentDetails({ agentId }: { agentId: string }) {
           <AgentForm key={agent.id} agent={agent} />
         </TabsContent>
         <TabsContent value="readiness">
-          <AgentReadiness />
+          <AgentReadiness agentId={agent.id} />
         </TabsContent>
         <TabsContent value="providers">
-          <AgentProviderSettings />
+          <AgentProviderSettings agent={agent} />
         </TabsContent>
         <TabsContent value="routing">
           <AgentRouting agentId={agent.id} />

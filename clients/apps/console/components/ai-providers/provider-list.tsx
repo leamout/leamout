@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@leamout/ui/components/button";
 import { Input } from "@leamout/ui/components/input";
 import {
   Table,
@@ -9,31 +10,42 @@ import {
   TableHeader,
   TableRow,
 } from "@leamout/ui/components/table";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
-import {
-  type ProviderAvailability,
-  providerCatalog,
-} from "@/components/ai-providers/catalog";
+import { useOrganization } from "@/components/onboarding/organization-provider";
+import { api, errorMessage } from "@/lib/api";
+import { providerCatalog } from "./catalog";
+import type { AIIntegration } from "./types";
 
-export function ProviderList({
-  availability = [],
-}: {
-  availability?: ProviderAvailability[];
-}) {
+export function ProviderList() {
+  const { selected } = useOrganization();
+  const organizationId = selected?.id ?? "";
   const [search, setSearch] = useState("");
+
+  const integrations = useQuery({
+    queryKey: ["ai-integrations", organizationId],
+    queryFn: ({ signal }) =>
+      api<{ ai_integrations: AIIntegration[] }>("/ai-integrations/", {
+        organizationId,
+        signal,
+      }),
+    enabled: Boolean(organizationId),
+  });
+
   const filtered = providerCatalog.filter((provider) =>
-    provider.name.toLowerCase().includes(search.toLowerCase()),
+    provider.name.toLowerCase().includes(search.trim().toLowerCase()),
   );
+
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">AI providers</h1>
         <p className="text-muted-foreground">
-          Configure organization credentials and review platform defaults for
-          your agents.
+          Create and verify organization-owned AI integrations for Voice Agents.
         </p>
       </div>
+
       <div className="max-w-md space-y-2">
         <label htmlFor="provider-search" className="text-sm font-medium">
           Search providers
@@ -45,68 +57,67 @@ export function ProviderList({
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {[
-                "Provider",
-                "Capabilities",
-                "Organization BYOA",
-                "Platform default",
-              ].map((label) => (
-                <TableHead key={label}>{label}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((provider) => {
-              const state = availability.find(
-                (item) => item.providerId === provider.id,
-              );
-              return (
-                <TableRow key={provider.id}>
-                  <TableCell>
-                    <Link
-                      className="font-medium hover:underline"
-                      href={`/ai-providers/${provider.id}`}
-                    >
-                      {provider.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    {state?.capabilities
-                      ? state.capabilities.join(", ") || "None available"
-                      : "Not loaded"}
-                  </TableCell>
-                  <TableCell>
-                    {state?.organizationCredentialCount === undefined
-                      ? "Not loaded"
-                      : `${state.organizationCredentialCount} credentials`}
-                  </TableCell>
-                  <TableCell>
-                    {state?.platformAvailable === undefined
-                      ? "Not loaded"
-                      : state.platformAvailable
-                        ? "Available"
-                        : "Unavailable"}
+
+      {integrations.isPending ? (
+        <p role="status">Loading AI integrations…</p>
+      ) : integrations.isError ? (
+        <div className="space-y-3" role="alert">
+          <p>{errorMessage(integrations.error)}</p>
+          <Button variant="outline" onClick={() => void integrations.refetch()}>
+            Try again
+          </Button>
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Provider</TableHead>
+                <TableHead>Roles</TableHead>
+                <TableHead>Integrations</TableHead>
+                <TableHead>Verified</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((provider) => {
+                const credentials = integrations.data.ai_integrations.filter(
+                  (item) => item.provider === provider.id,
+                );
+                const ready = credentials.filter(
+                  (item) => item.connection_state === "ready",
+                ).length;
+
+                return (
+                  <TableRow key={provider.id}>
+                    <TableCell>
+                      <Link
+                        className="font-medium hover:underline"
+                        href={"/ai-providers/" + encodeURIComponent(provider.id)}
+                      >
+                        {provider.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{provider.roles.join(", ").toUpperCase()}</TableCell>
+                    <TableCell>{credentials.length}</TableCell>
+                    <TableCell>{ready}</TableCell>
+                  </TableRow>
+                );
+              })}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-12 text-center">
+                    No matching providers.
                   </TableCell>
                 </TableRow>
-              );
-            })}
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={4} className="h-32 text-center">
-                  No matching providers. Try another search.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        UI preview. Capability and credential availability have not been
-        fetched. Choose credential sources within agent configuration.
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Role labels describe the built-in providers. The backend validates role
+        compatibility and credential ownership when an Agent is configured.
+        Platform credential availability is not exposed by this API.
       </p>
     </div>
   );
