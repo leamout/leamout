@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   config:
-    name: Validate proxy, Keycloak and Prometheus
+    name: Validate proxy, Kinde and Prometheus
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

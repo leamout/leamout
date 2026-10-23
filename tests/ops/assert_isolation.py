@@ -9,27 +9,6 @@ import json
 import sys
 
 EXPECTED_ENVIRONMENTS = {
-    "keycloak-postgres": {
-        "POSTGRES_DB",
-        "POSTGRES_USER",
-        "POSTGRES_PASSWORD",
-    },
-    "keycloak": {
-        "FRONTEND_URL",
-        "BACKEND_URL",
-        "BACKOFFICE_URL",
-        "KEYCLOAK_CLIENT_SECRET",
-        "KC_DB",
-        "KC_DB_URL",
-        "KC_DB_USERNAME",
-        "KC_DB_PASSWORD",
-        "KC_HOSTNAME",
-        "KC_HTTP_ENABLED",
-        "KC_PROXY_HEADERS",
-        "KC_PROXY_TRUSTED_ADDRESSES",
-        "KC_BOOTSTRAP_ADMIN_USERNAME",
-        "KC_BOOTSTRAP_ADMIN_PASSWORD",
-    },
     "postgres": {
         "POSTGRES_DB",
         "POSTGRES_USER",
@@ -52,9 +31,9 @@ EXPECTED_ENVIRONMENTS = {
         "TURN_PUBLIC_URLS",
         "CORS_ORIGINS",
         "TRUSTED_PROXY_CIDRS",
-        "KEYCLOAK_ISSUER",
-        "KEYCLOAK_CLIENT_ID",
-        "KEYCLOAK_CLIENT_SECRET",
+        "KINDE_ISSUER",
+        "KINDE_CLIENT_ID",
+        "KINDE_CLIENT_SECRET",
         "POLAR_ACCESS_TOKEN",
         "POLAR_WEBHOOK_SECRET",
         "POLAR_ENVIRONMENT",
@@ -68,9 +47,9 @@ EXPECTED_ENVIRONMENTS = {
         "BACKOFFICE_URL",
         "DATABASE_URL",
         "ENCRYPTION_KEY",
-        "KEYCLOAK_ISSUER",
-        "KEYCLOAK_CLIENT_ID",
-        "KEYCLOAK_CLIENT_SECRET",
+        "KINDE_ISSUER",
+        "KINDE_CLIENT_ID",
+        "KINDE_CLIENT_SECRET",
     },
     "worker": {
         "APP_ENV",
@@ -132,13 +111,6 @@ EXPECTED_ENVIRONMENTS = {
 }
 
 EXPECTED_NETWORKS = {
-    "keycloak-postgres": {
-        "identity",
-    },
-    "keycloak": {
-        "edge",
-        "identity",
-    },
     "postgres": {
         "database",
     },
@@ -191,7 +163,7 @@ EXPECTED_NETWORKS = {
     },
 }
 
-INTERNAL_NETWORKS = {"database", "cache", "events", "identity"}
+INTERNAL_NETWORKS = {"database", "cache", "events"}
 
 
 def main():
@@ -224,10 +196,6 @@ def main():
         services["caddy"]["networks"]["edge"]["ipv4_address"]
         == "172.33.0.10"
     ), "Caddy must retain its explicit trusted proxy IP"
-    assert (
-        services["keycloak"]["environment"]["KC_PROXY_TRUSTED_ADDRESSES"]
-        == "172.33.0.10/32"
-    ), "Keycloak must trust only Caddy, not the entire edge network"
 
     for name, network, address in (
         ("freeswitch", "control", "172.32.0.20"),

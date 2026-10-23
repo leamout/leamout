@@ -17,13 +17,11 @@ from urllib.parse import unquote, urlsplit
 
 REQUIRED_SECRETS = {
     "POSTGRES_PASSWORD": 16,
-    "KEYCLOAK_DB_PASSWORD": 16,
-    "KEYCLOAK_ADMIN_PASSWORD": 16,
     "FREESWITCH_ESL_PASSWORD": 16,
     "MEDIA_CONTROL_TOKEN": 32,
     "MEDIA_TOKEN_SECRET": 32,
     "TURN_AUTH_SECRET": 32,
-    "KEYCLOAK_CLIENT_SECRET": 32,
+    "KINDE_CLIENT_SECRET": 16,
 }
 
 
@@ -87,10 +85,20 @@ def validate(infra: dict[str, str], app: dict[str, str]) -> list[str]:
         "FRONTEND_URL": f"https://console.{domain}",
         "BACKEND_URL": f"https://api.{domain}",
         "BACKOFFICE_URL": f"https://backoffice.{domain}",
-        "KEYCLOAK_ISSUER": f"https://auth.{domain}/realms/leamout",
     }
     for key, value in expected.items():
         check(app.get(key) == value, f"{key} must match the deployed {domain} hostname")
+
+    issuer = app.get("KINDE_ISSUER", "")
+    try:
+        endpoint = urlsplit(issuer)
+        check(endpoint.scheme == "https" and endpoint.hostname is not None
+              and endpoint.hostname.endswith(".kinde.com") and endpoint.username is None
+              and not endpoint.path.strip("/") and not endpoint.query and not endpoint.fragment,
+              "KINDE_ISSUER must be an HTTPS Kinde tenant origin")
+    except ValueError:
+        errors.append("KINDE_ISSUER must be an HTTPS Kinde tenant origin")
+    check(bool(app.get("KINDE_CLIENT_ID", "").strip()), "KINDE_CLIENT_ID is required")
 
     origins = [
         origin.strip()
@@ -112,7 +120,7 @@ def validate(infra: dict[str, str], app: dict[str, str]) -> list[str]:
     for key, minimum in REQUIRED_SECRETS.items():
         source = (
             infra
-            if key in {"POSTGRES_PASSWORD", "KEYCLOAK_DB_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD"}
+            if key in {"POSTGRES_PASSWORD"}
             else app
         )
         check(

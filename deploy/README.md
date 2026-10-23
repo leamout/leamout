@@ -20,8 +20,7 @@ with `--env-file .env.example --env-file server/.env.example`. No application
 configuration file is mounted or injected wholesale into containers.
 
 The overlay uses the existing `control` network. The application stack also
-uses a separate public-proxy `edge` network, and isolated `database`, `cache`,
-`events`, and `identity` networks. FreeSWITCH and RTPEngine retain their
+uses a separate public-proxy `edge` network, and isolated `database`, `cache`, and `events` networks. FreeSWITCH and RTPEngine retain their
 fixed IP addresses on `control` for SIP/media connectivity.
 
 Grafana is published only on `127.0.0.1:3000`; access it through a secured tunnel or reverse proxy.
@@ -55,8 +54,7 @@ explicit environment allowlist. The edge proxy does not receive database,
 identity, billing, or encryption credentials.
 
 Use the same PostgreSQL password in both files. Match `DOMAIN` in the root
-`.env` and `server/.env`; Caddy and Keycloak derive their hostnames from this
-value. Default hosted origins are `FRONTEND_URL=https://console.leamout.com`, `BACKEND_URL=https://api.leamout.com`, `KEYCLOAK_ISSUER=https://auth.leamout.com/realms/leamout` and `CORS_ORIGINS=https://console.leamout.com`. Set the real `DOMAIN`,
+`.env` and `server/.env`; Caddy uses DOMAIN to configure its public hosts. Default hosted origins are `FRONTEND_URL=https://console.leamout.com`, `BACKEND_URL=https://api.leamout.com`, and `CORS_ORIGINS=https://console.leamout.com`. Set `KINDE_ISSUER`, `KINDE_CLIENT_ID`, and `KINDE_CLIENT_SECRET` from the hosted Kinde application. Set the real `DOMAIN`,
 `CORS_ORIGINS`, `TURN_PUBLIC_URLS` and `TURN_REALM` for the deployment;
 keep `TRUSTED_PROXY_CIDRS=172.33.0.10/32` so only the static Caddy
 address can supply forwarded client IP headers;
@@ -81,15 +79,14 @@ This is Leamout-operated infrastructure, not a customer self-hosting product.
 The Compose checks and synthetic acceptance tests do **not** establish that a
 live environment is ready for customer traffic.
 
-1. Provision DNS for `api.<DOMAIN>`, `auth.<DOMAIN>`,
-   `backoffice.<DOMAIN>`, and `turn.<DOMAIN>`. Host the console separately
+1. Provision DNS for `api.<DOMAIN>`, `backoffice.<DOMAIN>`, and `turn.<DOMAIN>`. Host the console separately
    at `console.<DOMAIN>`. Confirm public IPv4/NAT, firewalls, SIP signaling,
    RTP, TURN and TLS reachability. Install the certificate/key files required
    by OpenSIPS and Coturn under `/etc/leamout/certs/`, and configure the
    Caddy ACME mount at `/var/lib/leamout/acme` as needed.
 2. Copy both example environment files as shown above. Generate **unique**
-   secrets for PostgreSQL, Keycloak, FreeSWITCH, media control, TURN, and
-   the Keycloak client. A URL-safe generator avoids characters that require
+   secrets for PostgreSQL, FreeSWITCH, media control, TURN, and
+   the Kinde client. A URL-safe generator avoids characters that require
    escaping in PostgreSQL URLs or Compose values:
 
    ```sh
@@ -103,8 +100,7 @@ live environment is ready for customer traffic.
 3. Set actual public URLs, `PUBLIC_IP`, TURN settings, and service
    credentials. `POSTGRES_PASSWORD` in the root file must match the
    password in `server/.env`'s `DATABASE_URL`; percent-encode URL-reserved
-   characters if necessary. Keep the Keycloak confidential-client secret
-   consistent with the imported realm.
+   characters if necessary. Configure the Kinde confidential OIDC app with both console and backoffice callback URLs.
 4. Restrict the environment files and run the fail-closed checks **before**
    starting or upgrading services:
 
@@ -123,8 +119,7 @@ live environment is ready for customer traffic.
    public IP, DNS/origin consistency, database password consistency, narrow
    forwarded-header trust, and accidental partial Polar configuration. It does not print secrets or
    call external services.
-5. If this is an **upgrade**, back up PostgreSQL (including Keycloak's
-   database), NATS JetStream, Redis, and relevant persistent volumes **before**
+5. If this is an **upgrade**, back up PostgreSQL, NATS JetStream, Redis, and relevant persistent volumes **before**
    running Compose. Verify that backups are restorable. The `migrate` service
    applies migrations automatically on startup; rolling back application
    containers does not roll back database schema changes.
@@ -135,7 +130,7 @@ live environment is ready for customer traffic.
    docker compose --env-file .env --env-file server/.env -f deploy/compose/docker.yaml ps
    ```
 
-7. Before enabling customer traffic, verify live HTTPS/TLS and Keycloak
+7. Before enabling customer traffic, verify live HTTPS/TLS and Kinde
    login/logout, API readiness (`https://api.<DOMAIN>/readyz`), private
    metrics access controls, Alertmanager delivery, and a real organization
    onboarding flow. Place an actual BYOC SIP call using a verified BYOA
@@ -151,7 +146,7 @@ do not delete named volumes as a troubleshooting shortcut.
 
 ## Production reliability gates
 
-Run `python3 tests/ops/validate.py` to check the default origins, Keycloak realm placeholders, and public metrics boundary. CI also runs `caddy adapt --validate` and `promtool check rules` against the deployment assets. These configuration checks do not replace a live TLS or Keycloak login test.
+Run `python3 tests/ops/validate.py` to check the default origins and Kinde identity configuration, and public metrics boundary. CI also runs `caddy adapt --validate` and `promtool check rules` against the deployment assets. These configuration checks do not replace a live TLS or Kinde login test.
 
 Prometheus alerts cover target availability, API HTTP 5xx spikes, media attachment timeouts, provider/transport failures, mean turn latency, and backpressure. The exporter currently measures aggregate mean latency; no p95/p99 claim is possible without histograms. Suggested initial operational objectives are API success >=99.5% and media attachment success >=99% over rolling 30-day windows. The present short-window alerts are operational signals, not full error-budget burn alerts. Configure a real Alertmanager receiver before production.
 
@@ -159,6 +154,6 @@ The Voice Agent release gate tests continued call, media fork and durable-sessio
 
 ## BYOS-only recording storage
 
-Leamout Cloud does not provide a default object store. Customers configure S3-compatible recording integrations; the runtime does not start or depend on MinIO. The `recordings-data` volume remains temporary FreeSWITCH recording staging, not long-term object storage.
+Leamout does not provide a default object store. Customers configure S3-compatible recording integrations; the runtime does not start or depend on MinIO. The `recordings-data` volume remains temporary FreeSWITCH recording staging, not long-term object storage.
 
 **Existing deployments:** before removing a live MinIO service or volume, back up and migrate every recording where `storage_integration_id IS NULL` into the appropriate customer bucket. Verify object content and transactionally update its integration ID and bucket. Legacy recordings remain intentionally inaccessible to the BYOS-only adapter until migrated; never silently repoint them to the current customer bucket. This PR does not automate migration.
