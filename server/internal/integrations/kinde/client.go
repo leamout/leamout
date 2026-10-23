@@ -40,7 +40,7 @@ func New(_ context.Context, cfg Config, callbackURL string, development bool) (*
 				TokenURL: issuer + "/oauth2/token",
 			},
 			RedirectURL: callbackURL,
-			Scopes: []string{oidc.ScopeOpenID, "profile", "email", "offline"},
+			Scopes:      []string{oidc.ScopeOpenID, "profile", "email", "offline"},
 		},
 		http:   &http.Client{Timeout: 10 * time.Second},
 		issuer: issuer,

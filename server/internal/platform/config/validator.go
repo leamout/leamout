@@ -25,7 +25,7 @@ func (c Config) ValidateForServer() error {
 		"FREESWITCH_ESL_PASSWORD": c.FreeSWITCHESLPassword,
 		"ENCRYPTION_KEY":          c.EncryptionKey,
 		"TURN_AUTH_SECRET":        c.TURNAuthSecret,
-		"KINDE_CLIENT_SECRET":  c.Kinde.ClientSecret,
+		"KINDE_CLIENT_SECRET":     c.Kinde.ClientSecret,
 	})
 }
 
@@ -44,8 +44,8 @@ func (c Config) ValidateForWorker() error {
 // ValidateForBackoffice keeps the admin service independent of telephony and AI secrets.
 func (c Config) ValidateForBackoffice() error {
 	return requireSettings(map[string]string{
-		"DATABASE_URL":           c.DatabaseURL,
-		"ENCRYPTION_KEY":         c.EncryptionKey,
+		"DATABASE_URL":        c.DatabaseURL,
+		"ENCRYPTION_KEY":      c.EncryptionKey,
 		"KINDE_CLIENT_SECRET": c.Kinde.ClientSecret,
 	})
 }

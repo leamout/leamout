@@ -138,7 +138,7 @@ func (h *Handler) BackofficeLogout(w http.ResponseWriter, r *http.Request) {
 		h.failed(w)
 		return
 	}
-	http.Redirect(w, r, h.client.LogoutURL(h.frontendURL + "/log-in"), http.StatusSeeOther)
+	http.Redirect(w, r, h.client.LogoutURL(h.frontendURL+"/log-in"), http.StatusSeeOther)
 }
 
 func (h *Handler) revokeBrowserSession(w http.ResponseWriter, r *http.Request) error {
@@ -164,4 +164,3 @@ func (h *Handler) setStateCookie(w http.ResponseWriter, value string, maxAge int
 func (h *Handler) failed(w http.ResponseWriter) {
 	httputil.Error(w, apperror.NewUnauthorized("sign-in could not be completed; return to Leamout and try again"))
 }
-

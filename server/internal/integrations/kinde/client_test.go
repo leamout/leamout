@@ -117,7 +117,6 @@ func TestKindeExchangeAndRefresh(t *testing.T) {
 		{"expired", func(c map[string]any) { c["exp"] = time.Now().Add(-time.Minute).Unix() }},
 		{"unverified", func(c map[string]any) { c["email_verified"] = false }},
 		{"subject", func(c map[string]any) { c["sub"] = "" }},
-		
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			mutate = test.mutate
