@@ -160,7 +160,10 @@ export function ToolForm({
                     {agents.data?.voice_agents.map((agent) => (
                       <option key={agent.id} value={agent.id}>{agent.name}</option>
                     ))}
-                    {tool && !agents.data?.voice_agents.some((agent) => agent.id === tool.voice_agent_id) && (
+                    {tool &&
+                      !agents.data?.voice_agents.some(
+                        (agent) => agent.id === tool.voice_agent_id,
+                      ) && (
                       <option value={tool.voice_agent_id}>{tool.voice_agent_id}</option>
                     )}
                   </select>
@@ -175,7 +178,11 @@ export function ToolForm({
                     <option value="builtin">Built-in</option>
                   </select>
                 ) : name === "name" && type === "builtin" ? (
-                  <select {...field} id="tool-name" className="h-10 rounded-md border bg-background px-3">
+                  <select
+                    {...field}
+                    id="tool-name"
+                    className="h-10 rounded-md border bg-background px-3"
+                  >
                     <option value="">Choose built-in action</option>
                     {builtins.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
@@ -191,7 +198,13 @@ export function ToolForm({
                   <Input
                     {...field}
                     id={"tool-" + name}
-                    type={name === "timeoutMs" ? "number" : name === "endpointUrl" ? "url" : "text"}
+                    type={
+                      name === "timeoutMs"
+                        ? "number"
+                        : name === "endpointUrl"
+                          ? "url"
+                          : "text"
+                    }
                     aria-invalid={fieldState.invalid}
                   />
                 )}
@@ -217,10 +230,14 @@ export function ToolForm({
           )}
           <Button
             variant="outline"
-            onClick={() => router.push(
-              "/tools/" + encodeURIComponent(save.data.id) +
-              "?agent_id=" + encodeURIComponent(save.data.voice_agent_id),
-            )}
+            onClick={() =>
+              router.push(
+                "/tools/" +
+                  encodeURIComponent(save.data.id) +
+                  "?agent_id=" +
+                  encodeURIComponent(save.data.voice_agent_id),
+              )
+            }
           >
             View tool
           </Button>

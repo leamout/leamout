@@ -3,13 +3,24 @@
 import Link from "next/link";
 import { ToolForm } from "./tool-form";
 
-export function CreateToolForm({ agentId = "" }: { agentId?: string }) {
+export function CreateToolForm({
+  agentId = "",
+}: {
+  agentId?: string;
+}) {
   return (
     <div className="space-y-6">
-      <Link href="/tools" className="text-sm text-muted-foreground hover:underline">Back to tools</Link>
+      <Link
+        href="/tools"
+        className="text-sm text-muted-foreground hover:underline"
+      >
+        Back to tools
+      </Link>
       <div className="space-y-2">
         <h1 className="text-3xl font-semibold">Create tool</h1>
-        <p className="text-muted-foreground">Define a tool owned by one Voice Agent.</p>
+        <p className="text-muted-foreground">
+          Define a tool owned by one Voice Agent.
+        </p>
       </div>
       <ToolForm creating initialAgentId={agentId} />
     </div>
