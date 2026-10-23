@@ -3,7 +3,7 @@
 import { Button } from "@leamout/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useOrganization } from "@/components/onboarding/organization-provider";
 import { api, errorMessage } from "@/lib/api";
@@ -11,10 +11,9 @@ import { SecretReveal } from "@/components/webhooks/secret-reveal";
 import { ToolForm } from "./tool-form";
 import type { Tool } from "./types";
 
-export function ToolDetails({ toolId }: { toolId: string }) {
+export function ToolDetails({ toolId, agentId }: { toolId: string; agentId: string }) {
   const { selected } = useOrganization();
   const organizationId = selected?.id ?? "";
-  const agentId = useSearchParams().get("agent_id") ?? "";
   const client = useQueryClient();
   const router = useRouter();
   const [confirmDelete, setConfirmDelete] = useState(false);

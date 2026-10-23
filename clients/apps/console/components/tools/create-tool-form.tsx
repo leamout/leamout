@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { ToolForm } from "./tool-form";
 
-export function CreateToolForm() {
-  const agentId = useSearchParams().get("agent_id") ?? "";
+export function CreateToolForm({ agentId = "" }: { agentId?: string }) {
   return (
     <div className="space-y-6">
       <Link href="/tools" className="text-sm text-muted-foreground hover:underline">Back to tools</Link>
