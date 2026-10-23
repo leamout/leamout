@@ -70,7 +70,7 @@ export function AuditLog() {
         (actorType === "all" || event.actor_type === actorType) &&
         (targetType === "all" || event.target_type === targetType),
     )
-    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+    .sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at));
 
   return (
     <div className="space-y-6">
