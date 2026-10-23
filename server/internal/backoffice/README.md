@@ -94,5 +94,4 @@ stored record, not an effective entitlement calculation. Offset pagination uses
 a deterministic creation-time/ID order; concurrent insertions may shift pages.
 
 Templ output and generated Tailwind CSS remain untracked. Generate templates
-before Go checks and regenerate SQLC after query changes. `TEST_DATABASE_URL`
-enables PostgreSQL-backed access, revocation and organization acceptance tests.
+before Go checks and regenerate SQLC after query changes.
