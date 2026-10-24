@@ -47,9 +47,9 @@ EXPECTED_ENVIRONMENTS = {
         "BACKOFFICE_URL",
         "DATABASE_URL",
         "ENCRYPTION_KEY",
-        "BACKOFFICE_KINDE_ISSUER",
-        "BACKOFFICE_KINDE_CLIENT_ID",
-        "BACKOFFICE_KINDE_CLIENT_SECRET",
+        "KINDE_ISSUER",
+        "KINDE_CLIENT_ID",
+        "KINDE_CLIENT_SECRET",
     },
     "worker": {
         "APP_ENV",

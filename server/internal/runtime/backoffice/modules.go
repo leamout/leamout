@@ -33,7 +33,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	if err != nil {
 		return nil, fmt.Errorf("initialize session encryption: %w", err)
 	}
-	client, err := kinde.New(ctx, cfg.BackofficeKinde, cfg.BackofficeURL+"/auth/callback", cfg.IsDevelopment())
+	client, err := kinde.New(ctx, cfg.Kinde, cfg.BackofficeURL+"/auth/callback", cfg.IsDevelopment())
 	if err != nil {
 		return nil, fmt.Errorf("initialize Kinde: %w", err)
 	}

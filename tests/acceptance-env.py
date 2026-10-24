@@ -13,9 +13,6 @@ values = {
     "KINDE_ISSUER": "https://acceptance.kinde.com",
     "KINDE_CLIENT_ID": "acceptance-kinde-client-not-live",
     "KINDE_CLIENT_SECRET": "acceptance-kinde-client-secret-not-live",
-    "BACKOFFICE_KINDE_ISSUER": "https://acceptance.kinde.com",
-    "BACKOFFICE_KINDE_CLIENT_ID": "acceptance-backoffice-client-not-live",
-    "BACKOFFICE_KINDE_CLIENT_SECRET": "acceptance-backoffice-secret-not-live",
     "DATABASE_URL": (
         "postgres://leamout:"
         + os.environ["POSTGRES_PASSWORD"]

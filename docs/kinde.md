@@ -4,14 +4,16 @@ Leamout uses **Kinde only** for hosted identity. Kinde owns sign-in, sign-up, em
 
 ## Set up Kinde
 
-1. Create **two Kinde regular web applications** in one Kinde tenant, each with separate confidential client IDs and secrets: one for console and one for backoffice.
+1. Create **one Kinde regular web application** with a confidential client ID and secret. Both the Leamout console and backoffice use this same Kinde application and tenant.
 2. Configure the issuer (for example `https://your-tenant.kinde.com`) and enable the Authorization Code flow, email and profile scopes, and refresh tokens (the Kinde `offline` scope).
-3. Register each callback URL in its corresponding application:
+3. Register **both** callback URLs in the same Kinde application:
    - `https://console.leamout.com/api/v1/auth/callback`
    - `https://backoffice.leamout.com/auth/callback`
 4. Register `https://console.leamout.com/log-in` and `https://backoffice.leamout.com/log-in` as allowed logout return URLs.
-5. Set `KINDE_ISSUER`, `KINDE_CLIENT_ID` and `KINDE_CLIENT_SECRET` for the API, plus `BACKOFFICE_KINDE_ISSUER`, `BACKOFFICE_KINDE_CLIENT_ID` and `BACKOFFICE_KINDE_CLIENT_SECRET` for the operator console in `server/.env`. Compose allowlists these keys to API and backoffice only. Do **not** add secrets to Next.js or browser bundles.
+5. Set `KINDE_ISSUER`, `KINDE_CLIENT_ID` and `KINDE_CLIENT_SECRET` in `server/.env`. Compose allowlists these same credentials to the API and backoffice only. Do **not** add secrets to Next.js or browser bundles.
 6. Require verified email in Kinde. Leamout rejects an unverified email. Configure Kinde's registration, authentication and MFA policies.
+
+Both entry points share Kinde's sign-in system, but use their own callback URLs and host-only Leamout session cookies. Backoffice permissions are enforced separately through Leamout's platform-administrator authorization; a valid Kinde login alone does not grant operator access.
 
 The Go backend performs OIDC authorization code + PKCE (S256), state cookie binding, nonce checking, ID token verification against OIDC discovery/JWKS, and encrypted refresh token storage. The frontend login and logout API remain `/api/v1/auth/*`; the standalone backoffice uses `/auth/*`.
 
@@ -25,4 +27,4 @@ Existing database migrations and SQLC-generated models are deliberately preserve
 
 ## Refresh and audience security
 
-The verifier enforces signature, issuer and expiration using OIDC discovery/JWKS. It then accepts a standard client-ID audience, or the Kinde issuer audience only when the `azp` claim matches the configured confidential client; other audiences fail closed. Leamout revalidates Kinde refresh-token authority at least every ten minutes while a session is active, even when Kinde issues longer-lived access tokens. A failed refresh rejects access. Operator and customer OAuth applications must have independent credentials and callback allowlists.
+The verifier enforces signature, issuer and expiration using OIDC discovery/JWKS. It then accepts a standard client-ID audience, or the Kinde issuer audience only when the `azp` claim matches the configured confidential client; other audiences fail closed. Leamout revalidates Kinde refresh-token authority at least every ten minutes while a session is active, even when Kinde issues longer-lived access tokens. A failed refresh rejects access. The single Kinde OAuth application must allowlist both callback URLs and both logout return URLs.
