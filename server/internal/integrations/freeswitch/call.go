@@ -3,11 +3,16 @@ package freeswitch
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 )
+
+// ErrOriginateUncertain means FreeSWITCH might have queued a channel even
+// though Leamout could not confirm the background command acknowledgement.
+var ErrOriginateUncertain = errors.New("FreeSWITCH originate outcome uncertain")
 
 const (
 	playbackPathVariable     = "leamout_playback_path"
@@ -43,7 +48,7 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 	// identity immediately while calls.id remains a separate logical identity.
 	command := "originate " + commandWords(endpoint, "&park()")
 	if _, err := c.BGAPI(ctx, command); err != nil {
-		return Call{}, err
+		return Call{UUID: channelID, Destination: req.Destination}, fmt.Errorf("%w: %w", ErrOriginateUncertain, err)
 	}
 
 	return Call{

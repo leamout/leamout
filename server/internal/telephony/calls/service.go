@@ -237,6 +237,16 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		}
 	})
 	if err != nil {
+		var originateErr *calling.OriginateError
+		if errors.As(err, &originateErr) &&
+			originateErr.Class == calling.OriginateFailureUncertain {
+			// The bgapi request may already be running on FreeSWITCH. Keep
+			// the call nonterminal and admission leases intact. Its stable
+			// UUID allows lifecycle events and reconciliation to recover it.
+			return sqlc.Call{}, apperror.NewServiceUnavailable(
+				"call origination outcome is uncertain; do not retry", err,
+			)
+		}
 		reason := "originate_failed"
 		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
 		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())

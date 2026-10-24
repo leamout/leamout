@@ -11,6 +11,7 @@ const (
 	OriginateFailureValidation OriginateFailureClass = "validation"
 	OriginateFailureTransport  OriginateFailureClass = "transport"
 	OriginateFailureTimeout    OriginateFailureClass = "timeout"
+	OriginateFailureUncertain  OriginateFailureClass = "uncertain"
 	OriginateFailureSIP        OriginateFailureClass = "sip"
 	OriginateFailureCapacity   OriginateFailureClass = "capacity"
 	OriginateFailureInternal   OriginateFailureClass = "internal"

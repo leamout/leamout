@@ -88,6 +88,11 @@ func (c *Controller) Originate(
 		Variables:   variables,
 	})
 	if err != nil {
+		if errors.Is(err, freeswitch.ErrOriginateUncertain) {
+			return OriginateResult{ChannelID: call.UUID}, &OriginateError{
+				Class: OriginateFailureUncertain, Err: err,
+			}
+		}
 		return OriginateResult{}, classifyClientOriginateError(err)
 	}
 	if strings.TrimSpace(call.UUID) == "" {
