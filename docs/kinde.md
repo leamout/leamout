@@ -28,3 +28,9 @@ Existing database migrations and SQLC-generated models are deliberately preserve
 ## Refresh and audience security
 
 The verifier enforces signature, issuer and expiration using OIDC discovery/JWKS. It then accepts a standard client-ID audience, or the Kinde issuer audience only when the `azp` claim matches the configured confidential client; other audiences fail closed. Leamout revalidates Kinde refresh-token authority at least every ten minutes while a session is active, even when Kinde issues longer-lived access tokens. A failed refresh rejects access. The single Kinde OAuth application must allowlist both callback URLs and both logout return URLs.
+
+## Self-service account management
+
+Leamout uses Kinde's **user** self-service portal for personal identity/profile changes. From Console Settings > Profile or Security, an authenticated browser requests `GET /api/v1/auth/account`, which checks the host-only Leamout session, refreshes the encrypted Kinde token as needed, calls `GET /account_api/v1/portal_link?subnav=profile&return_url=...` using a server-side bearer access token, and redirects the user to the one-time Kinde portal link. The access token never reaches Next.js. The destination must remain an HTTPS URL on the configured Kinde issuer origin. The Backoffice Account link uses the same Kinde tenant and OAuth client but returns to the backoffice and requires Leamout platform-admin authorization.
+
+Kinde's user portal must be enabled in the Kinde environment. Password recovery, authentication factor policies, and account security must be configured and tested in Kinde; Leamout does not implement a parallel password or MFA database. Console Security also lists/revokes **Leamout-local** browser sessions; revoking those sessions does not revoke all Kinde SSO sessions. Kinde organizations, billing, and API keys must not be used as substitutes for Leamout-owned data.

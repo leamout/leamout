@@ -37,3 +37,16 @@ func TestCallbackRejectsMissingOrMismatchedBrowserState(t *testing.T) {
 		})
 	}
 }
+
+func TestAccountRejectsMissingSession(t *testing.T) {
+	handler := &Handler{frontendURL: "https://console.example.com"}
+	request := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/v1/auth/account", nil)
+	response := httptest.NewRecorder()
+	handler.Account(response, request)
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", response.Code)
+	}
+	if response.Header().Get("Cache-Control") != "no-store" {
+		t.Fatal("missing cache-control for account management")
+	}
+}
