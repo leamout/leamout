@@ -21,7 +21,7 @@ func New(
 	development bool,
 ) (*Client, error) {
 	if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.ClientSecret) == "" {
-		return nil, errors.New("Kinde client ID and secret are required")
+		return nil, errors.New("kinde client ID and secret are required")
 	}
 
 	for _, value := range []string{cfg.Issuer, callbackURL} {
@@ -35,14 +35,14 @@ func New(
 				(!development ||
 					u.Scheme != "http" ||
 					(u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1"))) {
-			return nil, errors.New("Kinde issuer and callback must be absolute HTTPS URLs (localhost HTTP is allowed in development)")
+			return nil, errors.New("kinde issuer and callback must be absolute HTTPS URLs (localhost HTTP is allowed in development)")
 		}
 	}
 
 	issuer := strings.TrimRight(cfg.Issuer, "/")
 	parsed, _ := url.Parse(issuer)
 	if parsed.Path != "" {
-		return nil, errors.New("Kinde issuer must be an origin without a path")
+		return nil, errors.New("kinde issuer must be an origin without a path")
 	}
 
 	return &Client{
@@ -120,7 +120,7 @@ func (c *Client) Exchange(
 		oauth2.VerifierOption(verifier),
 	)
 	if err != nil {
-		return Identity{}, Tokens{}, errors.New("Kinde code exchange failed")
+		return Identity{}, Tokens{}, errors.New("kinde code exchange failed")
 	}
 
 	identity, raw, actualNonce, expiration, err := c.verifyIDToken(ctx, access)
@@ -162,7 +162,7 @@ func (c *Client) Refresh(
 		&previous.OAuth,
 	).Token()
 	if err != nil {
-		return Tokens{}, errors.New("Kinde session refresh failed")
+		return Tokens{}, errors.New("kinde session refresh failed")
 	}
 	if access.AccessToken == "" ||
 		access.RefreshToken == "" ||
@@ -186,7 +186,7 @@ func (c *Client) Refresh(
 		}
 		if identity.Subject != subject ||
 			(nonce != "" && nonce != previous.Nonce) {
-			return Tokens{}, errors.New("Kinde session identity changed")
+			return Tokens{}, errors.New("kinde session identity changed")
 		}
 
 		result.IDToken = raw
