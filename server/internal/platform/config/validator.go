@@ -44,8 +44,8 @@ func (c Config) ValidateForWorker() error {
 // ValidateForBackoffice keeps the admin service independent of telephony and AI secrets.
 func (c Config) ValidateForBackoffice() error {
 	return requireSettings(map[string]string{
-		"DATABASE_URL":        c.DatabaseURL,
-		"ENCRYPTION_KEY":      c.EncryptionKey,
+		"DATABASE_URL":                   c.DatabaseURL,
+		"ENCRYPTION_KEY":                 c.EncryptionKey,
 		"BACKOFFICE_KINDE_ISSUER":        c.BackofficeKinde.Issuer,
 		"BACKOFFICE_KINDE_CLIENT_ID":     c.BackofficeKinde.ClientID,
 		"BACKOFFICE_KINDE_CLIENT_SECRET": c.BackofficeKinde.ClientSecret,
