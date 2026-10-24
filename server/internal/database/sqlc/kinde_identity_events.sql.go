@@ -18,14 +18,16 @@ WITH recorded AS (
         event_id,
         subject,
         event_type,
-        occurred_at
+        occurred_at,
+        disable_user
     )
     VALUES (
         $1,
         $2,
         $3,
         $4,
-        $5
+        $5,
+        $6::boolean
     )
     ON CONFLICT (issuer, event_id) DO NOTHING
     RETURNING issuer, subject, event_type, occurred_at
@@ -97,7 +99,9 @@ revoked_sessions AS (
       AND s.revoked_at IS NULL
     RETURNING s.id
 )
-SELECT EXISTS(SELECT 1 FROM recorded)::boolean AS recorded
+SELECT
+    EXISTS(SELECT 1 FROM recorded)::boolean AS recorded,
+    (SELECT COUNT(*) FROM revoked_sessions)::bigint AS revoked_session_count
 `
 
 type ApplyKindeIdentityEventParams struct {
@@ -111,10 +115,17 @@ type ApplyKindeIdentityEventParams struct {
 	ProfileEmail string             `db:"profile_email" json:"profile_email"`
 }
 
+type ApplyKindeIdentityEventRow struct {
+	Recorded            bool  `db:"recorded" json:"recorded"`
+	RevokedSessionCount int64 `db:"revoked_session_count" json:"revoked_session_count"`
+}
+
 // Signed events are applied atomically. Event IDs prevent replay, and newer
 // events prevent stale profile writes. Disabling is deliberately irreversible
 // through webhooks, including suspension and deletion events.
-func (q *Queries) ApplyKindeIdentityEvent(ctx context.Context, arg ApplyKindeIdentityEventParams) (bool, error) {
+// Materialize the revocation CTE before responding to the provider. A 200
+// must mean the user disable and session revocations committed together.
+func (q *Queries) ApplyKindeIdentityEvent(ctx context.Context, arg ApplyKindeIdentityEventParams) (ApplyKindeIdentityEventRow, error) {
 	row := q.db.QueryRow(ctx, applyKindeIdentityEvent,
 		arg.Issuer,
 		arg.EventID,
@@ -125,7 +136,7 @@ func (q *Queries) ApplyKindeIdentityEvent(ctx context.Context, arg ApplyKindeIde
 		arg.ProfileName,
 		arg.ProfileEmail,
 	)
-	var recorded bool
-	err := row.Scan(&recorded)
-	return recorded, err
+	var i ApplyKindeIdentityEventRow
+	err := row.Scan(&i.Recorded, &i.RevokedSessionCount)
+	return i, err
 }

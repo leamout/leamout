@@ -363,7 +363,14 @@ func (q *Queries) ListBackofficeUsers(ctx context.Context) ([]ListBackofficeUser
 
 const upsertIdentityUser = `-- name: UpsertIdentityUser :one
 INSERT INTO users (identity_issuer, identity_subject, name, email, email_verified)
-VALUES ($1, $2, $3, $4, TRUE)
+SELECT $1, $2, $3, $4, TRUE
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM kinde_identity_events AS e
+    WHERE e.issuer = $1
+      AND e.subject = $2
+      AND e.disable_user = TRUE
+)
 ON CONFLICT (identity_issuer, identity_subject) DO UPDATE
 SET name = EXCLUDED.name, email = EXCLUDED.email, email_verified = TRUE, updated_at = NOW()
 WHERE users.disabled_at IS NULL
@@ -377,6 +384,8 @@ type UpsertIdentityUserParams struct {
 	Email           string  `db:"email" json:"email"`
 }
 
+// Signed suspension/deletion events are durable local tombstones, including
+// when Kinde delivers a webhook before the user's first Leamout sign-in.
 func (q *Queries) UpsertIdentityUser(ctx context.Context, arg UpsertIdentityUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, upsertIdentityUser,
 		arg.IdentityIssuer,

@@ -135,13 +135,14 @@ type Idempotency struct {
 }
 
 type KindeIdentityEvent struct {
-	ID         uuid.UUID          `db:"id" json:"id"`
-	Issuer     string             `db:"issuer" json:"issuer"`
-	EventID    string             `db:"event_id" json:"event_id"`
-	Subject    string             `db:"subject" json:"subject"`
-	EventType  string             `db:"event_type" json:"event_type"`
-	OccurredAt pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
-	ReceivedAt pgtype.Timestamptz `db:"received_at" json:"received_at"`
+	ID          uuid.UUID          `db:"id" json:"id"`
+	Issuer      string             `db:"issuer" json:"issuer"`
+	EventID     string             `db:"event_id" json:"event_id"`
+	Subject     string             `db:"subject" json:"subject"`
+	EventType   string             `db:"event_type" json:"event_type"`
+	OccurredAt  pgtype.Timestamptz `db:"occurred_at" json:"occurred_at"`
+	DisableUser bool               `db:"disable_user" json:"disable_user"`
+	ReceivedAt  pgtype.Timestamptz `db:"received_at" json:"received_at"`
 }
 
 type NetworkPolicy struct {

@@ -155,7 +155,6 @@ func identityDatabase(t *testing.T) *sqlc.Queries {
 	return sqlc.New(pool)
 }
 
-
 func TestKindeProviderRevocation(t *testing.T) {
 	queries := identityDatabase(t)
 	ctx := t.Context()
@@ -167,7 +166,9 @@ func TestKindeProviderRevocation(t *testing.T) {
 		user, err := queries.UpsertIdentityUser(ctx, sqlc.UpsertIdentityUserParams{
 			IdentityIssuer: issuer, IdentitySubject: subject, Email: email,
 		})
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		return user.ID
 	}
 	userID := createUser(subject, "revoked@example.com")
@@ -180,7 +181,9 @@ func TestKindeProviderRevocation(t *testing.T) {
 			IdentitySessionID: label, TokensCiphertext: "encrypted",
 			Assurance: "unknown", ExpiresAt: pgconv.TimeToTimestamptz(expires),
 		})
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 		return stored.ID
 	}
 	first := createSession(userID, "revoked-first")
@@ -194,7 +197,9 @@ func TestKindeProviderRevocation(t *testing.T) {
 			OccurredAt: pgconv.TimeToTimestamptz(at), DisableUser: disabled,
 			ProfileName: "Updated Name", ProfileEmail: "updated@example.com",
 		})
-		if err != nil { t.Fatal(err) }
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	apply("event_suspend", "user.updated", true, eventTime)
 	for _, id := range []uuid.UUID{first, second} {
@@ -233,10 +238,12 @@ func TestKindeDeletionBeforeFirstLoginBlocksIdentityCreation(t *testing.T) {
 	_, err := queries.ApplyKindeIdentityEvent(ctx, sqlc.ApplyKindeIdentityEventParams{
 		Issuer: issuer, EventID: "event_deleted_before_login",
 		Subject: subject, EventType: "user.deleted",
-		OccurredAt: pgconv.TimeToTimestamptz(time.Now()),
+		OccurredAt:  pgconv.TimeToTimestamptz(time.Now()),
 		DisableUser: true,
 	})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := queries.UpsertIdentityUser(ctx, sqlc.UpsertIdentityUserParams{
 		IdentityIssuer: issuer, IdentitySubject: subject, Email: "deleted@example.com",
 	}); err == nil {
