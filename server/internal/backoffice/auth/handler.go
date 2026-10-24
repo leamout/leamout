@@ -25,3 +25,7 @@ func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write(body.Bytes())
 }
+
+func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
+	h.identity.BackofficeAccount(w, r)
+}

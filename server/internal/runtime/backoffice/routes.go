@@ -40,6 +40,7 @@ func newRouter(modules *modules, logger *logging.Logger, backofficeURL string) (
 		protected.Use(modules.authn.RequireSession)
 		protected.Use(requirePlatformAdmin(modules.queries, logger))
 		protected.Use(protection.Handler)
+		protected.Get("/auth/account", modules.authentication.Account)
 		modules.organizations.Routes(protected)
 		modules.agents.Routes(protected)
 		modules.calls.Routes(protected)

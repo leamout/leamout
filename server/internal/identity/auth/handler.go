@@ -154,7 +154,32 @@ func (h *Handler) revokeBrowserSession(w http.ResponseWriter, r *http.Request) e
 }
 
 func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, h.frontendURL+"/settings/profile", http.StatusSeeOther)
+	h.account(w, r, "/settings/profile")
+}
+
+func (h *Handler) BackofficeAccount(w http.ResponseWriter, r *http.Request) {
+	h.account(w, r, "/organizations")
+}
+
+func (h *Handler) account(w http.ResponseWriter, r *http.Request, returnPath string) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	cookie, err := r.Cookie(authn.SessionCookieName)
+	if err != nil || cookie.Value == "" {
+		httputil.Error(w, apperror.NewUnauthorized("session authentication required"))
+		return
+	}
+	accessToken, err := h.sessions.AccessToken(r.Context(), cookie.Value)
+	if err != nil {
+		httputil.Error(w, apperror.NewUnauthorized("session authentication required"))
+		return
+	}
+	destination, err := h.client.PortalURL(r.Context(), accessToken, h.frontendURL+returnPath)
+	if err != nil {
+		httputil.Error(w, apperror.NewServiceUnavailable("account management is unavailable", err))
+		return
+	}
+	http.Redirect(w, r, destination, http.StatusSeeOther)
 }
 
 func (h *Handler) setStateCookie(w http.ResponseWriter, value string, maxAge int) {

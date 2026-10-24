@@ -170,6 +170,22 @@ func (s *Service) ResolveSession(
 	}, nil
 }
 
+// AccessToken returns provider credentials only to server-side authenticated flows.
+func (s *Service) AccessToken(ctx context.Context, value string) (string, error) {
+	if _, err := s.ResolveSession(ctx, value); err != nil {
+		return "", ErrInvalidSession
+	}
+	stored, err := s.Get(ctx, value)
+	if err != nil {
+		return "", ErrInvalidSession
+	}
+	tokens, err := s.decrypt(stored)
+	if err != nil || tokens.OAuth.AccessToken == "" || !time.Now().Before(tokens.OAuth.Expiry) {
+		return "", ErrInvalidSession
+	}
+	return tokens.OAuth.AccessToken, nil
+}
+
 func (s *Service) List(
 	ctx context.Context,
 	userID uuid.UUID,
