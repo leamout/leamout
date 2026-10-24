@@ -4,6 +4,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity/auth"
+	"github.com/leamout/leamout/server/internal/identity/kindesync"
 	"github.com/leamout/leamout/server/internal/identity/session"
 	"github.com/leamout/leamout/server/internal/identity/users"
 	"github.com/leamout/leamout/server/internal/integrations/kinde"
@@ -11,6 +12,7 @@ import (
 )
 
 type Module struct {
+	KindeSync *kindesync.Handler
 	Auth    AuthModule
 	Session SessionModule
 	Users   UsersModule
@@ -47,6 +49,7 @@ func New(
 	usersService := users.NewService(usersRepository)
 
 	return &Module{
+		KindeSync: kindesync.NewHandler(queries, client),
 		Auth: AuthModule{
 			Handler: auth.NewHandler(queries, sessionService, client, cipher, frontendURL, development),
 		},
