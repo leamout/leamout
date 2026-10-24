@@ -139,6 +139,9 @@ func TestKindeExchangeAndRefresh(t *testing.T) {
 	}{
 		{"issuer", func(c map[string]any) { c["iss"] = "https://wrong.example.com" }},
 		{"audience", func(c map[string]any) { c["aud"] = "another-client" }},
+		{"wrong azp", func(c map[string]any) { c["aud"] = issuer; c["azp"] = "another-client" }},
+		{"missing azp", func(c map[string]any) { c["aud"] = issuer; delete(c, "azp") }},
+		{"multiple audiences without azp", func(c map[string]any) { c["aud"] = []string{"console", "other-app"}; delete(c, "azp") }},
 		{"expired", func(c map[string]any) { c["exp"] = time.Now().Add(-time.Minute).Unix() }},
 		{"unverified", func(c map[string]any) { c["email_verified"] = false }},
 		{"subject", func(c map[string]any) { c["sub"] = "" }},
@@ -150,6 +153,15 @@ func TestKindeExchangeAndRefresh(t *testing.T) {
 			}
 		})
 	}
+	// Kinde's issuer-audience ID tokens must identify this confidential client.
+	mutate = func(claims map[string]any) {
+		claims["aud"] = issuer
+		claims["azp"] = "console"
+	}
+	if _, _, err := client.Exchange(t.Context(), "code", "verifier", "nonce"); err != nil {
+		t.Fatalf("rejected valid Kinde issuer audience and azp: %v", err)
+	}
+
 	// Kinde does not guarantee a Keycloak-style sid claim.
 	mutate = func(claims map[string]any) {
 		delete(claims, "sid")
@@ -192,5 +204,18 @@ func signClaims(t *testing.T, signer jose.Signer, claims map[string]any) string 
 func TestProductionRejectsInsecureConfiguration(t *testing.T) {
 	if _, err := New(t.Context(), Config{Issuer: "http://localhost:8180", ClientID: "console", ClientSecret: "secret"}, "https://console.example.com/callback", false); err == nil {
 		t.Fatal("accepted insecure production issuer")
+	}
+}
+
+func TestNextValidationDeadline(t *testing.T) {
+	future := time.Now().Add(24 * time.Hour)
+	got := nextValidationDeadline(future)
+	if time.Until(got) > maximumIdentityValidationAge ||
+		time.Until(got) < maximumIdentityValidationAge-time.Minute {
+		t.Fatalf("unexpected revalidation deadline: %v", got)
+	}
+	soon := time.Now().Add(time.Minute)
+	if got := nextValidationDeadline(soon); !got.Equal(soon) {
+		t.Fatalf("provider expiration should be respected: got %v want %v", got, soon)
 	}
 }
