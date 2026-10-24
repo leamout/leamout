@@ -67,13 +67,13 @@ func (h *Handler) Receive(w http.ResponseWriter, r *http.Request) {
 		email = strings.TrimSpace(*event.Data.User.Email)
 	}
 	_, err = h.queries.ApplyKindeIdentityEvent(r.Context(), sqlc.ApplyKindeIdentityEventParams{
-		Issuer: h.client.Issuer(),
-		EventID: event.EventID,
-		Subject: event.Subject(),
-		EventType: event.Type,
-		OccurredAt: event.Timestamp,
-		DisableUser: disabled,
-		ProfileName: name,
+		Issuer:       h.client.Issuer(),
+		EventID:      event.EventID,
+		Subject:      event.Subject(),
+		EventType:    event.Type,
+		OccurredAt:   event.Timestamp,
+		DisableUser:  disabled,
+		ProfileName:  name,
 		ProfileEmail: email,
 	})
 	if err != nil {

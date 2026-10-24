@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	webhookMaxAge = 48 * time.Hour
+	webhookMaxAge    = 48 * time.Hour
 	webhookClockSkew = 5 * time.Minute
 )
 

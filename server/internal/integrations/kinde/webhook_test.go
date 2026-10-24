@@ -45,15 +45,15 @@ func TestVerifyWebhookSignedEvents(t *testing.T) {
 	makeJWT := func(eventID string, timestamp time.Time, eventType string) string {
 		t.Helper()
 		payload, err := json.Marshal(map[string]any{
-			"event_id": eventID,
-			"type": eventType,
+			"event_id":  eventID,
+			"type":      eventType,
 			"timestamp": timestamp.UTC().Format(time.RFC3339Nano),
 			"data": map[string]any{
 				"user": map[string]any{
-					"id": "kp_1234567890",
-					"email": "updated@example.com",
-					"first_name": "Ada",
-					"last_name": "Lovelace",
+					"id":           "kp_1234567890",
+					"email":        "updated@example.com",
+					"first_name":   "Ada",
+					"last_name":    "Lovelace",
 					"is_suspended": false,
 				},
 			},

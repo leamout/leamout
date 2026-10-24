@@ -13,9 +13,9 @@ import (
 
 type Module struct {
 	KindeSync *kindesync.Handler
-	Auth    AuthModule
-	Session SessionModule
-	Users   UsersModule
+	Auth      AuthModule
+	Session   SessionModule
+	Users     UsersModule
 }
 
 type AuthModule struct {

@@ -1,4 +1,4 @@
-h1:2rjVUSZq6N0XEV/fufB9Yeeuk+Za7dZ5sr0fWUhuclQ=
+h1:jSkvL7mvgpxDR1szqKoyKFAjOPfkc67KMdll0xLiLP4=
 001_extensions.sql h1:V12FA/dbb8clPffRf/1QJRpbB/S0eECkElwvfOVRda4=
 002_create_users.sql h1:f9pqkZuAW3r1oiiDAWRUZks9Fo1px4PlBQ2JFpc51NI=
 003_create_authentication.sql h1:HrAm5EmiyAMOsdggJRc6ZatZeADNv+AWN2tM67BNQQQ=
@@ -32,3 +32,4 @@ h1:2rjVUSZq6N0XEV/fufB9Yeeuk+Za7dZ5sr0fWUhuclQ=
 033_create_plans.sql h1:QFtwFCXvUGzR/fMYNdZbadHuTfiBAtqkWz0327mQPpA=
 034_create_subscriptions.sql h1:CnG8qP40fN4+1rkRFO0fenJRhP4Tc0GrnKPRTJoGs54=
 035_create_billing_webhook_events.sql h1:YtuCGzkvVTjfpoa1WPKYB6iqXajiuy5k/O3SJFsZLLs=
+036_create_kinde_identity_events.sql h1:escKy2ZSMvn7qKsJRKFn9RLUCsQ248iq8gA8GDgb8B4=
