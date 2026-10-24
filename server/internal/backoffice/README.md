@@ -15,6 +15,22 @@ organization. Disabled agents and agents belonging to disabled or deleted
 organizations remain inspectable. These pages are read-only and exclude raw
 engine configuration and provider credentials.
 
+Subscriptions provide organization/ID search, recorded status, plan-code and
+cancellation filters, and billing-period/provider-reference details. The stored
+status is not an effective entitlement calculation. Organizations without a
+subscription record do not appear in this list.
+
+Calls provide call/SIP ID and participant search, state/direction filters, exact
+organization and agent filters, and inclusive UTC creation-date filters. Detail
+pages show lifecycle timestamps, answered duration and the latest agent-session
+metrics. Missing session data is shown explicitly. Calls with disabled or deleted
+owners remain inspectable. Live duration is a snapshot at page load.
+
+Both features are read-only, use 25-row pagination and require the existing
+platform-admin session guard. Queries remain in `subscriptions.sql`, `calls.sql`
+and `voice_agent_sessions.sql`; no configuration snapshots or event payloads are
+rendered.
+
 ## Development
 
 Backoffice uses `config.Load()` and `config.Config` from
@@ -49,7 +65,7 @@ available for subsequent sign-in. Signed backchannel logout events can be
 received at `/identity/backchannel-logout`; the existing API backchannel handler
 also revokes matching sessions in the shared database.
 
-Only active users with `is_platform_admin` may access organization and agent pages.
+Only active users with `is_platform_admin` may access organization, agent, subscription and call pages.
 A trusted administrator must explicitly promote an existing, verified account
 using its exact ID:
 
@@ -79,6 +95,8 @@ is involved. The Docker build generates templates and the local asset bundle.
   validation, pages and feature components.
 - `internal/backoffice/agents`: agent models, repository, handlers, routes,
   validation, pages and feature components.
+- `internal/backoffice/subscriptions` and `internal/backoffice/calls`: models,
+  repositories, handlers, routes, validation, pages and feature components.
 - `internal/backoffice/components`: shared shell and reusable UI.
 - `internal/backoffice/assets`: embedded local CSS, JavaScript and favicon.
 - `internal/database/queries/organizations.sql`: organization queries, including

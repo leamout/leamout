@@ -180,3 +180,23 @@ WHERE session.state = 'active'
 ORDER BY session.started_at ASC
 LIMIT 500;
 
+
+-- name: GetLatestBackofficeCallSession :one
+SELECT
+    id,
+    voice_agent_id,
+    state,
+    configuration_revision,
+    turn_count,
+    interruption_count,
+    first_response_latency_ms,
+    avg_turn_latency_ms,
+    started_at,
+    ended_at,
+    media_started_at,
+    media_ended_at
+FROM voice_agent_sessions
+WHERE call_id = sqlc.arg(call_id)
+  AND organization_id = sqlc.arg(organization_id)
+ORDER BY started_at DESC, id DESC
+LIMIT 1;

@@ -44,6 +44,7 @@ templ DetailContent(agent Detail) {
 		</div>
 		<span class="badge badge-outline badge-lg">{ agent.Status }</span>
 	</div>
+	<a class="btn btn-outline btn-sm mt-4" href={ templ.SafeURL("/calls?agent_id=" + agent.ID.String()) }>View calls</a>
 	<div class="mt-8 grid gap-6 lg:grid-cols-2">
 		<section class="rounded-box border border-base-300 bg-base-100 p-6">
 			<h2 class="text-lg font-semibold">Configuration</h2>

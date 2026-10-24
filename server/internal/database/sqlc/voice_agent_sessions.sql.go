@@ -225,6 +225,67 @@ func (q *Queries) GetActiveVoiceAgentSessionByCallID(ctx context.Context, arg Ge
 	return i, err
 }
 
+const getLatestBackofficeCallSession = `-- name: GetLatestBackofficeCallSession :one
+SELECT
+    id,
+    voice_agent_id,
+    state,
+    configuration_revision,
+    turn_count,
+    interruption_count,
+    first_response_latency_ms,
+    avg_turn_latency_ms,
+    started_at,
+    ended_at,
+    media_started_at,
+    media_ended_at
+FROM voice_agent_sessions
+WHERE call_id = $1
+  AND organization_id = $2
+ORDER BY started_at DESC, id DESC
+LIMIT 1
+`
+
+type GetLatestBackofficeCallSessionParams struct {
+	CallID         uuid.UUID `db:"call_id" json:"call_id"`
+	OrganizationID uuid.UUID `db:"organization_id" json:"organization_id"`
+}
+
+type GetLatestBackofficeCallSessionRow struct {
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	VoiceAgentID           uuid.UUID          `db:"voice_agent_id" json:"voice_agent_id"`
+	State                  string             `db:"state" json:"state"`
+	ConfigurationRevision  int32              `db:"configuration_revision" json:"configuration_revision"`
+	TurnCount              int32              `db:"turn_count" json:"turn_count"`
+	InterruptionCount      int32              `db:"interruption_count" json:"interruption_count"`
+	FirstResponseLatencyMs *int32             `db:"first_response_latency_ms" json:"first_response_latency_ms"`
+	AvgTurnLatencyMs       *int32             `db:"avg_turn_latency_ms" json:"avg_turn_latency_ms"`
+	StartedAt              pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	EndedAt                pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	MediaStartedAt         pgtype.Timestamptz `db:"media_started_at" json:"media_started_at"`
+	MediaEndedAt           pgtype.Timestamptz `db:"media_ended_at" json:"media_ended_at"`
+}
+
+func (q *Queries) GetLatestBackofficeCallSession(ctx context.Context, arg GetLatestBackofficeCallSessionParams) (GetLatestBackofficeCallSessionRow, error) {
+	row := q.db.QueryRow(ctx, getLatestBackofficeCallSession, arg.CallID, arg.OrganizationID)
+	var i GetLatestBackofficeCallSessionRow
+	err := row.Scan(
+		&i.ID,
+		&i.VoiceAgentID,
+		&i.State,
+		&i.ConfigurationRevision,
+		&i.TurnCount,
+		&i.InterruptionCount,
+		&i.FirstResponseLatencyMs,
+		&i.AvgTurnLatencyMs,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.MediaStartedAt,
+		&i.MediaEndedAt,
+	)
+	return i, err
+}
+
 const getOrganizationRuntimeUsedSeconds = `-- name: GetOrganizationRuntimeUsedSeconds :one
 SELECT COALESCE(SUM(
     GREATEST(0, CEIL(EXTRACT(EPOCH FROM

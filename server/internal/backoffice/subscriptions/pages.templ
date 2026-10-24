@@ -1,0 +1,84 @@
+package subscriptions
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/server/internal/backoffice/components"
+)
+
+templ Page(result List) {
+	@components.Layout("Subscriptions", "subscriptions", ListContent(result))
+}
+
+templ ListContent(result List) {
+	<div class="mb-8">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Billing</p>
+		<h1 class="mt-2 text-3xl font-bold">Subscriptions</h1>
+		<p class="mt-2 text-base-content/70">Inspect recorded subscriptions and billing periods across Leamout.</p>
+	</div>
+	@Filters(result.Filter)
+	@SubscriptionTable(result.Subscriptions)
+	<nav class="mt-6 flex items-center justify-between" aria-label="Pagination">
+		<span class="text-sm text-base-content/60">Page { fmt.Sprint(result.Filter.Page) }</span>
+		<div class="flex gap-2">
+			if result.Filter.Page > 1 {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page-1)) }>Previous</a>
+			}
+			if result.HasNext {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page+1)) }>Next</a>
+			}
+		</div>
+	</nav>
+}
+
+templ DetailPage(detail Detail) {
+	@components.Layout("Subscription "+detail.ID.String(), "subscriptions", DetailContent(detail))
+}
+
+templ DetailContent(detail Detail) {
+	<a class="link link-primary text-sm" href="/subscriptions">Back to subscriptions</a>
+	<h1 class="mt-6 text-3xl font-bold">Subscription details</h1>
+	<p class="mt-2 break-all font-mono text-sm text-base-content/60">{ detail.ID.String() }</p>
+	<a class="link link-primary mt-4 inline-block" href={ templ.SafeURL("/organizations/" + detail.OrganizationID.String()) }>{ detail.OrganizationName }</a>
+	<p class="mt-4 text-sm text-base-content/60">Recorded billing state is shown here. Effective access also depends on billing periods, grace periods, and organization status.</p>
+	<div class="mt-8 grid gap-6 lg:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Plan and status</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Plan", detail.PlanName)
+				@Field("Plan code", detail.PlanCode)
+				@Field("Plan ID", detail.PlanID.String())
+				@Field("Recorded status", detail.Status)
+				@Field("Organization status", detail.OrganizationStatus)
+				@Field("Cancel at period end", fmt.Sprint(detail.CancelAtPeriodEnd))
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Billing periods</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Period starts", detail.PeriodStart)
+				@Field("Period ends", detail.PeriodEnd)
+				@Field("Trial ends", detail.TrialEndsAt)
+				@Field("Past due since", detail.PastDueAt)
+				@Field("Grace ends", detail.GraceEndsAt)
+				@Field("Canceled", detail.CanceledAt)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Provider references</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Provider", detail.Provider)
+				@Field("Customer ID", detail.ProviderCustomerID)
+				@Field("Subscription ID", detail.ProviderSubscriptionID)
+				@Field("Last provider event created", detail.ProviderEventCreatedAt)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Record timeline</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Created", detail.CreatedAt)
+				@Field("Updated", detail.UpdatedAt)
+			</dl>
+		</section>
+	</div>
+}

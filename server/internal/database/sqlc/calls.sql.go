@@ -78,73 +78,52 @@ func (q *Queries) CreateCall(ctx context.Context, arg CreateCallParams) (Call, e
 
 const getBackofficeCall = `-- name: GetBackofficeCall :one
 SELECT
-    c.id::TEXT AS id,
-    c.organization_id::TEXT AS organization_id,
+    c.id,
+    c.organization_id,
     o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    c.voice_agent_id, COALESCE(va.name, '')::text AS agent_name,
     c.direction,
     c.state,
-    c.media_state,
     c.from_uri,
     c.to_uri,
-    COALESCE(c.sip_call_id, '—')::TEXT AS sip_call_id,
-    COALESCE(c.voice_agent_id::TEXT, '—')::TEXT AS voice_agent_id,
-    COALESCE(agent.name, '—')::TEXT AS voice_agent_name,
-    COALESCE(c.trunk_id::TEXT, '—')::TEXT AS trunk_id,
-    COALESCE(t.name, '—')::TEXT AS trunk_name,
-    COALESCE(c.trunk_endpoint_id::TEXT, '—')::TEXT AS trunk_endpoint_id,
-    COALESCE(c.hangup_reason, '—')::TEXT AS hangup_reason,
-    CAST(
-        GREATEST(
-            0::BIGINT,
-            COALESCE(
-                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
-                0::BIGINT
-            )
-        ) AS BIGINT
-    ) AS duration_seconds,
-    COUNT(DISTINCT r.id)::BIGINT AS recording_count,
-    COALESCE(string_agg(DISTINCT r.status, ', ' ORDER BY r.status), 'none')::TEXT AS recording_status,
-    COALESCE(to_char(c.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS started_at,
-    COALESCE(to_char(c.answered_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS answered_at,
-    COALESCE(to_char(c.ended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS ended_at,
-    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS created_at,
-    to_char(c.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS updated_at
+    c.created_at,
+    c.media_state,
+    c.started_at,
+    c.answered_at,
+    c.ended_at,
+    c.updated_at,
+    COALESCE(c.sip_call_id, '')::text AS sip_call_id,
+    COALESCE(c.hangup_reason, '')::text AS hangup_reason,
+    c.trunk_id,
+    c.trunk_endpoint_id
 FROM calls AS c
 JOIN organizations AS o ON o.id = c.organization_id
-LEFT JOIN voice_agents AS agent ON agent.id = c.voice_agent_id
-LEFT JOIN trunks AS t ON t.id = c.trunk_id
-LEFT JOIN recordings AS r
-  ON r.call_id = c.id
- AND r.organization_id = c.organization_id
+LEFT JOIN voice_agents AS va ON va.id = c.voice_agent_id AND va.organization_id = c.organization_id
 WHERE c.id = $1
-GROUP BY c.id, o.name, agent.name, t.name
-LIMIT 1
 `
 
 type GetBackofficeCallRow struct {
-	ID               string `db:"id" json:"id"`
-	OrganizationID   string `db:"organization_id" json:"organization_id"`
-	OrganizationName string `db:"organization_name" json:"organization_name"`
-	Direction        string `db:"direction" json:"direction"`
-	State            string `db:"state" json:"state"`
-	MediaState       string `db:"media_state" json:"media_state"`
-	FromUri          string `db:"from_uri" json:"from_uri"`
-	ToUri            string `db:"to_uri" json:"to_uri"`
-	SipCallID        string `db:"sip_call_id" json:"sip_call_id"`
-	VoiceAgentID     string `db:"voice_agent_id" json:"voice_agent_id"`
-	VoiceAgentName   string `db:"voice_agent_name" json:"voice_agent_name"`
-	TrunkID          string `db:"trunk_id" json:"trunk_id"`
-	TrunkName        string `db:"trunk_name" json:"trunk_name"`
-	TrunkEndpointID  string `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
-	HangupReason     string `db:"hangup_reason" json:"hangup_reason"`
-	DurationSeconds  int64  `db:"duration_seconds" json:"duration_seconds"`
-	RecordingCount   int64  `db:"recording_count" json:"recording_count"`
-	RecordingStatus  string `db:"recording_status" json:"recording_status"`
-	StartedAt        string `db:"started_at" json:"started_at"`
-	AnsweredAt       string `db:"answered_at" json:"answered_at"`
-	EndedAt          string `db:"ended_at" json:"ended_at"`
-	CreatedAt        string `db:"created_at" json:"created_at"`
-	UpdatedAt        string `db:"updated_at" json:"updated_at"`
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationName   string             `db:"organization_name" json:"organization_name"`
+	OrganizationStatus string             `db:"organization_status" json:"organization_status"`
+	VoiceAgentID       *uuid.UUID         `db:"voice_agent_id" json:"voice_agent_id"`
+	AgentName          string             `db:"agent_name" json:"agent_name"`
+	Direction          string             `db:"direction" json:"direction"`
+	State              string             `db:"state" json:"state"`
+	FromUri            string             `db:"from_uri" json:"from_uri"`
+	ToUri              string             `db:"to_uri" json:"to_uri"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MediaState         string             `db:"media_state" json:"media_state"`
+	StartedAt          pgtype.Timestamptz `db:"started_at" json:"started_at"`
+	AnsweredAt         pgtype.Timestamptz `db:"answered_at" json:"answered_at"`
+	EndedAt            pgtype.Timestamptz `db:"ended_at" json:"ended_at"`
+	UpdatedAt          pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	SipCallID          string             `db:"sip_call_id" json:"sip_call_id"`
+	HangupReason       string             `db:"hangup_reason" json:"hangup_reason"`
+	TrunkID            *uuid.UUID         `db:"trunk_id" json:"trunk_id"`
+	TrunkEndpointID    *uuid.UUID         `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
 }
 
 func (q *Queries) GetBackofficeCall(ctx context.Context, id uuid.UUID) (GetBackofficeCallRow, error) {
@@ -154,26 +133,23 @@ func (q *Queries) GetBackofficeCall(ctx context.Context, id uuid.UUID) (GetBacko
 		&i.ID,
 		&i.OrganizationID,
 		&i.OrganizationName,
+		&i.OrganizationStatus,
+		&i.VoiceAgentID,
+		&i.AgentName,
 		&i.Direction,
 		&i.State,
-		&i.MediaState,
 		&i.FromUri,
 		&i.ToUri,
-		&i.SipCallID,
-		&i.VoiceAgentID,
-		&i.VoiceAgentName,
-		&i.TrunkID,
-		&i.TrunkName,
-		&i.TrunkEndpointID,
-		&i.HangupReason,
-		&i.DurationSeconds,
-		&i.RecordingCount,
-		&i.RecordingStatus,
+		&i.CreatedAt,
+		&i.MediaState,
 		&i.StartedAt,
 		&i.AnsweredAt,
 		&i.EndedAt,
-		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SipCallID,
+		&i.HangupReason,
+		&i.TrunkID,
+		&i.TrunkEndpointID,
 	)
 	return i, err
 }
@@ -423,43 +399,77 @@ func (q *Queries) ListActiveCallsForAdmissionReconciliation(ctx context.Context)
 
 const listBackofficeCalls = `-- name: ListBackofficeCalls :many
 SELECT
-    c.id::TEXT AS id,
-    c.organization_id::TEXT AS organization_id,
+    c.id,
+    c.organization_id,
     o.name AS organization_name,
-    c.from_uri,
-    c.to_uri,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    c.voice_agent_id, COALESCE(va.name, '')::text AS agent_name,
     c.direction,
     c.state,
-    CAST(
-        GREATEST(
-            0::BIGINT,
-            COALESCE(
-                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
-                0::BIGINT
-            )
-        ) AS BIGINT
-    ) AS duration_seconds,
-    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+    c.from_uri,
+    c.to_uri,
+    c.created_at
 FROM calls AS c
 JOIN organizations AS o ON o.id = c.organization_id
-ORDER BY c.created_at DESC
-LIMIT 100
+LEFT JOIN voice_agents AS va ON va.id = c.voice_agent_id AND va.organization_id = c.organization_id
+WHERE (
+    $1::text = ''
+    OR c.id::text = $1::text
+    OR c.sip_call_id = $1::text
+    OR strpos(lower(c.from_uri), lower($1::text)) > 0
+    OR strpos(lower(c.to_uri), lower($1::text)) > 0
+)
+  AND ($2::text = '' OR c.state = $2::text)
+  AND ($3::text = '' OR c.direction = $3::text)
+  AND ($4::uuid IS NULL OR c.organization_id = $4::uuid)
+  AND ($5::uuid IS NULL OR c.voice_agent_id = $5::uuid)
+  AND ($6::timestamptz IS NULL OR c.created_at >= $6::timestamptz)
+  AND ($7::timestamptz IS NULL OR c.created_at < $7::timestamptz)
+ORDER BY c.created_at DESC,
+    c.id DESC
+LIMIT $9::int
+OFFSET $8::int
 `
 
-type ListBackofficeCallsRow struct {
-	ID               string `db:"id" json:"id"`
-	OrganizationID   string `db:"organization_id" json:"organization_id"`
-	OrganizationName string `db:"organization_name" json:"organization_name"`
-	FromUri          string `db:"from_uri" json:"from_uri"`
-	ToUri            string `db:"to_uri" json:"to_uri"`
-	Direction        string `db:"direction" json:"direction"`
-	State            string `db:"state" json:"state"`
-	DurationSeconds  int64  `db:"duration_seconds" json:"duration_seconds"`
-	CreatedAt        string `db:"created_at" json:"created_at"`
+type ListBackofficeCallsParams struct {
+	Search         string             `db:"search" json:"search"`
+	State          string             `db:"state" json:"state"`
+	Direction      string             `db:"direction" json:"direction"`
+	OrganizationID *uuid.UUID         `db:"organization_id" json:"organization_id"`
+	AgentID        *uuid.UUID         `db:"agent_id" json:"agent_id"`
+	CreatedFrom    pgtype.Timestamptz `db:"created_from" json:"created_from"`
+	CreatedBefore  pgtype.Timestamptz `db:"created_before" json:"created_before"`
+	PageOffset     int32              `db:"page_offset" json:"page_offset"`
+	PageLimit      int32              `db:"page_limit" json:"page_limit"`
 }
 
-func (q *Queries) ListBackofficeCalls(ctx context.Context) ([]ListBackofficeCallsRow, error) {
-	rows, err := q.db.Query(ctx, listBackofficeCalls)
+type ListBackofficeCallsRow struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationName   string             `db:"organization_name" json:"organization_name"`
+	OrganizationStatus string             `db:"organization_status" json:"organization_status"`
+	VoiceAgentID       *uuid.UUID         `db:"voice_agent_id" json:"voice_agent_id"`
+	AgentName          string             `db:"agent_name" json:"agent_name"`
+	Direction          string             `db:"direction" json:"direction"`
+	State              string             `db:"state" json:"state"`
+	FromUri            string             `db:"from_uri" json:"from_uri"`
+	ToUri              string             `db:"to_uri" json:"to_uri"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// Operator projections intentionally include disabled and deleted organizations.
+func (q *Queries) ListBackofficeCalls(ctx context.Context, arg ListBackofficeCallsParams) ([]ListBackofficeCallsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeCalls,
+		arg.Search,
+		arg.State,
+		arg.Direction,
+		arg.OrganizationID,
+		arg.AgentID,
+		arg.CreatedFrom,
+		arg.CreatedBefore,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -471,11 +481,13 @@ func (q *Queries) ListBackofficeCalls(ctx context.Context) ([]ListBackofficeCall
 			&i.ID,
 			&i.OrganizationID,
 			&i.OrganizationName,
-			&i.FromUri,
-			&i.ToUri,
+			&i.OrganizationStatus,
+			&i.VoiceAgentID,
+			&i.AgentName,
 			&i.Direction,
 			&i.State,
-			&i.DurationSeconds,
+			&i.FromUri,
+			&i.ToUri,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err

@@ -148,3 +148,63 @@ WHERE o.id > sqlc.arg(after_organization_id)
   AND o.deleted_at IS NULL
 ORDER BY o.id
 LIMIT 100;
+
+-- Operator projections intentionally include disabled and deleted organizations.
+-- name: ListBackofficeSubscriptions :many
+SELECT
+    s.id,
+    s.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    s.plan_id,
+    p.name AS plan_name,
+    p.code AS plan_code,
+    s.status,
+    s.current_period_end,
+    s.cancel_at_period_end,
+    s.created_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+JOIN plans AS p ON p.id = s.plan_id
+WHERE (
+    sqlc.arg(search)::text = ''
+    OR s.id::text = sqlc.arg(search)::text
+    OR strpos(lower(o.name), lower(sqlc.arg(search)::text)) > 0
+    OR s.provider_subscription_id = sqlc.arg(search)::text
+)
+  AND (sqlc.arg(status)::text = '' OR s.status = sqlc.arg(status)::text)
+  AND (sqlc.arg(plan)::text = '' OR p.code = sqlc.arg(plan)::text)
+  AND (sqlc.arg(cancellation)::text = '' OR s.cancel_at_period_end = (sqlc.arg(cancellation)::text = 'scheduled'))
+  AND (sqlc.narg(organization_id)::uuid IS NULL OR s.organization_id = sqlc.narg(organization_id)::uuid)
+ORDER BY s.created_at DESC,
+    s.id DESC
+LIMIT sqlc.arg(page_limit)::int
+OFFSET sqlc.arg(page_offset)::int;
+
+-- name: GetBackofficeSubscription :one
+SELECT
+    s.id,
+    s.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    s.plan_id,
+    p.name AS plan_name,
+    p.code AS plan_code,
+    s.status,
+    s.current_period_end,
+    s.cancel_at_period_end,
+    s.created_at,
+    s.current_period_start,
+    s.trial_ends_at,
+    s.past_due_at,
+    s.grace_ends_at,
+    s.canceled_at,
+    s.updated_at,
+    s.provider_event_created_at,
+    COALESCE(s.provider, '')::text AS provider,
+    COALESCE(s.provider_customer_id, '')::text AS provider_customer_id,
+    COALESCE(s.provider_subscription_id, '')::text AS provider_subscription_id
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+JOIN plans AS p ON p.id = s.plan_id
+WHERE s.id = sqlc.arg(id);
