@@ -8,14 +8,16 @@ WITH recorded AS (
         event_id,
         subject,
         event_type,
-        occurred_at
+        occurred_at,
+        disable_user
     )
     VALUES (
         sqlc.arg(issuer),
         sqlc.arg(event_id),
         sqlc.arg(subject),
         sqlc.arg(event_type),
-        sqlc.arg(occurred_at)
+        sqlc.arg(occurred_at),
+        sqlc.arg(disable_user)::boolean
     )
     ON CONFLICT (issuer, event_id) DO NOTHING
     RETURNING issuer, subject, event_type, occurred_at
@@ -87,4 +89,8 @@ revoked_sessions AS (
       AND s.revoked_at IS NULL
     RETURNING s.id
 )
-SELECT EXISTS(SELECT 1 FROM recorded)::boolean AS recorded;
+-- Materialize the revocation CTE before responding to the provider. A 200
+-- must mean the user disable and session revocations committed together.
+SELECT
+    EXISTS(SELECT 1 FROM recorded)::boolean AS recorded,
+    (SELECT COUNT(*) FROM revoked_sessions)::bigint AS revoked_session_count;

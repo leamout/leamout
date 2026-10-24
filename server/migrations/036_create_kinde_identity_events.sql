@@ -6,6 +6,7 @@ CREATE TABLE kinde_identity_events (
     event_type TEXT NOT NULL
         CHECK (event_type IN ('user.updated', 'user.deleted')),
     occurred_at TIMESTAMPTZ NOT NULL,
+    disable_user BOOLEAN NOT NULL DEFAULT FALSE,
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (issuer, event_id)
 );
