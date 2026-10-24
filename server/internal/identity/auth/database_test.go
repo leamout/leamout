@@ -154,3 +154,99 @@ func identityDatabase(t *testing.T) *sqlc.Queries {
 	}
 	return sqlc.New(pool)
 }
+
+func TestKindeProviderRevocation(t *testing.T) {
+	queries := identityDatabase(t)
+	ctx := t.Context()
+	issuer := "https://tenant.kinde.com"
+	subject := "kp_provider_revocation"
+	otherSubject := "kp_unrelated"
+	createUser := func(subject, email string) uuid.UUID {
+		t.Helper()
+		user, err := queries.UpsertIdentityUser(ctx, sqlc.UpsertIdentityUserParams{
+			IdentityIssuer: issuer, IdentitySubject: subject, Email: email,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return user.ID
+	}
+	userID := createUser(subject, "revoked@example.com")
+	otherID := createUser(otherSubject, "unrelated@example.com")
+	expires := time.Now().Add(time.Hour)
+	createSession := func(user uuid.UUID, label string) uuid.UUID {
+		t.Helper()
+		stored, err := queries.CreateSession(ctx, sqlc.CreateSessionParams{
+			UserID: user, TokenHash: label, IdentitySubject: subject,
+			IdentitySessionID: label, TokensCiphertext: "encrypted",
+			Assurance: "unknown", ExpiresAt: pgconv.TimeToTimestamptz(expires),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return stored.ID
+	}
+	first := createSession(userID, "revoked-first")
+	second := createSession(userID, "revoked-second")
+	unrelated := createSession(otherID, "unrelated")
+	eventTime := time.Now().UTC()
+	apply := func(eventID, eventType string, disabled bool, at time.Time) {
+		t.Helper()
+		_, err := queries.ApplyKindeIdentityEvent(ctx, sqlc.ApplyKindeIdentityEventParams{
+			Issuer: issuer, EventID: eventID, Subject: subject, EventType: eventType,
+			OccurredAt: pgconv.TimeToTimestamptz(at), DisableUser: disabled,
+			ProfileName: "Updated Name", ProfileEmail: "updated@example.com",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	apply("event_suspend", "user.updated", true, eventTime)
+	for _, id := range []uuid.UUID{first, second} {
+		if _, err := queries.GetSessionByID(ctx, id); err == nil {
+			t.Fatal("Kinde suspension left a live session")
+		}
+	}
+	if _, err := queries.GetSessionByID(ctx, unrelated); err != nil {
+		t.Fatalf("unrelated identity session revoked: %v", err)
+	}
+	if _, err := queries.CreateSession(ctx, sqlc.CreateSessionParams{
+		UserID: userID, TokenHash: "after-suspension", IdentitySubject: subject,
+		IdentitySessionID: "later", TokensCiphertext: "encrypted",
+		Assurance: "unknown", ExpiresAt: pgconv.TimeToTimestamptz(expires),
+	}); err == nil {
+		t.Fatal("suspended identity created a new session")
+	}
+	if _, err := queries.UpsertIdentityUser(ctx, sqlc.UpsertIdentityUserParams{
+		IdentityIssuer: issuer, IdentitySubject: subject, Email: "revoked@example.com",
+	}); err == nil {
+		t.Fatal("suspended identity reactivated through login")
+	}
+	apply("event_unsuspend", "user.updated", false, eventTime.Add(time.Minute))
+	apply("event_suspend", "user.updated", true, eventTime)
+	apply("event_deleted", "user.deleted", true, eventTime.Add(-time.Minute))
+	if _, err := queries.GetUserByID(ctx, userID); err == nil {
+		t.Fatal("provider replay or newer profile restored disabled user")
+	}
+}
+
+func TestKindeDeletionBeforeFirstLoginBlocksIdentityCreation(t *testing.T) {
+	queries := identityDatabase(t)
+	ctx := t.Context()
+	issuer := "https://tenant.kinde.com"
+	subject := "kp_deleted_before_login"
+	_, err := queries.ApplyKindeIdentityEvent(ctx, sqlc.ApplyKindeIdentityEventParams{
+		Issuer: issuer, EventID: "event_deleted_before_login",
+		Subject: subject, EventType: "user.deleted",
+		OccurredAt:  pgconv.TimeToTimestamptz(time.Now()),
+		DisableUser: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := queries.UpsertIdentityUser(ctx, sqlc.UpsertIdentityUserParams{
+		IdentityIssuer: issuer, IdentitySubject: subject, Email: "deleted@example.com",
+	}); err == nil {
+		t.Fatal("deleted Kinde subject could be provisioned after a webhook")
+	}
+}
