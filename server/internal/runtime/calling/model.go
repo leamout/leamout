@@ -3,8 +3,8 @@ package calling
 import (
 	"errors"
 	"fmt"
-	"time"
 	"github.com/google/uuid"
+	"time"
 )
 
 type OriginateRequest struct {
@@ -79,6 +79,7 @@ func NewSIPOriginateError(status int, err error) error {
 	}
 	return &OriginateError{Class: OriginateFailureSIP, SIPStatus: status, Err: err}
 }
+
 var (
 	ErrChannelUnavailable  = errors.New("active call channel unavailable")
 	ErrAdmissionCPS        = errors.New("trunk CPS limit exceeded")

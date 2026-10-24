@@ -1,8 +1,8 @@
 package calling
 
 import (
-	"testing"
 	"github.com/google/uuid"
+	"testing"
 )
 
 func TestChannelKey(t *testing.T) {

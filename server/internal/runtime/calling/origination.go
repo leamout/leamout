@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"net"
 	"net/netip"
 	"strconv"
 	"strings"
 	"unicode"
-	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 )
 
 const (
@@ -24,6 +24,7 @@ const (
 	dtmfTypeVar              = "dtmf_type"
 	mediaEncryptionHeaderVar = "sip_h_X-Leamout-Media-Encryption"
 )
+
 func (c *Controller) Originate(
 	ctx context.Context,
 	req OriginateRequest,

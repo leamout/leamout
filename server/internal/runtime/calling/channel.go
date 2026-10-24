@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"github.com/google/uuid"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
 	redisv9 "github.com/redis/go-redis/v9"
+	"strings"
 )
 
 type ChannelStore struct {

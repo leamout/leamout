@@ -3,10 +3,10 @@ package calling
 import (
 	"context"
 	"errors"
+	"github.com/google/uuid"
 	"net"
 	"strings"
 	"testing"
-	"github.com/google/uuid"
 )
 
 func TestFreeSWITCHEgress(t *testing.T) {
