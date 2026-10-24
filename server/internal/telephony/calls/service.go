@@ -213,7 +213,11 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 			Privacy: req.Privacy, DTMFMode: req.DTMFMode, MediaEncryption: req.MediaEncryption,
 		})
 		if originateErr != nil {
-			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
+			var classified *calling.OriginateError
+			if !errors.As(originateErr, &classified) ||
+				classified.Class != calling.OriginateFailureUncertain {
+				_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
+			}
 		}
 		return result, originateErr
 	}, func(attemptCtx context.Context, attempt routeAttemptOutcome) {
