@@ -3,11 +3,11 @@ package kinde
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"sync"
-	"sync/atomic"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -100,12 +100,16 @@ func TestVerifyWebhookSignedEvents(t *testing.T) {
 
 func TestVerifyWebhookCachesSigningKeysUnderConcurrentRequests(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	signer, err := jose.NewSigner(
 		jose.SigningKey{Algorithm: jose.RS256, Key: key},
 		(&jose.SignerOptions{}).WithHeader("kid", "stable-key"),
 	)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	var fetches atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fetches.Add(1)
@@ -115,17 +119,25 @@ func TestVerifyWebhookCachesSigningKeysUnderConcurrentRequests(t *testing.T) {
 	}))
 	defer server.Close()
 	client, err := New(t.Context(), Config{Issuer: server.URL, ClientID: "client", ClientSecret: "secret"}, "http://localhost/callback", true)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	payload, err := json.Marshal(map[string]any{
 		"event_id": "event_concurrent", "type": "user.deleted",
 		"timestamp": time.Now().UTC().Format(time.RFC3339Nano),
-		"data": map[string]any{"user": map[string]any{"id": "kp_123"}},
+		"data":      map[string]any{"user": map[string]any{"id": "kp_123"}},
 	})
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	jws, err := signer.Sign(payload)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	token, err := jws.CompactSerialize()
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var wg sync.WaitGroup
 	for range 24 {
@@ -153,15 +165,25 @@ func TestVerifyWebhookRejectsUnknownKeyWithoutRepeatedFetch(t *testing.T) {
 	}))
 	defer server.Close()
 	client, err := New(t.Context(), Config{Issuer: server.URL, ClientID: "client", ClientSecret: "secret"}, "http://localhost/callback", true)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	signer, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key}, (&jose.SignerOptions{}).WithHeader("kid", "unknown-key"))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	jws, err := signer.Sign([]byte(`{"event_id":"event_unknown","type":"user.deleted","timestamp":"2026-10-24T13:00:00Z"}`))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	token, err := jws.CompactSerialize()
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	for range 20 {
 		if _, err := client.VerifyWebhook(t.Context(), token); err == nil {
 			t.Fatal("untrusted webhook accepted")

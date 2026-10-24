@@ -205,7 +205,7 @@ func TestExecuteRoutePlanDoesNotRetryTransportFailure(t *testing.T) {
 		attempts++
 		return calling.OriginateResult{}, &calling.OriginateError{
 			Class: calling.OriginateFailureTransport,
-			Err: errors.New("lost ESL acknowledgement"),
+			Err:   errors.New("lost ESL acknowledgement"),
 		}
 	}, nil)
 	if err == nil || attempts != 1 {

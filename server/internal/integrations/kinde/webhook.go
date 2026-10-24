@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	webhookMaxAge    = 48 * time.Hour
-	webhookClockSkew = 5 * time.Minute
-	webhookJWKSMaxAge = 15 * time.Minute
+	webhookMaxAge              = 48 * time.Hour
+	webhookClockSkew           = 5 * time.Minute
+	webhookJWKSMaxAge          = 15 * time.Minute
 	webhookJWKSRefreshInterval = time.Minute
 )
 
@@ -116,9 +116,9 @@ func (c *Client) VerifyWebhook(ctx context.Context, raw string) (WebhookEvent, e
 }
 
 // webhookSigningKeys bounds outbound discovery under both normal traffic and
- // attacker-supplied unknown key IDs. The lock also coalesces concurrent misses.
- // Cached keys are never used beyond webhookJWKSMaxAge without a successful
- // refresh. A key rotation can be picked up before expiry at a bounded rate.
+// attacker-supplied unknown key IDs. The lock also coalesces concurrent misses.
+// Cached keys are never used beyond webhookJWKSMaxAge without a successful
+// refresh. A key rotation can be picked up before expiry at a bounded rate.
 func (c *Client) webhookSigningKeys(ctx context.Context, keyID string) (jose.JSONWebKeySet, error) {
 	c.webhookMu.Lock()
 	defer c.webhookMu.Unlock()
