@@ -72,7 +72,7 @@ func (h *Handler) Receive(w http.ResponseWriter, r *http.Request) {
 		EventID:      event.EventID,
 		Subject:      event.Subject(),
 		EventType:    event.Type,
-		OccurredAt:   event.Timestamp,
+		OccurredAt:   pgconv.TimeToTimestamptz(event.Timestamp),
 		DisableUser:  disabled,
 		ProfileName:  name,
 		ProfileEmail: email,
