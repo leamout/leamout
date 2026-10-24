@@ -73,7 +73,7 @@ func (c *Client) VerifyWebhook(ctx context.Context, raw string) (WebhookEvent, e
 	}
 	response, err := httpClient.Do(request)
 	if err != nil {
-		return WebhookEvent{}, fmt.Errorf("%w: %v", ErrWebhookUnavailable, err)
+		return WebhookEvent{}, fmt.Errorf("%w: %w", ErrWebhookUnavailable, err)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
