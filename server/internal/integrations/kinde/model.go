@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
+	"github.com/go-jose/go-jose/v4"
 	"golang.org/x/oauth2"
 )
 
@@ -21,6 +22,11 @@ type Client struct {
 	issuer   string
 	mu       sync.Mutex
 	verifier *oidc.IDTokenVerifier
+
+	webhookMu        sync.Mutex
+	webhookKeys      jose.JSONWebKeySet
+	webhookKeysAt    time.Time
+	webhookAttemptAt time.Time
 }
 
 type Identity struct {
