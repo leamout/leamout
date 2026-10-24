@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -74,7 +75,7 @@ func fetchLiveJSON(t *testing.T, ctx context.Context, endpoint string, target an
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("staging provider metadata returned HTTP %d", response.StatusCode)
 	}
-	if err := json.NewDecoder(http.MaxBytesReader(nil, response.Body, 1<<20)).Decode(target); err != nil {
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(target); err != nil {
 		t.Fatal("decode staging provider metadata:", err)
 	}
 }
@@ -321,4 +322,59 @@ func TestLiveKindeConfiguredIssuerIsNotPlaceholder(t *testing.T) {
 	if _, err := New(context.Background(), cfg, liveCallback(t, "KINDE_LIVE_CONSOLE_CALLBACK_URL"), false); err != nil {
 		t.Fatal(fmt.Errorf("invalid staging client setup: %w", err))
 	}
+}
+
+// TestLiveKindeAuthorizationCodeExchange is a manual, single-use staging flow.
+// Its optional inputs are deliberately not wired to GitHub Actions secrets.
+// Run only after generating the PKCE verifier, nonce and code in a real login.
+func TestLiveKindeAuthorizationCodeExchange(t *testing.T) {
+	code := strings.TrimSpace(os.Getenv("KINDE_LIVE_AUTH_CODE"))
+	verifier := strings.TrimSpace(os.Getenv("KINDE_LIVE_PKCE_VERIFIER"))
+	nonce := strings.TrimSpace(os.Getenv("KINDE_LIVE_NONCE"))
+	if code == "" && verifier == "" && nonce == "" {
+		t.Skip("real authorization-code exchange requires single-use KINDE_LIVE_AUTH_CODE, KINDE_LIVE_PKCE_VERIFIER and KINDE_LIVE_NONCE")
+	}
+	if code == "" || verifier == "" || nonce == "" {
+		t.Fatal("provide all three single-use authorization-code inputs")
+	}
+	cfg := liveKindeConfig(t)
+	callback := liveCallback(t, "KINDE_LIVE_CONSOLE_CALLBACK_URL")
+	client, err := New(t.Context(), cfg, callback, false)
+	if err != nil {
+		t.Fatal("initialize staging client:", err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 35*time.Second)
+	defer cancel()
+	identity, tokens, err := client.Exchange(ctx, code, verifier, nonce)
+	if err != nil {
+		t.Fatal("live Kinde authorization code was rejected:", err)
+	}
+	if identity.Subject == "" || !identity.EmailVerified ||
+		tokens.OAuth.RefreshToken == "" || !tokens.ValidUntil.After(time.Now()) {
+		t.Fatal("live identity lacks a verified subject, refresh token or valid session deadline")
+	}
+	// Refresh is deliberately opt-in: it consumes/rotates the provider token,
+	// which makes a persisted copy unsafe to reuse in a second run.
+	if os.Getenv("KINDE_LIVE_TEST_REFRESH") == "true" {
+		refreshed, err := client.Refresh(ctx, tokens, identity.Subject)
+		if err != nil {
+			t.Fatal("live refresh-token rotation failed:", err)
+		}
+		if refreshed.OAuth.RefreshToken == "" || !refreshed.ValidUntil.After(time.Now()) {
+			t.Fatal("live refresh returned invalid credentials")
+		}
+		tokens = refreshed
+	}
+	// The portal is a separate optional capability of the staging tenant.
+	if os.Getenv("KINDE_LIVE_TEST_PORTAL") == "true" {
+		returnURL := strings.TrimSpace(os.Getenv("KINDE_LIVE_PORTAL_RETURN_URL"))
+		if returnURL == "" {
+			t.Fatal("set KINDE_LIVE_PORTAL_RETURN_URL for a registered return URL")
+		}
+		if _, err := client.PortalURL(ctx, tokens.OAuth.AccessToken, returnURL); err != nil {
+			t.Fatal("live Kinde user portal request failed:", err)
+		}
+	}
+	// Do not print, persist or commit code, ID token, access token, refresh
+	// token, subject, profile information or the one-time portal URL.
 }
