@@ -1,4 +1,4 @@
-package keycloak
+package kinde
 
 import (
 	"crypto/rand"
@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 )
 
 // Exercise discovery, JWKS verification, token exchange and rotation over HTTP.
-func TestOIDCExchangeAndRefresh(t *testing.T) {
+func TestKindeExchangeAndRefresh(t *testing.T) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -26,21 +27,22 @@ func TestOIDCExchangeAndRefresh(t *testing.T) {
 	var issuer string
 	var mutate func(map[string]any)
 	refreshCount := 0
+	omitRefreshIDToken := false
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/.well-known/openid-configuration":
 			writeJSON(t, w, map[string]any{
 				"issuer":                                issuer,
-				"authorization_endpoint":                issuer + "/authorize",
-				"token_endpoint":                        issuer + "/token",
+				"authorization_endpoint":                issuer + "/oauth2/auth",
+				"token_endpoint":                        issuer + "/oauth2/token",
 				"jwks_uri":                              issuer + "/keys",
 				"end_session_endpoint":                  issuer + "/logout",
 				"id_token_signing_alg_values_supported": []string{"RS256"},
 			})
 		case "/keys":
 			writeJSON(t, w, jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "test", Algorithm: "RS256", Use: "sig"}}})
-		case "/token":
+		case "/oauth2/token":
 			if err := r.ParseForm(); err != nil {
 				t.Error(err)
 				return
@@ -67,9 +69,16 @@ func TestOIDCExchangeAndRefresh(t *testing.T) {
 				mutate(claims)
 			}
 			raw := signClaims(t, signer, claims)
-			writeJSON(t, w, map[string]any{
-				"access_token": "access", "refresh_token": "refresh-one", "token_type": "Bearer", "expires_in": 60, "id_token": raw,
-			})
+			response := map[string]any{
+				"access_token":  "access",
+				"refresh_token": "refresh-one",
+				"token_type":    "Bearer",
+				"expires_in":    60,
+			}
+			if r.Form.Get("grant_type") != "refresh_token" || !omitRefreshIDToken {
+				response["id_token"] = raw
+			}
+			writeJSON(t, w, response)
 		default:
 			http.NotFound(w, r)
 		}
@@ -85,8 +94,14 @@ func TestOIDCExchangeAndRefresh(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if authorization.Query().Get("code_challenge_method") != "S256" || authorization.Query().Get("state") != "state" || authorization.Query().Get("nonce") != "nonce" {
-		t.Fatal("authorization request is missing state, nonce or PKCE")
+	if authorization.Path != "/oauth2/auth" {
+		t.Fatalf("authorization path = %q, want /oauth2/auth", authorization.Path)
+	}
+	if authorization.Query().Get("code_challenge_method") != "S256" ||
+		authorization.Query().Get("state") != "state" ||
+		authorization.Query().Get("nonce") != "nonce" ||
+		!strings.Contains(authorization.Query().Get("scope"), "offline") {
+		t.Fatal("authorization request is missing state, nonce, offline scope or PKCE")
 	}
 	identity, tokens, err := client.Exchange(t.Context(), "code", "verifier", "nonce")
 	if err != nil {
@@ -95,13 +110,24 @@ func TestOIDCExchangeAndRefresh(t *testing.T) {
 	if identity.Subject != "subject-one" {
 		t.Fatal("wrong identity")
 	}
-	if _, err := client.Refresh(t.Context(), tokens, identity.Subject, identity.SessionID); err != nil {
+	if _, err := client.Refresh(t.Context(), tokens, identity.Subject); err != nil {
 		t.Fatal(err)
 	}
 	if refreshCount != 1 {
 		t.Fatal("refresh did not exchange tokens")
 	}
-	if _, err := client.Refresh(t.Context(), tokens, "another-subject", identity.SessionID); err == nil {
+
+	// Kinde may omit an ID token when refreshing an existing session.
+	omitRefreshIDToken = true
+	refreshed, err := client.Refresh(t.Context(), tokens, identity.Subject)
+	if err != nil {
+		t.Fatalf("refresh without ID token: %v", err)
+	}
+	if refreshed.IDToken != tokens.IDToken || refreshed.Nonce != tokens.Nonce {
+		t.Fatal("refresh lost the previously verified ID token or nonce")
+	}
+	omitRefreshIDToken = false
+	if _, err := client.Refresh(t.Context(), tokens, "another-subject"); err == nil {
 		t.Fatal("accepted changed subject")
 	}
 	if _, _, err := client.Exchange(t.Context(), "code", "verifier", "wrong-nonce"); err == nil {
@@ -116,7 +142,6 @@ func TestOIDCExchangeAndRefresh(t *testing.T) {
 		{"expired", func(c map[string]any) { c["exp"] = time.Now().Add(-time.Minute).Unix() }},
 		{"unverified", func(c map[string]any) { c["email_verified"] = false }},
 		{"subject", func(c map[string]any) { c["sub"] = "" }},
-		{"session", func(c map[string]any) { delete(c, "sid") }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			mutate = test.mutate
@@ -125,18 +150,18 @@ func TestOIDCExchangeAndRefresh(t *testing.T) {
 			}
 		})
 	}
+	// Kinde does not guarantee a Keycloak-style sid claim.
+	mutate = func(claims map[string]any) {
+		delete(claims, "sid")
+	}
+	withoutSID, _, err := client.Exchange(t.Context(), "code", "verifier", "nonce")
+	if err != nil || withoutSID.Subject != "subject-one" || withoutSID.SessionID != "" {
+		t.Fatalf("exchange without sid: identity=%+v, err=%v", withoutSID, err)
+	}
 	mutate = nil
-	logoutClaims := map[string]any{
-		"iss": issuer, "aud": "console", "sub": "subject-one", "sid": "session-one", "jti": "logout-one",
-		"iat": time.Now().Unix(), "exp": time.Now().Add(time.Minute).Unix(),
-		"events": map[string]any{"http://schemas.openid.net/event/backchannel-logout": map[string]any{}},
-	}
-	if _, err := client.VerifyLogout(t.Context(), signClaims(t, signer, logoutClaims)); err != nil {
-		t.Fatal(err)
-	}
-	logoutClaims["nonce"] = "not-allowed"
-	if _, err := client.VerifyLogout(t.Context(), signClaims(t, signer, logoutClaims)); err == nil {
-		t.Fatal("accepted logout with nonce")
+
+	if got := client.LogoutURL("https://console.example.com/log-in"); !strings.Contains(got, "/logout?redirect=") {
+		t.Fatal("Kinde logout redirect is not formed")
 	}
 }
 

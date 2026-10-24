@@ -29,7 +29,6 @@ export TURN_AUTH_SECRET="${TURN_AUTH_SECRET:-byoc-v1-turn-secret-0123456789abcde
 export TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP:-127.0.0.1}"
 export TURN_PUBLIC_URLS="${TURN_PUBLIC_URLS:-turn:127.0.0.1:3478}"
 export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
-. "$REPO_ROOT/tests/acceptance-identity.sh"
 
 # Generate an isolated application env file; never require or overwrite server/.env.
 APP_ENV_FILE=$(mktemp)
@@ -43,7 +42,7 @@ cleanup() {
     trap - EXIT INT TERM
     if [ "$status" -ne 0 ]; then
         (cd "$REPO_ROOT" && $COMPOSE ps -a) || true
-        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=300 keycloak keycloak-postgres server worker opensips freeswitch rtpengine byoc-v1-carrier postgres migrate) || true
+        (cd "$REPO_ROOT" && $COMPOSE logs --no-color --tail=300 server worker opensips freeswitch rtpengine byoc-v1-carrier postgres migrate) || true
     fi
     if [ "${BYOC_V1_KEEP_STACK:-0}" != "1" ]; then
         (cd "$REPO_ROOT" && $COMPOSE down -v --remove-orphans) >/dev/null 2>&1 || true

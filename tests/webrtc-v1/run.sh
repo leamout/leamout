@@ -29,7 +29,6 @@ export RTPENGINE_PUBLIC_IP="${RTPENGINE_PUBLIC_IP:-172.31.0.10}"
 export LEAMOUT_API_URL="${LEAMOUT_API_URL:-http://127.0.0.1:8080}"
 export LEAMOUT_API_TOKEN="${LEAMOUT_API_TOKEN:-lm_org_v1smoke0_v1smoke0abcdefghijklmnopqrstuvwx}"
 
-. "$REPO_ROOT/tests/acceptance-identity.sh"
 
 # Generate an isolated application env file; never require or overwrite server/.env.
 APP_ENV_FILE=$(mktemp)
@@ -49,7 +48,7 @@ cleanup() {
         (
             cd "$REPO_ROOT" &&
                 $COMPOSE logs --no-color --tail=300 \
-                    keycloak keycloak-postgres server opensips rtpengine freeswitch coturn postgres redis nats
+                    server opensips rtpengine freeswitch coturn postgres redis nats
         ) || true
     fi
 

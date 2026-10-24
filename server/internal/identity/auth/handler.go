@@ -2,14 +2,13 @@ package auth
 
 import (
 	"crypto/subtle"
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/leamout/leamout/server/internal/database/pgconv"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/internal/identity/session"
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 	"github.com/leamout/leamout/server/internal/security/authn"
 	"github.com/leamout/leamout/server/internal/security/encryption"
 	"github.com/leamout/leamout/server/internal/security/token"
@@ -23,13 +22,13 @@ const stateCookie = "leamout-oidc-state"
 type Handler struct {
 	queries     *sqlc.Queries
 	sessions    *session.Service
-	client      *keycloak.Client
+	client      *kinde.Client
 	cipher      *encryption.Cipher
 	frontendURL string
 	development bool
 }
 
-func NewHandler(queries *sqlc.Queries, sessions *session.Service, client *keycloak.Client, cipher *encryption.Cipher, frontendURL string, development bool) *Handler {
+func NewHandler(queries *sqlc.Queries, sessions *session.Service, client *kinde.Client, cipher *encryption.Cipher, frontendURL string, development bool) *Handler {
 	return &Handler{
 		queries:     queries,
 		sessions:    sessions,
@@ -108,7 +107,15 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		h.failed(w)
 		return
 	}
-	value, created, err := h.sessions.Create(r.Context(), user.ID, identity.Subject, identity.SessionID, tokens)
+	identitySessionID := identity.SessionID
+	if identitySessionID == "" {
+		identitySessionID, err = token.Generate(32)
+		if err != nil {
+			h.failed(w)
+			return
+		}
+	}
+	value, created, err := h.sessions.Create(r.Context(), user.ID, identity.Subject, identitySessionID, tokens)
 	if err != nil {
 		h.failed(w)
 		return
@@ -118,29 +125,36 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	idToken := ""
+	if err := h.revokeBrowserSession(w, r); err != nil {
+		h.failed(w)
+		return
+	}
+	httputil.OK(w, map[string]string{"logout_url": h.client.LogoutURL(h.frontendURL + "/log-in")})
+}
+
+// BackofficeLogout signs out the operator locally and at Kinde, using a browser redirect.
+func (h *Handler) BackofficeLogout(w http.ResponseWriter, r *http.Request) {
+	if err := h.revokeBrowserSession(w, r); err != nil {
+		h.failed(w)
+		return
+	}
+	http.Redirect(w, r, h.client.LogoutURL(h.frontendURL+"/log-in"), http.StatusSeeOther)
+}
+
+func (h *Handler) revokeBrowserSession(w http.ResponseWriter, r *http.Request) error {
 	if cookie, err := r.Cookie(authn.SessionCookieName); err == nil {
-		stored, err := h.sessions.Get(r.Context(), cookie.Value)
-		if err == nil {
-			clear, err := h.cipher.DecryptForScope("identity-session:"+stored.UserID.String(), stored.TokensCiphertext)
-			if err == nil {
-				var tokens keycloak.Tokens
-				if json.Unmarshal([]byte(clear), &tokens) == nil {
-					idToken = tokens.IDToken
-				}
-			}
+		if stored, err := h.sessions.Get(r.Context(), cookie.Value); err == nil {
 			if err := h.sessions.Revoke(r.Context(), stored.ID, stored.UserID); err != nil {
-				h.failed(w)
-				return
+				return err
 			}
 		}
 	}
 	session.ClearCookie(w, h.development, "")
-	httputil.OK(w, map[string]string{"logout_url": h.client.LogoutURL(idToken, h.frontendURL+"/log-in")})
+	return nil
 }
 
 func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, h.client.Issuer()+"/account/", http.StatusFound)
+	http.Redirect(w, r, h.frontendURL+"/settings/profile", http.StatusSeeOther)
 }
 
 func (h *Handler) setStateCookie(w http.ResponseWriter, value string, maxAge int) {
@@ -149,29 +163,4 @@ func (h *Handler) setStateCookie(w http.ResponseWriter, value string, maxAge int
 
 func (h *Handler) failed(w http.ResponseWriter) {
 	httputil.Error(w, apperror.NewUnauthorized("sign-in could not be completed; return to Leamout and try again"))
-}
-
-func (h *Handler) BackchannelLogout(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
-	if err := r.ParseForm(); err != nil {
-		h.failed(w)
-		return
-	}
-	event, err := h.client.VerifyLogout(r.Context(), r.PostForm.Get("logout_token"))
-	if err != nil {
-		h.failed(w)
-		return
-	}
-	if err := h.queries.DeleteExpiredOIDCLogoutEvents(r.Context()); err != nil {
-		h.failed(w)
-		return
-	}
-	if err := h.queries.ApplyOIDCLogout(r.Context(), sqlc.ApplyOIDCLogoutParams{
-		TokenID: event.TokenID, ExpiresAt: pgconv.NullableTimestamptz(&event.Expiry),
-		Issuer: event.Issuer, Subject: event.Subject, SessionID: event.SessionID,
-	}); err != nil {
-		h.failed(w)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
 }

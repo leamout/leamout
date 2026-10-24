@@ -14,7 +14,7 @@ import (
 	"github.com/leamout/leamout/server/internal/identity"
 	"github.com/leamout/leamout/server/internal/integrations/coturn"
 	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
-	"github.com/leamout/leamout/server/internal/integrations/keycloak"
+	"github.com/leamout/leamout/server/internal/integrations/kinde"
 	"github.com/leamout/leamout/server/internal/integrations/payments/polar"
 	"github.com/leamout/leamout/server/internal/integrations/postgres"
 	redisintegration "github.com/leamout/leamout/server/internal/integrations/redis"
@@ -106,12 +106,12 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	}
 
 	queries := sqlc.New(postgresClient.Pool())
-	keycloakClient, err := keycloak.New(ctx, cfg.Keycloak, cfg.FrontendURL+"/api/v1/auth/callback", cfg.IsDevelopment())
+	kindeClient, err := kinde.New(ctx, cfg.Kinde, cfg.FrontendURL+"/api/v1/auth/callback", cfg.IsDevelopment())
 	if err != nil {
 		closeDependencies()
-		return nil, fmt.Errorf("initialize Keycloak: %w", err)
+		return nil, fmt.Errorf("initialize Kinde: %w", err)
 	}
-	identityModule := identity.New(queries, cfg.IsDevelopment(), postgresClient.Pool(), keycloakClient, credentialCipher, cfg.FrontendURL)
+	identityModule := identity.New(queries, cfg.IsDevelopment(), postgresClient.Pool(), kindeClient, credentialCipher, cfg.FrontendURL)
 	tenancyModule := tenancy.New(queries)
 	invitationURL := cfg.FrontendURL + "/invitations/accept"
 	tenancyModule.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher), invitationURL)

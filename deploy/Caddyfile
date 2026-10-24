@@ -32,19 +32,6 @@ api.{$DOMAIN} {
     }
 }
 
-auth.{$DOMAIN} {
-    reverse_proxy keycloak:8080 {
-        header_up X-Forwarded-Port 443
-    }
-
-    header {
-        -Server
-        X-Content-Type-Options "nosniff"
-        Referrer-Policy "no-referrer"
-        Strict-Transport-Security "max-age=31536000"
-    }
-}
-
 backoffice.{$DOMAIN} {
     reverse_proxy backoffice:8082
 

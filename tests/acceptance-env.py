@@ -2,9 +2,6 @@
 
 import os
 from pathlib import Path
-import re
-import shutil
-import subprocess
 import sys
 
 values = {
@@ -13,9 +10,9 @@ values = {
     "FRONTEND_URL": "https://console.acceptance.invalid",
     "BACKEND_URL": "http://server:8080",
     "BACKOFFICE_URL": "https://backoffice.acceptance.invalid",
-    "KEYCLOAK_ISSUER": "https://keycloak:8443/realms/leamout",
-    "KEYCLOAK_CLIENT_ID": "leamout-console",
-    "KEYCLOAK_CLIENT_SECRET": "acceptance-keycloak-client-not-live",
+    "KINDE_ISSUER": "https://acceptance.kinde.com",
+    "KINDE_CLIENT_ID": "acceptance-kinde-client-not-live",
+    "KINDE_CLIENT_SECRET": "acceptance-kinde-client-secret-not-live",
     "DATABASE_URL": (
         "postgres://leamout:"
         + os.environ["POSTGRES_PASSWORD"]
@@ -40,17 +37,6 @@ for key in (
 ):
     values[key] = os.environ[key]
 
-# Realm imports resolve placeholders from this generated container environment.
-realm_path = Path(__file__).resolve().parents[1] / "deploy/keycloak/leamout-realm.json"
-required_variables = set(
-    re.findall(
-        r"\$\{([A-Z_][A-Z0-9_]*)\}", realm_path.read_text(encoding="utf-8")
-    )
-)
-missing_variables = sorted(key for key in required_variables if not values.get(key))
-if missing_variables:
-    raise SystemExit("Missing Keycloak realm variables: " + ", ".join(missing_variables))
-
 lines = []
 for key, value in values.items():
     if "\n" in value or "\r" in value:
@@ -60,22 +46,3 @@ for key, value in values.items():
 
 Path(sys.argv[1]).write_text("".join(lines), encoding="utf-8")
 
-# Keep production HTTPS and issuer validation enabled for acceptance tests.
-identity_dir = Path(sys.argv[1] + ".identity")
-trust_dir = identity_dir / "trust"
-trust_dir.mkdir(parents=True, exist_ok=True)
-subprocess.run(
-    [
-        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-        "-days", "1", "-subj", "/CN=keycloak",
-        "-addext", "subjectAltName=DNS:keycloak",
-        "-keyout", str(identity_dir / "key.pem"),
-        "-out", str(identity_dir / "certificate.pem"),
-    ],
-    check=True,
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL,
-)
-# Keycloak runs as a non-root container user. This is a disposable test key.
-(identity_dir / "key.pem").chmod(0o644)
-shutil.copyfile(identity_dir / "certificate.pem", trust_dir / "keycloak.pem")

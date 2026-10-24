@@ -2,7 +2,6 @@
 """Static production-deployment invariants (no live infrastructure required)."""
 
 from pathlib import Path
-import json
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -26,31 +25,22 @@ def main():
     assert app["FRONTEND_URL"] == f"https://console.{domain}"
     assert app["BACKEND_URL"] == f"https://api.{domain}"
     assert app["BACKOFFICE_URL"] == f"https://backoffice.{domain}"
-    assert app["KEYCLOAK_ISSUER"] == f"https://auth.{domain}/realms/leamout"
+    assert app["KINDE_ISSUER"].startswith("https://")
+    assert app["KINDE_ISSUER"].endswith(".kinde.com")
+    assert bool(app["KINDE_CLIENT_ID"])
+    assert bool(app["KINDE_CLIENT_SECRET"])
     assert app["FRONTEND_URL"] in app["CORS_ORIGINS"].split(",")
     assert app["FRONTEND_URL"] != app["BACKEND_URL"]
     assert app["TRUSTED_PROXY_CIDRS"] == "172.33.0.10/32"
 
-    realm = json.loads(
-        (ROOT / "deploy/keycloak/leamout-realm.json").read_text(encoding="utf-8")
-    )
-    client, = [item for item in realm["clients"] if item["clientId"] == "leamout-console"]
-    assert client["redirectUris"] == [
-        "${FRONTEND_URL}/api/v1/auth/callback",
-        "${BACKOFFICE_URL}/auth/callback",
-    ]
-    assert client["webOrigins"] == ["${FRONTEND_URL}"]
-    assert client["attributes"]["backchannel.logout.url"] == (
-        "${BACKEND_URL}/v1/identity/backchannel-logout"
-    )
-    assert client["attributes"]["pkce.code.challenge.method"] == "S256"
-
     compose = (ROOT / "deploy/compose/docker.yaml").read_text(encoding="utf-8")
-    assert "KC_HOSTNAME: https://auth.${DOMAIN:-leamout.com}" in compose
+    assert "KINDE_ISSUER:" in compose
+    assert "keycloak:" not in compose
+    assert "keycloak-postgres:" not in compose
     assert 'http://127.0.0.1:8081/readyz' in compose
     assert "172.32.0.0/24" in compose
     assert "172.33.0.0/24" in compose
-    assert "KC_PROXY_TRUSTED_ADDRESSES: 172.33.0.10/32" in compose
+    assert "\n  identity:\n" not in compose
     assert "env_file:" not in compose, "services must use explicit environment allowlists"
 
     caddy = (ROOT / "deploy/Caddyfile").read_text(encoding="utf-8")
@@ -66,7 +56,7 @@ def main():
     ).read_text(encoding="utf-8")
     assert "server:8080" in target
     assert "media:8090" in target
-    print("PASS deployment origins, Keycloak, worker health and metrics boundary")
+    print("PASS deployment origins, Kinde, worker health and metrics boundary")
 
 
 if __name__ == "__main__":

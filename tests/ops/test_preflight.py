@@ -20,8 +20,6 @@ def valid_settings():
         "PUBLIC_IP": "8.8.8.8",
         "TURN_REALM": f"turn.{DOMAIN}",
         "POSTGRES_PASSWORD": POSTGRES_PASSWORD,
-        "KEYCLOAK_DB_PASSWORD": STRONG,
-        "KEYCLOAK_ADMIN_PASSWORD": STRONG,
     }
     app = {
         "APP_ENV": "production",
@@ -29,7 +27,8 @@ def valid_settings():
         "FRONTEND_URL": f"https://console.{DOMAIN}",
         "BACKEND_URL": f"https://api.{DOMAIN}",
         "BACKOFFICE_URL": f"https://backoffice.{DOMAIN}",
-        "KEYCLOAK_ISSUER": f"https://auth.{DOMAIN}/realms/leamout",
+        "KINDE_ISSUER": "https://example.kinde.com",
+        "KINDE_CLIENT_ID": STRONG,
         "CORS_ORIGINS": f"https://console.{DOMAIN}",
         "TRUSTED_PROXY_CIDRS": "172.33.0.10/32",
         "TURN_PUBLIC_URLS": f"stun:turn.{DOMAIN}:3478,turn:turn.{DOMAIN}:3478?transport=udp",
@@ -37,7 +36,7 @@ def valid_settings():
         "MEDIA_CONTROL_TOKEN": STRONG,
         "MEDIA_TOKEN_SECRET": STRONG,
         "TURN_AUTH_SECRET": STRONG,
-        "KEYCLOAK_CLIENT_SECRET": STRONG,
+        "KINDE_CLIENT_SECRET": STRONG,
         "ENCRYPTION_KEY": ENCRYPTION_KEY,
         "DATABASE_URL": f"postgres://leamout:{POSTGRES_PASSWORD}@postgres:5432/leamout?sslmode=disable",
         "POLAR_ACCESS_TOKEN": "",
