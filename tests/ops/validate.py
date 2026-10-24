@@ -29,6 +29,9 @@ def main():
     assert app["KINDE_ISSUER"].endswith(".kinde.com")
     assert bool(app["KINDE_CLIENT_ID"])
     assert bool(app["KINDE_CLIENT_SECRET"])
+    assert app["BACKOFFICE_KINDE_ISSUER"] == app["KINDE_ISSUER"]
+    assert app["BACKOFFICE_KINDE_CLIENT_ID"] != app["KINDE_CLIENT_ID"]
+    assert bool(app["BACKOFFICE_KINDE_CLIENT_SECRET"])
     assert app["FRONTEND_URL"] in app["CORS_ORIGINS"].split(",")
     assert app["FRONTEND_URL"] != app["BACKEND_URL"]
     assert app["TRUSTED_PROXY_CIDRS"] == "172.33.0.10/32"

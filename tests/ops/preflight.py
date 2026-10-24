@@ -22,6 +22,7 @@ REQUIRED_SECRETS = {
     "MEDIA_TOKEN_SECRET": 32,
     "TURN_AUTH_SECRET": 32,
     "KINDE_CLIENT_SECRET": 16,
+    "BACKOFFICE_KINDE_CLIENT_SECRET": 16,
 }
 
 
@@ -99,6 +100,12 @@ def validate(infra: dict[str, str], app: dict[str, str]) -> list[str]:
     except ValueError:
         errors.append("KINDE_ISSUER must be an HTTPS Kinde tenant origin")
     check(bool(app.get("KINDE_CLIENT_ID", "").strip()), "KINDE_CLIENT_ID is required")
+
+    check(app.get("BACKOFFICE_KINDE_ISSUER") == issuer,
+          "BACKOFFICE_KINDE_ISSUER must match the console Kinde tenant")
+    check(bool(app.get("BACKOFFICE_KINDE_CLIENT_ID", "").strip()) and
+          app.get("BACKOFFICE_KINDE_CLIENT_ID") != app.get("KINDE_CLIENT_ID"),
+          "BACKOFFICE_KINDE_CLIENT_ID must be a separate OAuth application")
 
     origins = [
         origin.strip()

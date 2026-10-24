@@ -52,8 +52,8 @@ func TestValidateForBackofficeNeedsOnlyAdminDependencies(t *testing.T) {
 	cfg := Config{
 		DatabaseURL:   "postgres://db",
 		EncryptionKey: "encryption-key",
-		Kinde: kinde.Config{
-			ClientSecret: "oidc-secret",
+		BackofficeKinde: kinde.Config{
+			Issuer: "https://example.kinde.com", ClientID: "backoffice-client", ClientSecret: "oidc-secret",
 		},
 	}
 
@@ -61,7 +61,7 @@ func TestValidateForBackofficeNeedsOnlyAdminDependencies(t *testing.T) {
 		t.Fatalf("backoffice should not require telephony, cache or event credentials: %v", err)
 	}
 
-	cfg.Kinde.ClientSecret = ""
+	cfg.BackofficeKinde.ClientSecret = ""
 	if err := cfg.ValidateForBackoffice(); err == nil {
 		t.Fatal("backoffice must reject missing OIDC secret")
 	}

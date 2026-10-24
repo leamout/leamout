@@ -46,7 +46,9 @@ func (c Config) ValidateForBackoffice() error {
 	return requireSettings(map[string]string{
 		"DATABASE_URL":        c.DatabaseURL,
 		"ENCRYPTION_KEY":      c.EncryptionKey,
-		"KINDE_CLIENT_SECRET": c.Kinde.ClientSecret,
+		"BACKOFFICE_KINDE_ISSUER":        c.BackofficeKinde.Issuer,
+		"BACKOFFICE_KINDE_CLIENT_ID":     c.BackofficeKinde.ClientID,
+		"BACKOFFICE_KINDE_CLIENT_SECRET": c.BackofficeKinde.ClientSecret,
 	})
 }
 
@@ -60,6 +62,9 @@ func requireSettings(values map[string]string) error {
 		"ENCRYPTION_KEY",
 		"TURN_AUTH_SECRET",
 		"KINDE_CLIENT_SECRET",
+		"BACKOFFICE_KINDE_ISSUER",
+		"BACKOFFICE_KINDE_CLIENT_ID",
+		"BACKOFFICE_KINDE_CLIENT_SECRET",
 	} {
 		if value, ok := values[key]; ok && strings.TrimSpace(value) == "" {
 			return fmt.Errorf("%s is required", key)
