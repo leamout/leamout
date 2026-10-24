@@ -72,12 +72,10 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		postgresClient.Close()
 		return nil, fmt.Errorf("initialize FreeSWITCH: %w", err)
 	}
-	if err := freeSwitch.Connect(ctx); err != nil {
-		_ = freeSwitch.Close()
-		_ = redisClient.Close()
-		postgresClient.Close()
-		return nil, fmt.Errorf("connect FreeSWITCH: %w", err)
-	}
+	// FreeSWITCH is a telephony dependency, not a prerequisite for the
+	// control-plane API. The client reconnects with backoff in the background.
+	// Call operations fail closed until the telephony connection is ready.
+	freeSwitch.StartReconnect()
 
 	closeDependencies := func() {
 		_ = freeSwitch.Close()
