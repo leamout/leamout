@@ -70,10 +70,10 @@ func TestKindeExchangeAndRefresh(t *testing.T) {
 			}
 			raw := signClaims(t, signer, claims)
 			response := map[string]any{
-				"access_token": "access",
+				"access_token":  "access",
 				"refresh_token": "refresh-one",
-				"token_type":   "Bearer",
-				"expires_in":   60,
+				"token_type":    "Bearer",
+				"expires_in":    60,
 			}
 			if r.Form.Get("grant_type") != "refresh_token" || !omitRefreshIDToken {
 				response["id_token"] = raw
