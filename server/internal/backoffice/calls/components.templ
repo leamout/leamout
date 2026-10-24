@@ -1,0 +1,109 @@
+package calls
+
+templ Filters(filter Filter) {
+	<form method="get" action="/calls" class="mb-6 flex flex-wrap items-end gap-4">
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Call ID, SIP Call-ID or participant</span>
+			<input class="input input-bordered" type="search" name="q" value={ filter.Search } maxlength="200"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">State</span>
+			<select class="select select-bordered" name="state">
+				<option value="" selected?={ filter.State == "" }>All</option>
+				<option value="initiating" selected?={ filter.State == "initiating" }>Initiating</option>
+				<option value="ringing" selected?={ filter.State == "ringing" }>Ringing</option>
+				<option value="answered" selected?={ filter.State == "answered" }>Answered</option>
+				<option value="active" selected?={ filter.State == "active" }>Active</option>
+				<option value="completed" selected?={ filter.State == "completed" }>Completed</option>
+				<option value="failed" selected?={ filter.State == "failed" }>Failed</option>
+				<option value="cancelled" selected?={ filter.State == "cancelled" }>Cancelled</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Direction</span>
+			<select class="select select-bordered" name="direction">
+				<option value="" selected?={ filter.Direction == "" }>All</option>
+				<option value="inbound" selected?={ filter.Direction == "inbound" }>Inbound</option>
+				<option value="outbound" selected?={ filter.Direction == "outbound" }>Outbound</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Agent ID</span>
+			<input class="input input-bordered" type="text" name="agent_id" value={ filter.AgentID }/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Created from (UTC)</span>
+			<input class="input input-bordered" type="date" name="from" value={ filter.From }/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Created through (UTC)</span>
+			<input class="input input-bordered" type="date" name="to" value={ filter.To }/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Organization ID</span>
+			<input class="input input-bordered" type="text" name="organization_id" value={ filter.OrganizationID }/>
+		</label>
+		<button class="btn btn-primary" type="submit">Search</button>
+		<a class="btn btn-ghost" href="/calls">Clear</a>
+	</form>
+}
+
+templ CallTable(rows []Call) {
+	if len(rows) == 0 {
+		<div class="alert" role="status">No calls match these filters.</div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Call</th>
+						<th scope="col">Organization</th>
+						<th scope="col">Agent</th>
+						<th scope="col">Direction</th>
+						<th scope="col">State</th>
+						<th scope="col">Created</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range rows {
+						<tr>
+							<td>
+								<a class="link link-primary font-mono text-xs" href={ templ.SafeURL("/calls/" + row.ID.String()) }>{ row.ID.String() }</a>
+								<div class="mt-1 break-all text-xs">{ row.FromURI } → { row.ToURI }</div>
+							</td>
+							<td>
+								<a class="link link-primary" href={ templ.SafeURL("/organizations/" + row.OrganizationID.String()) }>{ row.OrganizationName }</a>
+								<div class="mt-1 text-xs text-base-content/60">{ row.OrganizationStatus }</div>
+							</td>
+							<td>
+								if row.VoiceAgentID != nil {
+									<a class="link link-primary" href={ templ.SafeURL("/agents/" + row.VoiceAgentID.String()) }>{ row.AgentName }</a>
+								} else {
+									—
+								}
+							</td>
+							<td>{ row.Direction }</td>
+							<td>
+								<span class="badge badge-outline">{ row.State }</span>
+							</td>
+							<td>{ row.CreatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ Field(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}

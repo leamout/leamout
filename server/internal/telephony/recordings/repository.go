@@ -146,7 +146,7 @@ func (r *Repository) GetCallOrganizationID(
 	if err != nil {
 		return uuid.Nil, err
 	}
-	return uuid.Parse(row.OrganizationID)
+	return row.OrganizationID, nil
 }
 
 func (r *Repository) List(

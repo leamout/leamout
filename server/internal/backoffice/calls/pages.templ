@@ -1,0 +1,97 @@
+package calls
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/server/internal/backoffice/components"
+)
+
+templ Page(result List) {
+	@components.Layout("Calls", "calls", ListContent(result))
+}
+
+templ ListContent(result List) {
+	<div class="mb-8">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Runtime</p>
+		<h1 class="mt-2 text-3xl font-bold">Calls</h1>
+		<p class="mt-2 text-base-content/70">Inspect call lifecycle and agent-session diagnostics across Leamout.</p>
+	</div>
+	@Filters(result.Filter)
+	@CallTable(result.Calls)
+	<nav class="mt-6 flex items-center justify-between" aria-label="Pagination">
+		<span class="text-sm text-base-content/60">Page { fmt.Sprint(result.Filter.Page) }</span>
+		<div class="flex gap-2">
+			if result.Filter.Page > 1 {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page-1)) }>Previous</a>
+			}
+			if result.HasNext {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page+1)) }>Next</a>
+			}
+		</div>
+	</nav>
+}
+
+templ DetailPage(detail Detail) {
+	@components.Layout("Call "+detail.ID.String(), "calls", DetailContent(detail))
+}
+
+templ DetailContent(detail Detail) {
+	<a class="link link-primary text-sm" href="/calls">Back to calls</a>
+	<h1 class="mt-6 text-3xl font-bold">Call details</h1>
+	<p class="mt-2 break-all font-mono text-sm text-base-content/60">{ detail.ID.String() }</p>
+	<a class="link link-primary mt-4 inline-block" href={ templ.SafeURL("/organizations/" + detail.OrganizationID.String()) }>{ detail.OrganizationName }</a>
+	if detail.VoiceAgentID != nil {
+		<div class="mt-2">
+			<a class="link link-primary" href={ templ.SafeURL("/agents/" + detail.VoiceAgentID.String()) }>{ detail.AgentName }</a>
+		</div>
+	}
+	<div class="mt-8 grid gap-6 lg:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Call</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Direction", detail.Direction)
+				@Field("State", detail.State)
+				@Field("Media state", detail.MediaState)
+				@Field("From", detail.FromURI)
+				@Field("To", detail.ToURI)
+				@Field("SIP Call-ID", detail.SIPCallID)
+				@Field("Hangup reason", detail.HangupReason)
+				@Field("Answered duration", detail.Duration)
+				@Field("Organization status", detail.OrganizationStatus)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Timeline and routing</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Created", detail.CreatedAt)
+				@Field("Started", detail.StartedAt)
+				@Field("Answered", detail.AnsweredAt)
+				@Field("Ended", detail.EndedAt)
+				@Field("Updated", detail.UpdatedAt)
+				@Field("Trunk ID", detail.TrunkID)
+				@Field("Trunk endpoint ID", detail.TrunkEndpointID)
+			</dl>
+		</section>
+	</div>
+	<section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
+		<h2 class="text-lg font-semibold">Latest agent session</h2>
+		if detail.Session == nil {
+			<p class="mt-4 text-base-content/60">No agent session has been recorded for this call.</p>
+		} else {
+			<a class="link link-primary mt-4 inline-block" href={ templ.SafeURL("/agents/" + detail.Session.VoiceAgentID.String()) }>View session agent</a>
+			<dl class="mt-4 grid gap-4 md:grid-cols-2">
+				@Field("Session ID", detail.Session.ID.String())
+				@Field("State", detail.Session.State)
+				@Field("First response latency", detail.Session.FirstResponseLatency)
+				@Field("Average turn latency", detail.Session.AverageTurnLatency)
+				@Field("Started", detail.Session.StartedAt)
+				@Field("Ended", detail.Session.EndedAt)
+				@Field("Media started", detail.Session.MediaStartedAt)
+				@Field("Media ended", detail.Session.MediaEndedAt)
+				@Field("Configuration revision", fmt.Sprint(detail.Session.ConfigurationRevision))
+				@Field("Turns", fmt.Sprint(detail.Session.TurnCount))
+				@Field("Interruptions", fmt.Sprint(detail.Session.InterruptionCount))
+			</dl>
+		}
+	</section>
+}

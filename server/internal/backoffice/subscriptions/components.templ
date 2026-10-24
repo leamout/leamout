@@ -1,0 +1,101 @@
+package subscriptions
+
+templ Filters(filter Filter) {
+	<form method="get" action="/subscriptions" class="mb-6 flex flex-wrap items-end gap-4">
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Organization name, subscription ID or provider subscription ID</span>
+			<input class="input input-bordered" type="search" name="q" value={ filter.Search } maxlength="200"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Recorded status</span>
+			<select class="select select-bordered" name="status">
+				<option value="" selected?={ filter.Status == "" }>All</option>
+				<option value="trialing" selected?={ filter.Status == "trialing" }>Trialing</option>
+				<option value="active" selected?={ filter.Status == "active" }>Active</option>
+				<option value="past_due" selected?={ filter.Status == "past_due" }>Past Due</option>
+				<option value="canceled" selected?={ filter.Status == "canceled" }>Canceled</option>
+				<option value="incomplete" selected?={ filter.Status == "incomplete" }>Incomplete</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Plan code</span>
+			<input class="input input-bordered" type="text" name="plan" value={ filter.Plan } maxlength="64"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Cancel at period end</span>
+			<select class="select select-bordered" name="cancellation">
+				<option value="" selected?={ filter.Cancellation == "" }>All</option>
+				<option value="scheduled" selected?={ filter.Cancellation == "scheduled" }>Scheduled</option>
+				<option value="not_scheduled" selected?={ filter.Cancellation == "not_scheduled" }>Not scheduled</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Organization ID</span>
+			<input class="input input-bordered" type="text" name="organization_id" value={ filter.OrganizationID }/>
+		</label>
+		<button class="btn btn-primary" type="submit">Search</button>
+		<a class="btn btn-ghost" href="/subscriptions">Clear</a>
+	</form>
+}
+
+templ SubscriptionTable(rows []Subscription) {
+	if len(rows) == 0 {
+		<div class="alert" role="status">No subscriptions match these filters.</div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Subscription</th>
+						<th scope="col">Organization</th>
+						<th scope="col">Plan</th>
+						<th scope="col">Recorded status</th>
+						<th scope="col">Period ends</th>
+						<th scope="col">Cancellation</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range rows {
+						<tr>
+							<td>
+								<a class="link link-primary font-mono text-xs" href={ templ.SafeURL("/subscriptions/" + row.ID.String()) }>{ row.ID.String() }</a>
+							</td>
+							<td>
+								<a class="link link-primary" href={ templ.SafeURL("/organizations/" + row.OrganizationID.String()) }>{ row.OrganizationName }</a>
+								<div class="mt-1 text-xs text-base-content/60">{ row.OrganizationStatus }</div>
+							</td>
+							<td>
+								{ row.PlanName }
+								<div class="mt-1 text-xs text-base-content/60">{ row.PlanCode }</div>
+							</td>
+							<td>
+								<span class="badge badge-outline">{ row.Status }</span>
+							</td>
+							<td>{ row.PeriodEnd }</td>
+							<td>
+								if row.CancelAtPeriodEnd {
+									Scheduled
+								} else {
+									—
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ Field(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}

@@ -12,6 +12,88 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getBackofficeSubscription = `-- name: GetBackofficeSubscription :one
+SELECT
+    s.id,
+    s.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    s.plan_id,
+    p.name AS plan_name,
+    p.code AS plan_code,
+    s.status,
+    s.current_period_end,
+    s.cancel_at_period_end,
+    s.created_at,
+    s.current_period_start,
+    s.trial_ends_at,
+    s.past_due_at,
+    s.grace_ends_at,
+    s.canceled_at,
+    s.updated_at,
+    s.provider_event_created_at,
+    COALESCE(s.provider, '')::text AS provider,
+    COALESCE(s.provider_customer_id, '')::text AS provider_customer_id,
+    COALESCE(s.provider_subscription_id, '')::text AS provider_subscription_id
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+JOIN plans AS p ON p.id = s.plan_id
+WHERE s.id = $1
+`
+
+type GetBackofficeSubscriptionRow struct {
+	ID                     uuid.UUID          `db:"id" json:"id"`
+	OrganizationID         uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationName       string             `db:"organization_name" json:"organization_name"`
+	OrganizationStatus     string             `db:"organization_status" json:"organization_status"`
+	PlanID                 uuid.UUID          `db:"plan_id" json:"plan_id"`
+	PlanName               string             `db:"plan_name" json:"plan_name"`
+	PlanCode               string             `db:"plan_code" json:"plan_code"`
+	Status                 string             `db:"status" json:"status"`
+	CurrentPeriodEnd       pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	CancelAtPeriodEnd      bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
+	CreatedAt              pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	CurrentPeriodStart     pgtype.Timestamptz `db:"current_period_start" json:"current_period_start"`
+	TrialEndsAt            pgtype.Timestamptz `db:"trial_ends_at" json:"trial_ends_at"`
+	PastDueAt              pgtype.Timestamptz `db:"past_due_at" json:"past_due_at"`
+	GraceEndsAt            pgtype.Timestamptz `db:"grace_ends_at" json:"grace_ends_at"`
+	CanceledAt             pgtype.Timestamptz `db:"canceled_at" json:"canceled_at"`
+	UpdatedAt              pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	ProviderEventCreatedAt pgtype.Timestamptz `db:"provider_event_created_at" json:"provider_event_created_at"`
+	Provider               string             `db:"provider" json:"provider"`
+	ProviderCustomerID     string             `db:"provider_customer_id" json:"provider_customer_id"`
+	ProviderSubscriptionID string             `db:"provider_subscription_id" json:"provider_subscription_id"`
+}
+
+func (q *Queries) GetBackofficeSubscription(ctx context.Context, id uuid.UUID) (GetBackofficeSubscriptionRow, error) {
+	row := q.db.QueryRow(ctx, getBackofficeSubscription, id)
+	var i GetBackofficeSubscriptionRow
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.OrganizationName,
+		&i.OrganizationStatus,
+		&i.PlanID,
+		&i.PlanName,
+		&i.PlanCode,
+		&i.Status,
+		&i.CurrentPeriodEnd,
+		&i.CancelAtPeriodEnd,
+		&i.CreatedAt,
+		&i.CurrentPeriodStart,
+		&i.TrialEndsAt,
+		&i.PastDueAt,
+		&i.GraceEndsAt,
+		&i.CanceledAt,
+		&i.UpdatedAt,
+		&i.ProviderEventCreatedAt,
+		&i.Provider,
+		&i.ProviderCustomerID,
+		&i.ProviderSubscriptionID,
+	)
+	return i, err
+}
+
 const getEffectiveOrganizationEntitlement = `-- name: GetEffectiveOrganizationEntitlement :one
 SELECT
     COALESCE(
@@ -91,6 +173,103 @@ func (q *Queries) GetOrganizationSubscription(ctx context.Context, organizationI
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listBackofficeSubscriptions = `-- name: ListBackofficeSubscriptions :many
+SELECT
+    s.id,
+    s.organization_id,
+    o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    s.plan_id,
+    p.name AS plan_name,
+    p.code AS plan_code,
+    s.status,
+    s.current_period_end,
+    s.cancel_at_period_end,
+    s.created_at
+FROM subscriptions AS s
+JOIN organizations AS o ON o.id = s.organization_id
+JOIN plans AS p ON p.id = s.plan_id
+WHERE (
+    $1::text = ''
+    OR s.id::text = $1::text
+    OR strpos(lower(o.name), lower($1::text)) > 0
+    OR s.provider_subscription_id = $1::text
+)
+  AND ($2::text = '' OR s.status = $2::text)
+  AND ($3::text = '' OR p.code = $3::text)
+  AND ($4::text = '' OR s.cancel_at_period_end = ($4::text = 'scheduled'))
+  AND ($5::uuid IS NULL OR s.organization_id = $5::uuid)
+ORDER BY s.created_at DESC,
+    s.id DESC
+LIMIT $7::int
+OFFSET $6::int
+`
+
+type ListBackofficeSubscriptionsParams struct {
+	Search         string     `db:"search" json:"search"`
+	Status         string     `db:"status" json:"status"`
+	Plan           string     `db:"plan" json:"plan"`
+	Cancellation   string     `db:"cancellation" json:"cancellation"`
+	OrganizationID *uuid.UUID `db:"organization_id" json:"organization_id"`
+	PageOffset     int32      `db:"page_offset" json:"page_offset"`
+	PageLimit      int32      `db:"page_limit" json:"page_limit"`
+}
+
+type ListBackofficeSubscriptionsRow struct {
+	ID                 uuid.UUID          `db:"id" json:"id"`
+	OrganizationID     uuid.UUID          `db:"organization_id" json:"organization_id"`
+	OrganizationName   string             `db:"organization_name" json:"organization_name"`
+	OrganizationStatus string             `db:"organization_status" json:"organization_status"`
+	PlanID             uuid.UUID          `db:"plan_id" json:"plan_id"`
+	PlanName           string             `db:"plan_name" json:"plan_name"`
+	PlanCode           string             `db:"plan_code" json:"plan_code"`
+	Status             string             `db:"status" json:"status"`
+	CurrentPeriodEnd   pgtype.Timestamptz `db:"current_period_end" json:"current_period_end"`
+	CancelAtPeriodEnd  bool               `db:"cancel_at_period_end" json:"cancel_at_period_end"`
+	CreatedAt          pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// Operator projections intentionally include disabled and deleted organizations.
+func (q *Queries) ListBackofficeSubscriptions(ctx context.Context, arg ListBackofficeSubscriptionsParams) ([]ListBackofficeSubscriptionsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeSubscriptions,
+		arg.Search,
+		arg.Status,
+		arg.Plan,
+		arg.Cancellation,
+		arg.OrganizationID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeSubscriptionsRow{}
+	for rows.Next() {
+		var i ListBackofficeSubscriptionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.OrganizationName,
+			&i.OrganizationStatus,
+			&i.PlanID,
+			&i.PlanName,
+			&i.PlanCode,
+			&i.Status,
+			&i.CurrentPeriodEnd,
+			&i.CancelAtPeriodEnd,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listBillingOrganizationReconciliationTargets = `-- name: ListBillingOrganizationReconciliationTargets :many

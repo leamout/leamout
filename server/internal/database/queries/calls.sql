@@ -234,70 +234,62 @@ WHERE organization_id = sqlc.arg(organization_id)
   AND state IN ('initiating', 'ringing')
 RETURNING *;
 
+-- Operator projections intentionally include disabled and deleted organizations.
 -- name: ListBackofficeCalls :many
 SELECT
-    c.id::TEXT AS id,
-    c.organization_id::TEXT AS organization_id,
+    c.id,
+    c.organization_id,
     o.name AS organization_name,
-    c.from_uri,
-    c.to_uri,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    c.voice_agent_id, COALESCE(va.name, '')::text AS agent_name,
     c.direction,
     c.state,
-    CAST(
-        GREATEST(
-            0::BIGINT,
-            COALESCE(
-                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
-                0::BIGINT
-            )
-        ) AS BIGINT
-    ) AS duration_seconds,
-    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS created_at
+    c.from_uri,
+    c.to_uri,
+    c.created_at
 FROM calls AS c
 JOIN organizations AS o ON o.id = c.organization_id
-ORDER BY c.created_at DESC
-LIMIT 100;
+LEFT JOIN voice_agents AS va ON va.id = c.voice_agent_id AND va.organization_id = c.organization_id
+WHERE (
+    sqlc.arg(search)::text = ''
+    OR c.id::text = sqlc.arg(search)::text
+    OR c.sip_call_id = sqlc.arg(search)::text
+    OR strpos(lower(c.from_uri), lower(sqlc.arg(search)::text)) > 0
+    OR strpos(lower(c.to_uri), lower(sqlc.arg(search)::text)) > 0
+)
+  AND (sqlc.arg(state)::text = '' OR c.state = sqlc.arg(state)::text)
+  AND (sqlc.arg(direction)::text = '' OR c.direction = sqlc.arg(direction)::text)
+  AND (sqlc.narg(organization_id)::uuid IS NULL OR c.organization_id = sqlc.narg(organization_id)::uuid)
+  AND (sqlc.narg(agent_id)::uuid IS NULL OR c.voice_agent_id = sqlc.narg(agent_id)::uuid)
+  AND (sqlc.narg(created_from)::timestamptz IS NULL OR c.created_at >= sqlc.narg(created_from)::timestamptz)
+  AND (sqlc.narg(created_before)::timestamptz IS NULL OR c.created_at < sqlc.narg(created_before)::timestamptz)
+ORDER BY c.created_at DESC,
+    c.id DESC
+LIMIT sqlc.arg(page_limit)::int
+OFFSET sqlc.arg(page_offset)::int;
 
 -- name: GetBackofficeCall :one
 SELECT
-    c.id::TEXT AS id,
-    c.organization_id::TEXT AS organization_id,
+    c.id,
+    c.organization_id,
     o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NOT NULL THEN 'deleted' ELSE o.status END::text AS organization_status,
+    c.voice_agent_id, COALESCE(va.name, '')::text AS agent_name,
     c.direction,
     c.state,
-    c.media_state,
     c.from_uri,
     c.to_uri,
-    COALESCE(c.sip_call_id, '—')::TEXT AS sip_call_id,
-    COALESCE(c.voice_agent_id::TEXT, '—')::TEXT AS voice_agent_id,
-    COALESCE(agent.name, '—')::TEXT AS voice_agent_name,
-    COALESCE(c.trunk_id::TEXT, '—')::TEXT AS trunk_id,
-    COALESCE(t.name, '—')::TEXT AS trunk_name,
-    COALESCE(c.trunk_endpoint_id::TEXT, '—')::TEXT AS trunk_endpoint_id,
-    COALESCE(c.hangup_reason, '—')::TEXT AS hangup_reason,
-    CAST(
-        GREATEST(
-            0::BIGINT,
-            COALESCE(
-                EXTRACT(EPOCH FROM (COALESCE(c.ended_at, NOW()) - c.answered_at))::BIGINT,
-                0::BIGINT
-            )
-        ) AS BIGINT
-    ) AS duration_seconds,
-    COUNT(DISTINCT r.id)::BIGINT AS recording_count,
-    COALESCE(string_agg(DISTINCT r.status, ', ' ORDER BY r.status), 'none')::TEXT AS recording_status,
-    COALESCE(to_char(c.started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS started_at,
-    COALESCE(to_char(c.answered_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS answered_at,
-    COALESCE(to_char(c.ended_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), '—')::TEXT AS ended_at,
-    to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS created_at,
-    to_char(c.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::TEXT AS updated_at
+    c.created_at,
+    c.media_state,
+    c.started_at,
+    c.answered_at,
+    c.ended_at,
+    c.updated_at,
+    COALESCE(c.sip_call_id, '')::text AS sip_call_id,
+    COALESCE(c.hangup_reason, '')::text AS hangup_reason,
+    c.trunk_id,
+    c.trunk_endpoint_id
 FROM calls AS c
 JOIN organizations AS o ON o.id = c.organization_id
-LEFT JOIN voice_agents AS agent ON agent.id = c.voice_agent_id
-LEFT JOIN trunks AS t ON t.id = c.trunk_id
-LEFT JOIN recordings AS r
-  ON r.call_id = c.id
- AND r.organization_id = c.organization_id
-WHERE c.id = sqlc.arg(id)
-GROUP BY c.id, o.name, agent.name, t.name
-LIMIT 1;
+LEFT JOIN voice_agents AS va ON va.id = c.voice_agent_id AND va.organization_id = c.organization_id
+WHERE c.id = sqlc.arg(id);
