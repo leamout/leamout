@@ -59,8 +59,12 @@ func (h *Handler) Receive(w http.ResponseWriter, r *http.Request) {
 	disabled := event.Type == "user.deleted" ||
 		(event.Data.User.IsSuspended != nil && *event.Data.User.IsSuspended)
 	name := ""
+	email := ""
 	if event.Data.User.FirstName != nil && event.Data.User.LastName != nil {
 		name = strings.TrimSpace(*event.Data.User.FirstName + " " + *event.Data.User.LastName)
+	}
+	if event.Data.User.Email != nil {
+		email = strings.TrimSpace(*event.Data.User.Email)
 	}
 	_, err = h.queries.ApplyKindeIdentityEvent(r.Context(), sqlc.ApplyKindeIdentityEventParams{
 		Issuer: h.client.Issuer(),
@@ -70,6 +74,7 @@ func (h *Handler) Receive(w http.ResponseWriter, r *http.Request) {
 		OccurredAt: event.Timestamp,
 		DisableUser: disabled,
 		ProfileName: name,
+		ProfileEmail: email,
 	})
 	if err != nil {
 		httputil.Error(w, apperror.NewServiceUnavailable("identity synchronization unavailable", err))
