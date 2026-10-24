@@ -83,8 +83,7 @@ func classifyOriginateFailure(err error) (failureClass string, sipStatus int, ou
 	sipStatus = originateError.SIPStatus
 	// An originate timeout does not prove that the remote carrier never
 	// established a call; do not send another INVITE on an ambiguous outcome.
-	if originateError.Class == calling.OriginateFailureTransport ||
-		originateError.Class == calling.OriginateFailureCapacity ||
+	if originateError.Class == calling.OriginateFailureCapacity ||
 		(originateError.Class == calling.OriginateFailureSIP && sipStatus >= 500 && sipStatus <= 599) {
 		outcome = "retryable_failure"
 	}

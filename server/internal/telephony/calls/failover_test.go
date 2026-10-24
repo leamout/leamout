@@ -196,3 +196,19 @@ func testRoutes(count int) []routing.OutboundRoute {
 	}
 	return routes
 }
+
+func TestExecuteRoutePlanDoesNotRetryTransportFailure(t *testing.T) {
+	attempts := 0
+	_, _, err := executeRoutePlan(context.Background(), testRoutes(3), func(
+		_ context.Context, _ routing.OutboundRoute,
+	) (calling.OriginateResult, error) {
+		attempts++
+		return calling.OriginateResult{}, &calling.OriginateError{
+			Class: calling.OriginateFailureTransport,
+			Err:   errors.New("lost ESL acknowledgement"),
+		}
+	}, nil)
+	if err == nil || attempts != 1 {
+		t.Fatalf("ambiguous transport failure retried: attempts=%d err=%v", attempts, err)
+	}
+}

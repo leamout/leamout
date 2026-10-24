@@ -1,57 +1,13 @@
 package calling
 
 import (
-	"errors"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 )
-
-var (
-	ErrUnsupportedEvent    = errors.New("unsupported FreeSWITCH call event")
-	ErrUncorrelatedEvent   = errors.New("uncorrelated FreeSWITCH call event")
-	ErrNotInboundAdmission = errors.New("not an inbound FreeSWITCH admission event")
-)
-
-type LifecycleType string
-
-const (
-	LifecycleInitiated LifecycleType = "initiated"
-	LifecycleRinging   LifecycleType = "ringing"
-	LifecycleAnswered  LifecycleType = "answered"
-	LifecycleActive    LifecycleType = "active"
-	LifecycleHeld      LifecycleType = "held"
-	LifecycleResumed   LifecycleType = "resumed"
-	LifecycleCompleted LifecycleType = "completed"
-	LifecycleFailed    LifecycleType = "failed"
-	LifecycleCancelled LifecycleType = "cancelled"
-)
-
-type LifecycleEvent struct {
-	CallID       uuid.UUID
-	ChannelID    string
-	SIPCallID    string
-	Type         LifecycleType
-	OccurredAt   time.Time
-	HangupReason *string
-}
-
-type InboundEvent struct {
-	ChannelID           string
-	SIPCallID           string
-	OrganizationID      uuid.UUID
-	VoiceAgentID        uuid.UUID
-	PhoneNumberID       uuid.UUID
-	VoiceAgentBindingID uuid.UUID
-	TrunkID             uuid.UUID
-	FromURI             string
-	ToURI               string
-	OccurredAt          time.Time
-}
 
 func FreeSWITCHEvents() []string {
 	return []string{

@@ -181,3 +181,10 @@ func (c *Client) reconnectDelay(attempt int) time.Duration {
 	}
 	return jittered
 }
+
+// StartReconnect begins an asynchronous connection attempt and retries with
+// bounded backoff until the client is connected or closed. It allows services
+// which do not require FreeSWITCH for startup to remain operational.
+func (c *Client) StartReconnect() {
+	c.startReconnect()
+}

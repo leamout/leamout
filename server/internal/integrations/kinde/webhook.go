@@ -14,8 +14,10 @@ import (
 )
 
 const (
-	webhookMaxAge    = 48 * time.Hour
-	webhookClockSkew = 5 * time.Minute
+	webhookMaxAge              = 48 * time.Hour
+	webhookClockSkew           = 5 * time.Minute
+	webhookJWKSMaxAge          = 15 * time.Minute
+	webhookJWKSRefreshInterval = time.Minute
 )
 
 // ErrWebhookUnavailable indicates that Kinde's signing keys could not be fetched.
@@ -63,25 +65,12 @@ func (c *Client) VerifyWebhook(ctx context.Context, raw string) (WebhookEvent, e
 		return WebhookEvent{}, errors.New("invalid Kinde webhook signature header")
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, c.issuer+"/.well-known/jwks", nil)
+	// Only a matching key ID can verify this token. Cache fetched keys across
+	// deliveries; unknown IDs trigger at most one refresh per minute. Both
+	// ordinary expiry and a missing JWKS fail closed without accepting a token.
+	keys, err := c.webhookSigningKeys(ctx, signed.Signatures[0].Header.KeyID)
 	if err != nil {
-		return WebhookEvent{}, ErrWebhookUnavailable
-	}
-	httpClient := *c.http
-	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
-		return http.ErrUseLastResponse
-	}
-	response, err := httpClient.Do(request)
-	if err != nil {
-		return WebhookEvent{}, fmt.Errorf("%w: %w", ErrWebhookUnavailable, err)
-	}
-	defer func() { _ = response.Body.Close() }()
-	if response.StatusCode != http.StatusOK {
-		return WebhookEvent{}, ErrWebhookUnavailable
-	}
-	var keys jose.JSONWebKeySet
-	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&keys); err != nil {
-		return WebhookEvent{}, ErrWebhookUnavailable
+		return WebhookEvent{}, err
 	}
 
 	var payload []byte
@@ -124,4 +113,59 @@ func (c *Client) VerifyWebhook(ctx context.Context, raw string) (WebhookEvent, e
 		}
 	}
 	return event, nil
+}
+
+// webhookSigningKeys bounds outbound discovery under both normal traffic and
+// attacker-supplied unknown key IDs. The lock also coalesces concurrent misses.
+// Cached keys are never used beyond webhookJWKSMaxAge without a successful
+// refresh. A key rotation can be picked up before expiry at a bounded rate.
+func (c *Client) webhookSigningKeys(ctx context.Context, keyID string) (jose.JSONWebKeySet, error) {
+	c.webhookMu.Lock()
+	defer c.webhookMu.Unlock()
+
+	now := time.Now()
+	hasFreshCache := len(c.webhookKeys.Keys) != 0 && now.Sub(c.webhookKeysAt) < webhookJWKSMaxAge
+	if hasFreshCache && len(c.webhookKeys.Key(keyID)) != 0 {
+		return c.webhookKeys, nil
+	}
+	if now.Sub(c.webhookAttemptAt) < webhookJWKSRefreshInterval {
+		if !hasFreshCache {
+			return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+		}
+		// A newly rotated key may arrive before the refresh cooldown ends;
+		// Kinde should retry delivery rather than have Leamout acknowledge it.
+		return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+	}
+	c.webhookAttemptAt = now
+	requestCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, c.issuer+"/.well-known/jwks", nil)
+	if err != nil {
+		return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+	}
+	httpClient := *c.http
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return jose.JSONWebKeySet{}, fmt.Errorf("%w: %w", ErrWebhookUnavailable, err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+	}
+	var keys jose.JSONWebKeySet
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&keys); err != nil {
+		return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+	}
+	if len(keys.Keys) == 0 || len(keys.Keys) > 64 {
+		return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+	}
+	c.webhookKeys = keys
+	c.webhookKeysAt = time.Now()
+	if len(keys.Key(keyID)) == 0 {
+		return jose.JSONWebKeySet{}, ErrWebhookUnavailable
+	}
+	return keys, nil
 }
