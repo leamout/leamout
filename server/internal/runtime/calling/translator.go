@@ -2,11 +2,12 @@ package calling
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/integrations/freeswitch"
 )
 
 func FreeSWITCHEvents() []string {
