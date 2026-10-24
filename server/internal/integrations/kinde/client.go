@@ -318,8 +318,9 @@ func (c *Client) PortalURL(ctx context.Context, accessToken, returnURL string) (
 	}
 	target, err := url.Parse(returnURL)
 	if err != nil || target.User != nil || target.Host == "" ||
-		(target.Scheme != "https" && !(target.Scheme == "http" &&
-			(target.Hostname() == "localhost" || target.Hostname() == "127.0.0.1"))) {
+		(target.Scheme != "https" &&
+			(target.Scheme != "http" ||
+				(target.Hostname() != "localhost" && target.Hostname() != "127.0.0.1"))) {
 		return "", errors.New("invalid portal return URL")
 	}
 	endpoint := c.issuer + "/account_api/v1/portal_link"
