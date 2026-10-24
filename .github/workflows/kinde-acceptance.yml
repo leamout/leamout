@@ -1,0 +1,62 @@
+name: Kinde live identity acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kinde-staging-identity-acceptance
+  cancel-in-progress: false
+
+jobs:
+  oidc-smoke:
+    name: Live staging OIDC and browser-entry smoke
+    runs-on: ubuntu-latest
+    environment: kinde-staging
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: server/go.mod
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      - name: Check staging identity configuration
+        env:
+          KINDE_LIVE_ISSUER: ${{ secrets.KINDE_STAGING_ISSUER }}
+          KINDE_LIVE_CLIENT_ID: ${{ secrets.KINDE_STAGING_CLIENT_ID }}
+          KINDE_LIVE_CLIENT_SECRET: ${{ secrets.KINDE_STAGING_CLIENT_SECRET }}
+          KINDE_LIVE_CONSOLE_CALLBACK_URL: ${{ vars.KINDE_STAGING_CONSOLE_CALLBACK_URL }}
+          KINDE_LIVE_BACKOFFICE_CALLBACK_URL: ${{ vars.KINDE_STAGING_BACKOFFICE_CALLBACK_URL }}
+        shell: bash
+        run: |
+          for key in KINDE_LIVE_ISSUER KINDE_LIVE_CLIENT_ID KINDE_LIVE_CLIENT_SECRET \
+            KINDE_LIVE_CONSOLE_CALLBACK_URL KINDE_LIVE_BACKOFFICE_CALLBACK_URL; do
+            if [[ -z "${!key}" ]]; then
+              echo "::error::Configure the kinde-staging environment value for $key"
+              exit 1
+            fi
+          done
+
+      - name: Verify live discovery, JWKS, redirects and optional staging routes
+        env:
+          KINDE_LIVE_ISSUER: ${{ secrets.KINDE_STAGING_ISSUER }}
+          KINDE_LIVE_CLIENT_ID: ${{ secrets.KINDE_STAGING_CLIENT_ID }}
+          KINDE_LIVE_CLIENT_SECRET: ${{ secrets.KINDE_STAGING_CLIENT_SECRET }}
+          KINDE_LIVE_CONSOLE_CALLBACK_URL: ${{ vars.KINDE_STAGING_CONSOLE_CALLBACK_URL }}
+          KINDE_LIVE_BACKOFFICE_CALLBACK_URL: ${{ vars.KINDE_STAGING_BACKOFFICE_CALLBACK_URL }}
+          KINDE_LIVE_CONSOLE_URL: ${{ vars.KINDE_STAGING_CONSOLE_URL }}
+          KINDE_LIVE_BACKOFFICE_URL: ${{ vars.KINDE_STAGING_BACKOFFICE_URL }}
+        run: |
+          go test -tags=kinde_live -run '^TestLiveKinde' -count=1 -timeout=5m -v ./internal/integrations/kinde
