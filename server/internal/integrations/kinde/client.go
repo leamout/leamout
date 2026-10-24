@@ -14,6 +14,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const maximumIdentityValidationAge = 10 * time.Minute
+
 func New(
 	_ context.Context,
 	cfg Config,
@@ -98,7 +100,10 @@ func (c *Client) idVerifier(ctx context.Context) (*oidc.IDTokenVerifier, error) 
 		if err != nil {
 			return nil, fmt.Errorf("discover Kinde: %w", err)
 		}
-		c.verifier = provider.Verifier(&oidc.Config{ClientID: c.config.ClientID})
+		// Kinde can use its issuer as the ID token audience and put the OAuth
+		// application identifier in azp. Audience validation is done below,
+		// after go-oidc has verified issuer, signature and token expiry.
+		c.verifier = provider.Verifier(&oidc.Config{SkipClientIDCheck: true})
 	}
 
 	return c.verifier, nil
@@ -139,6 +144,11 @@ func (c *Client) Exchange(
 	if access.Expiry.Before(expiration) {
 		expiration = access.Expiry
 	}
+	expiration = nextValidationDeadline(expiration)
+	if !expiration.After(time.Now()) {
+		return Identity{}, Tokens{}, errors.New("expired Kinde token response")
+	}
+
 	return identity, Tokens{
 		OAuth:      *access,
 		IDToken:    raw,
@@ -174,7 +184,10 @@ func (c *Client) Refresh(
 		OAuth:      *access,
 		IDToken:    previous.IDToken,
 		Nonce:      previous.Nonce,
-		ValidUntil: access.Expiry,
+		ValidUntil: nextValidationDeadline(access.Expiry),
+	}
+	if !result.ValidUntil.After(time.Now()) {
+		return Tokens{}, errors.New("expired Kinde refresh response")
 	}
 
 	// Kinde refresh responses can omit id_token. The rotating confidential-client
@@ -238,10 +251,59 @@ func (c *Client) verifyIDToken(
 	if identity.Name == "" {
 		identity.Name = strings.TrimSpace(identity.GivenName + " " + identity.FamilyName)
 	}
+	if err := c.validateAudience(id); err != nil {
+		return Identity{}, "", "", time.Time{}, err
+	}
 
 	return identity, raw, id.Nonce, id.Expiry, nil
 }
 
 func (c *Client) LogoutURL(returnURL string) string {
 	return c.issuer + "/logout?redirect=" + url.QueryEscape(returnURL)
+}
+
+func (c *Client) validateAudience(id *oidc.IDToken) error {
+	var claims struct {
+		AuthorizedParty string `json:"azp"`
+	}
+	if err := id.Claims(&claims); err != nil {
+		return errors.New("invalid Kinde authorized party")
+	}
+
+	hasClientAudience := false
+	hasIssuerAudience := false
+	for _, audience := range id.Audience {
+		switch audience {
+		case c.config.ClientID:
+			hasClientAudience = true
+		case c.issuer:
+			hasIssuerAudience = true
+		}
+	}
+
+	// Standard OIDC ID tokens target the client ID. Kinde can instead use
+	// the issuer as audience, in which case azp MUST identify our app.
+	// Multi-audience tokens also require an explicit matching azp.
+	if claims.AuthorizedParty != "" && claims.AuthorizedParty != c.config.ClientID {
+		return errors.New("invalid Kinde authorized party")
+	}
+	if hasClientAudience && len(id.Audience) == 1 {
+		return nil
+	}
+	if (hasClientAudience || hasIssuerAudience) &&
+		claims.AuthorizedParty == c.config.ClientID {
+		return nil
+	}
+	return errors.New("invalid Kinde ID token audience")
+}
+
+// nextValidationDeadline bounds the period during which a local Leamout
+// session can avoid refreshing its provider credentials, even if Kinde issues
+// longer-lived access tokens. Kinde remains the session's authority.
+func nextValidationDeadline(providerExpiry time.Time) time.Time {
+	deadline := time.Now().Add(maximumIdentityValidationAge)
+	if providerExpiry.Before(deadline) {
+		return providerExpiry
+	}
+	return deadline
 }
