@@ -34,3 +34,21 @@ The verifier enforces signature, issuer and expiration using OIDC discovery/JWKS
 Leamout uses Kinde's **user** self-service portal for personal identity/profile changes. From Console Settings > Profile or Security, an authenticated browser requests `GET /api/v1/auth/account`, which checks the host-only Leamout session, refreshes the encrypted Kinde token as needed, calls `GET /account_api/v1/portal_link?subnav=profile&return_url=...` using a server-side bearer access token, and redirects the user to the one-time Kinde portal link. The access token never reaches Next.js. The destination must remain an HTTPS URL on the configured Kinde issuer origin. The Backoffice Account link uses the same Kinde tenant and OAuth client but returns to the backoffice and requires Leamout platform-admin authorization.
 
 Kinde's user portal must be enabled in the Kinde environment. Password recovery, authentication factor policies, and account security must be configured and tested in Kinde; Leamout does not implement a parallel password or MFA database. Console Security also lists/revokes **Leamout-local** browser sessions; revoking those sessions does not revoke all Kinde SSO sessions. Kinde organizations, billing, and API keys must not be used as substitutes for Leamout-owned data.
+
+## Synchronizing Kinde identity changes
+
+Leamout receives signed Kinde `user.updated` and `user.deleted` webhooks at:
+
+`POST https://api.leamout.com/v1/identity/kinde/webhook`
+
+Configure this HTTPS address in **Kinde → Settings → Webhooks** and subscribe only to those two event types. Console and backoffice continue sharing a single Kinde identity provider and application.
+
+Kinde delivers `Content-Type: application/jwt` with a signed JWT body and a `webhook-id` header. The Go integration retrieves Kinde's published `/.well-known/jwks` and requires a valid RS256 signature and signing-key ID. The event must have a valid `event_id`, timestamp within the accepted replay window, and a matching `kp_` or `kp:` subject.
+
+Each accepted event is recorded once in `kinde_identity_events`, keyed by provider issuer and event ID. A signed `user.updated` event updates the **existing** Leamout user's profile display name and email, avoiding email collisions with other local users. It cannot create a user, change a user UUID, membership, platform-administrator status, or restore a disabled user. Out-of-order older profile updates do not overwrite newer updates.
+
+A signed `user.deleted` event or a user update indicating suspension marks the matching Leamout user disabled and revokes existing browser sessions. That is a conservative, irreversible local-access decision. Restoring access requires an explicit reviewed administrator action; Kinde webhook updates cannot silently reactivate accounts. Unknown Kinde user subjects do not create local accounts.
+
+Webhook verification failure returns a non-success status; transient JWKS/database errors produce an HTTP 503 so Kinde can retry. Production rollout requires setting up the provider webhook, applying migration `036_create_kinde_identity_events.sql`, regenerating sqlc/Atlas artifacts, and exercising signed provider events in staging. Kinde-originated changes to email or credentials must be verified against a real tenant; the local account link is always the verified `(identity_issuer, identity_subject)`, **never email alone**.
+
+This endpoint must be excluded from any browser-origin restrictions intended only for session-backed frontend requests. Do not put bearer tokens, webhook JWTs, or user PII in application logs.
