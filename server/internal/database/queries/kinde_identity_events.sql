@@ -49,6 +49,18 @@ changed_users AS (
             THEN COALESCE(u.disabled_at, NOW())
             ELSE u.disabled_at
         END,
+        email = CASE
+            WHEN NOT sqlc.arg(disable_user)::boolean
+                AND e.event_type = 'user.updated'
+                AND NULLIF(BTRIM(sqlc.arg(profile_email)::text), '') IS NOT NULL
+                AND NOT EXISTS (
+                    SELECT 1 FROM users AS other
+                    WHERE other.email = sqlc.arg(profile_email)::text::citext
+                      AND other.id <> u.id
+                )
+            THEN sqlc.arg(profile_email)::text::citext
+            ELSE u.email
+        END,
         updated_at = NOW()
     FROM current_event AS e
     WHERE u.identity_issuer = e.issuer
@@ -58,7 +70,10 @@ changed_users AS (
           OR (
               e.event_type = 'user.updated'
               AND u.disabled_at IS NULL
-              AND NULLIF(BTRIM(sqlc.arg(profile_name)::text), '') IS NOT NULL
+              AND (
+                  NULLIF(BTRIM(sqlc.arg(profile_name)::text), '') IS NOT NULL
+                  OR NULLIF(BTRIM(sqlc.arg(profile_email)::text), '') IS NOT NULL
+              )
           )
       )
     RETURNING u.id, u.disabled_at
