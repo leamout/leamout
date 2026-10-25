@@ -614,12 +614,14 @@ def webhooks():
 
 def health():
     if health_status("/healthz") != 200 or health_status("/readyz") != 200:
-        raise AcceptanceError("HTTP health endpoints are not healthy")
+        raise AcceptanceError("control-plane health endpoints are not healthy")
+    if health_status("/telephony/readyz") != 200:
+        raise AcceptanceError("telephony readiness is unavailable while FreeSWITCH is running")
     status = fs_cli("freeswitch", "status")
     if "UP" not in status.upper():
         raise AcceptanceError("FreeSWITCH status is not UP")
     fs_cli("freeswitch", "show channels count")
-    return "HTTP readiness and FreeSWITCH media status are healthy"
+    return "control-plane and telephony readiness, plus FreeSWITCH status, are healthy"
 
 
 def restart_safety():
@@ -635,25 +637,39 @@ def restart_safety():
 
     compose("restart", "server")
     wait_api_ready()
+    # Telephony reconnects asynchronously after the API starts. Verify it has
+    # recovered before testing the next deliberate FreeSWITCH outage.
+    wait_for(
+        "telephony reconnect after API restart",
+        lambda: health_status("/telephony/readyz") == 200,
+        timeout=45,
+    )
     if get_call(STATE["call_id"])["state"] != before["state"]:
         raise AcceptanceError("API/worker restart changed terminal call state")
 
     compose("stop", "freeswitch")
+    # FreeSWITCH downtime must affect telephony readiness, not API liveness or
+    # the control plane's PostgreSQL/Redis readiness.
     wait_for(
-        "readiness failure after FreeSWITCH stop",
-        lambda: health_status("/readyz") == 503,
+        "telephony readiness failure after FreeSWITCH stop",
+        lambda: health_status("/telephony/readyz") == 503,
         timeout=15,
     )
+    if health_status("/healthz") != 200 or health_status("/readyz") != 200:
+        raise AcceptanceError("FreeSWITCH outage took down control-plane readiness")
+
     compose("start", "freeswitch")
     wait_for(
-        "readiness recovery after FreeSWITCH start",
-        lambda: health_status("/readyz") == 200,
+        "telephony readiness recovery after FreeSWITCH start",
+        lambda: health_status("/telephony/readyz") == 200,
         timeout=45,
     )
+    if health_status("/healthz") != 200 or health_status("/readyz") != 200:
+        raise AcceptanceError("control-plane readiness changed after FreeSWITCH recovery")
 
     if get_call(STATE["call_id"])["state"] != before["state"]:
         raise AcceptanceError("FreeSWITCH restart changed completed call state")
-    return "API, worker, and FreeSWITCH restart with readiness/state recovery"
+    return "API and worker restarted; telephony readiness recovered without losing control-plane or call state"
 
 
 def print_summary():

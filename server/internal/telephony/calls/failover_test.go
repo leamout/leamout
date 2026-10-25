@@ -14,8 +14,8 @@ func TestSIPFailoverAcceptancePrimarySecondaryTertiary(t *testing.T) {
 	routes := testRoutes(3)
 	responses := []error{
 		&calling.OriginateError{
-			Class: calling.OriginateFailureTransport,
-			Err:   errors.New("TCP reset"),
+			Class: calling.OriginateFailureCapacity,
+			Err:   errors.New("trunk capacity exhausted"),
 		},
 		calling.NewSIPOriginateError(503, errors.New("carrier unavailable")),
 		nil,
@@ -42,7 +42,9 @@ func TestSIPFailoverAcceptancePrimarySecondaryTertiary(t *testing.T) {
 		t.Fatalf("unexpected selected route: result=%+v route=%+v", result, selected)
 	}
 	if len(outcomes) != 3 || outcomes[0].Outcome != "retryable_failure" ||
-		outcomes[1].SIPStatus != 503 || outcomes[2].Outcome != "succeeded" {
+		outcomes[0].FailureClass != string(calling.OriginateFailureCapacity) ||
+		outcomes[1].SIPStatus != 503 || outcomes[1].Outcome != "retryable_failure" ||
+		outcomes[2].Outcome != "succeeded" {
 		t.Fatalf("unexpected attempt outcomes: %+v", outcomes)
 	}
 }
@@ -152,6 +154,14 @@ func TestClassifyOriginateFailure(t *testing.T) {
 			retryable: true,
 		},
 		{
+			name: "transport ambiguity",
+			err: &calling.OriginateError{
+				Class: calling.OriginateFailureTransport,
+				Err:   errors.New("acknowledgement lost"),
+			},
+			retryable: false,
+		},
+		{
 			name: "server response",
 			err: calling.NewSIPOriginateError(
 				500,
@@ -195,4 +205,20 @@ func testRoutes(count int) []routing.OutboundRoute {
 		}
 	}
 	return routes
+}
+
+func TestExecuteRoutePlanDoesNotRetryTransportFailure(t *testing.T) {
+	attempts := 0
+	_, _, err := executeRoutePlan(context.Background(), testRoutes(3), func(
+		_ context.Context, _ routing.OutboundRoute,
+	) (calling.OriginateResult, error) {
+		attempts++
+		return calling.OriginateResult{}, &calling.OriginateError{
+			Class: calling.OriginateFailureTransport,
+			Err:   errors.New("lost ESL acknowledgement"),
+		}
+	}, nil)
+	if err == nil || attempts != 1 {
+		t.Fatalf("ambiguous transport failure retried: attempts=%d err=%v", attempts, err)
+	}
 }

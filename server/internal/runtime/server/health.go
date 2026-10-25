@@ -9,6 +9,16 @@ import (
 )
 
 func registerHealthRoutes(router chi.Router, modules *modules) {
+	router.Get("/telephony/readyz", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := modules.freeSwitch.HealthCheck(ctx); err != nil {
+			http.Error(w, "freeswitch unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("telephony ready\n"))
+	})
 	router.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
@@ -27,11 +37,6 @@ func registerHealthRoutes(router chi.Router, modules *modules) {
 			http.Error(w, "redis unavailable", http.StatusServiceUnavailable)
 			return
 		}
-		if err := modules.freeSwitch.HealthCheck(ctx); err != nil {
-			http.Error(w, "freeswitch unavailable", http.StatusServiceUnavailable)
-			return
-		}
-
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ready\n"))
