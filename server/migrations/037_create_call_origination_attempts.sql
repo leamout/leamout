@@ -2,7 +2,6 @@
 -- issuing a remote originate command. A missing ACK must not cause a new INVITE.
 CREATE TABLE IF NOT EXISTS call_origination_attempts (
     channel_id UUID PRIMARY KEY,
-    job_id UUID NOT NULL UNIQUE,
     call_id UUID NOT NULL,
     organization_id UUID NOT NULL,
     trunk_id UUID NOT NULL,
