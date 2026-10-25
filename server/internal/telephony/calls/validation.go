@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/leamout/leamout/server/internal/database/sqlc"
 	"github.com/leamout/leamout/server/pkg/apperror"
 	"github.com/leamout/leamout/server/pkg/listquery"
 )
@@ -185,4 +186,23 @@ func validateFilters(req ListRequest) error {
 		return err
 	}
 	return listquery.Range(req.CreatedFrom, req.CreatedBefore)
+}
+
+func validateExistingInbound(call sqlc.Call, req InboundAdmissionRequest) error {
+	if call.Direction != string(DirectionInbound) ||
+		call.OrganizationID != req.OrganizationID ||
+		call.VoiceAgentID == nil ||
+		*call.VoiceAgentID != req.VoiceAgentID ||
+		call.ToUri != req.ToURI {
+		return apperror.NewConflict("SIP Call-ID is already associated with a different call")
+	}
+	if call.TrunkID != nil && *call.TrunkID != req.TrunkID {
+		return apperror.NewConflict(
+			"SIP Call-ID trunk attribution does not match",
+		)
+	}
+	if isTerminalState(call.State) {
+		return apperror.NewConflict("inbound SIP call is already terminal")
+	}
+	return nil
 }

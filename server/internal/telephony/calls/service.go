@@ -3,7 +3,7 @@ package calls
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -117,171 +117,6 @@ func (s *Service) requireRuntimeAllowance(ctx context.Context, organizationID uu
 		return apperror.NewServiceUnavailable("runtime allowance service unavailable", nil)
 	}
 	return s.runtimeAllowance(ctx, organizationID)
-}
-
-func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req CreateRequest) (sqlc.Call, error) {
-	if err := validateOrganizationID(organizationID); err != nil {
-		return sqlc.Call{}, err
-	}
-	req, err := normalizeCreateRequest(req)
-	if err != nil {
-		return sqlc.Call{}, err
-	}
-	if req.VoiceAgentID != nil {
-		if err := s.requireRuntimeAllowance(ctx, organizationID); err != nil {
-			return sqlc.Call{}, err
-		}
-	}
-	if req.VoiceAgentID != nil {
-		if err := s.requireVoiceAgentReady(
-			ctx,
-			organizationID,
-			*req.VoiceAgentID,
-		); err != nil {
-			return sqlc.Call{}, err
-		}
-	}
-
-	call, err := s.repo.Create(ctx, organizationID, req)
-	if err != nil {
-		return sqlc.Call{}, apperror.NewInternal("create call", err)
-	}
-	if err := s.acquireOrganizationAdmission(ctx, organizationID, call.ID.String()); err != nil {
-		reason := "plan_concurrent_limit"
-		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
-		return sqlc.Call{}, err
-	}
-
-	decision, err := s.router.ResolveOutbound(ctx, routing.OutboundRequest{
-		OrganizationID: organizationID,
-		TrunkID:        req.TrunkID,
-		Destination:    req.ToURI,
-	})
-	if err != nil {
-		reason := "route_resolution_failed"
-		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
-		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
-		return sqlc.Call{}, err
-	}
-	_, ok := decision.Primary()
-	if !ok {
-		reason := "route_resolution_failed"
-		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
-		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
-		return sqlc.Call{}, apperror.NewNotFound("no eligible outbound route")
-	}
-
-	result, selected, err := executeRoutePlan(ctx, decision.Routes, func(
-		attemptCtx context.Context,
-		route routing.OutboundRoute,
-	) (calling.OriginateResult, error) {
-		trunkID := route.TrunkID
-		endpointID := route.TrunkEndpointID
-		if _, attributionErr := s.repo.SetRouteAttribution(
-			attemptCtx,
-			organizationID,
-			call.ID,
-			RouteAttribution{
-				TrunkID:         &trunkID,
-				TrunkEndpointID: &endpointID,
-			},
-		); attributionErr != nil {
-			return calling.OriginateResult{}, &calling.OriginateError{
-				Class: calling.OriginateFailureInternal, Err: attributionErr,
-			}
-		}
-		if admissionErr := s.admission.Acquire(
-			attemptCtx, route.TrunkID, call.ID.String(), route.Limits,
-		); admissionErr != nil {
-			return calling.OriginateResult{}, &calling.OriginateError{
-				Class: calling.OriginateFailureCapacity, Err: admissionErr,
-			}
-		}
-		addresses, resolveErr := s.egressPolicy.ResolveHost(attemptCtx, route.Host)
-		if resolveErr != nil {
-			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
-			return calling.OriginateResult{}, &calling.OriginateError{
-				Class: calling.OriginateFailureValidation,
-				Err:   fmt.Errorf("resolve public SIP trunk endpoint: %w", resolveErr),
-			}
-		}
-		channelID := uuid.NewString()
-		if err := s.repo.PrepareOrigination(attemptCtx, OriginationAttempt{
-			ChannelID: channelID, CallID: call.ID, OrganizationID: organizationID,
-			TrunkID: route.TrunkID, TrunkEndpointID: route.TrunkEndpointID,
-		}); err != nil {
-			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
-			return calling.OriginateResult{}, &calling.OriginateError{Class: calling.OriginateFailureInternal, Err: err}
-		}
-		result, originateErr := s.controller.Originate(attemptCtx, calling.OriginateRequest{
-			ChannelID: channelID,
-			CallID:    call.ID, Destination: req.ToURI, CallerID: req.FromURI,
-			PinnedIP: addresses[0].String(),
-			TrunkID:  route.TrunkID,
-			Host:     route.Host, Port: route.Port, Transport: route.Transport,
-			Privacy: req.Privacy, DTMFMode: req.DTMFMode, MediaEncryption: req.MediaEncryption,
-		})
-		if originateErr == nil {
-			if err := s.repo.MarkOriginationSubmitted(attemptCtx, channelID); err != nil {
-				return result, &calling.OriginateError{Class: calling.OriginateFailureUncertain, Err: err}
-			}
-		} else {
-			_ = s.repo.MarkOriginationUncertain(context.WithoutCancel(attemptCtx), channelID)
-		}
-		if originateErr != nil {
-			var classified *calling.OriginateError
-			if !errors.As(originateErr, &classified) ||
-				classified.Class != calling.OriginateFailureUncertain {
-				_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
-			}
-		}
-		return result, originateErr
-	}, func(attemptCtx context.Context, attempt routeAttemptOutcome) {
-		if s.metrics != nil {
-			s.metrics.RouteAttempt(
-				attemptCtx,
-				attempt.Route.TrunkID,
-				attempt.Route.TrunkEndpointID,
-				attempt.Outcome,
-				attempt.FailureClass,
-				attempt.Attempt,
-			)
-			if attempt.Outcome == "succeeded" {
-				s.metrics.EndpointSelection(
-					attemptCtx,
-					attempt.Route.TrunkID,
-					attempt.Route.TrunkEndpointID,
-					attempt.Attempt > 1,
-				)
-			}
-		}
-	})
-	if err != nil {
-		var originateErr *calling.OriginateError
-		if errors.As(err, &originateErr) &&
-			originateErr.Class == calling.OriginateFailureUncertain {
-			// The bgapi request may already be running on FreeSWITCH. Keep
-			// the call nonterminal and admission leases intact. Its stable
-			// UUID allows lifecycle events and reconciliation to recover it.
-			return call, apperror.NewServiceUnavailable(
-				"call origination outcome is uncertain; do not retry", err,
-			)
-		}
-		reason := "originate_failed"
-		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
-		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
-		return sqlc.Call{}, apperror.NewInternal("originate call", err)
-	}
-	if err := s.channels.Bind(ctx, call.ID, result.ChannelID); err != nil {
-		_ = s.controller.Hangup(ctx, result.ChannelID)
-		_ = s.admission.Release(ctx, selected.TrunkID, call.ID.String())
-		_ = s.admission.ReleaseOrganization(ctx, organizationID, call.ID.String())
-		reason := "channel_binding_failed"
-		_, _ = s.repo.MarkFailed(ctx, organizationID, call.ID, &reason)
-		return sqlc.Call{}, apperror.NewInternal("bind call channel", err)
-	}
-
-	return s.repo.Get(ctx, organizationID, call.ID)
 }
 
 func (s *Service) AdmitInbound(
@@ -537,25 +372,6 @@ func (s *Service) requireCallVoiceAgentReady(
 		call.OrganizationID,
 		*call.VoiceAgentID,
 	)
-}
-
-func validateExistingInbound(call sqlc.Call, req InboundAdmissionRequest) error {
-	if call.Direction != string(DirectionInbound) ||
-		call.OrganizationID != req.OrganizationID ||
-		call.VoiceAgentID == nil ||
-		*call.VoiceAgentID != req.VoiceAgentID ||
-		call.ToUri != req.ToURI {
-		return apperror.NewConflict("SIP Call-ID is already associated with a different call")
-	}
-	if call.TrunkID != nil && *call.TrunkID != req.TrunkID {
-		return apperror.NewConflict(
-			"SIP Call-ID trunk attribution does not match",
-		)
-	}
-	if isTerminalState(call.State) {
-		return apperror.NewConflict("inbound SIP call is already terminal")
-	}
-	return nil
 }
 
 func (s *Service) ensureInboundAttribution(
@@ -836,4 +652,233 @@ func translateMutationError(err error) error {
 		return apperror.NewConflict("call state transition or route attribution is not allowed")
 	}
 	return apperror.NewInternal("update call", err)
+}
+
+func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) error {
+	if event.CallID == uuid.Nil {
+		return apperror.NewBadRequest("call lifecycle event requires call id")
+	}
+	if event.ChannelID != "" && !isTerminalLifecycle(event.Type) {
+		if err := s.channels.Bind(ctx, event.CallID, event.ChannelID); err != nil {
+			return apperror.NewInternal("bind call channel", err)
+		}
+	}
+
+	snapshot, err := s.repo.GetLifecycleSnapshot(ctx, event.CallID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return apperror.NewInternal("resolve lifecycle call", err)
+	}
+	// Origination is queued; the real SIP Call-ID only exists once FreeSWITCH
+	// has created a SIP dialog. Record it from the correlated channel's ESL
+	// events, before applying the state transition (including terminal events).
+	if snapshot.Direction == string(DirectionOutbound) {
+		if isTerminalLifecycle(event.Type) {
+			if err := s.repo.MarkOriginationFinished(ctx, event.CallID); err != nil {
+				return apperror.NewInternal("finish outbound origination tracking", err)
+			}
+		} else if event.ChannelID != "" {
+			if err := s.repo.MarkOriginationObserved(ctx, event.CallID, event.ChannelID); err != nil {
+				return apperror.NewInternal("observe outbound origination tracking", err)
+			}
+		}
+		if sipCallID := strings.TrimSpace(event.SIPCallID); sipCallID != "" {
+			if err := s.repo.BindOutboundSIPCallID(ctx, snapshot.OrganizationID, event.CallID, sipCallID); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return apperror.NewConflict("outbound SIP Call-ID conflicts with existing call identity")
+				}
+				return apperror.NewInternal("persist outbound SIP Call-ID", err)
+			}
+		}
+	}
+
+	if !isTerminalLifecycle(event.Type) {
+		if err := s.admission.RefreshOrganization(
+			ctx,
+			snapshot.OrganizationID,
+			event.CallID,
+		); err != nil {
+			return apperror.NewServiceUnavailable("refresh organization call lease", err)
+		}
+		if snapshot.TrunkID != nil {
+			if err := s.admission.Refresh(ctx, *snapshot.TrunkID, event.CallID); err != nil {
+				return apperror.NewServiceUnavailable("refresh trunk call lease", err)
+			}
+		}
+	}
+	if lifecycleAlreadyApplied(snapshot, event.Type) {
+		if isTerminalLifecycle(event.Type) {
+			_ = s.channels.Delete(ctx, event.CallID)
+			_ = s.admission.ReleaseOrganization(
+				ctx,
+				snapshot.OrganizationID,
+				event.CallID.String(),
+			)
+			if snapshot.TrunkID != nil {
+				_ = s.admission.Release(ctx, *snapshot.TrunkID, event.CallID.String())
+			}
+		}
+		return nil
+	}
+
+	switch event.Type {
+	case LifecycleInitiated:
+		return nil
+	case LifecycleRinging:
+		_, err = s.MarkRinging(ctx, snapshot.OrganizationID, event.CallID)
+	case LifecycleAnswered:
+		_, err = s.MarkAnswered(ctx, snapshot.OrganizationID, event.CallID)
+	case LifecycleActive:
+		_, err = s.MarkActive(ctx, snapshot.OrganizationID, event.CallID)
+	case LifecycleHeld:
+		_, err = s.MarkHeld(ctx, snapshot.OrganizationID, event.CallID)
+	case LifecycleResumed:
+		_, err = s.MarkResumed(ctx, snapshot.OrganizationID, event.CallID)
+	case LifecycleCompleted:
+		_, err = s.MarkCompleted(ctx, snapshot.OrganizationID, event.CallID, event.HangupReason)
+	case LifecycleFailed:
+		_, err = s.MarkFailed(ctx, snapshot.OrganizationID, event.CallID, event.HangupReason)
+	case LifecycleCancelled:
+		_, err = s.MarkCancelled(ctx, snapshot.OrganizationID, event.CallID, event.HangupReason)
+	default:
+		return apperror.NewBadRequest("unsupported call lifecycle event")
+	}
+	if err == nil && isTerminalLifecycle(event.Type) {
+		_ = s.channels.Delete(ctx, event.CallID)
+		_ = s.admission.ReleaseOrganization(
+			ctx,
+			snapshot.OrganizationID,
+			event.CallID.String(),
+		)
+		if snapshot.TrunkID != nil {
+			_ = s.admission.Release(ctx, *snapshot.TrunkID, event.CallID.String())
+		}
+	}
+	return err
+}
+
+func lifecycleAlreadyApplied(snapshot LifecycleSnapshot, eventType LifecycleEventType) bool {
+	switch eventType {
+	case LifecycleInitiated:
+		return true
+	case LifecycleRinging:
+		return snapshot.State != string(StateInitiating)
+	case LifecycleAnswered:
+		return snapshot.State == string(StateAnswered) || snapshot.State == string(StateActive) || isTerminalState(snapshot.State)
+	case LifecycleActive:
+		return snapshot.State == string(StateActive) || isTerminalState(snapshot.State)
+	case LifecycleHeld:
+		return snapshot.MediaState == string(MediaStateHeld) || isTerminalState(snapshot.State)
+	case LifecycleResumed:
+		return snapshot.MediaState == string(MediaStateActive) || isTerminalState(snapshot.State)
+	case LifecycleCompleted, LifecycleFailed, LifecycleCancelled:
+		return isTerminalState(snapshot.State)
+	default:
+		return false
+	}
+}
+
+func isTerminalLifecycle(eventType LifecycleEventType) bool {
+	return eventType == LifecycleCompleted || eventType == LifecycleFailed || eventType == LifecycleCancelled
+}
+
+func isTerminalState(state string) bool {
+	return state == string(StateCompleted) || state == string(StateFailed) || state == string(StateCancelled)
+}
+
+func (s *Service) MarkRinging(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	return s.transition(ctx, organizationID, id, s.repo.MarkRinging)
+}
+
+func (s *Service) MarkAnswered(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	return s.transition(ctx, organizationID, id, s.repo.MarkAnswered)
+}
+
+func (s *Service) MarkActive(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	return s.transition(ctx, organizationID, id, s.repo.MarkActive)
+}
+
+func (s *Service) MarkHeld(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	return s.transition(ctx, organizationID, id, s.repo.MarkHeld)
+}
+
+func (s *Service) MarkResumed(ctx context.Context, organizationID, id uuid.UUID) (sqlc.Call, error) {
+	return s.transition(ctx, organizationID, id, s.repo.MarkResumed)
+}
+
+func (s *Service) MarkCompleted(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+	reason *string,
+) (sqlc.Call, error) {
+	if err := validateIDs(organizationID, id); err != nil {
+		return sqlc.Call{}, err
+	}
+	reason = normalizeOptionalReason(reason)
+	call, err := s.repo.MarkCompleted(ctx, organizationID, id, reason)
+	return call, translateMutationError(err)
+}
+
+func (s *Service) MarkFailed(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+	reason *string,
+) (sqlc.Call, error) {
+	if err := validateIDs(organizationID, id); err != nil {
+		return sqlc.Call{}, err
+	}
+	reason = normalizeOptionalReason(reason)
+	call, err := s.repo.MarkFailed(ctx, organizationID, id, reason)
+	return call, translateMutationError(err)
+}
+
+func (s *Service) MarkCancelled(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+	reason *string,
+) (sqlc.Call, error) {
+	if err := validateIDs(organizationID, id); err != nil {
+		return sqlc.Call{}, err
+	}
+	reason = normalizeOptionalReason(reason)
+	call, err := s.repo.MarkCancelled(ctx, organizationID, id, reason)
+	return call, translateMutationError(err)
+}
+
+func (s *Service) transition(
+	ctx context.Context,
+	organizationID, id uuid.UUID,
+	fn func(context.Context, uuid.UUID, uuid.UUID) (sqlc.Call, error),
+) (sqlc.Call, error) {
+	if err := validateIDs(organizationID, id); err != nil {
+		return sqlc.Call{}, err
+	}
+	call, err := fn(ctx, organizationID, id)
+	return call, translateMutationError(err)
+}
+
+// ResolveLifecycleCall returns the canonical call row for an internal
+// lifecycle event without requiring the worker to already know tenant context.
+// Unknown or stale event identities are ignored.
+func (s *Service) ResolveLifecycleCall(ctx context.Context, id uuid.UUID) (sqlc.Call, error) {
+	if id == uuid.Nil {
+		return sqlc.Call{}, apperror.NewBadRequest("call lifecycle event requires call id")
+	}
+	snapshot, err := s.repo.GetLifecycleSnapshot(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.Call{}, nil
+	}
+	if err != nil {
+		return sqlc.Call{}, apperror.NewInternal("resolve lifecycle call", err)
+	}
+	call, err := s.repo.Get(ctx, snapshot.OrganizationID, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sqlc.Call{}, nil
+	}
+	if err != nil {
+		return sqlc.Call{}, apperror.NewInternal("get lifecycle call", err)
+	}
+	return call, nil
 }
