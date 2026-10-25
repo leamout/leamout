@@ -37,6 +37,15 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 
 	call, err := h.service.Create(r.Context(), organizationID, req)
 	if err != nil {
+		if call.ID != uuid.Nil {
+			// An uncertain bgapi submission may already have created a real
+			// SIP leg. Return its durable identity, not a retry-inducing 503.
+			httputil.Accepted(w, map[string]any{
+				"call": callResponse(call),
+				"origination_status": "uncertain",
+			})
+			return
+		}
 		httputil.Error(w, err)
 		return
 	}
