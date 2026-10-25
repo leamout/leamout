@@ -143,28 +143,11 @@ func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error 
 		return err
 	}
 	for _, item := range pending {
-		trunks, err := j.repo.ListCleanupTrunks(ctx, item.CallID)
-		if err == nil {
-			err = j.service.channels.Delete(ctx, item.CallID)
-		}
-		if err == nil {
-			err = j.service.admission.ReleaseOrganization(ctx, item.OrganizationID, item.CallID.String())
-		}
-		if err == nil {
-			for _, trunkID := range trunks {
-				if err = j.service.admission.Release(ctx, trunkID, item.CallID.String()); err != nil {
-					break
-				}
-			}
-		}
-		if err != nil {
+		if err := j.service.cleanupTerminalAdmission(ctx, item); err != nil {
 			if deferErr := j.repo.DeferAdmissionCleanup(ctx, item.CallID); deferErr != nil {
 				return errors.Join(err, fmt.Errorf("defer terminal cleanup for %s: %w", item.CallID, deferErr))
 			}
-			continue
-		}
-		if err := j.repo.FinishAdmissionCleanup(ctx, item.CallID); err != nil {
-			return fmt.Errorf("finish terminal cleanup for %s: %w", item.CallID, err)
+			log.Printf("retry terminal call cleanup for %s: %v", item.CallID, err)
 		}
 	}
 	return nil

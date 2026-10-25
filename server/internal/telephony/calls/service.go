@@ -3,6 +3,8 @@ package calls
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
 	"strings"
 
 	"github.com/google/uuid"
@@ -705,6 +707,9 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 		}
 	}
 	if lifecycleAlreadyApplied(snapshot, event.Type) {
+		if isTerminalLifecycle(event.Type) {
+			s.cleanupTerminalAdmissionAfterLifecycle(ctx, event.CallID, snapshot.OrganizationID)
+		}
 		return nil
 	}
 
@@ -729,6 +734,9 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 		_, err = s.MarkCancelled(ctx, snapshot.OrganizationID, event.CallID, event.HangupReason)
 	default:
 		return apperror.NewBadRequest("unsupported call lifecycle event")
+	}
+	if err == nil && isTerminalLifecycle(event.Type) {
+		s.cleanupTerminalAdmissionAfterLifecycle(ctx, event.CallID, snapshot.OrganizationID)
 	}
 
 	return err
@@ -856,4 +864,45 @@ func (s *Service) ResolveLifecycleCall(ctx context.Context, id uuid.UUID) (sqlc.
 		return sqlc.Call{}, apperror.NewInternal("get lifecycle call", err)
 	}
 	return call, nil
+}
+
+
+// cleanupTerminalAdmissionAfterLifecycle releases admission capacity promptly
+// after the terminal transition commits. A transient failure is safe: the
+// transaction also persisted a cleanup marker for the worker to retry.
+// Lifecycle consumers must still observe the terminal event even when Redis
+// is temporarily unavailable.
+func (s *Service) cleanupTerminalAdmissionAfterLifecycle(
+	ctx context.Context,
+	callID, organizationID uuid.UUID,
+) {
+	if err := s.cleanupTerminalAdmission(ctx, AdmissionCleanup{
+		CallID: callID, OrganizationID: organizationID,
+	}); err != nil {
+		log.Printf("deferred terminal call cleanup for %s: %v", callID, err)
+	}
+}
+
+// cleanupTerminalAdmission is idempotent: Redis ZREM, channel deletion and the
+// durable queue deletion can safely run again after a partial failure.
+func (s *Service) cleanupTerminalAdmission(ctx context.Context, item AdmissionCleanup) error {
+	trunks, err := s.repo.ListCleanupTrunks(ctx, item.CallID)
+	if err != nil {
+		return fmt.Errorf("list admission trunks for call %s: %w", item.CallID, err)
+	}
+	if err := s.channels.Delete(ctx, item.CallID); err != nil {
+		return fmt.Errorf("delete channel for call %s: %w", item.CallID, err)
+	}
+	if err := s.admission.ReleaseOrganization(ctx, item.OrganizationID, item.CallID.String()); err != nil {
+		return fmt.Errorf("release organization admission for call %s: %w", item.CallID, err)
+	}
+	for _, trunkID := range trunks {
+		if err := s.admission.Release(ctx, trunkID, item.CallID.String()); err != nil {
+			return fmt.Errorf("release trunk %s admission for call %s: %w", trunkID, item.CallID, err)
+		}
+	}
+	if err := s.repo.FinishAdmissionCleanup(ctx, item.CallID); err != nil {
+		return fmt.Errorf("finish admission cleanup for call %s: %w", item.CallID, err)
+	}
+	return nil
 }
