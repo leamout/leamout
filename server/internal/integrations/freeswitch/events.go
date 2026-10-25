@@ -137,7 +137,6 @@ func plainEventHeader(body, name string) string {
 	return ""
 }
 
-
 // A fixed number of worker queues bounds the number of concurrently executing
 // ESL callbacks. Each channel is assigned to exactly one FIFO queue, retaining
 // the order of its events while allowing independent channels to progress.
