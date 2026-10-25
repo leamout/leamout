@@ -87,10 +87,15 @@ func TestEventDispatchOverloadIsExplicitAndBounded(t *testing.T) {
 }
 
 func TestEventDispatchStableShard(t *testing.T) {
-	if eventDispatchShard("abc") != eventDispatchShard("abc") {
-		t.Fatal("unstable event shard")
-	}
-	if eventDispatchShard("abc") < 0 || eventDispatchShard("abc") >= eventDispatchShards {
-		t.Fatal("invalid shard")
+	for _, key := range []string{"abc", "another-channel", "unkeyed"} {
+		want := eventDispatchShard(key)
+		if want < 0 || want >= eventDispatchShards {
+			t.Fatalf("invalid shard %d for %q", want, key)
+		}
+		for i := 0; i < 10; i++ {
+			if got := eventDispatchShard(key); got != want {
+				t.Fatalf("unstable shard for %q: got %d, want %d", key, got, want)
+			}
+		}
 	}
 }
