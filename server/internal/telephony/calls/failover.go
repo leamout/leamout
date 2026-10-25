@@ -32,6 +32,8 @@ func executeRoutePlan(
 ) (calling.OriginateResult, routing.OutboundRoute, error) {
 	limit := min(len(routes), maxOutboundAttempts)
 	var lastErr error
+	var lastResult calling.OriginateResult
+	var lastRoute routing.OutboundRoute
 	for index := 0; index < limit; index++ {
 		if err := ctx.Err(); err != nil {
 			return calling.OriginateResult{}, routing.OutboundRoute{}, err
@@ -63,6 +65,8 @@ func executeRoutePlan(
 			observe(context.WithoutCancel(ctx), outcome)
 		}
 		lastErr = err
+		lastResult = result
+		lastRoute = route
 		if outcome.Outcome != "retryable_failure" {
 			break
 		}
@@ -70,7 +74,7 @@ func executeRoutePlan(
 	if lastErr == nil {
 		lastErr = errors.New("outbound route plan is empty")
 	}
-	return calling.OriginateResult{}, routing.OutboundRoute{}, lastErr
+	return lastResult, lastRoute, lastErr
 }
 
 func classifyOriginateFailure(err error) (failureClass string, sipStatus int, outcome string) {

@@ -41,6 +41,7 @@ func (c *Controller) Originate(
 	}
 
 	call, err := c.client.Originate(ctx, freeswitch.OriginateRequest{
+		ChannelID:   req.ChannelID,
 		Endpoint:    endpoint,
 		Destination: req.Destination,
 		CallerID:    req.CallerID,
