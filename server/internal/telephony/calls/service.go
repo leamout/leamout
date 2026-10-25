@@ -119,8 +119,6 @@ func (s *Service) requireRuntimeAllowance(ctx context.Context, organizationID uu
 	return s.runtimeAllowance(ctx, organizationID)
 }
 
-
-
 func (s *Service) AdmitInbound(
 	ctx context.Context,
 	req InboundAdmissionRequest,
@@ -375,8 +373,6 @@ func (s *Service) requireCallVoiceAgentReady(
 		*call.VoiceAgentID,
 	)
 }
-
-
 
 func (s *Service) ensureInboundAttribution(
 	ctx context.Context,
