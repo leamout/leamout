@@ -866,7 +866,6 @@ func (s *Service) ResolveLifecycleCall(ctx context.Context, id uuid.UUID) (sqlc.
 	return call, nil
 }
 
-
 // cleanupTerminalAdmissionAfterLifecycle releases admission capacity promptly
 // after the terminal transition commits. A transient failure is safe: the
 // transaction also persisted a cleanup marker for the worker to retry.
