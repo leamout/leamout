@@ -293,3 +293,50 @@ func (r *Repository) mutate(
 	}
 	return call, nil
 }
+
+func (r *Repository) PrepareOrigination(ctx context.Context, a OriginationAttempt) error {
+	channelID, err := uuid.Parse(a.ChannelID)
+	if err != nil { return fmt.Errorf("parse originate channel UUID: %w", err) }
+	return r.queries.PrepareCallOrigination(ctx, sqlc.PrepareCallOriginationParams{
+		ChannelID: channelID, CallID: a.CallID, OrganizationID: a.OrganizationID,
+		TrunkID: a.TrunkID, TrunkEndpointID: a.TrunkEndpointID,
+	})
+}
+
+func (r *Repository) MarkOriginationSubmitted(ctx context.Context, channelID string) error {
+	id, err := uuid.Parse(channelID)
+	if err != nil { return err }
+	return r.queries.MarkCallOriginationSubmitted(ctx, id)
+}
+
+func (r *Repository) MarkOriginationUncertain(ctx context.Context, channelID string) error {
+	id, err := uuid.Parse(channelID)
+	if err != nil { return err }
+	return r.queries.MarkCallOriginationUncertain(ctx, id)
+}
+
+func (r *Repository) MarkOriginationObserved(ctx context.Context, callID uuid.UUID, channelID string) error {
+	id, err := uuid.Parse(channelID)
+	if err != nil { return err }
+	return r.queries.MarkCallOriginationObserved(ctx, sqlc.MarkCallOriginationObservedParams{
+		CallID: callID, ChannelID: id,
+	})
+}
+
+func (r *Repository) MarkOriginationFinished(ctx context.Context, callID uuid.UUID) error {
+	return r.queries.MarkCallOriginationFinishedForCall(ctx, callID)
+}
+
+func (r *Repository) ListUnresolvedOriginations(ctx context.Context) ([]UnresolvedOrigination, error) {
+	rows, err := r.queries.ListUnresolvedCallOriginations(ctx)
+	if err != nil { return nil, err }
+	result := make([]UnresolvedOrigination, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, UnresolvedOrigination{
+			ChannelID: row.ChannelID.String(), CallID: row.CallID,
+			OrganizationID: row.OrganizationID, TrunkID: row.TrunkID,
+			CreatedAt: row.CreatedAt.Time,
+		})
+	}
+	return result, nil
+}

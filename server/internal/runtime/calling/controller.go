@@ -135,3 +135,7 @@ func (c *Controller) SetCallID(
 	}
 	return nil
 }
+
+func (c *Controller) ChannelExists(ctx context.Context, channelID string) (bool, error) {
+	return c.client.ChannelExists(ctx, channelID)
+}

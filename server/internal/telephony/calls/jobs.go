@@ -78,6 +78,10 @@ func (j *ReconciliationJob) Reconcile(ctx context.Context) error {
 		return fmt.Errorf("list calls for admission reconciliation: %w", err)
 	}
 
+	if err := j.reconcileOriginations(ctx); err != nil {
+		return fmt.Errorf("reconcile outbound originations: %w", err)
+	}
+
 	for _, call := range active {
 		if err := j.service.admission.Refresh(ctx, call.TrunkID, call.ID); err != nil {
 			return fmt.Errorf("refresh trunk admission lease for call %s: %w", call.ID, err)
