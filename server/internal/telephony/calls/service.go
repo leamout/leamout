@@ -675,11 +675,7 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 	// has created a SIP dialog. Record it from the correlated channel's ESL
 	// events, before applying the state transition (including terminal events).
 	if snapshot.Direction == string(DirectionOutbound) {
-		if isTerminalLifecycle(event.Type) {
-			if err := s.repo.MarkOriginationFinished(ctx, event.CallID); err != nil {
-				return apperror.NewInternal("finish outbound origination tracking", err)
-			}
-		} else if event.ChannelID != "" {
+		if !isTerminalLifecycle(event.Type) && event.ChannelID != "" {
 			if err := s.repo.MarkOriginationObserved(ctx, event.CallID, event.ChannelID); err != nil {
 				return apperror.NewInternal("observe outbound origination tracking", err)
 			}
@@ -709,17 +705,6 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 		}
 	}
 	if lifecycleAlreadyApplied(snapshot, event.Type) {
-		if isTerminalLifecycle(event.Type) {
-			_ = s.channels.Delete(ctx, event.CallID)
-			_ = s.admission.ReleaseOrganization(
-				ctx,
-				snapshot.OrganizationID,
-				event.CallID.String(),
-			)
-			if snapshot.TrunkID != nil {
-				_ = s.admission.Release(ctx, *snapshot.TrunkID, event.CallID.String())
-			}
-		}
 		return nil
 	}
 
@@ -745,17 +730,7 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 	default:
 		return apperror.NewBadRequest("unsupported call lifecycle event")
 	}
-	if err == nil && isTerminalLifecycle(event.Type) {
-		_ = s.channels.Delete(ctx, event.CallID)
-		_ = s.admission.ReleaseOrganization(
-			ctx,
-			snapshot.OrganizationID,
-			event.CallID.String(),
-		)
-		if snapshot.TrunkID != nil {
-			_ = s.admission.Release(ctx, *snapshot.TrunkID, event.CallID.String())
-		}
-	}
+
 	return err
 }
 

@@ -116,6 +116,11 @@ type UnresolvedOrigination struct {
 	CreatedAt      time.Time
 }
 
+type AdmissionCleanup struct {
+	CallID uuid.UUID
+	OrganizationID uuid.UUID
+}
+
 type ActiveAdmissionCall struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID

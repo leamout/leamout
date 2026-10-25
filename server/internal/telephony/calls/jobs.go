@@ -94,6 +94,9 @@ func (j *ReconciliationJob) Reconcile(ctx context.Context) error {
 	if err := j.reconcileOriginations(ctx); err != nil {
 		return fmt.Errorf("reconcile outbound originations: %w", err)
 	}
+	if err := j.reconcileTerminalCleanup(ctx); err != nil {
+		return fmt.Errorf("reconcile terminal admission cleanup: %w", err)
+	}
 
 	return nil
 }
@@ -113,6 +116,9 @@ func (j *ReconciliationJob) reconcileOriginations(ctx context.Context) error {
 			return fmt.Errorf("query originate channel %s: %w", channelID, err)
 		}
 		if !exists {
+			if err := j.repo.DeferOriginationCheck(ctx, channelID); err != nil {
+				return fmt.Errorf("defer unresolved originate channel %s: %w", channelID, err)
+			}
 			continue
 		}
 		if err := j.service.channels.Bind(ctx, attempt.CallID, channelID); err != nil {
@@ -127,3 +133,35 @@ func (j *ReconciliationJob) reconcileOriginations(ctx context.Context) error {
 
 // Successful channel discovery does not imply the call was answered; only
 // lifecycle events may advance the call state.
+
+// Terminal rows are durable even if the lifecycle handler or Redis restarts.
+// Redis ZREM and channel deletion are safe to repeat. Only delete the durable
+// cleanup marker once every required release has succeeded.
+func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error {
+	pending, err := j.repo.ListDueAdmissionCleanup(ctx)
+	if err != nil { return err }
+	for _, item := range pending {
+		trunks, err := j.repo.ListCleanupTrunks(ctx, item.CallID)
+		if err == nil {
+			err = j.service.channels.Delete(ctx, item.CallID)
+		}
+		if err == nil {
+			err = j.service.admission.ReleaseOrganization(ctx, item.OrganizationID, item.CallID.String())
+		}
+		if err == nil {
+			for _, trunkID := range trunks {
+				if err = j.service.admission.Release(ctx, trunkID, item.CallID.String()); err != nil { break }
+			}
+		}
+		if err != nil {
+			if deferErr := j.repo.DeferAdmissionCleanup(ctx, item.CallID); deferErr != nil {
+				return errors.Join(err, fmt.Errorf("defer terminal cleanup for %s: %w", item.CallID, deferErr))
+			}
+			continue
+		}
+		if err := j.repo.FinishAdmissionCleanup(ctx, item.CallID); err != nil {
+			return fmt.Errorf("finish terminal cleanup for %s: %w", item.CallID, err)
+		}
+	}
+	return nil
+}
