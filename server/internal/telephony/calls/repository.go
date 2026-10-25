@@ -374,7 +374,18 @@ func (r *Repository) ListDueAdmissionCleanup(ctx context.Context) ([]AdmissionCl
 }
 
 func (r *Repository) ListCleanupTrunks(ctx context.Context, callID uuid.UUID) ([]uuid.UUID, error) {
-	return r.queries.ListCallCleanupTrunks(ctx, callID)
+	rows, err := r.queries.ListCallCleanupTrunks(ctx, callID)
+	if err != nil {
+		return nil, err
+	}
+
+	trunks := make([]uuid.UUID, 0, len(rows))
+	for _, trunkID := range rows {
+		if trunkID != nil {
+			trunks = append(trunks, *trunkID)
+		}
+	}
+	return trunks, nil
 }
 
 func (r *Repository) DeferAdmissionCleanup(ctx context.Context, callID uuid.UUID) error {
