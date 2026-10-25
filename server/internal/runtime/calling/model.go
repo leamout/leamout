@@ -9,7 +9,7 @@ import (
 )
 
 type OriginateRequest struct {
-	ChannelID string
+	ChannelID          string
 	CallID             uuid.UUID
 	Destination        string
 	CallerID           string

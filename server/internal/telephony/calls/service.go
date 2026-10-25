@@ -215,7 +215,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 		}
 		result, originateErr := s.controller.Originate(attemptCtx, calling.OriginateRequest{
 			ChannelID: channelID,
-			CallID: call.ID, Destination: req.ToURI, CallerID: req.FromURI,
+			CallID:    call.ID, Destination: req.ToURI, CallerID: req.FromURI,
 			PinnedIP: addresses[0].String(),
 			TrunkID:  route.TrunkID,
 			Host:     route.Host, Port: route.Port, Transport: route.Transport,

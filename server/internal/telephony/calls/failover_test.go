@@ -233,7 +233,7 @@ func TestExecuteRoutePlanPreservesUncertainChannelIdentity(t *testing.T) {
 		attempts++
 		return want, &calling.OriginateError{
 			Class: calling.OriginateFailureUncertain,
-			Err: errors.New("FreeSWITCH accepted command but ACK was lost"),
+			Err:   errors.New("FreeSWITCH accepted command but ACK was lost"),
 		}
 	}, nil)
 	if err == nil || attempts != 1 {

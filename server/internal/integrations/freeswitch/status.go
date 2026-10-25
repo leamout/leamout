@@ -116,12 +116,19 @@ func stringField(row map[string]any, key string) string {
 }
 
 func (c *Client) ChannelExists(ctx context.Context, channelID string) (bool, error) {
-	if _, err := uuid.Parse(channelID); err != nil { return false, err }
+	if _, err := uuid.Parse(channelID); err != nil {
+		return false, err
+	}
 	reply, err := c.Command(ctx, "uuid_exists "+channelID)
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	switch strings.ToLower(strings.TrimSpace(reply.Body)) {
-	case "true": return true, nil
-	case "false": return false, nil
-	default: return false, fmt.Errorf("unexpected uuid_exists response %q", reply.Body)
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected uuid_exists response %q", reply.Body)
 	}
 }

@@ -101,19 +101,19 @@ type DTMFActionRequest struct {
 }
 
 type OriginationAttempt struct {
-	ChannelID string
-	CallID uuid.UUID
-	OrganizationID uuid.UUID
-	TrunkID uuid.UUID
+	ChannelID       string
+	CallID          uuid.UUID
+	OrganizationID  uuid.UUID
+	TrunkID         uuid.UUID
 	TrunkEndpointID uuid.UUID
 }
 
 type UnresolvedOrigination struct {
-	ChannelID string
-	CallID uuid.UUID
+	ChannelID      string
+	CallID         uuid.UUID
 	OrganizationID uuid.UUID
-	TrunkID uuid.UUID
-	CreatedAt time.Time
+	TrunkID        uuid.UUID
+	CreatedAt      time.Time
 }
 
 type ActiveAdmissionCall struct {
