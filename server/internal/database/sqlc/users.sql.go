@@ -176,127 +176,6 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
-const listBackofficeUserOrganizations = `-- name: ListBackofficeUserOrganizations :many
-SELECT
-    o.id::TEXT AS organization_id,
-    o.name,
-    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::TEXT AS organization_status,
-    om.role,
-    om.status AS membership_status,
-    to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS joined_at
-FROM organization_members AS om
-JOIN organizations AS o ON o.id = om.organization_id
-WHERE om.user_id = $1
-ORDER BY
-    CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
-    om.created_at ASC
-`
-
-type ListBackofficeUserOrganizationsRow struct {
-	OrganizationID     string `db:"organization_id" json:"organization_id"`
-	Name               string `db:"name" json:"name"`
-	OrganizationStatus string `db:"organization_status" json:"organization_status"`
-	Role               string `db:"role" json:"role"`
-	MembershipStatus   string `db:"membership_status" json:"membership_status"`
-	JoinedAt           string `db:"joined_at" json:"joined_at"`
-}
-
-func (q *Queries) ListBackofficeUserOrganizations(ctx context.Context, userID uuid.UUID) ([]ListBackofficeUserOrganizationsRow, error) {
-	rows, err := q.db.Query(ctx, listBackofficeUserOrganizations, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListBackofficeUserOrganizationsRow{}
-	for rows.Next() {
-		var i ListBackofficeUserOrganizationsRow
-		if err := rows.Scan(
-			&i.OrganizationID,
-			&i.Name,
-			&i.OrganizationStatus,
-			&i.Role,
-			&i.MembershipStatus,
-			&i.JoinedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listBackofficeUserSessions = `-- name: ListBackofficeUserSessions :many
-SELECT
-    s.id::TEXT AS session_id,
-    s.assurance,
-    COALESCE(host(s.ip_address), '—')::TEXT AS ip_address,
-    COALESCE(NULLIF(BTRIM(s.user_agent), ''), '—')::TEXT AS user_agent,
-    CASE
-        WHEN s.revoked_at IS NOT NULL THEN 'revoked'
-        WHEN s.expires_at <= NOW() THEN 'expired'
-        ELSE 'active'
-    END::TEXT AS status,
-    to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS created_at,
-    COALESCE(
-        to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
-        '—'
-    )::TEXT AS last_seen_at,
-    to_char(s.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS expires_at,
-    COALESCE(
-        to_char(s.revoked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
-        '—'
-    )::TEXT AS revoked_at
-FROM sessions AS s
-WHERE s.user_id = $1
-ORDER BY s.created_at DESC
-LIMIT 20
-`
-
-type ListBackofficeUserSessionsRow struct {
-	SessionID  string `db:"session_id" json:"session_id"`
-	Assurance  string `db:"assurance" json:"assurance"`
-	IpAddress  string `db:"ip_address" json:"ip_address"`
-	UserAgent  string `db:"user_agent" json:"user_agent"`
-	Status     string `db:"status" json:"status"`
-	CreatedAt  string `db:"created_at" json:"created_at"`
-	LastSeenAt string `db:"last_seen_at" json:"last_seen_at"`
-	ExpiresAt  string `db:"expires_at" json:"expires_at"`
-	RevokedAt  string `db:"revoked_at" json:"revoked_at"`
-}
-
-func (q *Queries) ListBackofficeUserSessions(ctx context.Context, userID uuid.UUID) ([]ListBackofficeUserSessionsRow, error) {
-	rows, err := q.db.Query(ctx, listBackofficeUserSessions, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ListBackofficeUserSessionsRow{}
-	for rows.Next() {
-		var i ListBackofficeUserSessionsRow
-		if err := rows.Scan(
-			&i.SessionID,
-			&i.Assurance,
-			&i.IpAddress,
-			&i.UserAgent,
-			&i.Status,
-			&i.CreatedAt,
-			&i.LastSeenAt,
-			&i.ExpiresAt,
-			&i.RevokedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const listBackofficeUsers = `-- name: ListBackofficeUsers :many
 SELECT
     u.id::TEXT AS id,
@@ -309,6 +188,23 @@ SELECT
     to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS created_at
 FROM users AS u
 LEFT JOIN organization_members AS om ON om.user_id = u.id
+WHERE (
+    $1::text = ''
+    OR u.id::text = $1::text
+    OR strpos(lower(u.email::text), lower($1::text)) > 0
+    OR strpos(lower(COALESCE(u.name, '')), lower($1::text)) > 0
+)
+  AND ($2::text = '' OR (u.disabled_at IS NULL) = ($2::text = 'active'))
+  AND ($3::text = '' OR u.is_platform_admin = ($3::text = 'yes'))
+  AND ($4::text = '' OR u.email_verified = ($4::text = 'yes'))
+  AND (
+      $5::uuid IS NULL
+      OR EXISTS (
+          SELECT 1 FROM organization_members AS member
+          WHERE member.user_id = u.id
+            AND member.organization_id = $5::uuid
+      )
+  )
 GROUP BY
     u.id,
     u.name,
@@ -317,9 +213,20 @@ GROUP BY
     u.is_platform_admin,
     u.disabled_at,
     u.created_at
-ORDER BY u.created_at DESC
-LIMIT 100
+ORDER BY u.created_at DESC, u.id DESC
+LIMIT $7::int
+OFFSET $6::int
 `
+
+type ListBackofficeUsersParams struct {
+	Search         string     `db:"search" json:"search"`
+	Status         string     `db:"status" json:"status"`
+	Admin          string     `db:"admin" json:"admin"`
+	Verified       string     `db:"verified" json:"verified"`
+	OrganizationID *uuid.UUID `db:"organization_id" json:"organization_id"`
+	PageOffset     int32      `db:"page_offset" json:"page_offset"`
+	PageLimit      int32      `db:"page_limit" json:"page_limit"`
+}
 
 type ListBackofficeUsersRow struct {
 	ID                string `db:"id" json:"id"`
@@ -332,8 +239,16 @@ type ListBackofficeUsersRow struct {
 	CreatedAt         string `db:"created_at" json:"created_at"`
 }
 
-func (q *Queries) ListBackofficeUsers(ctx context.Context) ([]ListBackofficeUsersRow, error) {
-	rows, err := q.db.Query(ctx, listBackofficeUsers)
+func (q *Queries) ListBackofficeUsers(ctx context.Context, arg ListBackofficeUsersParams) ([]ListBackofficeUsersRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeUsers,
+		arg.Search,
+		arg.Status,
+		arg.Admin,
+		arg.Verified,
+		arg.OrganizationID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}

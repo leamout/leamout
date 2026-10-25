@@ -58,6 +58,23 @@ SELECT
     to_char(u.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS created_at
 FROM users AS u
 LEFT JOIN organization_members AS om ON om.user_id = u.id
+WHERE (
+    sqlc.arg(search)::text = ''
+    OR u.id::text = sqlc.arg(search)::text
+    OR strpos(lower(u.email::text), lower(sqlc.arg(search)::text)) > 0
+    OR strpos(lower(COALESCE(u.name, '')), lower(sqlc.arg(search)::text)) > 0
+)
+  AND (sqlc.arg(status)::text = '' OR (u.disabled_at IS NULL) = (sqlc.arg(status)::text = 'active'))
+  AND (sqlc.arg(admin)::text = '' OR u.is_platform_admin = (sqlc.arg(admin)::text = 'yes'))
+  AND (sqlc.arg(verified)::text = '' OR u.email_verified = (sqlc.arg(verified)::text = 'yes'))
+  AND (
+      sqlc.narg(organization_id)::uuid IS NULL
+      OR EXISTS (
+          SELECT 1 FROM organization_members AS member
+          WHERE member.user_id = u.id
+            AND member.organization_id = sqlc.narg(organization_id)::uuid
+      )
+  )
 GROUP BY
     u.id,
     u.name,
@@ -66,8 +83,9 @@ GROUP BY
     u.is_platform_admin,
     u.disabled_at,
     u.created_at
-ORDER BY u.created_at DESC
-LIMIT 100;
+ORDER BY u.created_at DESC, u.id DESC
+LIMIT sqlc.arg(page_limit)::int
+OFFSET sqlc.arg(page_offset)::int;
 
 -- name: GetBackofficeUser :one
 SELECT
@@ -106,44 +124,3 @@ GROUP BY
     u.created_at,
     u.updated_at
 LIMIT 1;
-
--- name: ListBackofficeUserOrganizations :many
-SELECT
-    o.id::TEXT AS organization_id,
-    o.name,
-    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::TEXT AS organization_status,
-    om.role,
-    om.status AS membership_status,
-    to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS joined_at
-FROM organization_members AS om
-JOIN organizations AS o ON o.id = om.organization_id
-WHERE om.user_id = sqlc.arg(user_id)
-ORDER BY
-    CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
-    om.created_at ASC;
-
--- name: ListBackofficeUserSessions :many
-SELECT
-    s.id::TEXT AS session_id,
-    s.assurance,
-    COALESCE(host(s.ip_address), '—')::TEXT AS ip_address,
-    COALESCE(NULLIF(BTRIM(s.user_agent), ''), '—')::TEXT AS user_agent,
-    CASE
-        WHEN s.revoked_at IS NOT NULL THEN 'revoked'
-        WHEN s.expires_at <= NOW() THEN 'expired'
-        ELSE 'active'
-    END::TEXT AS status,
-    to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS created_at,
-    COALESCE(
-        to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
-        '—'
-    )::TEXT AS last_seen_at,
-    to_char(s.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS expires_at,
-    COALESCE(
-        to_char(s.revoked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
-        '—'
-    )::TEXT AS revoked_at
-FROM sessions AS s
-WHERE s.user_id = sqlc.arg(user_id)
-ORDER BY s.created_at DESC
-LIMIT 20;

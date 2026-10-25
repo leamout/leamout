@@ -1,0 +1,87 @@
+package users
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/server/internal/backoffice/components"
+)
+
+templ Page(result List) {
+	@components.Layout("Users", "users", ListContent(result))
+}
+
+templ ListContent(result List) {
+	<div class="mb-8">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Customers</p>
+		<h1 class="mt-2 text-3xl font-bold">Users</h1>
+		<p class="mt-2 text-base-content/70">Inspect accounts, memberships and session records across Leamout.</p>
+	</div>
+	@Filters(result.Filter)
+	@UserTable(result.Users)
+	<nav class="mt-6 flex items-center justify-between" aria-label="Pagination">
+		<span class="text-sm text-base-content/60">Page { fmt.Sprint(result.Filter.Page) }</span>
+		<div class="flex gap-2">
+			if result.Filter.Page > 1 {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page-1)) }>Previous</a>
+			}
+			if result.HasNext {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page+1)) }>Next</a>
+			}
+		</div>
+	</nav>
+}
+
+templ DetailPage(detail Detail) {
+	@components.Layout(detail.Email, "users", DetailContent(detail))
+}
+
+templ DetailContent(detail Detail) {
+	<a class="link link-primary text-sm" href="/users">Back to users</a>
+	<h1 class="mt-6 text-3xl font-bold">{ detail.Email }</h1>
+	<p class="mt-2 break-all font-mono text-sm text-base-content/60">{ detail.ID }</p>
+	<p class="mt-2 text-sm text-base-content/60">All timestamps are UTC.</p>
+	<div class="mt-8 grid gap-6 lg:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Account</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Name", detail.Name)
+				@Field("Email", detail.Email)
+				@Field("Status", detail.Status)
+				@Field("Email verified", fmt.Sprint(detail.EmailVerified))
+				@Field("Platform administrator", fmt.Sprint(detail.IsPlatformAdmin))
+				@Field("Active memberships", fmt.Sprint(detail.OrganizationCount))
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Activity</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Created", detail.CreatedAt)
+				@Field("Updated", detail.UpdatedAt)
+				@Field("Disabled", detail.DisabledAt)
+				@Field("Last seen", detail.LastSeenAt)
+				@Field("Unrevoked, unexpired sessions", fmt.Sprint(detail.ActiveSessionCount))
+			</dl>
+		</section>
+	</div>
+	<section class="mt-8">
+		<h2 class="mb-4 text-lg font-semibold">Organization memberships</h2>
+		<p class="mb-4 text-sm text-base-content/60">Includes disabled memberships and disabled or deleted organizations. An active membership alone does not establish effective access.</p>
+		@MembershipTable(detail.Memberships)
+		<nav class="mt-4 flex items-center justify-between" aria-label="Membership pagination">
+			<span>Page { fmt.Sprint(detail.MemberPage) }</span>
+			<div class="flex gap-2">
+				if detail.MemberPage > 1 {
+					<a class="btn btn-outline btn-sm" href={ templ.SafeURL(memberPageURL(detail.ID, detail.MemberPage-1)) }>Previous</a>
+				}
+				if detail.HasNextMembers {
+					<a class="btn btn-outline btn-sm" href={ templ.SafeURL(memberPageURL(detail.ID, detail.MemberPage+1)) }>Next</a>
+				}
+			</div>
+		</nav>
+	</section>
+	<section class="mt-8">
+		<h2 class="mb-4 text-lg font-semibold">Recent sessions</h2>
+		<p class="mb-4 text-sm text-base-content/60">Latest 20 stored session records. Recorded status reflects expiry and revocation; access also depends on account and authentication rules.</p>
+		@SessionTable(detail.Sessions)
+	</section>
+}

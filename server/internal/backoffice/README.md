@@ -31,6 +31,16 @@ platform-admin session guard. Queries remain in `subscriptions.sql`, `calls.sql`
 and `voice_agent_sessions.sql`; no configuration snapshots or event payloads are
 rendered.
 
+Users provide email/name/ID search, account-status, verification, platform-admin
+and organization filters. Details show paginated memberships and the latest 20
+sessions with lifecycle metadata, without tokens or credentials.
+
+Numbers provide number/ID/organization search, lifecycle, country, voice,
+organization and trunk filters. Details show the owning organization, trunk and
+bound agent, including disabled or released records. Both features are read-only,
+use 25-row pagination and the existing platform-admin guard. Queries live in
+`users.sql`, `organization_members.sql`, `sessions.sql` and `phone_numbers.sql`.
+
 ## Development
 
 Backoffice uses `config.Load()` and `config.Config` from
@@ -65,7 +75,7 @@ available for subsequent sign-in. Signed backchannel logout events can be
 received at `/identity/backchannel-logout`; the existing API backchannel handler
 also revokes matching sessions in the shared database.
 
-Only active users with `is_platform_admin` may access organization, agent, subscription and call pages.
+Only active users with `is_platform_admin` may access organization, agent, subscription, call, user and number pages.
 A trusted administrator must explicitly promote an existing, verified account
 using its exact ID:
 
@@ -96,6 +106,8 @@ is involved. The Docker build generates templates and the local asset bundle.
 - `internal/backoffice/agents`: agent models, repository, handlers, routes,
   validation, pages and feature components.
 - `internal/backoffice/subscriptions` and `internal/backoffice/calls`: models,
+  repositories, handlers, routes, validation, pages and feature components.
+- `internal/backoffice/users` and `internal/backoffice/numbers`: models,
   repositories, handlers, routes, validation, pages and feature components.
 - `internal/backoffice/components`: shared shell and reusable UI.
 - `internal/backoffice/assets`: embedded local CSS, JavaScript and favicon.

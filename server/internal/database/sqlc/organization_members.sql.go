@@ -154,6 +154,66 @@ func (q *Queries) GetOrganizationMember(ctx context.Context, arg GetOrganization
 	return i, err
 }
 
+const listBackofficeUserOrganizations = `-- name: ListBackofficeUserOrganizations :many
+SELECT
+    o.id::TEXT AS organization_id,
+    o.name,
+    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::TEXT AS organization_status,
+    om.role,
+    om.status AS membership_status,
+    to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS joined_at
+FROM organization_members AS om
+JOIN organizations AS o ON o.id = om.organization_id
+WHERE om.user_id = $1
+ORDER BY
+    CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
+    om.created_at ASC, om.organization_id ASC
+LIMIT $3::int
+OFFSET $2::int
+`
+
+type ListBackofficeUserOrganizationsParams struct {
+	UserID     uuid.UUID `db:"user_id" json:"user_id"`
+	PageOffset int32     `db:"page_offset" json:"page_offset"`
+	PageLimit  int32     `db:"page_limit" json:"page_limit"`
+}
+
+type ListBackofficeUserOrganizationsRow struct {
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	Name               string `db:"name" json:"name"`
+	OrganizationStatus string `db:"organization_status" json:"organization_status"`
+	Role               string `db:"role" json:"role"`
+	MembershipStatus   string `db:"membership_status" json:"membership_status"`
+	JoinedAt           string `db:"joined_at" json:"joined_at"`
+}
+
+func (q *Queries) ListBackofficeUserOrganizations(ctx context.Context, arg ListBackofficeUserOrganizationsParams) ([]ListBackofficeUserOrganizationsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeUserOrganizations, arg.UserID, arg.PageOffset, arg.PageLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeUserOrganizationsRow{}
+	for rows.Next() {
+		var i ListBackofficeUserOrganizationsRow
+		if err := rows.Scan(
+			&i.OrganizationID,
+			&i.Name,
+			&i.OrganizationStatus,
+			&i.Role,
+			&i.MembershipStatus,
+			&i.JoinedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMembersByOrganizationID = `-- name: ListMembersByOrganizationID :many
 SELECT tm.organization_id, tm.user_id, tm.role, tm.status, tm.created_at, tm.updated_at
 FROM organization_members AS tm

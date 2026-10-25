@@ -43,6 +43,8 @@ func newRouter(modules *modules, logger *logging.Logger, backofficeURL string) (
 		protected.Get("/auth/account", modules.authentication.Account)
 		modules.organizations.Routes(protected)
 		modules.agents.Routes(protected)
+		modules.users.Routes(protected)
+		modules.numbers.Routes(protected)
 		modules.calls.Routes(protected)
 		modules.subscriptions.Routes(protected)
 	})

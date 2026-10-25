@@ -152,6 +152,75 @@ func (q *Queries) GetSessionByTokenHash(ctx context.Context, tokenHash string) (
 	return i, err
 }
 
+const listBackofficeUserSessions = `-- name: ListBackofficeUserSessions :many
+SELECT
+    s.id::TEXT AS session_id,
+    s.assurance,
+    COALESCE(host(s.ip_address), '—')::TEXT AS ip_address,
+    COALESCE(NULLIF(BTRIM(s.user_agent), ''), '—')::TEXT AS user_agent,
+    CASE
+        WHEN s.revoked_at IS NOT NULL THEN 'revoked'
+        WHEN s.expires_at <= NOW() THEN 'expired'
+        ELSE 'active'
+    END::TEXT AS status,
+    to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS created_at,
+    COALESCE(
+        to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+        '—'
+    )::TEXT AS last_seen_at,
+    to_char(s.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS expires_at,
+    COALESCE(
+        to_char(s.revoked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+        '—'
+    )::TEXT AS revoked_at
+FROM sessions AS s
+WHERE s.user_id = $1
+ORDER BY s.created_at DESC, s.id DESC
+LIMIT 20
+`
+
+type ListBackofficeUserSessionsRow struct {
+	SessionID  string `db:"session_id" json:"session_id"`
+	Assurance  string `db:"assurance" json:"assurance"`
+	IpAddress  string `db:"ip_address" json:"ip_address"`
+	UserAgent  string `db:"user_agent" json:"user_agent"`
+	Status     string `db:"status" json:"status"`
+	CreatedAt  string `db:"created_at" json:"created_at"`
+	LastSeenAt string `db:"last_seen_at" json:"last_seen_at"`
+	ExpiresAt  string `db:"expires_at" json:"expires_at"`
+	RevokedAt  string `db:"revoked_at" json:"revoked_at"`
+}
+
+func (q *Queries) ListBackofficeUserSessions(ctx context.Context, userID uuid.UUID) ([]ListBackofficeUserSessionsRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficeUserSessions, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListBackofficeUserSessionsRow{}
+	for rows.Next() {
+		var i ListBackofficeUserSessionsRow
+		if err := rows.Scan(
+			&i.SessionID,
+			&i.Assurance,
+			&i.IpAddress,
+			&i.UserAgent,
+			&i.Status,
+			&i.CreatedAt,
+			&i.LastSeenAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSessionsByUserID = `-- name: ListSessionsByUserID :many
 SELECT s.id, s.user_id, s.token_hash, s.identity_subject, s.identity_session_id, s.tokens_ciphertext, s.assurance, s.ip_address, s.user_agent, s.expires_at, s.last_seen_at, s.revoked_at, s.created_at
 FROM sessions AS s
