@@ -41,7 +41,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 			// An uncertain bgapi submission may already have created a real
 			// SIP leg. Return its durable identity, not a retry-inducing 503.
 			httputil.Accepted(w, map[string]any{
-				"call": callResponse(call),
+				"call":               callResponse(call),
 				"origination_status": "uncertain",
 			})
 			return
