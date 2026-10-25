@@ -272,6 +272,9 @@ func (r *Repository) mutate(
 		}); err != nil {
 			return sqlc.Call{}, fmt.Errorf("enqueue terminal call admission cleanup: %w", err)
 		}
+		if err := queries.MarkCallOriginationFinishedForCall(ctx, call.ID); err != nil {
+			return sqlc.Call{}, fmt.Errorf("finish origination tracking for terminal call: %w", err)
+		}
 	}
 
 	occurredAt := time.Now().UTC()
