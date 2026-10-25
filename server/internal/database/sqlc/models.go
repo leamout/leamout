@@ -76,6 +76,13 @@ type Call struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type CallAdmissionCleanup struct {
+	CallID         uuid.UUID          `db:"call_id" json:"call_id"`
+	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`
+	NextAttemptAt  pgtype.Timestamptz `db:"next_attempt_at" json:"next_attempt_at"`
+	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type CallOriginationAttempt struct {
 	ChannelID       uuid.UUID          `db:"channel_id" json:"channel_id"`
 	CallID          uuid.UUID          `db:"call_id" json:"call_id"`

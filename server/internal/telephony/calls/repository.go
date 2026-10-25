@@ -266,6 +266,16 @@ func (r *Repository) mutate(
 	if err != nil {
 		return sqlc.Call{}, err
 	}
+	if isTerminalState(call.State) {
+		if err := queries.EnqueueCallAdmissionCleanup(ctx, sqlc.EnqueueCallAdmissionCleanupParams{
+			CallID: call.ID, OrganizationID: call.OrganizationID,
+		}); err != nil {
+			return sqlc.Call{}, fmt.Errorf("enqueue terminal call admission cleanup: %w", err)
+		}
+		if err := queries.MarkCallOriginationFinishedForCall(ctx, call.ID); err != nil {
+			return sqlc.Call{}, fmt.Errorf("finish origination tracking for terminal call: %w", err)
+		}
+	}
 
 	occurredAt := time.Now().UTC()
 	if _, err := outbox.NewRepository(queries).Insert(ctx, outbox.Event{
@@ -349,4 +359,47 @@ func (r *Repository) ListUnresolvedOriginations(ctx context.Context) ([]Unresolv
 		})
 	}
 	return result, nil
+}
+
+func (r *Repository) ListDueAdmissionCleanup(ctx context.Context) ([]AdmissionCleanup, error) {
+	rows, err := r.queries.ListDueCallAdmissionCleanup(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]AdmissionCleanup, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, AdmissionCleanup{CallID: row.CallID, OrganizationID: row.OrganizationID})
+	}
+	return result, nil
+}
+
+func (r *Repository) ListCleanupTrunks(ctx context.Context, callID uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := r.queries.ListCallCleanupTrunks(ctx, callID)
+	if err != nil {
+		return nil, err
+	}
+
+	trunks := make([]uuid.UUID, 0, len(rows))
+	for _, trunkID := range rows {
+		if trunkID != nil {
+			trunks = append(trunks, *trunkID)
+		}
+	}
+	return trunks, nil
+}
+
+func (r *Repository) DeferAdmissionCleanup(ctx context.Context, callID uuid.UUID) error {
+	return r.queries.DeferCallAdmissionCleanup(ctx, callID)
+}
+
+func (r *Repository) FinishAdmissionCleanup(ctx context.Context, callID uuid.UUID) error {
+	return r.queries.DeleteCallAdmissionCleanup(ctx, callID)
+}
+
+func (r *Repository) DeferOriginationCheck(ctx context.Context, channelID string) error {
+	id, err := uuid.Parse(channelID)
+	if err != nil {
+		return err
+	}
+	return r.queries.DeferCallOriginationCheck(ctx, id)
 }
