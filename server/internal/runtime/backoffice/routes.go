@@ -42,6 +42,8 @@ func newRouter(modules *modules, logger *logging.Logger, backofficeURL string) (
 		protected.Use(protection.Handler)
 		modules.organizations.Routes(protected)
 		modules.agents.Routes(protected)
+		modules.users.Routes(protected)
+		modules.numbers.Routes(protected)
 		modules.calls.Routes(protected)
 		modules.subscriptions.Routes(protected)
 	})

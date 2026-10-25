@@ -7,8 +7,10 @@ import (
 	"github.com/leamout/leamout/server/internal/backoffice/agents"
 	backofficeauth "github.com/leamout/leamout/server/internal/backoffice/auth"
 	"github.com/leamout/leamout/server/internal/backoffice/calls"
+	"github.com/leamout/leamout/server/internal/backoffice/numbers"
 	"github.com/leamout/leamout/server/internal/backoffice/organizations"
 	"github.com/leamout/leamout/server/internal/backoffice/subscriptions"
+	"github.com/leamout/leamout/server/internal/backoffice/users"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
 	identityauth "github.com/leamout/leamout/server/internal/identity/auth"
 	"github.com/leamout/leamout/server/internal/identity/session"
@@ -22,6 +24,8 @@ import (
 )
 
 type modules struct {
+	numbers        *numbers.Handler
+	users          *users.Handler
 	subscriptions  *subscriptions.Handler
 	calls          *calls.Handler
 	authentication *backofficeauth.Handler
@@ -50,6 +54,8 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	resolver := authn.NewResolver(sessions, nil)
 	authentication := identityauth.NewHandler(queries, sessions, client, cipher, cfg.BackofficeURL, cfg.IsDevelopment())
 	return &modules{
+		numbers:        numbers.NewHandler(numbers.NewRepository(queries), logger),
+		users:          users.NewHandler(users.NewRepository(queries), logger),
 		subscriptions:  subscriptions.NewHandler(subscriptions.NewRepository(queries), logger),
 		calls:          calls.NewHandler(calls.NewRepository(queries), logger),
 		authentication: backofficeauth.NewHandler(authentication),

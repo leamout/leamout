@@ -1,0 +1,104 @@
+package numbers
+
+templ Filters(filter Filter) {
+	<form method="get" action="/numbers" class="mb-6 flex flex-wrap items-end gap-4">
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Number, ID or organization name</span>
+			<input class="input input-bordered" type="search" name="q" value={ filter.Search } maxlength="200"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Status</span>
+			<select class="select select-bordered" name="status">
+				<option value="" selected?={ filter.Status == "" }>All</option>
+				<option value="active" selected?={ filter.Status == "active" }>Active</option>
+				<option value="disabled" selected?={ filter.Status == "disabled" }>Disabled</option>
+				<option value="porting" selected?={ filter.Status == "porting" }>Porting</option>
+				<option value="released" selected?={ filter.Status == "released" }>Released</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Country code</span>
+			<input class="input input-bordered" type="text" name="country" value={ filter.Country } maxlength="2" placeholder="GH"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Voice enabled</span>
+			<select class="select select-bordered" name="voice">
+				<option value="" selected?={ filter.Voice == "" }>All</option>
+				<option value="yes" selected?={ filter.Voice == "yes" }>Yes</option>
+				<option value="no" selected?={ filter.Voice == "no" }>No</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Trunk ID</span>
+			<input class="input input-bordered" type="text" name="trunk_id" value={ filter.TrunkID }/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Organization ID</span>
+			<input class="input input-bordered" type="text" name="organization_id" value={ filter.OrganizationID }/>
+		</label>
+		<button class="btn btn-primary" type="submit">Search</button>
+		<a class="btn btn-ghost" href="/numbers">Clear</a>
+	</form>
+}
+
+templ NumberTable(rows []Number) {
+	if len(rows) == 0 {
+		<div class="alert" role="status">No numbers match these filters.</div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Number</th>
+						<th scope="col">Organization</th>
+						<th scope="col">Country</th>
+						<th scope="col">Status</th>
+						<th scope="col">Voice</th>
+						<th scope="col">Bound agent</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range rows {
+						<tr>
+							<td><a class="link link-primary" href={ templ.SafeURL("/numbers/" + row.ID) }>{ row.Number }</a></td>
+							<td><a class="link link-primary" href={ templ.SafeURL("/organizations/" + row.OrganizationID) }>{ row.OrganizationName }</a></td>
+							<td>{ row.CountryCode }</td>
+							<td>{ row.Status }</td>
+							<td>
+								@YesNo(row.VoiceEnabled)
+							</td>
+							<td>
+								if row.AgentID != "" {
+									<a class="link link-primary" href={ templ.SafeURL("/agents/" + row.AgentID) }>{ row.AgentName }</a>
+								} else {
+									—
+								}
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ YesNo(value bool) {
+	if value {
+		Yes
+	} else {
+		No
+	}
+}
+
+templ Field(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}

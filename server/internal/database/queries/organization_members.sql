@@ -121,3 +121,20 @@ AND EXISTS (
     AND actor.role IN ('owner', 'admin')
 )
 AND target.role <> 'owner';
+
+-- name: ListBackofficeUserOrganizations :many
+SELECT
+    o.id::TEXT AS organization_id,
+    o.name,
+    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::TEXT AS organization_status,
+    om.role,
+    om.status AS membership_status,
+    to_char(om.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS joined_at
+FROM organization_members AS om
+JOIN organizations AS o ON o.id = om.organization_id
+WHERE om.user_id = sqlc.arg(user_id)
+ORDER BY
+    CASE om.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END,
+    om.created_at ASC, om.organization_id ASC
+LIMIT sqlc.arg(page_limit)::int
+OFFSET sqlc.arg(page_offset)::int;

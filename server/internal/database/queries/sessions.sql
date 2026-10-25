@@ -101,3 +101,29 @@ FOR UPDATE OF s;
 -- name: UpdateIdentitySessionTokens :exec
 UPDATE sessions SET tokens_ciphertext = sqlc.arg(tokens_ciphertext), last_seen_at = NOW()
 WHERE id = sqlc.arg(id) AND revoked_at IS NULL;
+
+-- name: ListBackofficeUserSessions :many
+SELECT
+    s.id::TEXT AS session_id,
+    s.assurance,
+    COALESCE(host(s.ip_address), '—')::TEXT AS ip_address,
+    COALESCE(NULLIF(BTRIM(s.user_agent), ''), '—')::TEXT AS user_agent,
+    CASE
+        WHEN s.revoked_at IS NOT NULL THEN 'revoked'
+        WHEN s.expires_at <= NOW() THEN 'expired'
+        ELSE 'active'
+    END::TEXT AS status,
+    to_char(s.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS created_at,
+    COALESCE(
+        to_char(s.last_seen_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+        '—'
+    )::TEXT AS last_seen_at,
+    to_char(s.expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI')::TEXT AS expires_at,
+    COALESCE(
+        to_char(s.revoked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI'),
+        '—'
+    )::TEXT AS revoked_at
+FROM sessions AS s
+WHERE s.user_id = sqlc.arg(user_id)
+ORDER BY s.created_at DESC, s.id DESC
+LIMIT 20;

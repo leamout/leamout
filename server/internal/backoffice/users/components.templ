@@ -1,0 +1,159 @@
+package users
+
+import "fmt"
+
+templ Filters(filter Filter) {
+	<form method="get" action="/users" class="mb-6 flex flex-wrap items-end gap-4">
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Name, email or user ID</span>
+			<input class="input input-bordered" type="search" name="q" value={ filter.Search } maxlength="200"/>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Status</span>
+			<select class="select select-bordered" name="status">
+				<option value="" selected?={ filter.Status == "" }>All</option>
+				<option value="active" selected?={ filter.Status == "active" }>Active</option>
+				<option value="disabled" selected?={ filter.Status == "disabled" }>Disabled</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Platform administrator</span>
+			<select class="select select-bordered" name="admin">
+				<option value="" selected?={ filter.Admin == "" }>All</option>
+				<option value="yes" selected?={ filter.Admin == "yes" }>Yes</option>
+				<option value="no" selected?={ filter.Admin == "no" }>No</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Email verified</span>
+			<select class="select select-bordered" name="verified">
+				<option value="" selected?={ filter.Verified == "" }>All</option>
+				<option value="yes" selected?={ filter.Verified == "yes" }>Yes</option>
+				<option value="no" selected?={ filter.Verified == "no" }>No</option>
+			</select>
+		</label>
+		<label class="form-control">
+			<span class="mb-2 block text-sm font-medium">Organization ID</span>
+			<input class="input input-bordered" type="text" name="organization_id" value={ filter.OrganizationID }/>
+		</label>
+		<button class="btn btn-primary" type="submit">Search</button>
+		<a class="btn btn-ghost" href="/users">Clear</a>
+	</form>
+}
+
+templ UserTable(rows []User) {
+	if len(rows) == 0 {
+		<div class="alert" role="status">No users match these filters.</div>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">User</th>
+						<th scope="col">Status</th>
+						<th scope="col">Email verified</th>
+						<th scope="col">Platform admin</th>
+						<th scope="col">Active memberships</th>
+						<th scope="col">Created (UTC)</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range rows {
+						<tr>
+							<td>
+								<a class="link link-primary" href={ templ.SafeURL("/users/" + row.ID) }>{ row.Email }</a>
+								<div class="mt-1 text-sm text-base-content/60">{ row.Name }</div>
+							</td>
+							<td>{ row.Status }</td>
+							<td>
+								@YesNo(row.EmailVerified)
+							</td>
+							<td>
+								@YesNo(row.IsPlatformAdmin)
+							</td>
+							<td>{ fmt.Sprint(row.OrganizationCount) }</td>
+							<td>{ row.CreatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ YesNo(value bool) {
+	if value {
+		Yes
+	} else {
+		No
+	}
+}
+
+templ Field(label string, value string) {
+	<div>
+		<dt class="text-sm text-base-content/60">{ label }</dt>
+		<dd class="mt-1 break-all font-medium">
+			if value == "" {
+				—
+			} else {
+				{ value }
+			}
+		</dd>
+	</div>
+}
+
+templ MembershipTable(rows []Membership) {
+	if len(rows) == 0 {
+		<p class="text-base-content/60">No memberships on this page.</p>
+	} else {
+		<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+			<table class="table">
+				<thead>
+					<tr>
+						<th scope="col">Organization</th>
+						<th scope="col">Organization status</th>
+						<th scope="col">Role</th>
+						<th scope="col">Membership status</th>
+						<th scope="col">Joined (UTC)</th>
+					</tr>
+				</thead>
+				<tbody>
+					for _, row := range rows {
+						<tr>
+							<td><a class="link link-primary" href={ templ.SafeURL("/organizations/" + row.OrganizationID) }>{ row.Name }</a></td>
+							<td>{ row.OrganizationStatus }</td>
+							<td>{ row.Role }</td>
+							<td>{ row.Status }</td>
+							<td>{ row.JoinedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+	}
+}
+
+templ SessionTable(rows []Session) {
+	if len(rows) == 0 {
+		<p class="text-base-content/60">No sessions recorded.</p>
+	} else {
+		<div class="grid gap-4 lg:grid-cols-2">
+			for _, row := range rows {
+				<section class="rounded-box border border-base-300 bg-base-100 p-6">
+					<h2 class="text-lg font-semibold">Session</h2>
+					<dl class="mt-4 grid gap-4">
+						@Field("ID", row.ID)
+						@Field("Recorded status", row.Status)
+						@Field("Assurance", row.Assurance)
+						@Field("IP address", row.IPAddress)
+						@Field("Browser", row.UserAgent)
+						@Field("Created (UTC)", row.CreatedAt)
+						@Field("Last seen (UTC)", row.LastSeenAt)
+						@Field("Expires (UTC)", row.ExpiresAt)
+						@Field("Revoked (UTC)", row.RevokedAt)
+					</dl>
+				</section>
+			}
+		</div>
+	}
+}

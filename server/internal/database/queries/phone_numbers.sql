@@ -125,47 +125,65 @@ WHERE pn.number = sqlc.arg(number)
   AND o.deleted_at IS NULL
 LIMIT 1;
 
+-- Operator projections include all number and organization lifecycle states.
 -- name: ListBackofficePhoneNumbers :many
 SELECT
-    pn.id::TEXT AS id,
-    pn.organization_id::TEXT AS organization_id,
+    pn.id::text AS id,
+    pn.organization_id::text AS organization_id,
     o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::text AS organization_status,
     pn.number,
-    pn.country_code::TEXT AS country_code,
-    COALESCE(t.name, '—') AS trunk_name,
+    pn.country_code::text AS country_code,
+    COALESCE(pn.trunk_id::text, '')::text AS trunk_id,
+    COALESCE(t.name, '')::text AS trunk_name,
+    COALESCE(t.status, '')::text AS trunk_status,
+    COALESCE(b.voice_agent_id::text, '')::text AS agent_id,
+    COALESCE(a.name, '')::text AS agent_name,
+    COALESCE(a.status, '')::text AS agent_status,
     pn.voice_enabled,
     pn.status,
-    to_char(
-        pn.created_at AT TIME ZONE 'UTC',
-        'YYYY-MM-DD HH24:MI'
-    ) AS created_at
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::text AS created_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
-LEFT JOIN trunks AS t ON t.id = pn.trunk_id
-ORDER BY pn.created_at DESC
-LIMIT 100;
+LEFT JOIN trunks AS t ON t.id = pn.trunk_id AND t.organization_id = pn.organization_id
+LEFT JOIN voice_agent_bindings AS b ON b.phone_number_id = pn.id AND b.organization_id = pn.organization_id
+LEFT JOIN voice_agents AS a ON a.id = b.voice_agent_id AND a.organization_id = pn.organization_id
+WHERE (
+    sqlc.arg(search)::text = ''
+    OR pn.id::text = sqlc.arg(search)::text
+    OR strpos(pn.number, sqlc.arg(search)::text) > 0
+    OR strpos(lower(o.name), lower(sqlc.arg(search)::text)) > 0
+)
+  AND (sqlc.arg(status)::text = '' OR pn.status = sqlc.arg(status)::text)
+  AND (sqlc.arg(country)::text = '' OR pn.country_code = sqlc.arg(country)::text)
+  AND (sqlc.arg(voice)::text = '' OR pn.voice_enabled = (sqlc.arg(voice)::text = 'yes'))
+  AND (sqlc.narg(organization_id)::uuid IS NULL OR pn.organization_id = sqlc.narg(organization_id)::uuid)
+  AND (sqlc.narg(trunk_id)::uuid IS NULL OR pn.trunk_id = sqlc.narg(trunk_id)::uuid)
+ORDER BY pn.created_at DESC, pn.id DESC
+LIMIT sqlc.arg(page_limit)::int
+OFFSET sqlc.arg(page_offset)::int;
 
 -- name: GetBackofficePhoneNumber :one
 SELECT
-    pn.id::TEXT AS id,
-    pn.organization_id::TEXT AS organization_id,
+    pn.id::text AS id,
+    pn.organization_id::text AS organization_id,
     o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::text AS organization_status,
     pn.number,
-    pn.country_code::TEXT AS country_code,
-    CAST(COALESCE(pn.trunk_id::TEXT, '—') AS TEXT) AS trunk_id,
-    COALESCE(t.name, '—') AS trunk_name,
+    pn.country_code::text AS country_code,
+    COALESCE(pn.trunk_id::text, '')::text AS trunk_id,
+    COALESCE(t.name, '')::text AS trunk_name,
+    COALESCE(t.status, '')::text AS trunk_status,
+    COALESCE(b.voice_agent_id::text, '')::text AS agent_id,
+    COALESCE(a.name, '')::text AS agent_name,
+    COALESCE(a.status, '')::text AS agent_status,
     pn.voice_enabled,
     pn.status,
-    to_char(
-        pn.created_at AT TIME ZONE 'UTC',
-        'YYYY-MM-DD HH24:MI'
-    ) AS created_at,
-    to_char(
-        pn.updated_at AT TIME ZONE 'UTC',
-        'YYYY-MM-DD HH24:MI'
-    ) AS updated_at
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::text AS created_at,
+    to_char(pn.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::text AS updated_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
-LEFT JOIN trunks AS t ON t.id = pn.trunk_id
-WHERE pn.id = sqlc.arg(id)
-LIMIT 1;
+LEFT JOIN trunks AS t ON t.id = pn.trunk_id AND t.organization_id = pn.organization_id
+LEFT JOIN voice_agent_bindings AS b ON b.phone_number_id = pn.id AND b.organization_id = pn.organization_id
+LEFT JOIN voice_agents AS a ON a.id = b.voice_agent_id AND a.organization_id = pn.organization_id
+WHERE pn.id = sqlc.arg(id);

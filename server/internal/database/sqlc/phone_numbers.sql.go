@@ -71,42 +71,47 @@ func (q *Queries) CreateBYOCPhoneNumber(ctx context.Context, arg CreateBYOCPhone
 
 const getBackofficePhoneNumber = `-- name: GetBackofficePhoneNumber :one
 SELECT
-    pn.id::TEXT AS id,
-    pn.organization_id::TEXT AS organization_id,
+    pn.id::text AS id,
+    pn.organization_id::text AS organization_id,
     o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::text AS organization_status,
     pn.number,
-    pn.country_code::TEXT AS country_code,
-    CAST(COALESCE(pn.trunk_id::TEXT, '—') AS TEXT) AS trunk_id,
-    COALESCE(t.name, '—') AS trunk_name,
+    pn.country_code::text AS country_code,
+    COALESCE(pn.trunk_id::text, '')::text AS trunk_id,
+    COALESCE(t.name, '')::text AS trunk_name,
+    COALESCE(t.status, '')::text AS trunk_status,
+    COALESCE(b.voice_agent_id::text, '')::text AS agent_id,
+    COALESCE(a.name, '')::text AS agent_name,
+    COALESCE(a.status, '')::text AS agent_status,
     pn.voice_enabled,
     pn.status,
-    to_char(
-        pn.created_at AT TIME ZONE 'UTC',
-        'YYYY-MM-DD HH24:MI'
-    ) AS created_at,
-    to_char(
-        pn.updated_at AT TIME ZONE 'UTC',
-        'YYYY-MM-DD HH24:MI'
-    ) AS updated_at
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::text AS created_at,
+    to_char(pn.updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::text AS updated_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
-LEFT JOIN trunks AS t ON t.id = pn.trunk_id
+LEFT JOIN trunks AS t ON t.id = pn.trunk_id AND t.organization_id = pn.organization_id
+LEFT JOIN voice_agent_bindings AS b ON b.phone_number_id = pn.id AND b.organization_id = pn.organization_id
+LEFT JOIN voice_agents AS a ON a.id = b.voice_agent_id AND a.organization_id = pn.organization_id
 WHERE pn.id = $1
-LIMIT 1
 `
 
 type GetBackofficePhoneNumberRow struct {
-	ID               string `db:"id" json:"id"`
-	OrganizationID   string `db:"organization_id" json:"organization_id"`
-	OrganizationName string `db:"organization_name" json:"organization_name"`
-	Number           string `db:"number" json:"number"`
-	CountryCode      string `db:"country_code" json:"country_code"`
-	TrunkID          string `db:"trunk_id" json:"trunk_id"`
-	TrunkName        string `db:"trunk_name" json:"trunk_name"`
-	VoiceEnabled     bool   `db:"voice_enabled" json:"voice_enabled"`
-	Status           string `db:"status" json:"status"`
-	CreatedAt        string `db:"created_at" json:"created_at"`
-	UpdatedAt        string `db:"updated_at" json:"updated_at"`
+	ID                 string `db:"id" json:"id"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	OrganizationStatus string `db:"organization_status" json:"organization_status"`
+	Number             string `db:"number" json:"number"`
+	CountryCode        string `db:"country_code" json:"country_code"`
+	TrunkID            string `db:"trunk_id" json:"trunk_id"`
+	TrunkName          string `db:"trunk_name" json:"trunk_name"`
+	TrunkStatus        string `db:"trunk_status" json:"trunk_status"`
+	AgentID            string `db:"agent_id" json:"agent_id"`
+	AgentName          string `db:"agent_name" json:"agent_name"`
+	AgentStatus        string `db:"agent_status" json:"agent_status"`
+	VoiceEnabled       bool   `db:"voice_enabled" json:"voice_enabled"`
+	Status             string `db:"status" json:"status"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+	UpdatedAt          string `db:"updated_at" json:"updated_at"`
 }
 
 func (q *Queries) GetBackofficePhoneNumber(ctx context.Context, id uuid.UUID) (GetBackofficePhoneNumberRow, error) {
@@ -116,10 +121,15 @@ func (q *Queries) GetBackofficePhoneNumber(ctx context.Context, id uuid.UUID) (G
 		&i.ID,
 		&i.OrganizationID,
 		&i.OrganizationName,
+		&i.OrganizationStatus,
 		&i.Number,
 		&i.CountryCode,
 		&i.TrunkID,
 		&i.TrunkName,
+		&i.TrunkStatus,
+		&i.AgentID,
+		&i.AgentName,
+		&i.AgentStatus,
 		&i.VoiceEnabled,
 		&i.Status,
 		&i.CreatedAt,
@@ -243,39 +253,83 @@ func (q *Queries) GetVoiceAgentBindingByNumber(ctx context.Context, number strin
 
 const listBackofficePhoneNumbers = `-- name: ListBackofficePhoneNumbers :many
 SELECT
-    pn.id::TEXT AS id,
-    pn.organization_id::TEXT AS organization_id,
+    pn.id::text AS id,
+    pn.organization_id::text AS organization_id,
     o.name AS organization_name,
+    CASE WHEN o.deleted_at IS NULL THEN o.status ELSE 'deleted' END::text AS organization_status,
     pn.number,
-    pn.country_code::TEXT AS country_code,
-    COALESCE(t.name, '—') AS trunk_name,
+    pn.country_code::text AS country_code,
+    COALESCE(pn.trunk_id::text, '')::text AS trunk_id,
+    COALESCE(t.name, '')::text AS trunk_name,
+    COALESCE(t.status, '')::text AS trunk_status,
+    COALESCE(b.voice_agent_id::text, '')::text AS agent_id,
+    COALESCE(a.name, '')::text AS agent_name,
+    COALESCE(a.status, '')::text AS agent_status,
     pn.voice_enabled,
     pn.status,
-    to_char(
-        pn.created_at AT TIME ZONE 'UTC',
-        'YYYY-MM-DD HH24:MI'
-    ) AS created_at
+    to_char(pn.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')::text AS created_at
 FROM phone_numbers AS pn
 JOIN organizations AS o ON o.id = pn.organization_id
-LEFT JOIN trunks AS t ON t.id = pn.trunk_id
-ORDER BY pn.created_at DESC
-LIMIT 100
+LEFT JOIN trunks AS t ON t.id = pn.trunk_id AND t.organization_id = pn.organization_id
+LEFT JOIN voice_agent_bindings AS b ON b.phone_number_id = pn.id AND b.organization_id = pn.organization_id
+LEFT JOIN voice_agents AS a ON a.id = b.voice_agent_id AND a.organization_id = pn.organization_id
+WHERE (
+    $1::text = ''
+    OR pn.id::text = $1::text
+    OR strpos(pn.number, $1::text) > 0
+    OR strpos(lower(o.name), lower($1::text)) > 0
+)
+  AND ($2::text = '' OR pn.status = $2::text)
+  AND ($3::text = '' OR pn.country_code = $3::text)
+  AND ($4::text = '' OR pn.voice_enabled = ($4::text = 'yes'))
+  AND ($5::uuid IS NULL OR pn.organization_id = $5::uuid)
+  AND ($6::uuid IS NULL OR pn.trunk_id = $6::uuid)
+ORDER BY pn.created_at DESC, pn.id DESC
+LIMIT $8::int
+OFFSET $7::int
 `
 
-type ListBackofficePhoneNumbersRow struct {
-	ID               string `db:"id" json:"id"`
-	OrganizationID   string `db:"organization_id" json:"organization_id"`
-	OrganizationName string `db:"organization_name" json:"organization_name"`
-	Number           string `db:"number" json:"number"`
-	CountryCode      string `db:"country_code" json:"country_code"`
-	TrunkName        string `db:"trunk_name" json:"trunk_name"`
-	VoiceEnabled     bool   `db:"voice_enabled" json:"voice_enabled"`
-	Status           string `db:"status" json:"status"`
-	CreatedAt        string `db:"created_at" json:"created_at"`
+type ListBackofficePhoneNumbersParams struct {
+	Search         string     `db:"search" json:"search"`
+	Status         string     `db:"status" json:"status"`
+	Country        string     `db:"country" json:"country"`
+	Voice          string     `db:"voice" json:"voice"`
+	OrganizationID *uuid.UUID `db:"organization_id" json:"organization_id"`
+	TrunkID        *uuid.UUID `db:"trunk_id" json:"trunk_id"`
+	PageOffset     int32      `db:"page_offset" json:"page_offset"`
+	PageLimit      int32      `db:"page_limit" json:"page_limit"`
 }
 
-func (q *Queries) ListBackofficePhoneNumbers(ctx context.Context) ([]ListBackofficePhoneNumbersRow, error) {
-	rows, err := q.db.Query(ctx, listBackofficePhoneNumbers)
+type ListBackofficePhoneNumbersRow struct {
+	ID                 string `db:"id" json:"id"`
+	OrganizationID     string `db:"organization_id" json:"organization_id"`
+	OrganizationName   string `db:"organization_name" json:"organization_name"`
+	OrganizationStatus string `db:"organization_status" json:"organization_status"`
+	Number             string `db:"number" json:"number"`
+	CountryCode        string `db:"country_code" json:"country_code"`
+	TrunkID            string `db:"trunk_id" json:"trunk_id"`
+	TrunkName          string `db:"trunk_name" json:"trunk_name"`
+	TrunkStatus        string `db:"trunk_status" json:"trunk_status"`
+	AgentID            string `db:"agent_id" json:"agent_id"`
+	AgentName          string `db:"agent_name" json:"agent_name"`
+	AgentStatus        string `db:"agent_status" json:"agent_status"`
+	VoiceEnabled       bool   `db:"voice_enabled" json:"voice_enabled"`
+	Status             string `db:"status" json:"status"`
+	CreatedAt          string `db:"created_at" json:"created_at"`
+}
+
+// Operator projections include all number and organization lifecycle states.
+func (q *Queries) ListBackofficePhoneNumbers(ctx context.Context, arg ListBackofficePhoneNumbersParams) ([]ListBackofficePhoneNumbersRow, error) {
+	rows, err := q.db.Query(ctx, listBackofficePhoneNumbers,
+		arg.Search,
+		arg.Status,
+		arg.Country,
+		arg.Voice,
+		arg.OrganizationID,
+		arg.TrunkID,
+		arg.PageOffset,
+		arg.PageLimit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -287,9 +341,15 @@ func (q *Queries) ListBackofficePhoneNumbers(ctx context.Context) ([]ListBackoff
 			&i.ID,
 			&i.OrganizationID,
 			&i.OrganizationName,
+			&i.OrganizationStatus,
 			&i.Number,
 			&i.CountryCode,
+			&i.TrunkID,
 			&i.TrunkName,
+			&i.TrunkStatus,
+			&i.AgentID,
+			&i.AgentName,
+			&i.AgentStatus,
 			&i.VoiceEnabled,
 			&i.Status,
 			&i.CreatedAt,

@@ -1,0 +1,79 @@
+package numbers
+
+import (
+	"fmt"
+
+	"github.com/leamout/leamout/server/internal/backoffice/components"
+)
+
+templ Page(result List) {
+	@components.Layout("Numbers", "numbers", ListContent(result))
+}
+
+templ ListContent(result List) {
+	<div class="mb-8">
+		<p class="text-sm font-semibold uppercase tracking-wider text-base-content/60">Telephony</p>
+		<h1 class="mt-2 text-3xl font-bold">Numbers</h1>
+		<p class="mt-2 text-base-content/70">Inspect registered BYOC numbers and their routing configuration across Leamout.</p>
+	</div>
+	@Filters(result.Filter)
+	@NumberTable(result.Numbers)
+	<nav class="mt-6 flex items-center justify-between" aria-label="Pagination">
+		<span class="text-sm text-base-content/60">Page { fmt.Sprint(result.Filter.Page) }</span>
+		<div class="flex gap-2">
+			if result.Filter.Page > 1 {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page-1)) }>Previous</a>
+			}
+			if result.HasNext {
+				<a class="btn btn-outline btn-sm" href={ templ.SafeURL(pageURL(result.Filter, result.Filter.Page+1)) }>Next</a>
+			}
+		</div>
+	</nav>
+}
+
+templ DetailPage(detail Detail) {
+	@components.Layout(detail.Number.Number, "numbers", DetailContent(detail))
+}
+
+templ DetailContent(detail Detail) {
+	<a class="link link-primary text-sm" href="/numbers">Back to numbers</a>
+	<h1 class="mt-6 text-3xl font-bold">{ detail.Number.Number }</h1>
+	<p class="mt-2 break-all font-mono text-sm text-base-content/60">{ detail.ID }</p>
+	<p class="mt-2 text-sm text-base-content/60">All timestamps are UTC.</p>
+	<a class="link link-primary mt-4 inline-block" href={ templ.SafeURL("/organizations/" + detail.OrganizationID) }>{ detail.OrganizationName }</a>
+	<div class="mt-8 grid gap-6 lg:grid-cols-2">
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Number</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Number", detail.Number.Number)
+				@Field("Country", detail.CountryCode)
+				@Field("Status", detail.Status)
+				@Field("Voice enabled", fmt.Sprint(detail.VoiceEnabled))
+				@Field("Organization status", detail.OrganizationStatus)
+				@Field("Created", detail.CreatedAt)
+				@Field("Updated", detail.UpdatedAt)
+			</dl>
+		</section>
+		<section class="rounded-box border border-base-300 bg-base-100 p-6">
+			<h2 class="text-lg font-semibold">Trunk</h2>
+			<dl class="mt-4 grid gap-4">
+				@Field("Name", detail.TrunkName)
+				@Field("ID", detail.TrunkID)
+				@Field("Status", detail.TrunkStatus)
+			</dl>
+		</section>
+	</div>
+	<section class="mt-8 rounded-box border border-base-300 bg-base-100 p-6">
+		<h2 class="text-lg font-semibold">Agent binding</h2>
+		if detail.AgentID == "" {
+			<p class="mt-4 text-base-content/60">No agent is bound to this number.</p>
+		} else {
+			<a class="link link-primary mt-4 inline-block" href={ templ.SafeURL("/agents/" + detail.AgentID) }>{ detail.AgentName }</a>
+			<dl class="mt-4 grid gap-4">
+				@Field("Agent ID", detail.AgentID)
+				@Field("Agent status", detail.AgentStatus)
+			</dl>
+		}
+		<p class="mt-4 text-sm text-base-content/60">These are stored routing settings. A binding does not guarantee call readiness.</p>
+	</section>
+}
