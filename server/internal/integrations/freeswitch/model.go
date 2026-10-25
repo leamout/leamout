@@ -113,6 +113,7 @@ const (
 )
 
 type OriginateRequest struct {
+	ChannelID   string
 	Endpoint    string
 	Destination string
 	CallerID    string

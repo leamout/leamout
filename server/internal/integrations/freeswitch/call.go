@@ -24,7 +24,13 @@ func (c *Client) Originate(ctx context.Context, req OriginateRequest) (Call, err
 		return Call{}, err
 	}
 
-	channelID := uuid.NewString()
+	channelID := req.ChannelID
+	if channelID == "" {
+		channelID = uuid.NewString()
+	}
+	if _, err := uuid.Parse(channelID); err != nil {
+		return Call{}, fmt.Errorf("invalid originate channel UUID: %w", err)
+	}
 	variables := make(map[string]string, len(req.Variables)+1)
 	for key, value := range req.Variables {
 		variables[key] = value

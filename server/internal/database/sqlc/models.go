@@ -76,6 +76,17 @@ type Call struct {
 	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 }
 
+type CallOriginationAttempt struct {
+	ChannelID       uuid.UUID          `db:"channel_id" json:"channel_id"`
+	CallID          uuid.UUID          `db:"call_id" json:"call_id"`
+	OrganizationID  uuid.UUID          `db:"organization_id" json:"organization_id"`
+	TrunkID         uuid.UUID          `db:"trunk_id" json:"trunk_id"`
+	TrunkEndpointID uuid.UUID          `db:"trunk_endpoint_id" json:"trunk_endpoint_id"`
+	Status          string             `db:"status" json:"status"`
+	CreatedAt       pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+}
+
 type CallParticipant struct {
 	ID             uuid.UUID          `db:"id" json:"id"`
 	OrganizationID uuid.UUID          `db:"organization_id" json:"organization_id"`

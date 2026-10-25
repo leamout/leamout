@@ -205,13 +205,29 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 				Err:   fmt.Errorf("resolve public SIP trunk endpoint: %w", resolveErr),
 			}
 		}
+		channelID := uuid.NewString()
+		if err := s.repo.PrepareOrigination(attemptCtx, OriginationAttempt{
+			ChannelID: channelID, CallID: call.ID, OrganizationID: organizationID,
+			TrunkID: route.TrunkID, TrunkEndpointID: route.TrunkEndpointID,
+		}); err != nil {
+			_ = s.admission.Release(attemptCtx, route.TrunkID, call.ID.String())
+			return calling.OriginateResult{}, &calling.OriginateError{Class: calling.OriginateFailureInternal, Err: err}
+		}
 		result, originateErr := s.controller.Originate(attemptCtx, calling.OriginateRequest{
-			CallID: call.ID, Destination: req.ToURI, CallerID: req.FromURI,
+			ChannelID: channelID,
+			CallID:    call.ID, Destination: req.ToURI, CallerID: req.FromURI,
 			PinnedIP: addresses[0].String(),
 			TrunkID:  route.TrunkID,
 			Host:     route.Host, Port: route.Port, Transport: route.Transport,
 			Privacy: req.Privacy, DTMFMode: req.DTMFMode, MediaEncryption: req.MediaEncryption,
 		})
+		if originateErr == nil {
+			if err := s.repo.MarkOriginationSubmitted(attemptCtx, channelID); err != nil {
+				return result, &calling.OriginateError{Class: calling.OriginateFailureUncertain, Err: err}
+			}
+		} else {
+			_ = s.repo.MarkOriginationUncertain(context.WithoutCancel(attemptCtx), channelID)
+		}
 		if originateErr != nil {
 			var classified *calling.OriginateError
 			if !errors.As(originateErr, &classified) ||
@@ -247,7 +263,7 @@ func (s *Service) Create(ctx context.Context, organizationID uuid.UUID, req Crea
 			// The bgapi request may already be running on FreeSWITCH. Keep
 			// the call nonterminal and admission leases intact. Its stable
 			// UUID allows lifecycle events and reconciliation to recover it.
-			return sqlc.Call{}, apperror.NewServiceUnavailable(
+			return call, apperror.NewServiceUnavailable(
 				"call origination outcome is uncertain; do not retry", err,
 			)
 		}

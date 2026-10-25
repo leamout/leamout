@@ -91,5 +91,9 @@ func (j *ReconciliationJob) Reconcile(ctx context.Context) error {
 		}
 	}
 
+	if err := j.reconcileOriginations(ctx); err != nil {
+		return fmt.Errorf("reconcile outbound originations: %w", err)
+	}
+
 	return nil
 }

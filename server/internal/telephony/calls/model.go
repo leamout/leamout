@@ -100,6 +100,22 @@ type DTMFActionRequest struct {
 	Digits string `json:"digits"`
 }
 
+type OriginationAttempt struct {
+	ChannelID       string
+	CallID          uuid.UUID
+	OrganizationID  uuid.UUID
+	TrunkID         uuid.UUID
+	TrunkEndpointID uuid.UUID
+}
+
+type UnresolvedOrigination struct {
+	ChannelID      string
+	CallID         uuid.UUID
+	OrganizationID uuid.UUID
+	TrunkID        uuid.UUID
+	CreatedAt      time.Time
+}
+
 type ActiveAdmissionCall struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID

@@ -32,6 +32,15 @@ func (s *Service) ObserveLifecycle(ctx context.Context, event LifecycleEvent) er
 	// has created a SIP dialog. Record it from the correlated channel's ESL
 	// events, before applying the state transition (including terminal events).
 	if snapshot.Direction == string(DirectionOutbound) {
+		if isTerminalLifecycle(event.Type) {
+			if err := s.repo.MarkOriginationFinished(ctx, event.CallID); err != nil {
+				return apperror.NewInternal("finish outbound origination tracking", err)
+			}
+		} else if event.ChannelID != "" {
+			if err := s.repo.MarkOriginationObserved(ctx, event.CallID, event.ChannelID); err != nil {
+				return apperror.NewInternal("observe outbound origination tracking", err)
+			}
+		}
 		if sipCallID := strings.TrimSpace(event.SIPCallID); sipCallID != "" {
 			if err := s.repo.BindOutboundSIPCallID(ctx, snapshot.OrganizationID, event.CallID, sipCallID); err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {

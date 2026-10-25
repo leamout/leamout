@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 func (c *Client) Channels(ctx context.Context) ([]Channel, error) {
@@ -111,4 +113,22 @@ func stringField(row map[string]any, key string) string {
 		return ""
 	}
 	return fmt.Sprint(value)
+}
+
+func (c *Client) ChannelExists(ctx context.Context, channelID string) (bool, error) {
+	if _, err := uuid.Parse(channelID); err != nil {
+		return false, err
+	}
+	reply, err := c.Command(ctx, "uuid_exists "+channelID)
+	if err != nil {
+		return false, err
+	}
+	switch strings.ToLower(strings.TrimSpace(reply.Body)) {
+	case "true":
+		return true, nil
+	case "false":
+		return false, nil
+	default:
+		return false, fmt.Errorf("unexpected uuid_exists response %q", reply.Body)
+	}
 }

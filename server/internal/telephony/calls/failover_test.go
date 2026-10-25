@@ -222,3 +222,24 @@ func TestExecuteRoutePlanDoesNotRetryTransportFailure(t *testing.T) {
 		t.Fatalf("ambiguous transport failure retried: attempts=%d err=%v", attempts, err)
 	}
 }
+
+func TestExecuteRoutePlanPreservesUncertainChannelIdentity(t *testing.T) {
+	want := calling.OriginateResult{ChannelID: uuid.NewString()}
+	routes := testRoutes(2)
+	attempts := 0
+	got, route, err := executeRoutePlan(context.Background(), routes, func(
+		_ context.Context, _ routing.OutboundRoute,
+	) (calling.OriginateResult, error) {
+		attempts++
+		return want, &calling.OriginateError{
+			Class: calling.OriginateFailureUncertain,
+			Err:   errors.New("FreeSWITCH accepted command but ACK was lost"),
+		}
+	}, nil)
+	if err == nil || attempts != 1 {
+		t.Fatalf("uncertain originate must fail closed once: attempts=%d err=%v", attempts, err)
+	}
+	if got.ChannelID != want.ChannelID || route.TrunkEndpointID != routes[0].TrunkEndpointID {
+		t.Fatalf("lost uncertain channel or route identity: result=%+v route=%+v", got, route)
+	}
+}
