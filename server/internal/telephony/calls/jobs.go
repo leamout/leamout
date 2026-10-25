@@ -139,7 +139,9 @@ func (j *ReconciliationJob) reconcileOriginations(ctx context.Context) error {
 // cleanup marker once every required release has succeeded.
 func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error {
 	pending, err := j.repo.ListDueAdmissionCleanup(ctx)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	for _, item := range pending {
 		trunks, err := j.repo.ListCleanupTrunks(ctx, item.CallID)
 		if err == nil {
@@ -150,7 +152,9 @@ func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error 
 		}
 		if err == nil {
 			for _, trunkID := range trunks {
-				if err = j.service.admission.Release(ctx, trunkID, item.CallID.String()); err != nil { break }
+				if err = j.service.admission.Release(ctx, trunkID, item.CallID.String()); err != nil {
+					break
+				}
 			}
 		}
 		if err != nil {

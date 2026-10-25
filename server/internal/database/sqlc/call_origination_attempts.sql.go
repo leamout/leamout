@@ -12,6 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deferCallOriginationCheck = `-- name: DeferCallOriginationCheck :exec
+UPDATE call_origination_attempts
+SET updated_at = NOW()
+WHERE channel_id = $1
+  AND status IN ('prepared', 'submitted', 'uncertain')
+`
+
+// A negative uuid_exists result is not conclusive evidence of failed
+// submission. Rotate the attempt to the end of the inspection queue.
+func (q *Queries) DeferCallOriginationCheck(ctx context.Context, channelID uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deferCallOriginationCheck, channelID)
+	return err
+}
+
 const getCallOriginationByChannel = `-- name: GetCallOriginationByChannel :one
 SELECT call_id, organization_id, trunk_id, status
 FROM call_origination_attempts
@@ -46,7 +60,7 @@ FROM call_origination_attempts AS a
 JOIN calls AS c ON c.id = a.call_id AND c.organization_id = a.organization_id
 WHERE a.status IN ('prepared', 'submitted', 'uncertain')
   AND c.state = 'initiating'
-ORDER BY a.created_at ASC, a.channel_id ASC
+ORDER BY a.updated_at ASC, a.channel_id ASC
 LIMIT 100
 `
 

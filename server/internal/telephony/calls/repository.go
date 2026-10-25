@@ -363,7 +363,9 @@ func (r *Repository) ListUnresolvedOriginations(ctx context.Context) ([]Unresolv
 
 func (r *Repository) ListDueAdmissionCleanup(ctx context.Context) ([]AdmissionCleanup, error) {
 	rows, err := r.queries.ListDueCallAdmissionCleanup(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	result := make([]AdmissionCleanup, 0, len(rows))
 	for _, row := range rows {
 		result = append(result, AdmissionCleanup{CallID: row.CallID, OrganizationID: row.OrganizationID})
@@ -385,6 +387,8 @@ func (r *Repository) FinishAdmissionCleanup(ctx context.Context, callID uuid.UUI
 
 func (r *Repository) DeferOriginationCheck(ctx context.Context, channelID string) error {
 	id, err := uuid.Parse(channelID)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	return r.queries.DeferCallOriginationCheck(ctx, id)
 }

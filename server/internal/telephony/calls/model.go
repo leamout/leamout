@@ -117,7 +117,7 @@ type UnresolvedOrigination struct {
 }
 
 type AdmissionCleanup struct {
-	CallID uuid.UUID
+	CallID         uuid.UUID
 	OrganizationID uuid.UUID
 }
 
