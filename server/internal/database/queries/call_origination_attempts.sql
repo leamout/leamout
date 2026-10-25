@@ -40,7 +40,7 @@ FROM call_origination_attempts AS a
 JOIN calls AS c ON c.id = a.call_id AND c.organization_id = a.organization_id
 WHERE a.status IN ('prepared', 'submitted', 'uncertain')
   AND c.state = 'initiating'
-ORDER BY a.created_at ASC, a.channel_id ASC
+ORDER BY a.updated_at ASC, a.channel_id ASC
 LIMIT 100;
 
 -- name: MarkCallOriginationObservedForChannel :exec
@@ -60,3 +60,11 @@ SELECT call_id, organization_id, trunk_id, status
 FROM call_origination_attempts
 WHERE channel_id = sqlc.arg(channel_id)
 LIMIT 1;
+
+-- name: DeferCallOriginationCheck :exec
+-- A negative uuid_exists result is not conclusive evidence of failed
+-- submission. Rotate the attempt to the end of the inspection queue.
+UPDATE call_origination_attempts
+SET updated_at = NOW()
+WHERE channel_id = sqlc.arg(channel_id)
+  AND status IN ('prepared', 'submitted', 'uncertain');
