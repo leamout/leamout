@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
-	"strings"
 )
 
 func (c *Client) Channels(ctx context.Context) ([]Channel, error) {
