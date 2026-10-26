@@ -1,7 +1,8 @@
 import "@leamout/ui/globals.css";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { plexMono, plexSans, spaceGrotesk } from "@/lib/fonts";
 import { constructMetadata } from "@/lib/metadata";
-import RootProviders from "./providers";
 
 export const metadata = constructMetadata({
   title: "Carrier-grade runtime for autonomous voice agents",
@@ -21,7 +22,9 @@ export default function RootLayout({
       className={`${plexSans.variable} ${plexMono.variable} ${spaceGrotesk.variable}`}
     >
       <body className="bg-background text-foreground antialiased">
-        <RootProviders>{children}</RootProviders>
+        {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

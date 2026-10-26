@@ -1,22 +1,25 @@
 import { Button } from "@leamout/ui/components/button";
 import { cn } from "@leamout/ui/lib/utils";
 import Link from "next/link";
-import { plans } from "@/lib/plans";
+import { type PublicPlan, plans } from "@/lib/plans";
 
-const presentation = {
-  Free: {
+const presentation: Record<
+  PublicPlan["code"],
+  { eyebrow: string; description: string }
+> = {
+  free: {
     eyebrow: "Explore",
     description: "Build and test your first voice agent.",
   },
-  Developer: {
+  developer: {
     eyebrow: "Launch",
     description: "Move your first voice applications into production.",
   },
-  Pro: {
+  pro: {
     eyebrow: "Operate",
     description: "Run more calls with expanded operational controls.",
   },
-  Scale: {
+  scale: {
     eyebrow: "Expand",
     description: "Support higher-volume agents and larger teams.",
   },
@@ -55,13 +58,12 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
 
         <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2 xl:grid-cols-4">
           {plans.map((plan) => {
-            const details =
-              presentation[plan.name as keyof typeof presentation];
-            const highlighted = plan.name === "Pro";
+            const details = presentation[plan.code];
+            const highlighted = plan.code === "pro";
 
             return (
               <article
-                key={plan.name}
+                key={plan.code}
                 className={cn(
                   "relative flex min-w-0 flex-col bg-card p-6 sm:p-7 xl:p-6",
                   highlighted && "bg-brand-surface",
@@ -149,7 +151,7 @@ export default function PricingPlans({ signupHref }: { signupHref: string }) {
                 </div>
 
                 <p className="mt-7 min-h-12 border-t border-border pt-5 text-sm leading-6 text-muted-foreground">
-                  {highlighted || plan.name === "Scale"
+                  {highlighted || plan.code === "scale"
                     ? "Includes advanced roles and configurable retention policies."
                     : "Includes access to the managed voice agent runtime."}
                 </p>
