@@ -32,9 +32,9 @@ export function HomeCallToAction() {
             size="lg"
             variant="outline"
             nativeButton={false}
-            render={<Link href="/docs" />}
+            render={<Link href="/docs/quickstart" />}
           >
-            Read documentation
+            Follow the quickstart
           </Button>
         </div>
       </div>

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const capabilities = [
   {
     title: "Streaming conversations",
@@ -16,11 +18,12 @@ const capabilities = [
   },
 ];
 
-const exampleEvents = [
-  { step: "01", name: "Speech detected", detail: "Incoming audio" },
-  { step: "02", name: "Agent processing", detail: "Model response" },
-  { step: "03", name: "Tool invoked", detail: "Application action" },
-  { step: "04", name: "Audio streamed", detail: "Return to caller" },
+const events = [
+  { name: "call.initiated", detail: "A call begins" },
+  { name: "call.ringing", detail: "The destination rings" },
+  { name: "call.answered", detail: "The call is answered" },
+  { name: "call.active", detail: "Active media phase" },
+  { name: "call.completed", detail: "The call ends successfully" },
 ];
 
 export function Capabilities() {
@@ -31,7 +34,7 @@ export function Capabilities() {
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
             Realtime execution
           </p>
-          <h2 className="mt-5 text-balance text-4xl font-heading font-semibold tracking-tight sm:text-5xl">
+          <h2 className="mt-5 text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
             More than a model on a phone call.
           </h2>
           <p className="mt-6 max-w-lg leading-8 text-muted-foreground">
@@ -51,38 +54,50 @@ export function Capabilities() {
           </div>
         </div>
         <div className="border border-border bg-card p-6 sm:p-8">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="font-mono text-xs uppercase tracking-widest text-foreground">
-              Conversation lifecycle
+              Documented call events
             </p>
             <span className="font-mono text-[10px] uppercase text-muted-foreground">
-              Illustrative sequence
+              API event names
             </span>
           </div>
-          <ol className="mt-8">
-            {exampleEvents.map((event, index) => (
+          <ol className="mt-7 space-y-0">
+            {events.map((event, index) => (
               <li
-                key={event.step}
-                className="relative flex gap-5 pb-9 last:pb-0"
+                key={event.name}
+                className="relative flex gap-4 pb-7 last:pb-0"
               >
-                {index < exampleEvents.length - 1 && (
+                {index < events.length - 1 && (
                   <span
                     aria-hidden="true"
-                    className="absolute left-[15px] top-9 h-[calc(100%-2.25rem)] w-px bg-border"
+                    className="absolute left-[15px] top-8 h-[calc(100%-2rem)] w-px bg-border"
                   />
                 )}
-                <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-background font-mono text-xs text-brand-orange">
-                  {event.step}
+                <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-background font-mono text-[10px] text-brand-orange">
+                  {String(index + 1).padStart(2, "0")}
                 </span>
-                <div className="flex-1 border-b border-border pb-6 last:border-0">
-                  <p className="font-medium">{event.name}</p>
-                  <p className="mt-1 font-mono text-xs text-muted-foreground">
+                <div className="min-w-0 flex-1 border-b border-border pb-5 last:border-0">
+                  <p className="break-all font-mono text-sm font-medium">
+                    {event.name}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {event.detail}
                   </p>
                 </div>
               </li>
             ))}
           </ol>
+          <p className="mt-5 text-xs leading-6 text-muted-foreground">
+            Selected names from the call event catalog, not a captured live
+            event sequence. Calls can follow other paths, including failures.
+          </p>
+          <Link
+            href="/docs/guides/voice/call-events"
+            className="mt-5 inline-block text-sm font-medium text-foreground underline decoration-brand-orange underline-offset-4 hover:text-brand-orange"
+          >
+            View call event reference
+          </Link>
         </div>
       </div>
     </section>
