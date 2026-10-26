@@ -20,13 +20,13 @@ func DefaultReconciliationJobConfig() ReconciliationJobConfig {
 }
 
 type ReconciliationJob struct {
-	repo    *Repository
-	service *Service
-	config  ReconciliationJobConfig
-	failures atomic.Uint64
-	cleanupRetries atomic.Uint64
-	unconfirmedChecks atomic.Uint64
-	recoveredOriginations atomic.Uint64
+	repo                   *Repository
+	service                *Service
+	config                 ReconciliationJobConfig
+	failures               atomic.Uint64
+	cleanupRetries         atomic.Uint64
+	unconfirmedChecks      atomic.Uint64
+	recoveredOriginations   atomic.Uint64
 }
 
 func NewReconciliationJob(
@@ -184,11 +184,11 @@ func (j *ReconciliationJob) ReliabilityStats(ctx context.Context) (ReliabilitySt
 		return ReliabilityStats{}, fmt.Errorf("count pending admission cleanup: %w", err)
 	}
 	return ReliabilityStats{
-		UnresolvedOriginations: unresolved,
+		UnresolvedOriginations:  unresolved,
 		PendingAdmissionCleanup: pending,
-		ReconciliationFailures: j.failures.Load(),
-		CleanupRetries: j.cleanupRetries.Load(),
-		UnconfirmedChecks: j.unconfirmedChecks.Load(),
-		RecoveredOriginations: j.recoveredOriginations.Load(),
+		ReconciliationFailures:  j.failures.Load(),
+		CleanupRetries:          j.cleanupRetries.Load(),
+		UnconfirmedChecks:       j.unconfirmedChecks.Load(),
+		RecoveredOriginations:   j.recoveredOriginations.Load(),
 	}, nil
 }

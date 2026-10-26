@@ -51,12 +51,12 @@ type Client struct {
 	subscriptionsMu sync.RWMutex
 	subscriptions   []subscription
 
-	eventQueues [eventDispatchShards]chan queuedEvent
-	reconnectAttempts atomic.Uint64
+	eventQueues        [eventDispatchShards]chan queuedEvent
+	reconnectAttempts  atomic.Uint64
 	reconnectSuccesses atomic.Uint64
-	disconnects atomic.Uint64
-	queueOverflows atomic.Uint64
-	oversizedFrames atomic.Uint64
+	disconnects        atomic.Uint64
+	queueOverflows     atomic.Uint64
+	oversizedFrames    atomic.Uint64
 
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc

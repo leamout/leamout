@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/leamout/leamout/server/internal/observability/logging"
@@ -124,9 +124,9 @@ func (m *modules) telephonyMetrics(ctx context.Context) (string, error) {
 	if fs.Ready {
 		ready = 1
 	}
-	metrics := []struct{
-		name string
-		kind string
+	metrics := []struct {
+		name  string
+		kind  string
 		value string
 	}{
 		{"leamout_freeswitch_connected", "gauge", strconv.Itoa(ready)},

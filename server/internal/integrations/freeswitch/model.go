@@ -257,13 +257,13 @@ type ConferenceMembers struct {
 // ReliabilityStats contains process-local FreeSWITCH counters. Scrape from the
 // worker process; the values reset on process restart as Prometheus counters do.
 type ReliabilityStats struct {
-	Ready              bool
-	ReconnectAttempts  uint64
-	ReconnectSuccesses uint64
-	Disconnects        uint64
+	Ready               bool
+	ReconnectAttempts   uint64
+	ReconnectSuccesses  uint64
+	Disconnects         uint64
 	EventQueueOverflows uint64
-	OversizedFrames    uint64
-	QueuedEvents       int
+	OversizedFrames     uint64
+	QueuedEvents        int
 }
 
 // ReliabilityStats only reads atomics and queue lengths. No Redis or blocking
@@ -277,12 +277,12 @@ func (c *Client) ReliabilityStats() ReliabilityStats {
 		queued += len(queue)
 	}
 	return ReliabilityStats{
-		Ready: c.Ready(),
-		ReconnectAttempts: c.reconnectAttempts.Load(),
-		ReconnectSuccesses: c.reconnectSuccesses.Load(),
-		Disconnects: c.disconnects.Load(),
+		Ready:               c.Ready(),
+		ReconnectAttempts:   c.reconnectAttempts.Load(),
+		ReconnectSuccesses:  c.reconnectSuccesses.Load(),
+		Disconnects:         c.disconnects.Load(),
 		EventQueueOverflows: c.queueOverflows.Load(),
-		OversizedFrames: c.oversizedFrames.Load(),
-		QueuedEvents: queued,
+		OversizedFrames:     c.oversizedFrames.Load(),
+		QueuedEvents:        queued,
 	}
 }
