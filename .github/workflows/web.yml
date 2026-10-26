@@ -43,13 +43,9 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      - name: Generate Bun lockfile diff
+      - name: Install dependencies
         working-directory: clients
-        run: |
-          bun install
-          echo LOCK_DIFF_BEGIN
-          git diff -- bun.lock
-          echo LOCK_DIFF_END
+        run: bun install --frozen-lockfile
 
       - name: Lint marketing website
         working-directory: clients/apps/web

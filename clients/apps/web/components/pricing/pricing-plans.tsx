@@ -1,7 +1,7 @@
 import { Button } from "@leamout/ui/components/button";
 import { cn } from "@leamout/ui/lib/utils";
 import Link from "next/link";
-import { plans, type PublicPlan } from "@/lib/plans";
+import { type PublicPlan, plans } from "@/lib/plans";
 
 const presentation: Record<
   PublicPlan["code"],
