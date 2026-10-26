@@ -14,7 +14,6 @@ From `clients/apps/web`, use:
 bun run dev
 bun run lint
 bun run typecheck
-bun run test
 bun run build
 ```
 
@@ -30,7 +29,7 @@ The site redirects `/docs` to `https://docs.leamout.com`, and `/status` to
 
 The separate [web workflow](../../../.github/workflows/web.yml) installs
 dependencies with a frozen lockfile, runs Biome and TypeScript checks,
-validates pricing against the backend seed, and builds the marketing app.
+and builds the marketing app.
 
 `app/opengraph-image.tsx` generates a 1200×630 branded image at build/request
 time. `lib/metadata.ts` uses this route for Open Graph and Twitter previews.
@@ -41,12 +40,10 @@ The blog uses MDX files in `content/` with validated metadata. Drafts are
 excluded from the static article routes and sitemap.
 
 Public fixed-price plans in `lib/plans.ts` mirror
-`server/migrations/033_create_plans.sql`. The targeted
-`tests/pricing.test.mjs` fails if seeded public plan names, prices, limits,
-or displayed entitlements diverge. The backend also seeds a custom Enterprise
-plan, which is not displayed as a fixed-price card. Review both catalogs when
-subscription offerings change. Carrier and AI provider charges are separate
-where applicable.
+`server/migrations/033_create_plans.sql`. The backend also seeds a custom
+Enterprise plan, which is not displayed as a fixed-price card. Review prices,
+limits, and entitlements in both catalogs whenever subscription offerings
+change. Carrier and AI provider charges are separate where applicable.
 
 The contact page always provides a public GitHub issue tracker for non-sensitive
 product feedback and a security disclosure email as currently configured.

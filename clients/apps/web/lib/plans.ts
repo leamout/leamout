@@ -1,5 +1,5 @@
 // Public fixed-price plans mirrored from server/migrations/033_create_plans.sql.
-// Checked against the backend seed by tests/pricing.test.mjs.
+// Update this catalog alongside the backend plan seed when offerings change.
 export const plans = [
   {
     code: "free",

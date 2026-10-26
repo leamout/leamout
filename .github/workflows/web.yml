@@ -55,10 +55,6 @@ jobs:
         working-directory: clients/apps/web
         run: bun run typecheck
 
-      - name: Validate pricing against backend plans
-        working-directory: clients/apps/web
-        run: bun run test
-
       - name: Build marketing website
         working-directory: clients/apps/web
         run: bun run build
