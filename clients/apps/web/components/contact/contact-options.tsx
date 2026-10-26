@@ -4,10 +4,23 @@ import { consoleURL } from "@/lib/site";
 
 const issueURL = "https://github.com/leamout/leamout/issues/new";
 
+// Publish a general contact channel only after the mailbox has been verified.
+const configuredEmail = process.env.CONTACT_EMAIL?.trim();
+const contactEmail =
+  configuredEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(configuredEmail)
+    ? configuredEmail
+    : null;
+
 export function ContactOptions() {
   return (
     <div className="py-20">
-      <div className="grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">
+      <div
+        className={
+          contactEmail
+            ? "grid gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-3"
+            : "grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2"
+        }
+      >
         <section className="flex flex-col bg-card p-8 sm:p-10">
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
             01 / Get building
@@ -36,9 +49,33 @@ export function ContactOptions() {
             </Button>
           </div>
         </section>
+        {contactEmail && (
+          <section className="flex flex-col bg-card p-8 sm:p-10">
+            <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
+              02 / Private inquiries
+            </p>
+            <h2 className="mt-6 font-heading text-3xl font-semibold tracking-tight">
+              Contact the team
+            </h2>
+            <p className="mt-4 max-w-md flex-1 leading-7 text-muted-foreground">
+              For business questions, partnerships, or account-specific help,
+              reach us privately. Please avoid including credentials or
+              recordings in your initial message.
+            </p>
+            <div className="mt-9">
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<a href={`mailto:${contactEmail}`} />}
+              >
+                Email Leamout
+              </Button>
+            </div>
+          </section>
+        )}
         <section className="flex flex-col bg-card p-8 sm:p-10">
           <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
-            02 / Feedback
+            {contactEmail ? "03 / Feedback" : "02 / Feedback"}
           </p>
           <h2 className="mt-6 font-heading text-3xl font-semibold tracking-tight">
             Share a product issue
