@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/leamout/leamout/server/internal/observability/logging"
@@ -27,10 +29,11 @@ func (m *modules) ready(ctx context.Context) error {
 	return nil
 }
 
-// Worker readiness is private to its container. The listener starts only after
+// Worker readiness and metrics are exposed only on the private control network.
+// The listener starts only after
 // the FreeSWITCH lifecycle subscription has been acknowledged.
 func runWorkloadsWithReadiness(ctx context.Context, logger *logging.Logger, modules *modules) error {
-	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:8081")
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", ":8081")
 	if err != nil {
 		return fmt.Errorf("listen for worker readiness: %w", err)
 	}
@@ -39,7 +42,7 @@ func runWorkloadsWithReadiness(ctx context.Context, logger *logging.Logger, modu
 	defer cancel()
 
 	server := &http.Server{
-		Handler:           workerReadinessHandler(modules.ready),
+		Handler:           workerReadinessHandler(modules.ready, modules.telephonyMetrics),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	serverErr := make(chan error, 1)
@@ -80,7 +83,7 @@ func runWorkloadsWithReadiness(ctx context.Context, logger *logging.Logger, modu
 	return result
 }
 
-func workerReadinessHandler(ready func(context.Context) error) http.Handler {
+func workerReadinessHandler(ready func(context.Context) error, telemetry ...func(context.Context) (string, error)) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
@@ -93,5 +96,56 @@ func workerReadinessHandler(ready func(context.Context) error) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ready\n"))
 	})
+	if len(telemetry) > 0 && telemetry[0] != nil {
+		mux.HandleFunc("GET /metrics", func(w http.ResponseWriter, r *http.Request) {
+			ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+			defer cancel()
+			body, err := telemetry[0](ctx)
+			if err != nil {
+				http.Error(w, "telephony reliability metrics unavailable", http.StatusServiceUnavailable)
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+			_, _ = w.Write([]byte(body))
+		})
+	}
 	return mux
+}
+
+// telephonyMetrics reports per-worker event counters and complete PostgreSQL
+// backlogs. No org, call, or channel identifiers appear as metric labels.
+func (m *modules) telephonyMetrics(ctx context.Context) (string, error) {
+	calls, err := m.callReconciliation.ReliabilityStats(ctx)
+	if err != nil {
+		return "", err
+	}
+	fs := m.freeSwitch.ReliabilityStats()
+	ready := 0
+	if fs.Ready {
+		ready = 1
+	}
+	metrics := []struct {
+		name  string
+		kind  string
+		value string
+	}{
+		{"leamout_freeswitch_connected", "gauge", strconv.Itoa(ready)},
+		{"leamout_freeswitch_reconnect_attempts_total", "counter", strconv.FormatUint(fs.ReconnectAttempts, 10)},
+		{"leamout_freeswitch_reconnect_successes_total", "counter", strconv.FormatUint(fs.ReconnectSuccesses, 10)},
+		{"leamout_freeswitch_disconnects_total", "counter", strconv.FormatUint(fs.Disconnects, 10)},
+		{"leamout_freeswitch_event_queue_overflows_total", "counter", strconv.FormatUint(fs.EventQueueOverflows, 10)},
+		{"leamout_freeswitch_oversized_frames_total", "counter", strconv.FormatUint(fs.OversizedFrames, 10)},
+		{"leamout_freeswitch_event_queue_depth", "gauge", strconv.Itoa(fs.QueuedEvents)},
+		{"leamout_call_unresolved_originations", "gauge", strconv.FormatInt(calls.UnresolvedOriginations, 10)},
+		{"leamout_call_pending_admission_cleanup", "gauge", strconv.FormatInt(calls.PendingAdmissionCleanup, 10)},
+		{"leamout_call_reconciliation_failures_total", "counter", strconv.FormatUint(calls.ReconciliationFailures, 10)},
+		{"leamout_call_cleanup_retries_total", "counter", strconv.FormatUint(calls.CleanupRetries, 10)},
+		{"leamout_call_unconfirmed_channel_checks_total", "counter", strconv.FormatUint(calls.UnconfirmedChecks, 10)},
+		{"leamout_call_recovered_originations_total", "counter", strconv.FormatUint(calls.RecoveredOriginations, 10)},
+	}
+	var output strings.Builder
+	for _, metric := range metrics {
+		fmt.Fprintf(&output, "# TYPE %s %s\n%s %s\n", metric.name, metric.kind, metric.name, metric.value)
+	}
+	return output.String(), nil
 }

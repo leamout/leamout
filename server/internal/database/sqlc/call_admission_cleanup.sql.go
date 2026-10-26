@@ -11,6 +11,17 @@ import (
 	"github.com/google/uuid"
 )
 
+const countPendingAdmissionCleanup = `-- name: CountPendingAdmissionCleanup :one
+SELECT count(*) FROM call_admission_cleanup
+`
+
+func (q *Queries) CountPendingAdmissionCleanup(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingAdmissionCleanup)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deferCallAdmissionCleanup = `-- name: DeferCallAdmissionCleanup :exec
 UPDATE call_admission_cleanup
 SET next_attempt_at = NOW() + INTERVAL '1 minute'

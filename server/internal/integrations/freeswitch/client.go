@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -50,7 +51,12 @@ type Client struct {
 	subscriptionsMu sync.RWMutex
 	subscriptions   []subscription
 
-	eventQueues [eventDispatchShards]chan queuedEvent
+	eventQueues        [eventDispatchShards]chan queuedEvent
+	reconnectAttempts  atomic.Uint64
+	reconnectSuccesses atomic.Uint64
+	disconnects        atomic.Uint64
+	queueOverflows     atomic.Uint64
+	oversizedFrames    atomic.Uint64
 
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
@@ -233,6 +239,7 @@ func (c *Client) readLoop(
 		frame, err := readFrame(reader)
 		if err != nil {
 			if errors.Is(err, errESLFrameTooLarge) {
+				c.oversizedFrames.Add(1)
 				log.Printf("FreeSWITCH ESL frame rejected: %v", err)
 			}
 			c.disconnect(conn, err)
@@ -276,6 +283,7 @@ func (c *Client) disconnect(conn net.Conn, readErr error) {
 	c.readErr = nil
 	c.replyCh = nil
 	c.ready = false
+	c.disconnects.Add(1)
 	shouldReconnect := !c.closed
 	c.mu.Unlock()
 	_ = conn.Close()

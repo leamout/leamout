@@ -1,3 +1,10 @@
+-- name: CountUnresolvedOriginationAttempts :one
+SELECT count(*)
+FROM call_origination_attempts AS a
+JOIN calls AS c ON c.id = a.call_id AND c.organization_id = a.organization_id
+WHERE a.status IN ('prepared', 'submitted', 'uncertain')
+  AND c.state = 'initiating';
+
 -- name: PrepareCallOrigination :exec
 INSERT INTO call_origination_attempts (
     channel_id, call_id, organization_id, trunk_id, trunk_endpoint_id

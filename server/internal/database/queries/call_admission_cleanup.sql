@@ -1,3 +1,6 @@
+-- name: CountPendingAdmissionCleanup :one
+SELECT count(*) FROM call_admission_cleanup;
+
 -- name: EnqueueCallAdmissionCleanup :exec
 INSERT INTO call_admission_cleanup (call_id, organization_id)
 VALUES (sqlc.arg(call_id), sqlc.arg(organization_id))

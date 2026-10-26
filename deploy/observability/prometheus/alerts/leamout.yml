@@ -87,3 +87,41 @@ groups:
         annotations:
           summary: "Realtime media queues under pressure"
           description: "At least three backpressure failures in five minutes."
+
+  - name: leamout-telephony-reliability
+    rules:
+      - alert: LeamoutFreeSWITCHDisconnected
+        expr: leamout_freeswitch_connected{component="worker"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Worker FreeSWITCH ESL connection is unavailable"
+          description: "FreeSWITCH lifecycle event delivery is unavailable; investigate telephony readiness and reconciliation."
+
+      - alert: LeamoutFreeSWITCHEventOverload
+        expr: increase(leamout_freeswitch_event_queue_overflows_total{component="worker"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "FreeSWITCH ESL event queue saturated"
+          description: "Event queue overflow caused a reconnect; lifecycle events may have been missed."
+
+      - alert: LeamoutOriginationBacklog
+        expr: leamout_call_unresolved_originations{component="worker"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Outbound origination reconciliation backlog persists"
+          description: "An unresolved origination cannot be safely redialed without conclusive evidence."
+
+      - alert: LeamoutAdmissionCleanupBacklog
+        expr: leamout_call_pending_admission_cleanup{component="worker"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Terminal call admission cleanup is pending"
+          description: "Redis organization or trunk call reservations may remain held."
