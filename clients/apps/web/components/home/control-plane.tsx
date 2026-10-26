@@ -13,7 +13,10 @@ const diagnosticFields = [
 
 export function ControlPlane() {
   return (
-    <section id="console" className="scroll-mt-24 border-b border-border bg-card">
+    <section
+      id="console"
+      className="scroll-mt-24 border-b border-border bg-card"
+    >
       <div className="mx-auto grid max-w-[1200px] gap-14 px-5 py-24 sm:px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center lg:gap-20 lg:px-8 lg:py-28">
         <section
           aria-labelledby="call-detail-preview-title"
@@ -32,8 +35,8 @@ export function ControlPlane() {
           </div>
           <div className="px-5 pt-5 sm:px-6">
             <p className="text-xs leading-6 text-muted-foreground">
-              Inspect the persisted details of a call in your organization.
-              No real call data is shown here.
+              Inspect the persisted details of a call in your organization. No
+              real call data is shown here.
             </p>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {["State", "Media state", "Direction", "Talk time"].map(
@@ -83,8 +86,8 @@ export function ControlPlane() {
               ))}
             </ul>
             <p className="mt-5 border-t border-border pt-4 text-xs leading-6 text-muted-foreground">
-              The current call API does not expose SIP message traces,
-              per-turn AI latency, transcripts, or tool execution traces.
+              The current call API does not expose SIP message traces, per-turn
+              AI latency, transcripts, or tool execution traces.
             </p>
           </div>
         </section>

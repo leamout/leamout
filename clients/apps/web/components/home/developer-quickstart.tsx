@@ -91,9 +91,9 @@ export function DeveloperQuickstart() {
               Check the agent readiness API.
             </h3>
             <p className="mt-3 text-sm leading-7 text-muted-foreground">
-              An organization API token with permission and a saved agent ID
-              are required. Check the `ready` value and address any reported
-              issues before routing real traffic.
+              An organization API token with permission and a saved agent ID are
+              required. Check the `ready` value and address any reported issues
+              before routing real traffic.
             </p>
             <Link
               href="/docs/quickstart"
@@ -107,7 +107,11 @@ export function DeveloperQuickstart() {
               GET /v1/voice-agents/:id/readiness
             </p>
             <pre className="overflow-x-auto font-mono text-xs leading-7 text-foreground">
-              <code>{'curl -sS "https://api.leamout.com/v1/voice-agents/$VOICE_AGENT_ID/readiness" -H "Authorization: Bearer $LEAMOUT_TOKEN"'}</code>
+              <code>
+                {
+                  'curl -sS "https://api.leamout.com/v1/voice-agents/$VOICE_AGENT_ID/readiness" -H "Authorization: Bearer $LEAMOUT_TOKEN"'
+                }
+              </code>
             </pre>
             <p className="mt-4 text-xs leading-6 text-muted-foreground">
               This is a configuration check, not a live media or carrier test.

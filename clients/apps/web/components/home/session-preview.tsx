@@ -44,8 +44,8 @@ export function SessionPreview() {
       </div>
       <div className="space-y-4 p-5 sm:p-7">
         <p className="text-xs leading-6 text-muted-foreground">
-          The fields below reflect the current Console. They are not a
-          customer session or a preconfigured agent.
+          The fields below reflect the current Console. They are not a customer
+          session or a preconfigured agent.
         </p>
         <dl className="grid gap-3 sm:grid-cols-2">
           {configuration.map(({ label, detail }) => (
@@ -71,8 +71,8 @@ export function SessionPreview() {
           </div>
           <p className="mt-2 text-xs leading-6 text-muted-foreground">
             The readiness report checks required provider bindings and returns
-            issues to resolve. Creating an agent alone does not make it ready
-            to receive calls.
+            issues to resolve. Creating an agent alone does not make it ready to
+            receive calls.
           </p>
         </div>
         <div className="border-t border-border pt-4">
