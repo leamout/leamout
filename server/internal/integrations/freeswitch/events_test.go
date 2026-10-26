@@ -99,3 +99,77 @@ func TestEventDispatchStableShard(t *testing.T) {
 		}
 	}
 }
+
+
+func TestEventDispatchDelayedLifecycleDoesNotReorderSameChannel(t *testing.T) {
+	client, err := New(DefaultConfig("127.0.0.1:8021", "test"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	const stalledChannel = "stalled-channel"
+	otherChannel := "independent-channel"
+	for eventDispatchShard(otherChannel) == eventDispatchShard(stalledChannel) {
+		otherChannel += "-next"
+	}
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	processed := make(chan string, 3)
+	client.subscriptions = []subscription{{
+		events: []string{"CHANNEL_CREATE", "CHANNEL_ANSWER", "CHANNEL_HANGUP_COMPLETE"},
+		handler: func(ctx context.Context, event Event) error {
+			if event.Header("Unique-ID") == stalledChannel && event.Name == "CHANNEL_CREATE" {
+				close(started)
+				select {
+				case <-release:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+			processed <- event.Header("Unique-ID") + ":" + event.Name
+			return nil
+		},
+	}}
+
+	send := func(channel, name string) {
+		t.Helper()
+		if err := client.dispatchEvent(Frame{
+			ContentType: ContentTypeEventPlain,
+			Headers: map[string]string{"Event-Name": name, "Unique-ID": channel},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	send(stalledChannel, "CHANNEL_CREATE")
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("stalled handler did not begin")
+	}
+	send(stalledChannel, "CHANNEL_HANGUP_COMPLETE")
+	send(otherChannel, "CHANNEL_ANSWER")
+	select {
+	case got := <-processed:
+		if got != otherChannel+":CHANNEL_ANSWER" {
+			t.Fatalf("delayed call events overtook each other: %q", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("independent call did not progress while another channel was stalled")
+	}
+	close(release)
+	for _, want := range []string{
+		stalledChannel + ":CHANNEL_CREATE",
+		stalledChannel + ":CHANNEL_HANGUP_COMPLETE",
+	} {
+		select {
+		case got := <-processed:
+			if got != want {
+				t.Fatalf("per-channel lifecycle reordered: got %q, want %q", got, want)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timed out waiting for %s", want)
+		}
+	}
+}
