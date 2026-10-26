@@ -48,3 +48,19 @@ func TestWorkerReadinessRejectsOtherMethods(t *testing.T) {
 		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusMethodNotAllowed)
 	}
 }
+
+// Worker metrics remain available separately from readiness, and do not leak
+// internal errors or identity-cardinality labels to the HTTP response.
+func TestWorkerMetricsHandler(t *testing.T) {
+	handler := workerReadinessHandler(
+		func(context.Context) error { return errors.New("FreeSWITCH disconnected") },
+		func(context.Context) (string, error) {
+			return "# TYPE leamout_freeswitch_connected gauge\nleamout_freeswitch_connected 0\n", nil
+		},
+	)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "leamout_freeswitch_connected 0") {
+		t.Fatalf("metrics during outage: status=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+}

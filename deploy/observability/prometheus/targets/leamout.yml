@@ -3,6 +3,10 @@
   labels:
     component: api
 - targets:
+    - worker:8081
+  labels:
+    component: worker
+- targets:
     - media:8090
   labels:
     component: media
