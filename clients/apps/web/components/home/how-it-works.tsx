@@ -73,10 +73,10 @@ export function HowItWorks() {
             </p>
           </div>
           <Link
-            href="/platform"
+            href="/docs/guides/voice/inbound-call"
             className="shrink-0 text-sm font-medium text-foreground underline decoration-brand-orange underline-offset-8 hover:text-foreground"
           >
-            Explore the platform
+            Inbound call setup
           </Link>
         </div>
       </div>

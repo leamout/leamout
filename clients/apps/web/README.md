@@ -64,3 +64,34 @@ public issue tracker to request secrets, customer call data, or recordings.
 
 The marketing site does not claim external certifications, customer
 testimonials, uptime guarantees, or audited provider-processing locations.
+
+## Product references and onboarding
+
+The homepage now features source-aligned, non-interactive references to the
+implemented Console's **Voice Agent configuration** and **Call details**
+surfaces. These are **not authenticated screenshots, real customer records, or
+live call recordings**. They deliberately contain no fake timestamps, metrics,
+call IDs, completed checks, or provider connectivity assertions.
+
+Keep the labels synchronized with the corresponding Console implementation:
+
+- `clients/apps/console/components/agents/agent-details.tsx` defines the
+  agent's available tabs.
+- `clients/apps/console/components/agents/agent-form.tsx` defines the
+  configuration fields.
+- `clients/apps/console/components/agents/agent-readiness.tsx` defines the
+  readiness report.
+- `clients/apps/console/components/calls/call-details.tsx` defines the
+  call detail sections, persisted diagnostics, and API limitations.
+- `clients/apps/console/components/overview/overview-dashboard.tsx` defines
+  organization setup steps.
+
+The four onboarding steps link directly to published docs in
+`leamout/docs`: AI integrations, SIP trunks, Voice Agents, and inbound calls.
+The API readiness example is documented in the official quickstart. The
+marketing website never requests provider secrets or embeds organization data.
+
+For a future screenshot-based showcase, capture approved screens from a
+dedicated demo organization with explicitly sanitized data and verify that
+features are available in the deployed environment. Never label reconstructed
+interface references as live screenshots.

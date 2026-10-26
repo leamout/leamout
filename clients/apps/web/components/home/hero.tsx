@@ -37,9 +37,9 @@ export function HomeHero() {
               size="lg"
               variant="outline"
               nativeButton={false}
-              render={<Link href="/docs" />}
+              render={<Link href="/docs/quickstart" />}
             >
-              Read documentation
+              Explore quickstart
             </Button>
           </div>
           <ul className="mt-12 flex flex-wrap gap-x-6 gap-y-3 border-t border-border pt-6 text-xs font-medium text-muted-foreground">
