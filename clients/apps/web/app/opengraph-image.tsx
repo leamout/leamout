@@ -105,7 +105,9 @@ export default function OpenGraphImage() {
           fontSize: 18,
         }}
       >
-        <span style={{ color: "#C3C8C7" }}>One managed runtime. Your providers.</span>
+        <span style={{ color: "#C3C8C7" }}>
+          One managed runtime. Your providers.
+        </span>
         <span style={{ color: "#F5F6F4" }}>leamout.com</span>
       </div>
     </div>,

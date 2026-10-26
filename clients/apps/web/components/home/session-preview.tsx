@@ -15,8 +15,7 @@ const sessionEvents = [
 
 export function SessionPreview() {
   return (
-    <div
-      role="group"
+    <section
       aria-label="Illustrative Leamout voice agent session"
       className="overflow-hidden rounded-2xl border border-border bg-card shadow-[0_24px_90px_rgba(0,0,0,0.2)]"
     >
@@ -132,6 +131,6 @@ export function SessionPreview() {
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

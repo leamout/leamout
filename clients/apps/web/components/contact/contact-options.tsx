@@ -45,8 +45,8 @@ export function ContactOptions() {
           </h2>
           <p className="mt-4 max-w-md flex-1 leading-7 text-muted-foreground">
             For business questions, partnerships, or account-specific help,
-            reach us privately. Please avoid including credentials or
-            recordings in your initial message.
+            reach us privately. Please avoid including credentials or recordings
+            in your initial message.
           </p>
           <div className="mt-9">
             <Button
