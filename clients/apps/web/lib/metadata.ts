@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export function constructMetadata({
   title,
   description,
-  image = "/og.png",
+  image = "/opengraph-image",
   path = "",
   noIndex = false,
 }: {
