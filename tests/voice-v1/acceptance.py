@@ -672,11 +672,83 @@ def restart_safety():
     return "API and worker restarted; telephony readiness recovered without losing control-plane or call state"
 
 
+
+def failure_injection_recovery():
+    """Exercise live worker restart and a Redis outage at terminal cleanup."""
+    # Use a fresh call: the normal matrix has already completed its calls.
+    outbound_call()
+    call_id = STATE["call_id"]
+    channel_id = STATE["channel_id"]
+
+    compose("restart", "worker")
+    wait_for(
+        "worker readiness after active-call restart",
+        lambda: compose("exec", "-T", "worker", "wget", "-qO-",
+                        "http://127.0.0.1:8081/readyz", check=False).strip() == "ready",
+        timeout=60,
+    )
+    if fs_cli("freeswitch", f"uuid_exists {channel_id}").strip().lower() != "true":
+        raise AcceptanceError("live call disappeared after worker restart")
+    if get_call(call_id)["state"] not in {"answered", "active", "held"}:
+        raise AcceptanceError("worker restart changed a live call into a terminal state")
+
+    # A FreeSWITCH hangup still creates a durable lifecycle transition when
+    # Redis is down. The terminal cleanup marker must survive and be retried.
+    compose("stop", "redis")
+    try:
+        fs_cli("freeswitch", f"uuid_kill {channel_id}")
+        escaped_id = str(uuid.UUID(call_id))
+        def durable_terminal():
+            state = psql(
+                "SELECT state FROM calls WHERE id = '" + escaped_id + "';"
+            ).strip()
+            return state if state in {"completed", "cancelled", "failed"} else False
+        wait_for("durable terminal call during Redis outage", durable_terminal, timeout=45)
+    finally:
+        compose("start", "redis")
+
+    wait_for("API readiness after Redis recovery",
+             lambda: health_status("/readyz") == 200, timeout=60)
+    wait_for(
+        "worker readiness after Redis recovery",
+        lambda: compose("exec", "-T", "worker", "wget", "-qO-",
+                        "http://127.0.0.1:8081/readyz", check=False).strip() == "ready",
+        timeout=60,
+    )
+
+    def cleanup_complete():
+        return psql(
+            "SELECT count(*) FROM call_admission_cleanup WHERE call_id = '"
+            + str(uuid.UUID(call_id)) + "';"
+        ).strip() == "0"
+    wait_for("retryable terminal admission cleanup", cleanup_complete, timeout=90)
+
+    # Both organization and trunk concurrency reservations must disappear.
+    for prefix, identifier in (
+        ("organization", ORG_ID),
+        ("trunk", STATE["trunk_id"]),
+    ):
+        members = compose(
+            "exec", "-T", "redis", "redis-cli", "--raw", "ZRANGE",
+            f"telecom:admission:{prefix}:{identifier}:leases", "0", "-1",
+        ).splitlines()
+        if call_id in members:
+            raise AcceptanceError(f"stale {prefix} admission lease after Redis recovery")
+
+    # No leaked capacity: a new outbound call must be admitted after cleanup.
+    outbound_call()
+    second_id = STATE["call_id"]
+    hangup_outbound()
+    return (
+        "live worker restart retained call; Redis outage persisted terminal state; "
+        f"cleanup recovered; replacement outbound call {second_id} succeeded"
+    )
+
 def print_summary():
     print("\nVoice v1 acceptance matrix")
     print("=" * 72)
     failed = 0
-    for number in range(1, 16):
+    for number in range(1, 17 if os.getenv("VOICE_V1_FAILURE_INJECTION") == "1" else 16):
         status, name, detail = RESULTS.get(
             number,
             ("FAIL", "unexecuted acceptance item", "dependency prevented execution"),
@@ -729,6 +801,9 @@ def main():
         record(13, "Receive webhooks", webhooks)
     record(14, "Inspect call/media health", health)
     record(15, "Restart components without corrupting state", restart_safety)
+
+    if os.getenv("VOICE_V1_FAILURE_INJECTION") == "1":
+        record(16, "Recover worker restart and Redis outage", failure_injection_recovery)
 
     failed = print_summary()
     if failed:

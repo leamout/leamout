@@ -308,3 +308,35 @@ func TestTerminalLifecycleAndState(t *testing.T) {
 		t.Fatal("active must not be terminal state")
 	}
 }
+
+func TestDelayedLifecycleCannotReopenTerminalCall(t *testing.T) {
+	snapshot := LifecycleSnapshot{State: string(StateCompleted)}
+	for _, event := range []LifecycleEventType{
+		LifecycleInitiated,
+		LifecycleRinging,
+		LifecycleAnswered,
+		LifecycleActive,
+		LifecycleHeld,
+		LifecycleResumed,
+		LifecycleCompleted,
+		LifecycleFailed,
+		LifecycleCancelled,
+	} {
+		if !lifecycleAlreadyApplied(snapshot, event) {
+			t.Fatalf("delayed lifecycle %s would mutate terminal call", event)
+		}
+	}
+}
+
+func TestRepeatedTerminalLifecycleRemainsIdempotent(t *testing.T) {
+	for _, state := range []State{StateCompleted, StateFailed, StateCancelled} {
+		snapshot := LifecycleSnapshot{State: string(state)}
+		for _, event := range []LifecycleEventType{
+			LifecycleCompleted, LifecycleFailed, LifecycleCancelled,
+		} {
+			if !lifecycleAlreadyApplied(snapshot, event) {
+				t.Fatalf("terminal state %s rejected replay of %s", state, event)
+			}
+		}
+	}
+}
