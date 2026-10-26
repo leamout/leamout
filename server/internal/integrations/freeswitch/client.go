@@ -3,6 +3,7 @@ package freeswitch
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -231,6 +232,9 @@ func (c *Client) readLoop(
 	for {
 		frame, err := readFrame(reader)
 		if err != nil {
+			if errors.Is(err, errESLFrameTooLarge) {
+				log.Printf("FreeSWITCH ESL frame rejected: %v", err)
+			}
 			c.disconnect(conn, err)
 			return
 		}
@@ -302,14 +306,43 @@ func writeCommand(conn net.Conn, command string) (int, error) {
 	return fmt.Fprintf(conn, "%s\n\n", command)
 }
 
+// Keep both ESL control responses and queued events within a fixed memory
+// budget. Plain events usually carry many FreeSWITCH variables but should not
+// be allowed to allocate arbitrary memory before entering the bounded queue.
+const (
+	maxESLHeaderBytes    = 64 << 10
+	maxESLEventBodyBytes = 128 << 10
+	maxESLReplyBodyBytes = 8 << 20
+)
+
+var errESLFrameTooLarge = errors.New("FreeSWITCH ESL frame exceeds size limit")
+
+func readESLHeaderLine(reader *bufio.Reader, remaining int) (string, int, error) {
+	var line []byte
+	for {
+		part, err := reader.ReadSlice('\n')
+		if len(part) > remaining-len(line) {
+			return "", 0, fmt.Errorf("%w: headers exceed %d bytes", errESLFrameTooLarge, maxESLHeaderBytes)
+		}
+		line = append(line, part...)
+		if err == nil {
+			return strings.TrimRight(string(line), "\r\n"), len(line), nil
+		}
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			return "", 0, err
+		}
+	}
+}
+
 func readFrame(reader *bufio.Reader) (Frame, error) {
 	headers := make(map[string]string)
+	headerBytes := 0
 	for {
-		line, err := reader.ReadString('\n')
+		line, bytesRead, err := readESLHeaderLine(reader, maxESLHeaderBytes-headerBytes)
 		if err != nil {
 			return Frame{}, err
 		}
-		line = strings.TrimRight(line, "\r\n")
+		headerBytes += bytesRead
 		if line == "" {
 			break
 		}
@@ -327,6 +360,15 @@ func readFrame(reader *bufio.Reader) (Frame, error) {
 		if err != nil || length < 0 {
 			return Frame{}, fmt.Errorf("invalid FreeSWITCH content length %q", raw)
 		}
+	}
+
+	limit := maxESLReplyBodyBytes
+	if headers["Content-Type"] == ContentTypeEventPlain {
+		limit = maxESLEventBodyBytes
+	}
+	if length > limit {
+		return Frame{}, fmt.Errorf("%w: content type %q length %d exceeds %d bytes",
+			errESLFrameTooLarge, headers["Content-Type"], length, limit)
 	}
 
 	body := make([]byte, length)
