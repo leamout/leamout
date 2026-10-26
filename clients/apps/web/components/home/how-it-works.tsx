@@ -1,20 +1,33 @@
 import Link from "next/link";
 
-const layers = [
+const responsibilities = [
   {
-    label: "Your telephony",
-    title: "SIP carrier or PBX",
-    detail: "Existing numbers, trunks, and routing",
+    number: "01",
+    label: "SIGNAL",
+    title: "Connect the call",
+    detail:
+      "Accept SIP signaling and work with your existing carrier, numbers, or PBX.",
   },
   {
-    label: "Leamout managed runtime",
-    title: "SIP edge + voice agent",
-    detail: "Signaling, realtime media, turns, and tools",
+    number: "02",
+    label: "STREAM",
+    title: "Move realtime media",
+    detail:
+      "Keep the audio path connected while the call and conversation progress.",
   },
   {
-    label: "Your intelligence",
-    title: "AI providers",
-    detail: "Realtime model or STT, LLM, and TTS",
+    number: "03",
+    label: "EXECUTE",
+    title: "Run the agent",
+    detail:
+      "Coordinate your selected realtime model or your STT, LLM, and TTS stack.",
+  },
+  {
+    number: "04",
+    label: "OPERATE",
+    title: "Track the lifecycle",
+    detail:
+      "Inspect persisted call milestones, routing identifiers, and recordings where available.",
   },
 ];
 
@@ -22,86 +35,59 @@ export function HowItWorks() {
   return (
     <section
       id="architecture"
-      className="scroll-mt-24 border-b border-border"
       aria-labelledby="home-architecture-title"
+      className="border-b border-border bg-white"
     >
-      <div className="mx-auto max-w-[1200px] px-5 py-24 sm:px-6 lg:px-8 lg:py-28">
-        <div className="grid gap-6 lg:grid-cols-[1fr_0.9fr] lg:items-end">
+      <div className="mx-auto max-w-[1280px] px-5 py-20 sm:px-6 sm:py-24 lg:px-8 lg:py-28">
+        <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr] lg:items-end lg:gap-16">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-brand-orange">
-              One managed voice path
+              02 / The managed runtime
             </p>
             <h2
               id="home-architecture-title"
-              className="mt-5 max-w-2xl text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl"
+              className="mt-5 max-w-2xl text-balance font-heading text-4xl font-semibold leading-tight tracking-[-0.04em] sm:text-5xl"
             >
-              Connect the parts. Leamout runs the call.
+              A voice call is a system, not just a prompt.
             </h2>
           </div>
-          <p className="max-w-lg leading-8 text-muted-foreground">
-            Keep your existing SIP connectivity and AI accounts. Leamout
-            operates the signaling, media, and agent session between them.
-          </p>
+          <div className="max-w-2xl lg:justify-self-end">
+            <p className="text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+              Real calls involve signaling, media, agent execution, and
+              changing call state. Leamout provides the runtime between
+              telephony and AI, while your team keeps control of the agent
+              experience and provider choices.
+            </p>
+            <Link
+              href="/platform"
+              className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-foreground underline decoration-brand-orange decoration-2 underline-offset-4 transition-colors hover:text-brand-orange"
+            >
+              Explore the platform
+              <span aria-hidden="true">↗</span>
+            </Link>
+          </div>
         </div>
 
-        <div className="mt-12 overflow-hidden rounded-xl border border-border bg-card">
-          <div className="grid gap-px bg-border lg:grid-cols-3">
-            {layers.map((layer, index) => (
-              <div
-                key={layer.label}
-                className={
-                  index === 1
-                    ? "relative bg-brand-surface px-7 py-9 sm:px-9"
-                    : "bg-card px-7 py-9 sm:px-9"
-                }
-              >
-                {index === 1 && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-0 top-0 h-1 bg-brand-orange"
-                  />
-                )}
-                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-brand-orange">
-                  {layer.label}
-                </p>
-                <h3 className="mt-6 font-heading text-2xl font-semibold">
-                  {layer.title}
-                </h3>
-                <p className="mt-3 text-sm leading-7 text-muted-foreground">
-                  {layer.detail}
-                </p>
+        <ol className="mt-12 grid gap-8 border-y border-border py-8 sm:mt-16 sm:grid-cols-2 sm:gap-x-10 sm:gap-y-10 lg:grid-cols-4 lg:gap-7">
+          {responsibilities.map((item) => (
+            <li key={item.number} className="min-w-0">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-brand-orange">
+                  {item.label}
+                </span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {item.number}
+                </span>
               </div>
-            ))}
-          </div>
-          <div className="grid gap-5 border-t border-border bg-background px-7 py-6 md:grid-cols-[0.85fr_1.15fr] md:items-center sm:px-9">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-brand-orange">
-                Leamout control plane
-              </p>
-              <h3 className="mt-2 text-lg font-semibold">
-                Configure, route, and inspect.
+              <h3 className="mt-5 font-heading text-xl font-semibold tracking-tight">
+                {item.title}
               </h3>
-            </div>
-            <p className="text-sm leading-7 text-muted-foreground">
-              Manage Voice Agents and provider bindings, assign inbound
-              numbers, inspect persisted call details, and subscribe to
-              lifecycle events. Audio returns to the caller over the SIP
-              connection.
-            </p>
-          </div>
-        </div>
-        <div className="mt-7 flex flex-wrap items-center justify-between gap-5">
-          <p className="max-w-2xl text-xs leading-6 text-muted-foreground">
-            Simplified architecture. SIP ingress and AI provider connectivity
-            must be configured before an agent can take a call.
-          </p>
-          <Link
-            href="/platform"
-            className="shrink-0 text-sm font-medium text-foreground underline decoration-brand-orange underline-offset-4 hover:text-brand-orange"
-          >
-            Explore the architecture
-          </Link>
-        </div>
+              <p className="mt-3 text-sm leading-7 text-muted-foreground">
+                {item.detail}
+              </p>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );

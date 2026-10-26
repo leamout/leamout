@@ -68,13 +68,14 @@ testimonials, uptime guarantees, or audited provider-processing locations.
 
 ## Product references and onboarding
 
-The homepage now features source-aligned, non-interactive references to the
-implemented Console's **Voice Agent configuration** and **Call details**
-surfaces. These are **not authenticated screenshots, real customer records, or
-live call recordings**. They deliberately contain no fake timestamps, metrics,
-call IDs, completed checks, or provider connectivity assertions.
+The homepage uses a static, conceptual SIP-to-runtime-to-AI diagram and
+representative call event names. These visuals are explanatory references, not
+live activity, authenticated Console screenshots, customer records, or
+evidence of production traffic. The marketing shell and homepage use Leamout's
+light palette: off-white surfaces, high-contrast typography, and orange
+accents.
 
-Keep the labels synchronized with the corresponding Console implementation:
+Keep product capabilities aligned with the current Console implementation:
 
 - `clients/apps/console/components/agents/agent-details.tsx` defines the
   agent's available tabs.
@@ -82,8 +83,8 @@ Keep the labels synchronized with the corresponding Console implementation:
   configuration fields.
 - `clients/apps/console/components/agents/agent-readiness.tsx` defines the
   readiness report.
-- `clients/apps/console/components/calls/call-details.tsx` defines the
-  call detail sections, persisted diagnostics, and API limitations.
+- `clients/apps/console/components/calls/call-details.tsx` defines persisted
+  call diagnostics and API limitations.
 - `clients/apps/console/components/overview/overview-dashboard.tsx` defines
   organization setup steps.
 
