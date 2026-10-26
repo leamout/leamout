@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -48,6 +49,8 @@ type Client struct {
 	subscriptionsMu sync.RWMutex
 	subscriptions   []subscription
 
+	eventQueues [eventDispatchShards]chan queuedEvent
+
 	lifecycleCtx    context.Context
 	lifecycleCancel context.CancelFunc
 	wg              sync.WaitGroup
@@ -60,7 +63,7 @@ func New(cfg Config) (*Client, error) {
 
 	lifecycleCtx, lifecycleCancel := context.WithCancel(context.Background())
 
-	return &Client{
+	client := &Client{
 		address:           cfg.Address,
 		password:          cfg.Password,
 		connectTimeout:    cfg.ConnectTimeout,
@@ -70,7 +73,9 @@ func New(cfg Config) (*Client, error) {
 		dialer:            &net.Dialer{Timeout: cfg.ConnectTimeout},
 		lifecycleCtx:      lifecycleCtx,
 		lifecycleCancel:   lifecycleCancel,
-	}, nil
+	}
+	client.startEventDispatch()
+	return client, nil
 }
 
 func (c *Client) Connect(ctx context.Context) error {
@@ -241,7 +246,13 @@ func (c *Client) readLoop(
 				return
 			}
 		case ContentTypeEventPlain:
-			c.dispatchEvent(frame)
+			if err := c.dispatchEvent(frame); err != nil {
+				// ESL has no backpressure or replay guarantee. A saturated
+				// handler queue must not silently discard lifecycle state.
+				log.Printf("FreeSWITCH event dispatch overload: %v", err)
+				c.disconnect(conn, err)
+				return
+			}
 		}
 	}
 }
@@ -280,26 +291,6 @@ func (c *Client) disconnect(conn net.Conn, readErr error) {
 
 	if shouldReconnect {
 		c.startReconnect()
-	}
-}
-
-func (c *Client) dispatchEvent(frame Frame) {
-	event := Event{
-		Headers: frame.Headers,
-		Body:    frame.Body,
-		Name:    frame.Header("Event-Name"),
-	}
-
-	for _, subscription := range c.subscriptionSnapshot() {
-		if !subscription.matches(event.Name) {
-			continue
-		}
-
-		go func(handler EventHandler) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_ = handler(ctx, event)
-		}(subscription.handler)
 	}
 }
 

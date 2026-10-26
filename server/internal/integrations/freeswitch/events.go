@@ -3,8 +3,11 @@ package freeswitch
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
+	"log"
 	"net/url"
 	"strings"
+	"time"
 )
 
 type EventHandler func(context.Context, Event) error
@@ -132,4 +135,98 @@ func plainEventHeader(body, name string) string {
 		return value
 	}
 	return ""
+}
+
+// A fixed number of worker queues bounds the number of concurrently executing
+// ESL callbacks. Each channel is assigned to exactly one FIFO queue, retaining
+// the order of its events while allowing independent channels to progress.
+const (
+	eventDispatchShards = 16
+	eventQueueDepth     = 128
+	eventHandlerTimeout = 5 * time.Second
+)
+
+type queuedEvent struct {
+	event    Event
+	handlers []EventHandler
+}
+
+func (c *Client) startEventDispatch() {
+	for index := range c.eventQueues {
+		queue := make(chan queuedEvent, eventQueueDepth)
+		c.eventQueues[index] = queue
+		c.wg.Add(1)
+		go c.consumeEventQueue(queue)
+	}
+}
+
+func (c *Client) consumeEventQueue(queue <-chan queuedEvent) {
+	defer c.wg.Done()
+
+	for {
+		select {
+		case <-c.lifecycleCtx.Done():
+			return
+		case item := <-queue:
+			for _, handler := range item.handlers {
+				ctx, cancel := context.WithTimeout(c.lifecycleCtx, eventHandlerTimeout)
+				err := handler(ctx, item.event)
+				cancel()
+				if err != nil {
+					log.Printf("FreeSWITCH event handler failed: event=%s channel=%s error=%v",
+						item.event.Name, item.event.Header("Unique-ID"), err)
+				}
+				if c.lifecycleCtx.Err() != nil {
+					return
+				}
+			}
+		}
+	}
+}
+
+func (c *Client) dispatchEvent(frame Frame) error {
+	event := Event{
+		Headers: frame.Headers,
+		Body:    frame.Body,
+		Name:    frame.Header("Event-Name"),
+	}
+
+	subscriptions := c.subscriptionSnapshot()
+	handlers := make([]EventHandler, 0, len(subscriptions))
+	for _, subscription := range subscriptions {
+		if subscription.matches(event.Name) {
+			handlers = append(handlers, subscription.handler)
+		}
+	}
+	if len(handlers) == 0 {
+		return nil
+	}
+	select {
+	case <-c.lifecycleCtx.Done():
+		return context.Canceled
+	default:
+	}
+
+	channel := strings.TrimSpace(event.Header("Unique-ID"))
+	key := channel
+	if key == "" {
+		key = strings.TrimSpace(event.Header("variable_leamout_call_id"))
+	}
+	if key == "" {
+		key = "unkeyed"
+	}
+
+	queue := c.eventQueues[eventDispatchShard(key)]
+	select {
+	case queue <- queuedEvent{event: event, handlers: handlers}:
+		return nil
+	default:
+		return fmt.Errorf("FreeSWITCH event queue full: event=%s channel=%s", event.Name, channel)
+	}
+}
+
+func eventDispatchShard(key string) int {
+	hash := fnv.New32a()
+	_, _ = hash.Write([]byte(key))
+	return int(hash.Sum32() % eventDispatchShards)
 }
