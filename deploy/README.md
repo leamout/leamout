@@ -37,6 +37,18 @@ Current tracing initialization should be wired and tested independently.
 retention and storage capacities, TLS/authentication for cross-host telemetry,
 backup policies and monitoring access controls before running at scale.
 
+The API depends on completed PostgreSQL migrations and healthy Redis/NATS, but
+**does not require FreeSWITCH to start**. The FreeSWITCH ESL client reconnects
+in the background: `/healthz` reports process liveness, `/readyz` checks
+PostgreSQL/Redis control-plane readiness, and `/telephony/readyz` reports
+FreeSWITCH availability separately (HTTP 503 until it connects). This allows
+plan, organization, and configuration APIs to remain available during a
+telephony outage. SIP/call operations still require a working telephony path.
+The worker currently requires FreeSWITCH at startup to subscribe to lifecycle
+events; its background workflows remain unavailable until that dependency is
+ready. The Voice v1 acceptance suite exercises the initial API-only boot,
+authenticated control-plane reads, then late FreeSWITCH startup and reconnection.
+
 ## Environment configuration
 
 Copy the deployment examples from the repository root:

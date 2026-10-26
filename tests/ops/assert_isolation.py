@@ -187,6 +187,22 @@ def main():
             f"{name}: expected networks {sorted(expected)}, got {sorted(actual)}"
         )
 
+
+    # The control-plane API must start from a fresh deployment without a
+    # running FreeSWITCH/media process. Database and cache health still gate it.
+    server_dependencies = services["server"].get("depends_on", {})
+    assert set(server_dependencies) == {"migrate", "redis", "nats"}, (
+        f"server must not wait on telephony/media: {sorted(server_dependencies)}"
+    )
+    assert server_dependencies["migrate"]["condition"] == "service_completed_successfully"
+    assert server_dependencies["redis"]["condition"] == "service_healthy"
+    assert server_dependencies["nats"]["condition"] == "service_healthy"
+
+    # The worker still needs live ESL on startup to establish lifecycle
+    # subscriptions; its telephony readiness is intentionally separate.
+    worker_dependencies = services["worker"].get("depends_on", {})
+    assert worker_dependencies["freeswitch"]["condition"] == "service_healthy"
+
     for name in INTERNAL_NETWORKS:
         assert config["networks"][name]["internal"] is True, (
             f"{name}: network must be internal"
@@ -206,7 +222,7 @@ def main():
             services[name]["networks"][network]["ipv4_address"] == address
         ), f"{name}: {network} fixed address changed"
 
-    print("PASS resolved deployment service secrets and network isolation")
+    print("PASS resolved deployment service secrets, control-plane startup and network isolation")
 
 
 if __name__ == "__main__":

@@ -102,8 +102,6 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-      freeswitch:
-        condition: service_healthy
     networks: [edge, control, database, cache]
 
   backoffice:
