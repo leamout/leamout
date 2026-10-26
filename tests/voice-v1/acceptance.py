@@ -709,6 +709,12 @@ def failure_injection_recovery():
 
     wait_for("API readiness after Redis recovery",
              lambda: health_status("/readyz") == 200, timeout=60)
+    wait_for(
+        "worker readiness after Redis recovery",
+        lambda: compose("exec", "-T", "worker", "wget", "-qO-",
+                        "http://127.0.0.1:8081/readyz", check=False).strip() == "ready",
+        timeout=60,
+    )
 
     def cleanup_complete():
         return psql(
@@ -800,8 +806,6 @@ def main():
         record(16, "Recover worker restart and Redis outage", failure_injection_recovery)
 
     failed = print_summary()
-    if RESULTS.get(16, ("PASS",))[0] == "FAIL":
-        failed += 1
     if failed:
         print(
             f"\nVoice v1 acceptance FAILED: {failed} capability check(s) did not pass."
