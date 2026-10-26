@@ -112,7 +112,8 @@ chmod 0600 "$CERT_DIR/webhook.key" "$CERT_DIR/opensips-privkey.pem"
 
 cd "$REPO_ROOT"
 $COMPOSE config --quiet
-$COMPOSE up -d --build postgres redis nats rtpengine freeswitch voice-v1-carrier voice-v1-webhook
+# Deliberately leave FreeSWITCH stopped. The API must start without it.
+$COMPOSE up -d --build postgres redis nats rtpengine voice-v1-carrier voice-v1-webhook
 
 printf '%s\n' "Waiting for PostgreSQL..."
 i=0
@@ -130,30 +131,8 @@ $COMPOSE exec -T postgres \
     psql -v ON_ERROR_STOP=1 -U leamout -d leamout \
     <tests/voice-v1/bootstrap.sql >/dev/null
 
-printf '%s\n' "Starting OpenSIPS after database bootstrap..."
-$COMPOSE up -d --build opensips
-
-printf '%s\n' "Waiting for OpenSIPS readiness..."
-i=0
-until $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status >/dev/null 2>&1; do
-    i=$((i + 1))
-    [ "$i" -lt 60 ] || { echo "OpenSIPS did not become ready" >&2; $COMPOSE logs --no-color --tail=200 opensips >&2 || true; exit 1; }
-    sleep 1
-done
-
-printf '%s\n' "Waiting for private FreeSWITCH ESL..."
-i=0
-until $COMPOSE exec -T freeswitch sh -c '
-    fs_cli -H 127.0.0.1 -P 8021 \
-        -p "$FREESWITCH_ESL_PASSWORD" \
-        -x status >/dev/null 2>&1
-'; do
-    i=$((i + 1))
-    [ "$i" -lt 60 ] || { echo "FreeSWITCH ESL did not become ready/authenticated" >&2; exit 1; }
-    sleep 1
-done
-
-$COMPOSE up -d --build server worker
+printf '%s\n' "Starting control-plane API before FreeSWITCH..."
+$COMPOSE up -d --build server
 
 ready=0
 for _ in $(seq 1 90); do
@@ -171,7 +150,67 @@ PY
     fi
     sleep 1
 done
-[ "$ready" -eq 1 ] || { echo "API did not become ready within 90 seconds" >&2; exit 1; }
+[ "$ready" -eq 1 ] || { echo "API did not become ready without FreeSWITCH" >&2; exit 1; }
+
+# Verify a genuinely fresh API-only startup: FreeSWITCH never started, and
+# normal (including authenticated) control-plane reads work before telephony.
+python3 - <<'PY'
+import sys
+sys.path.insert(0, "tests/voice-v1")
+import acceptance
+
+running = set(acceptance.compose("ps", "--status", "running", "--services").splitlines())
+if "freeswitch" in running or "worker" in running or "opensips" in running:
+    raise SystemExit("telephony dependencies started before the API-only check")
+for endpoint in ("/healthz", "/readyz"):
+    if acceptance.health_status(endpoint) != 200:
+        raise SystemExit(f"{endpoint} unavailable during fresh API-only startup")
+if acceptance.health_status("/telephony/readyz") != 503:
+    raise SystemExit("telephony readiness should report unavailable before FreeSWITCH starts")
+acceptance.api("GET", "/v1/plans", auth=False, expected={200})
+acceptance.api("GET", "/v1/voice-agents/", expected={200})
+print("PASS fresh startup: API and authenticated control plane work without FreeSWITCH")
+PY
+
+printf '%s\n' "Starting FreeSWITCH after the API is ready..."
+$COMPOSE up -d --build freeswitch
+
+printf '%s\n' "Waiting for private FreeSWITCH ESL..."
+i=0
+until $COMPOSE exec -T freeswitch sh -c '
+    fs_cli -H 127.0.0.1 -P 8021 \
+        -p "$FREESWITCH_ESL_PASSWORD" \
+        -x status >/dev/null 2>&1
+'; do
+    i=$((i + 1))
+    [ "$i" -lt 60 ] || { echo "FreeSWITCH ESL did not become ready/authenticated" >&2; exit 1; }
+    sleep 1
+done
+
+python3 - <<'PY'
+import sys
+sys.path.insert(0, "tests/voice-v1")
+import acceptance
+acceptance.wait_for(
+    "telephony readiness after late FreeSWITCH startup",
+    lambda: acceptance.health_status("/telephony/readyz") == 200,
+    timeout=45,
+)
+print("PASS late telephony startup: FreeSWITCH reconnected without restarting the API")
+PY
+
+printf '%s\n' "Starting OpenSIPS after database bootstrap and FreeSWITCH..."
+$COMPOSE up -d --build opensips
+
+printf '%s\n' "Waiting for OpenSIPS readiness..."
+i=0
+until $COMPOSE exec -T opensips /usr/local/bin/leamout-opensips-drain status >/dev/null 2>&1; do
+    i=$((i + 1))
+    [ "$i" -lt 60 ] || { echo "OpenSIPS did not become ready" >&2; $COMPOSE logs --no-color --tail=200 opensips >&2 || true; exit 1; }
+    sleep 1
+done
+
+$COMPOSE up -d --build worker
 
 # Inbound persistence depends on the worker's FreeSWITCH ESL subscription.
 # Starting the carrier call before the subscription is ready can lose CHANNEL_CREATE.
