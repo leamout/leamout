@@ -96,13 +96,12 @@ export function ControlPlane() {
             Call operations
           </p>
           <h2 className="mt-5 text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-            Debug the call, not just the prompt.
+            Operate with call-level context.
           </h2>
           <p className="mt-6 leading-8 text-muted-foreground">
-            The Console exposes persisted call lifecycle timestamps, SIP and
-            routing identifiers, call state, and linked recordings where
-            available. Inspect real call records when your organization has
-            traffic.
+            Inspect persisted call milestones, SIP identifiers, routing
+            attribution, and recordings where available. The Console is for
+            operating voice calls—not just configuring model prompts.
           </p>
           <ul className="mt-8 space-y-3 text-sm text-foreground">
             <li className="border-l-2 border-brand-orange pl-4">

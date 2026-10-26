@@ -10,15 +10,16 @@ export function PlatformIntro() {
           The Leamout platform
         </p>
         <h1 className="text-balance font-heading text-5xl font-semibold leading-[1.05] tracking-tight sm:text-6xl">
-          The runtime behind every conversation.
+          Inside the managed voice runtime.
         </h1>
         <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground">
-          Leamout brings SIP calling, realtime media, voice agent orchestration,
-          and operational control together in one managed service.
+          Explore how SIP signaling, realtime audio, agent execution, and
+          operational state work together during a live call.
         </p>
         <p className="mt-4 max-w-2xl leading-8 text-muted-foreground">
-          Connect your carrier and AI providers. Leamout runs the conversation
-          while you define how your agents behave and what they can do.
+          Your carrier supplies connectivity and your AI providers supply
+          model execution. Leamout operates the runtime and control plane
+          connecting the two.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button

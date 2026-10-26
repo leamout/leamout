@@ -11,7 +11,7 @@ import { websiteSchema } from "@/lib/seo/website";
 export const metadata = constructMetadata({
   title: "Platform",
   description:
-    "Explore the managed Leamout platform for SIP-native calling, realtime voice agents, call control, and AI orchestration.",
+    "Understand Leamout's SIP signaling, realtime media, Voice Agent orchestration, call lifecycle, and control plane.",
   path: "/platform",
 });
 

@@ -21,9 +21,10 @@ export function HomeHero() {
             <span className="text-muted-foreground">Built for real calls.</span>
           </h1>
           <p className="mt-8 max-w-xl text-lg leading-8 text-muted-foreground">
-            Leamout is the carrier-grade runtime and control plane for
-            autonomous voice agents. Connect your SIP trunks and AI providers,
-            then build, run, and observe conversations in one managed service.
+            Connect your SIP trunks and AI providers. Leamout manages
+            realtime media, agent execution, call control, and operational
+            visibility so you can build voice applications without running
+            the telephony stack.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Button
@@ -43,9 +44,9 @@ export function HomeHero() {
             </Button>
           </div>
           <ul className="mt-12 flex flex-wrap gap-x-6 gap-y-3 border-t border-border pt-6 text-xs font-medium text-muted-foreground">
-            <li>SIP-native</li>
-            <li>Bring your carrier</li>
-            <li>Choose your AI</li>
+            <li>SIP-native calling</li>
+            <li>Agent readiness checks</li>
+            <li>Call-level diagnostics</li>
           </ul>
         </div>
         <SessionPreview />

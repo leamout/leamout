@@ -17,8 +17,9 @@ export function HomeCallToAction() {
           Put your next voice agent on the line.
         </h2>
         <p className="mt-5 max-w-xl leading-8 text-muted-foreground">
-          Connect your SIP trunk and AI providers. Define your agent, then let
-          Leamout manage the runtime behind every conversation.
+          Verify your AI integration, connect your SIP trunk, and configure
+          the agent and inbound routing. Leamout operates the runtime that
+          connects them.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button

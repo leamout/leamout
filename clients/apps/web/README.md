@@ -109,3 +109,16 @@ Recharts dependencies used by its components, so the web app no longer
 redeclares them. Unused `motion` is removed. Next.js, MDX, schema and Vercel
 dependencies remain for existing functionality. Keep `clients/bun.lock` in
 sync with any workspace manifest changes; CI uses `--frozen-lockfile`.
+
+## Marketing page responsibilities
+
+The homepage introduces the managed runtime, explains the overall connection,
+shows source-aligned call operations, and links developers to onboarding.
+The Platform page explains SIP signaling, realtime media, agent orchestration,
+and the call lifecycle. The Integrations page covers the setup of existing
+SIP trunks, AI provider credentials, and application tools. Avoid repeating
+the same three-layer connection diagram across these pages.
+
+The interface references are still not screenshots of a live Console or
+evidence of customer traffic. Replace them with sanitized screenshots only
+after verifying the actual deployed demo environment.

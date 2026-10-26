@@ -52,13 +52,13 @@ export function DeveloperQuickstart() {
               id="developer-quickstart-title"
               className="mt-5 max-w-2xl text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl"
             >
-              Four configurations before your first call.
+              From setup to a call-ready agent.
             </h2>
           </div>
           <p className="max-w-lg leading-8 text-muted-foreground">
-            Follow the same setup resources used by the Leamout Console.
-            Configuration is not a successful call: provider readiness, SIP
-            ingress, routing, and runtime capacity must all be in place.
+            Four practical steps, linked to the current documentation.
+            Agent readiness checks configuration, not the full call path:
+            carrier ingress, routing, and runtime capacity still matter.
           </p>
         </div>
         <ol className="mt-12 grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">

@@ -17,7 +17,7 @@ const capabilities = [
   {
     title: "Operational visibility",
     description:
-      "Inspect calls, conversation history, recordings, and session activity from the same platform.",
+      "Inspect persisted call milestones, SIP and routing identifiers, and linked recordings where available.",
   },
 ];
 

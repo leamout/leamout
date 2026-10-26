@@ -12,7 +12,7 @@ import { websiteSchema } from "@/lib/seo/website";
 export const metadata = constructMetadata({
   title: "Integrations",
   description:
-    "Connect SIP trunks, AI providers, tools, and webhooks to autonomous voice agents on Leamout.",
+    "Configure SIP trunks, verify AI integrations, assign provider roles, and connect tools and webhooks to Leamout Voice Agents.",
   path: "/integrations",
 });
 

@@ -1,10 +1,8 @@
 import { HomeCallToAction } from "@/components/home/call-to-action";
-import { Capabilities } from "@/components/home/capabilities";
 import { ControlPlane } from "@/components/home/control-plane";
 import { DeveloperQuickstart } from "@/components/home/developer-quickstart";
 import { HomeHero } from "@/components/home/hero";
 import { HowItWorks } from "@/components/home/how-it-works";
-import { Ownership } from "@/components/home/ownership";
 import { JsonLd } from "@/components/seo/json-ld";
 import { organizationSchema } from "@/lib/seo/organization";
 import { founderSchema } from "@/lib/seo/person";
@@ -31,10 +29,8 @@ export default function Home() {
       />
       <HomeHero />
       <HowItWorks />
-      <DeveloperQuickstart />
-      <Capabilities />
       <ControlPlane />
-      <Ownership />
+      <DeveloperQuickstart />
       <HomeCallToAction />
     </>
   );
