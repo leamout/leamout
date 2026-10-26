@@ -309,7 +309,6 @@ func TestTerminalLifecycleAndState(t *testing.T) {
 	}
 }
 
-
 func TestDelayedLifecycleCannotReopenTerminalCall(t *testing.T) {
 	snapshot := LifecycleSnapshot{State: string(StateCompleted)}
 	for _, event := range []LifecycleEventType{

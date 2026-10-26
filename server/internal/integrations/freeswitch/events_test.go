@@ -100,7 +100,6 @@ func TestEventDispatchStableShard(t *testing.T) {
 	}
 }
 
-
 func TestEventDispatchDelayedLifecycleDoesNotReorderSameChannel(t *testing.T) {
 	client, err := New(DefaultConfig("127.0.0.1:8021", "test"))
 	if err != nil {
@@ -137,7 +136,7 @@ func TestEventDispatchDelayedLifecycleDoesNotReorderSameChannel(t *testing.T) {
 		t.Helper()
 		if err := client.dispatchEvent(Frame{
 			ContentType: ContentTypeEventPlain,
-			Headers: map[string]string{"Event-Name": name, "Unique-ID": channel},
+			Headers:     map[string]string{"Event-Name": name, "Unique-ID": channel},
 		}); err != nil {
 			t.Fatal(err)
 		}
