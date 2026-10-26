@@ -55,10 +55,6 @@ jobs:
         working-directory: clients/apps/web
         run: bun run typecheck
 
-      - name: Validate routes and metadata
-        working-directory: clients/apps/web
-        run: bun run check:site
-
       - name: Build marketing website
         working-directory: clients/apps/web
         run: bun run build

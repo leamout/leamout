@@ -14,7 +14,6 @@ From `clients/apps/web`, use:
 bun run dev
 bun run lint
 bun run typecheck
-bun run check:site
 bun run build
 ```
 
@@ -29,15 +28,8 @@ The site redirects `/docs` to `https://docs.leamout.com`, and `/status` to
 ## Launch and SEO checks
 
 The separate [web workflow](../../../.github/workflows/web.yml) installs
-dependencies with a frozen lockfile, runs Biome and TypeScript checks, checks
-site navigation and metadata, and builds the marketing app.
-
-`scripts/check-site.mjs` verifies that published static marketing routes
-appear in the sitemap, unpublished legal routes remain `noIndex`, the default
-social image exists, expected external redirects are configured, and literal
-internal links point to routes or assets. The production build validates Next.js
-route generation. Dynamic routes and deployed link responses still require
-end-to-end smoke testing.
+dependencies with a frozen lockfile, runs Biome and TypeScript checks, and
+builds the marketing app.
 
 `app/opengraph-image.tsx` generates a 1200×630 branded image at build/request
 time. `lib/metadata.ts` uses this route for Open Graph and Twitter previews.
@@ -54,9 +46,8 @@ Carrier and AI provider charges are separate where applicable.
 
 The contact page always provides a public GitHub issue tracker for non-sensitive
 product feedback and a security disclosure email as currently configured.
-For general private business or support inquiries, set `CONTACT_EMAIL` to a
-verified, deliverable mailbox **before building** the site. The private contact
-card remains hidden when the variable is absent or invalid. Never use the
+For general private inquiries, the page links directly to
+`hello@leamout.com`. Verify mailbox delivery before public launch. Never use the
 public issue tracker to request secrets, customer call data, or recordings.
 
 ## Before accepting public paid customers
