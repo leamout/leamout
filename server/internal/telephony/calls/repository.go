@@ -403,3 +403,13 @@ func (r *Repository) DeferOriginationCheck(ctx context.Context, channelID string
 	}
 	return r.queries.DeferCallOriginationCheck(ctx, id)
 }
+
+// These COUNT queries include the entire pending backlog, not only the
+// bounded batch selected by a reconciliation pass.
+func (r *Repository) CountUnresolvedOriginations(ctx context.Context) (int64, error) {
+	return r.queries.CountUnresolvedOriginationAttempts(ctx)
+}
+
+func (r *Repository) CountPendingAdmissionCleanup(ctx context.Context) (int64, error) {
+	return r.queries.CountPendingAdmissionCleanup(ctx)
+}

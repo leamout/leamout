@@ -221,6 +221,7 @@ func (c *Client) dispatchEvent(frame Frame) error {
 	case queue <- queuedEvent{event: event, handlers: handlers}:
 		return nil
 	default:
+		c.queueOverflows.Add(1)
 		return fmt.Errorf("FreeSWITCH event queue full: event=%s channel=%s", event.Name, channel)
 	}
 }

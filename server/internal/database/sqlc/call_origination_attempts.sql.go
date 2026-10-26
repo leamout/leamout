@@ -12,6 +12,21 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countUnresolvedOriginationAttempts = `-- name: CountUnresolvedOriginationAttempts :one
+SELECT count(*)
+FROM call_origination_attempts AS a
+JOIN calls AS c ON c.id = a.call_id AND c.organization_id = a.organization_id
+WHERE a.status IN ('prepared', 'submitted', 'uncertain')
+  AND c.state = 'initiating'
+`
+
+func (q *Queries) CountUnresolvedOriginationAttempts(ctx context.Context) (int64, error) {
+	row := q.db.QueryRow(ctx, countUnresolvedOriginationAttempts)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deferCallOriginationCheck = `-- name: DeferCallOriginationCheck :exec
 UPDATE call_origination_attempts
 SET updated_at = NOW()

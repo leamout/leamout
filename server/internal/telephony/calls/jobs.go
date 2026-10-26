@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 )
 
@@ -22,6 +23,10 @@ type ReconciliationJob struct {
 	repo    *Repository
 	service *Service
 	config  ReconciliationJobConfig
+	failures atomic.Uint64
+	cleanupRetries atomic.Uint64
+	unconfirmedChecks atomic.Uint64
+	recoveredOriginations atomic.Uint64
 }
 
 func NewReconciliationJob(
@@ -68,6 +73,7 @@ func (j *ReconciliationJob) Run(ctx context.Context) error {
 
 func (j *ReconciliationJob) runPass(ctx context.Context) {
 	if err := j.Reconcile(ctx); err != nil && !errors.Is(err, context.Canceled) {
+		j.failures.Add(1)
 		log.Printf("call reconciliation pass failed: %v", err)
 	}
 }
@@ -116,6 +122,7 @@ func (j *ReconciliationJob) reconcileOriginations(ctx context.Context) error {
 			return fmt.Errorf("query originate channel %s: %w", channelID, err)
 		}
 		if !exists {
+			j.unconfirmedChecks.Add(1)
 			if err := j.repo.DeferOriginationCheck(ctx, channelID); err != nil {
 				return fmt.Errorf("defer unresolved originate channel %s: %w", channelID, err)
 			}
@@ -127,6 +134,7 @@ func (j *ReconciliationJob) reconcileOriginations(ctx context.Context) error {
 		if err := j.repo.MarkOriginationObserved(ctx, attempt.CallID, channelID); err != nil {
 			return fmt.Errorf("mark recovered channel %s: %w", channelID, err)
 		}
+		j.recoveredOriginations.Add(1)
 	}
 	return nil
 }
@@ -144,6 +152,7 @@ func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error 
 	}
 	for _, item := range pending {
 		if err := j.service.cleanupTerminalAdmission(ctx, item); err != nil {
+			j.cleanupRetries.Add(1)
 			if deferErr := j.repo.DeferAdmissionCleanup(ctx, item.CallID); deferErr != nil {
 				return errors.Join(err, fmt.Errorf("defer terminal cleanup for %s: %w", item.CallID, deferErr))
 			}
@@ -151,4 +160,35 @@ func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error 
 		}
 	}
 	return nil
+}
+
+// ReliabilityStats is a point-in-time view of durable reconciliation backlogs
+// plus in-process counters. The backlog queries are unpaginated counts rather
+// than the 100-row work queue, so saturation remains visible.
+type ReliabilityStats struct {
+	UnresolvedOriginations int64
+	PendingAdmissionCleanup int64
+	ReconciliationFailures uint64
+	CleanupRetries uint64
+	UnconfirmedChecks uint64
+	RecoveredOriginations uint64
+}
+
+func (j *ReconciliationJob) ReliabilityStats(ctx context.Context) (ReliabilityStats, error) {
+	unresolved, err := j.repo.CountUnresolvedOriginations(ctx)
+	if err != nil {
+		return ReliabilityStats{}, fmt.Errorf("count unresolved originations: %w", err)
+	}
+	pending, err := j.repo.CountPendingAdmissionCleanup(ctx)
+	if err != nil {
+		return ReliabilityStats{}, fmt.Errorf("count pending admission cleanup: %w", err)
+	}
+	return ReliabilityStats{
+		UnresolvedOriginations: unresolved,
+		PendingAdmissionCleanup: pending,
+		ReconciliationFailures: j.failures.Load(),
+		CleanupRetries: j.cleanupRetries.Load(),
+		UnconfirmedChecks: j.unconfirmedChecks.Load(),
+		RecoveredOriginations: j.recoveredOriginations.Load(),
+	}, nil
 }

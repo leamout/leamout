@@ -140,7 +140,12 @@ func (c *Client) reconnectLoop() {
 	}()
 
 	for attempt := 0; ; attempt++ {
+		if c.lifecycleCtx.Err() != nil {
+			return
+		}
+		c.reconnectAttempts.Add(1)
 		if err := c.connectAndRestore(c.lifecycleCtx); err == nil {
+			c.reconnectSuccesses.Add(1)
 			return
 		}
 
