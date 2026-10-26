@@ -38,10 +38,10 @@ export function HomeHero() {
               </span>
             </h1>
             <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              Leamout is the SIP-native voice runtime between your telephony
-              and AI stack. We handle signaling, realtime media, agent
-              execution, and call lifecycle operations so you can focus on the
-              experience you are building.
+              Leamout is the SIP-native voice runtime between your telephony and
+              AI stack. We handle signaling, realtime media, agent execution,
+              and call lifecycle operations so you can focus on the experience
+              you are building.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button

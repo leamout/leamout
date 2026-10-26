@@ -101,9 +101,9 @@ export function ControlPlane() {
 
           <p className="border-t border-border bg-[#fbfbf9] px-5 py-4 text-[11px] leading-5 text-muted-foreground sm:px-7">
             This is a static reference to selected API event names, not a live
-            trace or a promise that every call follows this exact sequence.
-            The current call API does not expose SIP message traces, per-turn
-            AI latency, transcripts, or tool execution traces.
+            trace or a promise that every call follows this exact sequence. The
+            current call API does not expose SIP message traces, per-turn AI
+            latency, transcripts, or tool execution traces.
           </p>
         </div>
       </div>

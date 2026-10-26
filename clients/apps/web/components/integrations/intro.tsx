@@ -15,9 +15,9 @@ export function IntegrationsIntro() {
           Connected for voice.
         </h1>
         <p className="mt-7 max-w-2xl text-lg leading-8 text-muted-foreground">
-          Set up existing SIP trunks and phone numbers, verify AI
-          credentials, and bind application tools and webhooks. See how
-          each connection fits into a live Voice Agent.
+          Set up existing SIP trunks and phone numbers, verify AI credentials,
+          and bind application tools and webhooks. See how each connection fits
+          into a live Voice Agent.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button

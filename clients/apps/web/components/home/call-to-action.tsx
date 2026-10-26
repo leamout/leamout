@@ -16,8 +16,8 @@ export function HomeCallToAction() {
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8">
               Bring your existing SIP connectivity and AI provider. Start with
-              the documented setup flow, then verify your route before
-              sending real traffic.
+              the documented setup flow, then verify your route before sending
+              real traffic.
             </p>
           </div>
           <div className="flex flex-wrap gap-3 lg:justify-end">

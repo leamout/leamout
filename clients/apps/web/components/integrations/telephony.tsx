@@ -31,8 +31,8 @@ export function IntegrationsTelephony() {
           </h2>
           <p className="mt-6 leading-8 text-muted-foreground">
             Keep your carrier account, numbers, and telephony billing. Leamout
-            handles the managed voice runtime around that connection; it
-            does not sell or provision phone numbers.
+            handles the managed voice runtime around that connection; it does
+            not sell or provision phone numbers.
           </p>
           <Link
             href="/docs/guides/connectivity/sip-trunks"

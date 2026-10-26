@@ -56,9 +56,9 @@ export function DeveloperQuickstart() {
             </h2>
           </div>
           <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-            Follow the current setup guides in order. Readiness checks the
-            agent configuration; carrier ingress, inbound routing, and the
-            complete call path still need to be verified separately.
+            Follow the current setup guides in order. Readiness checks the agent
+            configuration; carrier ingress, inbound routing, and the complete
+            call path still need to be verified separately.
           </p>
         </div>
 
@@ -116,7 +116,13 @@ export function DeveloperQuickstart() {
             <div className="border-b border-border px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:px-5">
               GET /v1/voice-agents/:id/readiness
             </div>
-            <pre className="overflow-x-auto p-4 font-mono text-[11px] leading-6 text-foreground sm:p-5 sm:text-xs"><code>{"curl --request GET --url https://api.leamout.com/v1/voice-agents/$VOICE_AGENT_ID/readiness --header 'Authorization: Bearer $LEAMOUT_API_TOKEN'"}</code></pre>
+            <pre className="overflow-x-auto p-4 font-mono text-[11px] leading-6 text-foreground sm:p-5 sm:text-xs">
+              <code>
+                {
+                  "curl --request GET --url https://api.leamout.com/v1/voice-agents/$VOICE_AGENT_ID/readiness --header 'Authorization: Bearer $LEAMOUT_API_TOKEN'"
+                }
+              </code>
+            </pre>
           </div>
         </div>
       </div>

@@ -53,10 +53,10 @@ export function HowItWorks() {
           </div>
           <div className="max-w-2xl lg:justify-self-end">
             <p className="text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
-              Real calls involve signaling, media, agent execution, and
-              changing call state. Leamout provides the runtime between
-              telephony and AI, while your team keeps control of the agent
-              experience and provider choices.
+              Real calls involve signaling, media, agent execution, and changing
+              call state. Leamout provides the runtime between telephony and AI,
+              while your team keeps control of the agent experience and provider
+              choices.
             </p>
             <Link
               href="/platform"

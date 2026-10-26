@@ -17,9 +17,9 @@ export function PlatformIntro() {
           operational state work together during a live call.
         </p>
         <p className="mt-4 max-w-2xl leading-8 text-muted-foreground">
-          Your carrier supplies connectivity and your AI providers supply
-          model execution. Leamout operates the runtime and control plane
-          connecting the two.
+          Your carrier supplies connectivity and your AI providers supply model
+          execution. Leamout operates the runtime and control plane connecting
+          the two.
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button

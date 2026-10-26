@@ -42,8 +42,8 @@ export function PlatformArchitecture() {
           </div>
           <p className="max-w-lg leading-8 text-muted-foreground">
             A call is a continuous media session, not a single model request.
-            Leamout coordinates telephony, agent execution, and call state
-            while you control the configuration.
+            Leamout coordinates telephony, agent execution, and call state while
+            you control the configuration.
           </p>
         </div>
         <ol className="mt-12 grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">

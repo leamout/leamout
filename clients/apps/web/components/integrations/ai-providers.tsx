@@ -34,8 +34,8 @@ export function AIProviders() {
           Choose the engine. Bind the providers.
         </h2>
         <p className="mt-5 leading-8 text-muted-foreground">
-          Bring your own provider credentials and verify each integration
-          before assigning it to an agent.
+          Bring your own provider credentials and verify each integration before
+          assigning it to an agent.
         </p>
       </div>
       <div className="mt-10 grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-2">
@@ -88,8 +88,8 @@ export function AIProviders() {
       <div className="mt-7 flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
           Providers shown are in the current catalog. Credentials, supported
-          models, and capabilities vary by integration. A saved credential
-          must be verified before it can be relied on for calls.
+          models, and capabilities vary by integration. A saved credential must
+          be verified before it can be relied on for calls.
         </p>
         <Link
           href="/docs/guides/ai/integrations"
