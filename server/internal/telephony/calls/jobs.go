@@ -20,13 +20,13 @@ func DefaultReconciliationJobConfig() ReconciliationJobConfig {
 }
 
 type ReconciliationJob struct {
-	repo                   *Repository
-	service                *Service
-	config                 ReconciliationJobConfig
-	failures               atomic.Uint64
-	cleanupRetries         atomic.Uint64
-	unconfirmedChecks      atomic.Uint64
-	recoveredOriginations   atomic.Uint64
+	repo                  *Repository
+	service               *Service
+	config                ReconciliationJobConfig
+	failures              atomic.Uint64
+	cleanupRetries        atomic.Uint64
+	unconfirmedChecks     atomic.Uint64
+	recoveredOriginations atomic.Uint64
 }
 
 func NewReconciliationJob(
@@ -166,12 +166,12 @@ func (j *ReconciliationJob) reconcileTerminalCleanup(ctx context.Context) error 
 // plus in-process counters. The backlog queries are unpaginated counts rather
 // than the 100-row work queue, so saturation remains visible.
 type ReliabilityStats struct {
-	UnresolvedOriginations int64
+	UnresolvedOriginations  int64
 	PendingAdmissionCleanup int64
-	ReconciliationFailures uint64
-	CleanupRetries uint64
-	UnconfirmedChecks uint64
-	RecoveredOriginations uint64
+	ReconciliationFailures  uint64
+	CleanupRetries          uint64
+	UnconfirmedChecks       uint64
+	RecoveredOriginations   uint64
 }
 
 func (j *ReconciliationJob) ReliabilityStats(ctx context.Context) (ReliabilityStats, error) {
