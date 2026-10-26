@@ -14,6 +14,7 @@ From `clients/apps/web`, use:
 bun run dev
 bun run lint
 bun run typecheck
+bun run test
 bun run build
 ```
 
@@ -28,8 +29,8 @@ The site redirects `/docs` to `https://docs.leamout.com`, and `/status` to
 ## Launch and SEO checks
 
 The separate [web workflow](../../../.github/workflows/web.yml) installs
-dependencies with a frozen lockfile, runs Biome and TypeScript checks, and
-builds the marketing app.
+dependencies with a frozen lockfile, runs Biome and TypeScript checks,
+validates pricing against the backend seed, and builds the marketing app.
 
 `app/opengraph-image.tsx` generates a 1200×630 branded image at build/request
 time. `lib/metadata.ts` uses this route for Open Graph and Twitter previews.
@@ -39,10 +40,13 @@ time. `lib/metadata.ts` uses this route for Open Graph and Twitter previews.
 The blog uses MDX files in `content/` with validated metadata. Drafts are
 excluded from the static article routes and sitemap.
 
-Pricing in `lib/plans.ts` currently mirrors
-`server/migrations/033_create_plans.sql`; review both whenever the
-subscription catalog changes. Public pricing covers the managed runtime.
-Carrier and AI provider charges are separate where applicable.
+Public fixed-price plans in `lib/plans.ts` mirror
+`server/migrations/033_create_plans.sql`. The targeted
+`tests/pricing.test.mjs` fails if seeded public plan names, prices, limits,
+or displayed entitlements diverge. The backend also seeds a custom Enterprise
+plan, which is not displayed as a fixed-price card. Review both catalogs when
+subscription offerings change. Carrier and AI provider charges are separate
+where applicable.
 
 The contact page always provides a public GitHub issue tracker for non-sensitive
 product feedback and a security disclosure email as currently configured.
@@ -95,3 +99,16 @@ For a future screenshot-based showcase, capture approved screens from a
 dedicated demo organization with explicitly sanitized data and verify that
 features are available in the deployed environment. Never label reconstructed
 interface references as live screenshots.
+
+## Shared infrastructure
+
+The marketing website does not use the console's toast or tooltip providers.
+Its root layout stays a server component without a site-wide client wrapper.
+Vercel Analytics and Speed Insights remain mounted in `app/layout.tsx`;
+review deployment and consent requirements before public launch.
+
+The shared `@leamout/ui` package owns the Base UI, Hugeicons, `cn` and
+Recharts dependencies used by its components, so the web app no longer
+redeclares them. Unused `motion` is removed. Next.js, MDX, schema and Vercel
+dependencies remain for existing functionality. Keep `clients/bun.lock` in
+sync with any workspace manifest changes; CI uses `--frozen-lockfile`.

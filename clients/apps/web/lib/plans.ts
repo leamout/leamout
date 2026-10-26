@@ -1,6 +1,8 @@
-// Mirrors server/migrations/033_create_plans.sql. Update together when plans change.
+// Public fixed-price plans mirrored from server/migrations/033_create_plans.sql.
+// Checked against the backend seed by tests/pricing.test.mjs.
 export const plans = [
   {
+    code: "free",
     name: "Free",
     price: 0,
     minutes: 100,
@@ -10,6 +12,7 @@ export const plans = [
     retention: 1,
   },
   {
+    code: "developer",
     name: "Developer",
     price: 79,
     minutes: 2000,
@@ -19,6 +22,7 @@ export const plans = [
     retention: 14,
   },
   {
+    code: "pro",
     name: "Pro",
     price: 299,
     minutes: 10000,
@@ -28,6 +32,7 @@ export const plans = [
     retention: 30,
   },
   {
+    code: "scale",
     name: "Scale",
     price: 799,
     minutes: 30000,
@@ -36,4 +41,6 @@ export const plans = [
     trunks: 30,
     retention: 90,
   },
-];
+] as const;
+
+export type PublicPlan = (typeof plans)[number];
