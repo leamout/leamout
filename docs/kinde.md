@@ -19,7 +19,7 @@ The Go backend performs OIDC authorization code + PKCE (S256), state cookie bind
 
 ## Session and migration behavior
 
-Identity is keyed by `(identity_issuer, identity_subject)`; Leamout refuses to silently merge users with matching email addresses. **An existing Keycloak user will not automatically transfer to Kinde.** Provision identities in Kinde first and prepare a reviewed mapping of Kinde subjects to the corresponding local UUIDs before switching traffic. Keep organization memberships and subscription references untouched. Revoke old browser sessions when cutting over. Never delete an existing Keycloak database or volume until user identity data and any rollback requirements have been backed up and checked.
+Identity is keyed by `(identity_issuer, identity_subject)`; Leamout refuses to silently merge users with matching email addresses. Before an identity-provider cutover, provision identities in Kinde and prepare a reviewed mapping of Kinde subjects to the corresponding local UUIDs. Keep organization memberships and subscription references untouched, and revoke existing browser sessions as part of the cutover. Back up and verify identity data and rollback requirements before removing any legacy identity infrastructure.
 
 Kinde can omit a new ID token during refresh. Leamout retains the prior verified subject and validates any newly returned ID token. Provider login/logout is a browser action; local browser sessions are explicitly revoked. No provider back-channel logout support is assumed. Revoking an identity in Kinde may not immediately revoke a cached local Leamout session; revoke it locally when disabling access.
 
