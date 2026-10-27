@@ -132,6 +132,7 @@ func (j *WebhookJob) process(ctx context.Context, id, lease uuid.UUID) error {
 
 	transactionalService := *j.service
 	transactionalService.repo = j.repo.WithTx(tx)
+	transactionalService.emailTx = tx
 	transactionalService.subscriptions = subscriptions.NewService(
 		subscriptions.NewRepository(queries),
 	)
