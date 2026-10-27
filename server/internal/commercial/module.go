@@ -8,6 +8,7 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
+	"github.com/leamout/leamout/server/internal/platform/email"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
 )
 
@@ -29,6 +30,7 @@ type Dependencies struct {
 	Polar         *polarintegration.Client
 	PolarProducts map[string]string
 	FrontendURL   string
+	EmailService  *email.Service
 }
 
 type PlansModule struct {
@@ -76,6 +78,7 @@ func New(queries *sqlc.Queries, dependencies ...Dependencies) *Module {
 
 	billingService.SetRepository(billing.NewRepository(queries, deps.Database))
 	billingService.SetStatusDependencies(limitsService)
+	billingService.SetEmailService(deps.EmailService)
 
 	entitlementsRepository := entitlements.NewRepository(queries)
 	entitlementsService := entitlements.NewService(entitlementsRepository)
