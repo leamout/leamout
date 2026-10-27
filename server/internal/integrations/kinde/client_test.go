@@ -162,7 +162,7 @@ func TestKindeExchangeAndRefresh(t *testing.T) {
 		t.Fatalf("rejected valid Kinde issuer audience and azp: %v", err)
 	}
 
-	// Kinde does not guarantee a Keycloak-style sid claim.
+	// Kinde does not guarantee a sid claim.
 	mutate = func(claims map[string]any) {
 		delete(claims, "sid")
 	}
