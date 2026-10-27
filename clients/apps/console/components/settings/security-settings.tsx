@@ -18,12 +18,17 @@ export function SecuritySettings() {
     queryFn: () => api<{ sessions: Session[] }>("/sessions/"),
   });
   const revoke = useMutation({
-    mutationFn: (id: string) => api<{ message: string }>(`/sessions/${id}`, { method: "DELETE" }),
-    onSuccess: () => client.invalidateQueries({ queryKey: ["identity", "sessions"] }),
+    mutationFn: (id: string) =>
+      api<{ message: string }>(`/sessions/${id}`, { method: "DELETE" }),
+    onSuccess: () =>
+      client.invalidateQueries({ queryKey: ["identity", "sessions"] }),
   });
   const revokeAll = useMutation({
-    mutationFn: () => api<{ message: string }>("/sessions/", { method: "DELETE" }),
-    onSuccess: () => { window.location.assign("/log-in"); },
+    mutationFn: () =>
+      api<{ message: string }>("/sessions/", { method: "DELETE" }),
+    onSuccess: () => {
+      window.location.assign("/log-in");
+    },
   });
 
   return (
@@ -48,27 +53,45 @@ export function SecuritySettings() {
               Revoke browser sessions signed in to Leamout.
             </p>
           </div>
-          <Button variant="outline" disabled={revokeAll.isPending || sessions.isLoading}
-            onClick={() => revokeAll.mutate()}>
+          <Button
+            variant="outline"
+            disabled={revokeAll.isPending || sessions.isLoading}
+            onClick={() => revokeAll.mutate()}
+          >
             Sign out all sessions
           </Button>
         </div>
-        {sessions.isLoading && <p className="text-sm text-muted-foreground">Loading sessions…</p>}
-        {sessions.isError && <p role="alert" className="text-sm text-destructive">{errorMessage(sessions.error)}</p>}
+        {sessions.isLoading && (
+          <p className="text-sm text-muted-foreground">Loading sessions…</p>
+        )}
+        {sessions.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {errorMessage(sessions.error)}
+          </p>
+        )}
         {sessions.data?.sessions.length === 0 && (
           <p className="text-sm text-muted-foreground">No active sessions.</p>
         )}
         <div className="divide-y rounded-lg border">
           {sessions.data?.sessions.map((session) => (
-            <div key={session.id} className="flex items-center justify-between gap-4 p-4">
+            <div
+              key={session.id}
+              className="flex items-center justify-between gap-4 p-4"
+            >
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{session.user_agent || "Browser session"}</p>
+                <p className="truncate text-sm font-medium">
+                  {session.user_agent || "Browser session"}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   Created {new Date(session.created_at).toLocaleString()}
                 </p>
               </div>
-              <Button size="sm" variant="outline" disabled={revoke.isPending}
-                onClick={() => revoke.mutate(session.id)}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={revoke.isPending}
+                onClick={() => revoke.mutate(session.id)}
+              >
                 Revoke
               </Button>
             </div>
