@@ -13,6 +13,8 @@ type Data struct {
 	Inviter      string    `json:"inviter,omitempty"`
 	Role         string    `json:"role,omitempty"`
 	AcceptURL    string    `json:"accept_url,omitempty"`
+	Plan         string    `json:"plan,omitempty"`
+	BillingURL   string    `json:"billing_url,omitempty"`
 }
 type Request struct {
 	To              string
