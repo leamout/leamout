@@ -456,6 +456,14 @@ type TrunkSourceIp struct {
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
+type UsageNotificationEvent struct {
+	ID               uuid.UUID          `db:"id" json:"id"`
+	OrganizationID   uuid.UUID          `db:"organization_id" json:"organization_id"`
+	PeriodStart      pgtype.Timestamptz `db:"period_start" json:"period_start"`
+	ThresholdPercent int32              `db:"threshold_percent" json:"threshold_percent"`
+	CreatedAt        pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
 type User struct {
 	ID              uuid.UUID          `db:"id" json:"id"`
 	Email           string             `db:"email" json:"email"`
