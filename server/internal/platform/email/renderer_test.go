@@ -95,9 +95,9 @@ func TestRendererSupportsSubscriptionNotifications(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			message, err := NewRenderer().Render(tc.name, Data{
 				Organization: "Acme & Co",
-				Plan: "Pro",
-				BillingURL: "https://console.example.com/settings/billing",
-				ExpiresAt: time.Now().Add(24 * time.Hour),
+				Plan:         "Pro",
+				BillingURL:   "https://console.example.com/settings/billing",
+				ExpiresAt:    time.Now().Add(24 * time.Hour),
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -118,9 +118,9 @@ func TestRendererSupportsSubscriptionNotifications(t *testing.T) {
 func TestRendererRejectsInvalidSubscriptionNotificationData(t *testing.T) {
 	_, err := NewRenderer().Render("subscription-past-due", Data{
 		Organization: "Acme",
-		Plan: "Pro",
-		BillingURL: "javascript:alert(1)",
-		ExpiresAt: time.Now().Add(time.Hour),
+		Plan:         "Pro",
+		BillingURL:   "javascript:alert(1)",
+		ExpiresAt:    time.Now().Add(time.Hour),
 	})
 	if err == nil {
 		t.Fatal("accepted unsafe billing URL")

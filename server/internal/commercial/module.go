@@ -8,8 +8,8 @@ import (
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
 	"github.com/leamout/leamout/server/internal/database/sqlc"
-	"github.com/leamout/leamout/server/internal/platform/email"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
+	"github.com/leamout/leamout/server/internal/platform/email"
 )
 
 type Module struct {

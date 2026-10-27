@@ -126,8 +126,8 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 		trustedProxies,
 	)
 	commercialModule := commercial.New(queries, commercial.Dependencies{
-		Database:    postgresClient.Pool(),
-		Polar:       polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
+		Database:     postgresClient.Pool(),
+		Polar:        polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
 		FrontendURL:  cfg.FrontendURL,
 		EmailService: emailService,
 		PolarProducts: map[string]string{

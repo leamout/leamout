@@ -17,8 +17,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
-	platformemail "github.com/leamout/leamout/server/internal/platform/email"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
+	platformemail "github.com/leamout/leamout/server/internal/platform/email"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
 
@@ -315,13 +315,13 @@ func (s *Service) queueSubscriptionNotification(ctx context.Context, organizatio
 			continue
 		}
 		_, err = s.emails.QueueTx(ctx, s.emailTx, platformemail.Request{
-			To: user.Email,
+			To:       user.Email,
 			Template: templateName,
 			Data: platformemail.Data{
-				ExpiresAt: time.Now().AddDate(1, 0, 0),
+				ExpiresAt:    time.Now().AddDate(1, 0, 0),
 				Organization: organization.Name,
-				Plan: planName,
-				BillingURL: billingURL,
+				Plan:         planName,
+				BillingURL:   billingURL,
 			},
 		})
 		if err != nil {
