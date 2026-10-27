@@ -39,6 +39,7 @@ type modules struct {
 	billingReconciliation       *billing.ReconciliationJob
 	billingWebhooks             *billing.WebhookJob
 	emailDelivery               *email.Worker
+	usageNotifications          *usageNotificationJob
 	postgres                    *postgres.Client
 	redis                       *redisintegration.Client
 	nats                        *natsintegration.Client
@@ -305,11 +306,17 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 		closeDependencies()
 		return nil, fmt.Errorf("initialize SES: %w", err)
 	}
+	emailService := email.NewService(credentialCipher)
 	emailDelivery := email.NewWorker(email.NewRepository(postgresClient.Pool()), sender, credentialCipher)
+	usageNotifications := newUsageNotificationJob(
+		postgresClient.Pool(), queries, planLimits, emailService,
+		cfg.FrontendURL+"/settings/billing", logger,
+	)
 	return &modules{
 		billingReconciliation:       billingJob,
 		billingWebhooks:             billingWebhookJob,
 		emailDelivery:               emailDelivery,
+		usageNotifications:          usageNotifications,
 		postgres:                    postgresClient,
 		redis:                       redisClient,
 		nats:                        natsClient,
