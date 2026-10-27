@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/leamout/leamout/server/internal/commercial/plans"
 	"github.com/leamout/leamout/server/internal/commercial/subscriptions"
+	platformemail "github.com/leamout/leamout/server/internal/platform/email"
 	polarintegration "github.com/leamout/leamout/server/internal/integrations/payments/polar"
 	"github.com/leamout/leamout/server/pkg/apperror"
 )
@@ -31,6 +32,8 @@ type Service struct {
 	polar         *polarintegration.Client
 	productIDs    map[string]string
 	frontendURL   string
+	emails        *platformemail.Service
+	emailTx       pgx.Tx
 }
 
 func NewService(
@@ -154,6 +157,10 @@ func (s *Service) SetStatusDependencies(limitsService *limits.Service) {
 	s.limits = limitsService
 }
 
+func (s *Service) SetEmailService(service *platformemail.Service) {
+	s.emails = service
+}
+
 // Verify first, then acknowledge only after durable insertion. Retries retain
 // the original receipt; reusing an event ID for different bytes is rejected.
 func (s *Service) Webhook(ctx context.Context, payload []byte, headers http.Header) error {
@@ -240,7 +247,11 @@ func (s *Service) syncPolarSubscription(
 			pastDueAt, graceEndsAt = &start, &end
 		}
 	}
-	_, err = s.subscriptions.Sync(ctx, organizationID, subscriptions.SyncRequest{
+	previous, err := s.subscriptions.Get(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	updated, err := s.subscriptions.Sync(ctx, organizationID, subscriptions.SyncRequest{
 		PlanID:                 plan.ID,
 		Status:                 polarStatus(value.Status),
 		PastDueAt:              pastDueAt,
@@ -255,7 +266,70 @@ func (s *Service) syncPolarSubscription(
 		ProviderSubscriptionID: stringPtr(value.ID),
 		ProviderEventCreatedAt: &eventCreated,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if previous != nil && previous.Status == updated.Status {
+		return nil
+	}
+	return s.queueSubscriptionNotification(ctx, organizationID, plan.Name, updated.Status)
+}
+
+func (s *Service) queueSubscriptionNotification(ctx context.Context, organizationID uuid.UUID, planName, status string) error {
+	if s.emails == nil || s.emailTx == nil {
+		return nil
+	}
+	templateName := ""
+	switch status {
+	case subscriptions.StatusActive:
+		templateName = "subscription-activated"
+	case subscriptions.StatusPastDue:
+		templateName = "subscription-past-due"
+	case subscriptions.StatusCanceled:
+		templateName = "subscription-canceled"
+	default:
+		return nil
+	}
+	queries := sqlc.New(s.emailTx)
+	organization, err := queries.GetOrganizationByID(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	members, err := queries.ListMembersByOrganizationID(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	billingURL := strings.TrimRight(s.frontendURL, "/") + "/settings/billing"
+	if !platformemail.ValidURL(billingURL) {
+		return nil
+	}
+	for _, member := range members {
+		if member.Role != "owner" {
+			continue
+		}
+		user, err := queries.GetUserByID(ctx, member.UserID)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(user.Email) == "" {
+			continue
+		}
+		_, err = s.emails.QueueTx(ctx, s.emailTx, platformemail.Request{
+			To: user.Email,
+			Template: templateName,
+			Data: platformemail.Data{
+				ExpiresAt: time.Now().AddDate(1, 0, 0),
+				Organization: organization.Name,
+				Plan: planName,
+				BillingURL: billingURL,
+			},
+		})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
 }
 
 func polarStatus(status string) string {
