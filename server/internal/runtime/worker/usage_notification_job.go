@@ -18,6 +18,8 @@ import (
 
 const usageNotificationScanInterval = 5 * time.Minute
 
+type usageNotificationOwner struct { email string }
+
 type usageNotificationJob struct {
 	pool        *pgxpool.Pool
 	queries     *sqlc.Queries
@@ -69,10 +71,9 @@ func (j *usageNotificationJob) scan(ctx context.Context) error {
 		return fmt.Errorf("list usage notification recipients: %w", err)
 	}
 
-	type owner struct { email string }
 	type organization struct {
 		name string
-		owners []owner
+		owners []usageNotificationOwner
 	}
 	organizations := make(map[uuid.UUID]*organization)
 	for _, recipient := range recipients {
@@ -81,7 +82,7 @@ func (j *usageNotificationJob) scan(ctx context.Context) error {
 			entry = &organization{name: recipient.OrganizationName}
 			organizations[recipient.OrganizationID] = entry
 		}
-		entry.owners = append(entry.owners, owner{email: recipient.Recipient})
+		entry.owners = append(entry.owners, usageNotificationOwner{email: recipient.Recipient})
 	}
 
 	for organizationID, org := range organizations {
@@ -99,7 +100,6 @@ func (j *usageNotificationJob) scan(ctx context.Context) error {
 
 		used := usage.UsedSeconds
 		allowance := usage.AllowanceSeconds
-		percent := int64(math.Floor(float64(used) * 100 / float64(allowance)))
 		switch {
 		case used >= allowance:
 			if err := j.notify(ctx, organizationID, org.name, org.owners, usage, 100, true); err != nil {
@@ -109,8 +109,6 @@ func (j *usageNotificationJob) scan(ctx context.Context) error {
 			if err := j.notify(ctx, organizationID, org.name, org.owners, usage, 80, false); err != nil {
 				j.logger.Error(ctx, "queue usage warning notifications", "organization_id", organizationID, "error", err)
 			}
-		default:
-			_ = percent
 		}
 	}
 	return nil
@@ -120,7 +118,7 @@ func (j *usageNotificationJob) notify(
 	ctx context.Context,
 	organizationID uuid.UUID,
 	organizationName string,
-	owners []struct{ email string },
+	owners []usageNotificationOwner,
 	usage limits.RuntimeUsage,
 	threshold int32,
 	exhausted bool,
