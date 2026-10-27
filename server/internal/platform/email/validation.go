@@ -22,6 +22,12 @@ func validateData(name string, data Data) error {
 		if !ValidURL(data.AcceptURL) || data.Organization == "" {
 			return fmt.Errorf("invalid invitation data")
 		}
+	case "subscription-activated", "subscription-past-due", "subscription-canceled":
+		if strings.TrimSpace(data.Organization) == "" ||
+			strings.TrimSpace(data.Plan) == "" ||
+			!ValidURL(data.BillingURL) {
+			return fmt.Errorf("invalid subscription notification data")
+		}
 	default:
 		return fmt.Errorf("unsupported email template")
 	}
