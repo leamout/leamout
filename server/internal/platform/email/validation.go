@@ -22,6 +22,19 @@ func validateData(name string, data Data) error {
 		if !ValidURL(data.AcceptURL) || data.Organization == "" {
 			return fmt.Errorf("invalid invitation data")
 		}
+	case "usage-allowance-warning":
+		if strings.TrimSpace(data.Organization) == "" ||
+			!ValidURL(data.BillingURL) ||
+			data.AllowanceMinutes < 1 || data.UsedMinutes < 0 ||
+			data.UsagePercent < 1 || data.UsagePercent >= 100 || data.PeriodEnd.IsZero() {
+			return fmt.Errorf("invalid usage allowance warning data")
+		}
+	case "usage-allowance-exhausted":
+		if strings.TrimSpace(data.Organization) == "" ||
+			!ValidURL(data.BillingURL) ||
+			data.AllowanceMinutes < 1 || data.UsedMinutes < data.AllowanceMinutes || data.PeriodEnd.IsZero() {
+			return fmt.Errorf("invalid usage allowance exhausted data")
+		}
 	default:
 		return fmt.Errorf("unsupported email template")
 	}
