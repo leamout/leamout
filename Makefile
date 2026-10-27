@@ -32,4 +32,4 @@ backoffice-assets:
 	cd server/internal/backoffice && bun install --frozen-lockfile && bun run build
 
 backoffice-generate:
-	cd server && go run github.com/a-h/templ/cmd/templ@v0.3.1020 generate
+	cd server && go run github.com/a-h/templ/cmd/templ@v0.3.1100 generate
