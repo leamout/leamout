@@ -86,19 +86,19 @@ func TestLocalDevelopmentLinks(t *testing.T) {
 func TestRendererSupportsUsageAllowanceNotifications(t *testing.T) {
 	cases := []struct {
 		name, subject, expected string
-		data Data
+		data                    Data
 	}{
 		{
-			name: "usage-allowance-warning",
-			subject: "Your Leamout runtime allowance is 80% used",
+			name:     "usage-allowance-warning",
+			subject:  "Your Leamout runtime allowance is 80% used",
 			expected: "has used 800 of 1000 runtime minutes (80%)",
-			data: Data{Organization: "Acme & Co", UsedMinutes: 800, AllowanceMinutes: 1000, UsagePercent: 80, PeriodEnd: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), BillingURL: "https://console.example.com/settings/billing", ExpiresAt: time.Now().Add(24 * time.Hour)},
+			data:     Data{Organization: "Acme & Co", UsedMinutes: 800, AllowanceMinutes: 1000, UsagePercent: 80, PeriodEnd: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), BillingURL: "https://console.example.com/settings/billing", ExpiresAt: time.Now().Add(24 * time.Hour)},
 		},
 		{
-			name: "usage-allowance-exhausted",
-			subject: "Your Leamout runtime allowance has been exhausted",
+			name:     "usage-allowance-exhausted",
+			subject:  "Your Leamout runtime allowance has been exhausted",
 			expected: "full runtime allowance of 1000 minutes",
-			data: Data{Organization: "Acme & Co", UsedMinutes: 1000, AllowanceMinutes: 1000, UsagePercent: 100, PeriodEnd: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), BillingURL: "https://console.example.com/settings/billing", ExpiresAt: time.Now().Add(24 * time.Hour)},
+			data:     Data{Organization: "Acme & Co", UsedMinutes: 1000, AllowanceMinutes: 1000, UsagePercent: 100, PeriodEnd: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC), BillingURL: "https://console.example.com/settings/billing", ExpiresAt: time.Now().Add(24 * time.Hour)},
 		},
 	}
 	for _, tc := range cases {
@@ -122,13 +122,13 @@ func TestRendererSupportsUsageAllowanceNotifications(t *testing.T) {
 
 func TestRendererRejectsInvalidUsageAllowanceNotifications(t *testing.T) {
 	_, err := NewRenderer().Render("usage-allowance-warning", Data{
-		Organization: "Acme",
-		UsedMinutes:  800,
+		Organization:     "Acme",
+		UsedMinutes:      800,
 		AllowanceMinutes: 1000,
-		UsagePercent: 100,
-		PeriodEnd: time.Now().Add(time.Hour),
-		BillingURL: "javascript:alert(1)",
-		ExpiresAt: time.Now().Add(time.Hour),
+		UsagePercent:     100,
+		PeriodEnd:        time.Now().Add(time.Hour),
+		BillingURL:       "javascript:alert(1)",
+		ExpiresAt:        time.Now().Add(time.Hour),
 	})
 	if err == nil {
 		t.Fatal("accepted invalid usage allowance warning data")
