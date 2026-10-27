@@ -45,15 +45,13 @@ use 25-row pagination and the existing platform-admin guard. Queries live in
 
 Backoffice uses `config.Load()` and `config.Config` from
 `internal/platform/config/config.go`, loading the shared `server/.env`. Supply
-all required shared application settings. Backoffice connects to PostgreSQL and
-Keycloak; it does not start the API, workers or telephony services.
+all required shared application settings. Backoffice connects to PostgreSQL and Kinde; it does not start the API,
+workers or telephony services.
 
 Set `BACKOFFICE_URL` to the public origin of this application (default
-`http://localhost:8082`). For local HTTP, use `APP_ENV=development` and a local
-Keycloak issuer. The configured Keycloak client must allow the exact redirect
-URI `${BACKOFFICE_URL}/auth/callback`. The realm template includes this URI
-alongside the existing API application's callback; existing realms require
-updating the allowed redirect URIs explicitly.
+`http://localhost:8082`). For local HTTP, use `APP_ENV=development` and a Kinde development tenant.
+Register the exact redirect URI `${BACKOFFICE_URL}/auth/callback` in the
+shared Kinde application alongside the console callback. See `docs/kinde.md`.
 
 From the repository root, with Go from `server/go.mod` and Bun 1.3.14 installed:
 
@@ -63,15 +61,14 @@ cd server
 go run ./cmd/backoffice
 ```
 
-Open `http://localhost:8082/log-in`. The Templ page starts the Keycloak flow at
+Open `http://localhost:8082/log-in`. The Templ page starts the Kinde flow at
 `/auth/login`; `/auth/callback` creates a host-only browser session and returns
 the operator to `/organizations`. The flow reuses the identity package's state,
 nonce, PKCE and encrypted session implementation. It requires no console login,
 console cookie or console proxy.
 
 The sign-out form posts to `/auth/logout`, revokes the current local session,
-clears its cookie and redirects to `/log-in`. Keycloak's SSO session remains
-available for subsequent sign-in. Signed backchannel logout events can be
+clears its cookie and redirects to `/log-in`. The Kinde provider session remains available for subsequent sign-in. Signed backchannel logout events can be
 received at `/identity/backchannel-logout`; the existing API backchannel handler
 also revokes matching sessions in the shared database.
 
@@ -91,7 +88,7 @@ protected requests. No default administrator or automatic promotion is created.
 ## Deployment
 
 `server/.env.example` sets `BACKOFFICE_URL=https://backoffice.leamout.com`.
-Configure DNS for `backoffice.${DOMAIN}` and the matching Keycloak redirect URI.
+Configure DNS for `backoffice.${DOMAIN}` and register the matching callback URI in Kinde.
 The Compose `backoffice` service runs `/leamout/backoffice`; Caddy proxies the
 backoffice hostname directly to `backoffice:8082`. No Next.js service or route
 is involved. The Docker build generates templates and the local asset bundle.
