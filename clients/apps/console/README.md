@@ -1,10 +1,10 @@
 # Leamout Console
 
-Authentication is provided by Keycloak through the Go backend. Login and registration use browser redirects; no password or verification code is collected by the console. Account profile and security settings open the identity account console.
+Authentication uses Kinde through the Go backend. Login and registration use browser redirects; no password or verification code is collected by the console. Account profile and security settings open the identity account console.
 
-The existing `/api/v1` rewrite proxies login, the callback, and API calls to the backend. Keycloak tokens remain encrypted on the server. The browser receives only an HttpOnly, host-only session cookie. Logout clears that session and navigates to Keycloak to end SSO.
+The existing `/api/v1` rewrite proxies login, the callback, and API calls to the backend. Kinde tokens remain encrypted on the server. The browser receives only an HttpOnly, host-only session cookie. Logout clears that session and redirects to Kinde to end the provider session.
 
-Set the backend `FRONTEND_URL` to this console's public origin (for local `bun dev`, `http://localhost:3001`). Register exactly `<FRONTEND_URL>/api/v1/auth/callback` in Keycloak. See `docs/keycloak.md` at the repository root for setup.
+Set the backend `FRONTEND_URL` to this console's public origin (for local `bun dev`, `http://localhost:3001`). Register exactly `${FRONTEND_URL}/api/v1/auth/callback` in the Kinde application. See `docs/kinde.md` at the repository root for setup.
 
 ## Console route structure
 
