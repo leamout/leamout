@@ -98,14 +98,12 @@ func (j *usageNotificationJob) scan(ctx context.Context) error {
 			continue
 		}
 
-		used := usage.UsedSeconds
-		allowance := usage.AllowanceSeconds
-		switch {
-		case used >= allowance:
+		switch usageNotificationThreshold(usage.UsedSeconds, usage.AllowanceSeconds) {
+		case 100:
 			if err := j.notify(ctx, organizationID, org.name, org.owners, usage, 100, true); err != nil {
 				j.logger.Error(ctx, "queue quota exhaustion notifications", "organization_id", organizationID, "error", err)
 			}
-		case used*100 >= allowance*80:
+		case 80:
 			if err := j.notify(ctx, organizationID, org.name, org.owners, usage, 80, false); err != nil {
 				j.logger.Error(ctx, "queue usage warning notifications", "organization_id", organizationID, "error", err)
 			}
@@ -161,4 +159,20 @@ func (j *usageNotificationJob) notify(
 		if err != nil { return fmt.Errorf("queue %s for owner: %w", template, err) }
 	}
 	return tx.Commit(ctx)
+}
+
+
+// usageNotificationThreshold returns the highest crossed notification threshold.
+// Integer division is deliberately avoided so boundary checks stay exact.
+func usageNotificationThreshold(usedSeconds, allowanceSeconds int64) int32 {
+	if allowanceSeconds <= 0 || usedSeconds < 0 {
+		return 0
+	}
+	if usedSeconds >= allowanceSeconds {
+		return 100
+	}
+	if float64(usedSeconds) >= float64(allowanceSeconds)*0.8 {
+		return 80
+	}
+	return 0
 }
