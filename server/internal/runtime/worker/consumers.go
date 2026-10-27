@@ -200,6 +200,7 @@ func runWorkloads(ctx context.Context, logger *logging.Logger, modules *modules)
 		run("billing webhook processing", modules.billingWebhooks.Run)
 	}
 	run("email delivery", modules.emailDelivery.Run)
+	run("usage allowance notifications", modules.usageNotifications.Run)
 	run("outbox publisher", modules.outbox.Run)
 	run("webhook consumer", modules.webhookConsumer.Run)
 	run("webhook delivery worker", modules.webhookDelivery.Run)
