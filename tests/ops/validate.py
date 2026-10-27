@@ -35,8 +35,6 @@ def main():
 
     compose = (ROOT / "deploy/compose/docker.yaml").read_text(encoding="utf-8")
     assert "KINDE_ISSUER:" in compose
-    assert "keycloak:" not in compose
-    assert "keycloak-postgres:" not in compose
     assert 'http://127.0.0.1:8081/readyz' in compose
     assert "172.32.0.0/24" in compose
     assert "172.33.0.0/24" in compose

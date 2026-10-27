@@ -64,4 +64,4 @@ Infrastructure is deployed and validated with the configurations in
 See [PROPRIETARY.md](PROPRIETARY.md) and [NOTICE](NOTICE) for software and
 trademark notices.
 
-User authentication is provided by Keycloak. See [Keycloak setup](docs/keycloak.md) for the cloud identity deployment and console configuration.
+Hosted identity for the console and backoffice is provided exclusively by [Kinde](docs/kinde.md).
