@@ -4,10 +4,10 @@ import "testing"
 
 func TestUsageNotificationThreshold(t *testing.T) {
 	tests := []struct {
-		name string
-		used int64
+		name      string
+		used      int64
 		allowance int64
-		want int32
+		want      int32
 	}{
 		{name: "below warning", used: 799, allowance: 1000, want: 0},
 		{name: "at warning", used: 800, allowance: 1000, want: 80},

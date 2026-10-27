@@ -18,16 +18,16 @@ import (
 
 const usageNotificationScanInterval = 5 * time.Minute
 
-type usageNotificationOwner struct { email string }
+type usageNotificationOwner struct{ email string }
 
 type usageNotificationJob struct {
-	pool        *pgxpool.Pool
-	queries     *sqlc.Queries
-	limits      *limits.Service
-	email       *email.Service
-	billingURL  string
-	logger      *logging.Logger
-	interval    time.Duration
+	pool       *pgxpool.Pool
+	queries    *sqlc.Queries
+	limits     *limits.Service
+	email      *email.Service
+	billingURL string
+	logger     *logging.Logger
+	interval   time.Duration
 }
 
 func newUsageNotificationJob(
@@ -72,7 +72,7 @@ func (j *usageNotificationJob) scan(ctx context.Context) error {
 	}
 
 	type organization struct {
-		name string
+		name   string
 		owners []usageNotificationOwner
 	}
 	organizations := make(map[uuid.UUID]*organization)
@@ -122,16 +122,20 @@ func (j *usageNotificationJob) notify(
 	exhausted bool,
 ) error {
 	tx, err := j.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil { return fmt.Errorf("begin usage notification transaction: %w", err) }
+	if err != nil {
+		return fmt.Errorf("begin usage notification transaction: %w", err)
+	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	inserted, err := sqlc.New(tx).InsertUsageNotificationEvent(ctx, sqlc.InsertUsageNotificationEventParams{
-		ID: uuid.New(),
-		OrganizationID: organizationID,
-		PeriodStart: pgconv.TimeToTimestamptz(usage.PeriodStart),
+		ID:               uuid.New(),
+		OrganizationID:   organizationID,
+		PeriodStart:      pgconv.TimeToTimestamptz(usage.PeriodStart),
 		ThresholdPercent: threshold,
 	})
-	if err != nil { return fmt.Errorf("insert usage notification deduplication key: %w", err) }
+	if err != nil {
+		return fmt.Errorf("insert usage notification deduplication key: %w", err)
+	}
 	if inserted == 0 {
 		return tx.Commit(ctx)
 	}
@@ -139,28 +143,35 @@ func (j *usageNotificationJob) notify(
 	usedMinutes := int64(math.Ceil(float64(usage.UsedSeconds) / 60))
 	allowanceMinutes := int64(math.Ceil(float64(usage.AllowanceSeconds) / 60))
 	percent := int64(math.Floor(float64(usage.UsedSeconds) * 100 / float64(usage.AllowanceSeconds)))
-	if exhausted { percent = 100 } else if percent >= 100 { percent = 99 }
+	if exhausted {
+		percent = 100
+	} else if percent >= 100 {
+		percent = 99
+	}
 	template := "usage-allowance-warning"
-	if exhausted { template = "usage-allowance-exhausted" }
+	if exhausted {
+		template = "usage-allowance-exhausted"
+	}
 	for _, owner := range owners {
 		_, err := j.email.QueueTx(ctx, tx, email.Request{
-			To: owner.email,
+			To:       owner.email,
 			Template: template,
 			Data: email.Data{
-				ExpiresAt: time.Now().UTC().Add(30 * 24 * time.Hour),
-				Organization: organizationName,
-				BillingURL: j.billingURL,
-				UsedMinutes: usedMinutes,
+				ExpiresAt:        time.Now().UTC().Add(30 * 24 * time.Hour),
+				Organization:     organizationName,
+				BillingURL:       j.billingURL,
+				UsedMinutes:      usedMinutes,
 				AllowanceMinutes: allowanceMinutes,
-				UsagePercent: percent,
-				PeriodEnd: usage.PeriodEnd,
+				UsagePercent:     percent,
+				PeriodEnd:        usage.PeriodEnd,
 			},
 		})
-		if err != nil { return fmt.Errorf("queue %s for owner: %w", template, err) }
+		if err != nil {
+			return fmt.Errorf("queue %s for owner: %w", template, err)
+		}
 	}
 	return tx.Commit(ctx)
 }
-
 
 // usageNotificationThreshold returns the highest crossed notification threshold.
 // Integer division is deliberately avoided so boundary checks stay exact.
