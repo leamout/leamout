@@ -132,6 +132,7 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 	)
 	var billingJob *billing.ReconciliationJob
 	var billingWebhookJob *billing.WebhookJob
+	emailService := email.NewService(credentialCipher)
 	cloudCommercial := commercial.New(queries, commercial.Dependencies{
 		Database: postgresClient.Pool(),
 		Polar:    polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
@@ -140,7 +141,8 @@ func newModules(ctx context.Context, cfg config.Config, logger *logging.Logger) 
 			"pro":       cfg.Polar.ProProductID,
 			"scale":     cfg.Polar.ScaleProductID,
 		},
-		FrontendURL: cfg.FrontendURL,
+		FrontendURL:  cfg.FrontendURL,
+		EmailService: emailService,
 	})
 	planLimits := cloudCommercial.Limits.Service
 	if cfg.Polar.AccessToken != "" && cfg.Polar.WebhookSecret != "" {
