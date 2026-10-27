@@ -330,7 +330,6 @@ func (s *Service) queueSubscriptionNotification(ctx context.Context, organizatio
 	}
 	return nil
 }
-}
 
 func polarStatus(status string) string {
 	switch status {
