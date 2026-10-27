@@ -111,8 +111,9 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	}
 	identityModule := identity.New(queries, cfg.IsDevelopment(), postgresClient.Pool(), kindeClient, credentialCipher, cfg.FrontendURL)
 	tenancyModule := tenancy.New(queries)
+	emailService := email.NewService(credentialCipher)
 	invitationURL := cfg.FrontendURL + "/invitations/accept"
-	tenancyModule.ConfigureEmail(postgresClient.Pool(), email.NewService(credentialCipher), invitationURL)
+	tenancyModule.ConfigureEmail(postgresClient.Pool(), emailService, invitationURL)
 	trustedProxies, err := cfg.TrustedProxyPrefixes()
 	if err != nil {
 		closeDependencies()
@@ -127,7 +128,8 @@ func newModules(ctx context.Context, cfg config.Config) (*modules, error) {
 	commercialModule := commercial.New(queries, commercial.Dependencies{
 		Database:    postgresClient.Pool(),
 		Polar:       polar.New(cfg.Polar.AccessToken, cfg.Polar.WebhookSecret, cfg.Polar.Environment),
-		FrontendURL: cfg.FrontendURL,
+		FrontendURL:  cfg.FrontendURL,
+		EmailService: emailService,
 		PolarProducts: map[string]string{
 			"developer": cfg.Polar.DeveloperProductID,
 			"pro":       cfg.Polar.ProProductID,
