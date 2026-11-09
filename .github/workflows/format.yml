@@ -47,7 +47,7 @@ jobs:
           go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
 
       - name: Set up Atlas
-        uses: ariga/setup-atlas@v0.3
+        uses: ariga/setup-atlas@v0.5
         with:
           version: v1.3.0
 
