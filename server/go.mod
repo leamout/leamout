@@ -17,7 +17,7 @@ require (
 	github.com/go-chi/httplog/v3 v3.5.0
 	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.11.0
+	github.com/jackc/pgx/v5 v5.12.0
 	github.com/joho/godotenv v1.5.1
 	github.com/leamout/ai-providers v0.1.1
 	github.com/leamout/contracts v0.1.0
